@@ -9,7 +9,7 @@
   ·
   <a href="https://payincus.com/api/overview">API 文档</a>
   ·
-  <a href="https://t.me/Payincus">Telegram</a>
+  <a href="https://t.me/kqxw_chat">Telegram</a>
   ·
   <a href="https://github.com/VipMaxxxx/payincus/releases">Releases</a>
 </p>
@@ -25,7 +25,7 @@ PayIncus 的公开文档、源码、Release、扩展市场和主题市场都以�
 - 在线 Demo：<https://payincus.com/demo>
 - 扩展市场：<https://payincus.com/plugins/market>
 - API 参考：<https://payincus.com/api/overview>
-- Telegram：<https://t.me/Payincus>
+- Telegram：<https://t.me/kqxw_chat>
 
 ## 核心能力
 
