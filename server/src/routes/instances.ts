@@ -25,7 +25,7 @@ import {
 } from '../lib/incus/index.js'
 import { deleteSnapshot } from '../lib/incus/incus-snapshots.js'
 import { generateIncusConfig, generateRandomPassword } from '../lib/incus-config-generator.js'
-import { encryptSensitiveData, decryptSensitiveData, validateName } from '../lib/security.js'
+import { encryptSensitiveData, decryptSensitiveData, validateName, validatePassword } from '../lib/security.js'
 import {
   claimOperationVerificationRequirement
 } from '../lib/operation-verification.js'
@@ -1224,7 +1224,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     }
   }>, reply: FastifyReply) => {
     const { packageId, planId, image, cpu, memory, disk, hostId, sshKeyId, customInitCommandIds, promoCode, idempotencyKey } = request.body
-    let { name, sshKey } = request.body
+    let { name, sshKey, password } = request.body
     const { user } = request
     const normalPaidIdempotencyKey = idempotencyKey?.trim() || null
 
@@ -1234,13 +1234,29 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     await turnstileVerifier(request, reply)
     if (reply.sent) return
 
-    // 0. 处理 SSH 密钥：支持 sshKeyId 或直接传 sshKey
+    // 0. 处理认证方式（SSH 密钥 或 密码）
     if (sshKeyId && !sshKey) {
       const keyRecord = await db.getSSHKeyById(sshKeyId)
       if (!keyRecord || keyRecord.user_id !== user.id) {
         return reply.code(400).send(apiError(ErrorCode.SSH_KEY_NOT_OWNED))
       }
       sshKey = keyRecord.public_key
+    }
+
+    let effectivePassword = ''
+    if (typeof password === 'string' && password.trim().length > 0) {
+      password = password.trim()
+      const passwordCheck = validatePassword(password)
+      if (!passwordCheck.valid) {
+        return reply.code(400).send(apiError(ErrorCode.PASSWORD_TOO_WEAK, passwordCheck.message))
+      }
+      const lowerPw = password.toLowerCase()
+      if (['password', 'admin123', 'root123', '12345678', 'qwertyuiop'].some(weak => lowerPw.includes(weak))) {
+        return reply.code(400).send(apiError(ErrorCode.PASSWORD_TOO_WEAK, 'Password cannot contain common weak patterns'))
+      }
+      effectivePassword = password
+    } else {
+      effectivePassword = generateRandomPassword(16)
     }
 
     // 1. 验证套餐是否存在且可用
@@ -1420,9 +1436,9 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
     // 宿主机资源检查在 selectAvailableHost 中进行
 
-    // 3. 验证认证方式（必须提供 SSH 公钥）
+    // 3. 验证认证方式（支持 SSH 密钥或密码认证）
     // 注意：不再限制用户的实例配额，用户可以创建无限数量的实例
-    if (!sshKey) {
+    if (!sshKey && !effectivePassword) {
       return reply.code(400).send(apiError(ErrorCode.SSH_KEY_REQUIRED))
     }
 
@@ -1581,12 +1597,11 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
     // ==================== 阶段三: 生成配置 =====================
     // SSH 端口固定为 22（不再使用随机端口）
-    const autoPassword = generateRandomPassword(16)
     const { configPayload, metaData } = generateIncusConfig({
       instanceName: name,
       imageAlias: actualImageAlias,
-      rootPassword: autoPassword,
-      sshKey: sshKey,
+      rootPassword: effectivePassword,
+      sshKey: sshKey || undefined,
       networkMode,
       type: effectiveInstanceType === 'vm' ? 'virtual-machine' : 'container',
       extraShellCommands
@@ -2100,7 +2115,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         instanceIdSeed: incusId,
         imageAlias: actualImageAlias,
         rootPassword: metaData.rootPassword,
-        sshKey: sshKey,
+        sshKey: sshKey || undefined,
         network: staticIPv4 && ipv4Cidr ? {
           ipAddress: ipv4Cidr,
           gateway: ipv4Gateway,
@@ -2118,7 +2133,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         instanceName: name,
         imageAlias: actualImageAlias,
         rootPassword: metaData.rootPassword,
-        sshKey: sshKey,
+        sshKey: sshKey || undefined,
         networkMode,
         type: 'container',
         network: {

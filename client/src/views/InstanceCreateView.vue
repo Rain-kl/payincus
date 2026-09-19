@@ -154,7 +154,66 @@ const form = ref<InstanceForm>({
   autoRemotePort: true
 })
 
-watch(form, () => {
+// 认证方式相关状态与处理
+const authType = ref<'ssh' | 'password'>('password')
+const passwordMode = ref<'auto' | 'custom'>('auto')
+const customPassword = ref('')
+const showPassword = ref(false)
+
+const isCustomPasswordValid = computed(() => {
+  const pwd = customPassword.value
+  if (!pwd || pwd.length < 8 || pwd.length > 128) return false
+  if (!/[A-Z]/.test(pwd)) return false
+  if (!/[a-z]/.test(pwd)) return false
+  if (!/[0-9]/.test(pwd)) return false
+  const lowerPw = pwd.toLowerCase()
+  if (['password', 'admin123', 'root123', '12345678', 'qwertyuiop'].some(weak => lowerPw.includes(weak))) {
+    return false
+  }
+  return true
+})
+
+const isAuthValid = computed(() => {
+  if (authType.value === 'ssh') {
+    return sshKeys.value.length > 0 && form.value.sshKeyId !== null
+  }
+  if (passwordMode.value === 'auto') {
+    return true
+  }
+  return isCustomPasswordValid.value
+})
+
+function generateRandomCustomPassword(): void {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghijkmnopqrstuvwxyz'
+  const digits = '23456789'
+  const special = '!@#$%^&*'
+  const all = upper + lower + digits + special
+  const chars = [
+    upper[Math.floor(Math.random() * upper.length)],
+    lower[Math.floor(Math.random() * lower.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    special[Math.floor(Math.random() * special.length)]
+  ]
+  for (let i = 4; i < 16; i++) {
+    chars.push(all[Math.floor(Math.random() * all.length)])
+  }
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const temp = chars[i]
+    chars[i] = chars[j]
+    chars[j] = temp
+  }
+  customPassword.value = chars.join('')
+}
+
+watch(authType, (val) => {
+  if (val === 'ssh' && sshKeys.value.length > 0 && form.value.sshKeyId === null) {
+    form.value.sshKeyId = sshKeys.value[0].id
+  }
+})
+
+watch([form, authType, passwordMode, customPassword], () => {
   if (!submitting.value) {
     createIntentIdempotencyKey.value = null
   }
@@ -382,8 +441,7 @@ const canSubmit = computed<boolean>(() => {
          form.value.hostId !== null &&
          !!form.value.image &&
          availableImages.value.length > 0 &&
-         sshKeys.value.length > 0 &&
-         form.value.sshKeyId !== null &&
+         isAuthValid.value &&
          quotaCheck.value.valid &&
          resourceLimitCheck.value.valid &&
          !submitting.value &&
@@ -639,7 +697,12 @@ onMounted(async (): Promise<void> => {
     }
     
     if (sshKeys.value.length > 0) {
+      authType.value = 'ssh'
       form.value.sshKeyId = sshKeys.value[0].id
+    } else {
+      authType.value = 'password'
+      passwordMode.value = 'auto'
+      form.value.sshKeyId = null
     }
   } catch (err: any) {
     error.value = t('instance.createPage.loadFailed') + ': ' + (err?.message || String(err))
@@ -1059,7 +1122,14 @@ async function handleSubmit(): Promise<void> {
   try {
     if (form.value.packageId === null) throw new Error(t('instance.createPage.selectPackage'))
     if (form.value.hostId === null) throw new Error(getCreatePageText('selectHost'))
-    if (form.value.sshKeyId === null) throw new Error(getCreatePageText('selectSshKey'))
+    if (authType.value === 'ssh') {
+      if (form.value.sshKeyId === null) throw new Error(getCreatePageText('selectSshKey'))
+    } else {
+      if (passwordMode.value === 'custom') {
+        if (!customPassword.value) throw new Error(t('instance.createPage.passwordRequired'))
+        if (!isCustomPasswordValid.value) throw new Error(t('instance.createPage.passwordTooWeak'))
+      }
+    }
     
     if (!form.value.name.trim()) {
       refreshGeneratedInstanceName(true)
@@ -1085,7 +1155,8 @@ async function handleSubmit(): Promise<void> {
       cpu: form.value.cpu,
       memory: form.value.memory,
       disk: form.value.disk,
-      sshKeyId: form.value.sshKeyId,
+      sshKeyId: authType.value === 'ssh' ? (form.value.sshKeyId ?? undefined) : undefined,
+      password: (authType.value === 'password' && passwordMode.value === 'custom') ? customPassword.value : undefined,
       customInitCommandIds: form.value.customInitCommandIds.length > 0 ? form.value.customInitCommandIds : undefined,
       promoCode: (isPaidPackage.value && promoCodeValid.value && form.value.promoCode.trim()) ? form.value.promoCode.trim() : undefined,
       idempotencyKey: isPaidPackage.value ? createIntentIdempotencyKey.value || undefined : undefined,
@@ -1268,13 +1339,168 @@ async function handleSubmit(): Promise<void> {
             <div v-if="form.image" class="card p-5">
               <InitCommandSelector v-model="form.customInitCommandIds" :distro="selectedImageDistro" />
             </div>
-            <SSHKeySelector
-              :ssh-keys="sshKeys"
-              :selected-key-id="form.sshKeyId"
-              :step-number="regions.length > 0 ? 5 : 4"
-              :title="getCreatePageText('selectSshKey')"
-              @update:selected-key-id="form.sshKeyId = $event"
-            />
+            <!-- 步骤：认证方式 -->
+            <div class="card p-5">
+              <div class="flex items-center justify-between gap-3 mb-4">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="w-6 h-6 rounded-full text-sm font-bold flex items-center justify-center"
+                    :class="themeStore.isDark ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'"
+                  >
+                    {{ regions.length > 0 ? 5 : 4 }}
+                  </span>
+                  <h2
+                    class="text-sm font-medium"
+                    :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
+                  >
+                    {{ $t('instance.createPage.authMethod') }}
+                  </h2>
+                </div>
+
+                <!-- 认证方式切换 -->
+                <div class="flex items-center p-1 rounded-lg bg-themed-secondary border border-themed text-xs">
+                  <button
+                    type="button"
+                    class="px-3 py-1 rounded-md font-medium transition-all"
+                    :class="authType === 'ssh' ? 'bg-themed-surface text-themed shadow-sm font-semibold' : 'text-themed-muted hover:text-themed'"
+                    @click="authType = 'ssh'"
+                  >
+                    {{ $t('instance.createPage.authMethodSsh') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1 rounded-md font-medium transition-all"
+                    :class="authType === 'password' ? 'bg-themed-surface text-themed shadow-sm font-semibold' : 'text-themed-muted hover:text-themed'"
+                    @click="authType = 'password'"
+                  >
+                    {{ $t('instance.createPage.authMethodPassword') }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- SSH 密钥选择 -->
+              <div v-if="authType === 'ssh'">
+                <div v-if="sshKeys.length === 0" class="text-center py-6 px-4 rounded-xl border border-dashed border-themed bg-themed-tertiary">
+                  <div class="w-10 h-10 mx-auto mb-2.5 rounded-full bg-themed-secondary flex items-center justify-center text-themed-muted">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                  </div>
+                  <p class="text-xs text-themed-muted mb-3">{{ $t('instance.createPage.noSshKeyHint') }}</p>
+                  <div class="flex items-center justify-center gap-2.5">
+                    <button
+                      type="button"
+                      class="btn-primary text-xs px-3 py-1.5"
+                      @click="authType = 'password'"
+                    >
+                      {{ $t('instance.createPage.switchToPassword') }}
+                    </button>
+                    <router-link
+                      :to="profilePath()"
+                      class="btn-secondary text-xs px-3 py-1.5 inline-flex items-center"
+                    >
+                      {{ $t('instance.createPage.profileSettings') }}
+                    </router-link>
+                  </div>
+                </div>
+                <div v-else>
+                  <SSHKeySelector
+                    :ssh-keys="sshKeys"
+                    :selected-key-id="form.sshKeyId"
+                    :show-header="false"
+                    @update:selected-key-id="form.sshKeyId = $event"
+                  />
+                </div>
+              </div>
+
+              <!-- 密码认证 -->
+              <div v-else class="space-y-4">
+                <!-- 模式切换：随机生成 vs 自定义 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    class="p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3"
+                    :class="passwordMode === 'auto' ? (themeStore.isDark ? 'border-white bg-themed-secondary' : 'border-gray-900 bg-gray-50') : 'border-themed hover:border-themed-secondary'"
+                    @click="passwordMode = 'auto'"
+                  >
+                    <div class="w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0" :class="passwordMode === 'auto' ? 'border-primary-500' : 'border-themed-muted'">
+                      <div v-if="passwordMode === 'auto'" class="w-2 h-2 rounded-full bg-primary-500" />
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-sm font-medium text-themed">{{ $t('instance.createPage.passwordModeAuto') }}</div>
+                      <div class="text-xs text-themed-muted truncate">{{ $t('instance.createPage.passwordModeAutoDesc') }}</div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3"
+                    :class="passwordMode === 'custom' ? (themeStore.isDark ? 'border-white bg-themed-secondary' : 'border-gray-900 bg-gray-50') : 'border-themed hover:border-themed-secondary'"
+                    @click="passwordMode = 'custom'"
+                  >
+                    <div class="w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0" :class="passwordMode === 'custom' ? 'border-primary-500' : 'border-themed-muted'">
+                      <div v-if="passwordMode === 'custom'" class="w-2 h-2 rounded-full bg-primary-500" />
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-sm font-medium text-themed">{{ $t('instance.createPage.passwordModeCustom') }}</div>
+                      <div class="text-xs text-themed-muted truncate">{{ $t('instance.createPage.passwordModeCustomDesc') }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 自动生成提示 -->
+                <div v-if="passwordMode === 'auto'" class="p-3.5 rounded-xl border border-themed bg-themed-tertiary text-xs text-themed-muted flex items-start gap-2.5">
+                  <svg class="w-4 h-4 text-themed-muted mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{{ $t('instance.createPage.autoPasswordHint') }}</span>
+                </div>
+
+                <!-- 自定义密码输入 -->
+                <div v-else class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                      <input
+                        v-model="customPassword"
+                        :type="showPassword ? 'text' : 'password'"
+                        class="input pr-10 font-mono text-sm w-full"
+                        :placeholder="$t('instance.createPage.passwordPlaceholder')"
+                        autocomplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-themed-muted hover:text-themed"
+                        @click="showPassword = !showPassword"
+                      >
+                        <svg v-if="showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn-secondary text-xs px-3 py-2 shrink-0 flex items-center gap-1.5"
+                      @click="generateRandomCustomPassword"
+                    >
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>{{ $t('instance.createPage.generatePassword') }}</span>
+                    </button>
+                  </div>
+
+                  <!-- 弱密码提示 -->
+                  <div v-if="customPassword && !isCustomPasswordValid" class="text-xs text-rose-500 dark:text-rose-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ $t('instance.createPage.passwordTooWeak') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <!-- 订单概览 -->
             <div v-if="isPaidPackage && form.planId && selectedPlan" class="card p-5">
               <div class="flex items-center gap-3 mb-5">
@@ -1399,7 +1625,7 @@ async function handleSubmit(): Promise<void> {
               </div>
               <p class="mt-1.5 text-xs text-themed-muted">{{ $t('instance.createPage.autoNameHint') }}</p>
             </div>
-            <div v-if="sshKeys.length === 0" class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
+            <div v-if="authType === 'ssh' && sshKeys.length === 0" class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
               <p class="text-sm font-medium mb-1 text-amber-700 dark:text-amber-300">{{ $t('instance.createPage.missingSshKey') }}</p>
               <p class="text-xs text-amber-700/90 dark:text-amber-300/90">{{ $t('instance.createPage.missingSshKeyDesc') }} <router-link :to="profilePath()" class="font-medium underline hover:text-amber-900 dark:hover:text-amber-200">{{ $t('instance.createPage.profileSettings') }}</router-link> {{ $t('instance.createPage.addSshKey') }}</p>
             </div>

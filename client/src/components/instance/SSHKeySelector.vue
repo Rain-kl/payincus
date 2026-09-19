@@ -11,11 +11,13 @@ interface Props {
   selectedKeyId: number | null
   stepNumber?: number  // 步骤编号，默认 4
   title?: string
+  showHeader?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   stepNumber: 4,
-  title: undefined
+  title: undefined,
+  showHeader: true
 })
 const emit = defineEmits<{
   'update:selectedKeyId': [value: number | null]
@@ -58,8 +60,8 @@ function goToNextPage(): void {
 </script>
 
 <template>
-  <div class="card p-5">
-    <div class="flex items-center gap-2 mb-4">
+  <div :class="{ 'card p-5': props.showHeader }">
+    <div v-if="props.showHeader" class="flex items-center gap-2 mb-4">
       <span 
         class="w-6 h-6 rounded-full text-sm font-bold flex items-center justify-center"
         :class="themeStore.isDark ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'"
