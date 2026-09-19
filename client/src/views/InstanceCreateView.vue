@@ -1117,17 +1117,6 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <div class="kawaii-page animate-fade-in lg:h-full lg:flex lg:flex-col">
-    <header class="mb-4 flex flex-col gap-4 border-b border-themed pb-4 sm:flex-row sm:items-end sm:justify-between lg:mb-3 lg:shrink-0">
-      <div class="min-w-0">
-        <h1 class="text-xl font-semibold tracking-tight text-themed sm:text-2xl">{{ $t('instance.createPage.title') }}</h1>
-        <p class="mt-1.5 text-sm text-themed-muted">{{ $t('instance.createPage.description') }}</p>
-      </div>
-      <RouterLink :to="instancesPath()" class="btn btn-secondary w-full shrink-0 justify-center gap-1.5 sm:w-auto">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-        {{ $t('common.back') }}
-      </RouterLink>
-    </header>
-
     <!-- 套餐来源切换器 -->
     <div v-if="!loading" class="flex justify-center mb-4 lg:mb-3 shrink-0">
       <div
