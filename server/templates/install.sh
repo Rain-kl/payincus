@@ -1908,18 +1908,32 @@ import_cert() {
     fi
 
     # 证书可能因面板重装、迁移或灾备恢复而轮换；证书已校验通过，此处再替换旧信任项。
+    # Incus CLI 删除信任项必须使用证书指纹 (fingerprint)，保留以名称尝试以兼容特定版本。
     if incus config trust list --format csv 2>/dev/null | grep -q "panel"; then
         info "面板证书已存在，更新为当前证书"
+        local old_fps
+        old_fps=$(incus config trust list --format csv 2>/dev/null | awk -F',' '$1=="panel"{print $4}')
+        if [[ -n "$old_fps" ]]; then
+            while IFS= read -r fp; do
+                [[ -n "$fp" ]] && incus config trust remove "$fp" >/dev/null 2>&1 || true
+            done <<< "$old_fps"
+        fi
         incus config trust remove panel >/dev/null 2>&1 || true
     fi
 
     if ! incus config trust add-certificate "$cert_file" --name panel >/dev/null 2>&1; then
-        rm -f "$cert_file"
-        error "证书导入失败！请检查："
-        error "  1. Token 是否正确"
-        error "  2. 面板 ${PANEL_URL} 是否可达"
-        error "  3. 网络连接是否正常"
-        exit 1
+        local cert_fp
+        cert_fp=$(openssl x509 -noout -fingerprint -sha256 -in "$cert_file" 2>/dev/null | tr -d ':' | tr '[:upper:]' '[:lower:]' | cut -d'=' -f2 | cut -c1-12 || true)
+        if [[ -n "$cert_fp" ]] && incus config trust list --format csv 2>/dev/null | grep -q "$cert_fp"; then
+            info "证书已在受信任列表中"
+        else
+            rm -f "$cert_file"
+            error "证书导入失败！请检查："
+            error "  1. Token 是否正确"
+            error "  2. 面板 ${PANEL_URL} 是否可达"
+            error "  3. 网络连接是否正常"
+            exit 1
+        fi
     fi
 
     rm -f "$cert_file"
@@ -2798,6 +2812,13 @@ do_uninstall() {
         # 删除面板信任证书
         if incus config trust list --format csv 2>/dev/null | grep -q "panel"; then
             info "移除面板信任证书"
+            local panel_fps
+            panel_fps=$(incus config trust list --format csv 2>/dev/null | awk -F',' '$1=="panel"{print $4}')
+            if [[ -n "$panel_fps" ]]; then
+                while IFS= read -r fp; do
+                    [[ -n "$fp" ]] && incus config trust remove "$fp" 2>/dev/null || true
+                done <<< "$panel_fps"
+            fi
             incus config trust remove panel 2>/dev/null || true
         fi
 
