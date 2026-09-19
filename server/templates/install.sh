@@ -1219,9 +1219,11 @@ SVC_EOF
 setup_kernel() {
     step "步骤 [1/5]  配置内核参数..."
 
-    # 加载网桥过滤模块
+    # 加载网桥过滤与存储映射模块（支持 LVM / Thin-pool）
     echo "br_netfilter" > /etc/modules-load.d/br_netfilter.conf
     modprobe br_netfilter || true
+    modprobe dm_mod 2>/dev/null || true
+    modprobe dm_thin_pool 2>/dev/null || true
 
     # 基础 sysctl 参数 + BBR 拥塞控制 + TCP 缓冲区优化
     cat > /etc/sysctl.d/99-incus.conf <<EOF
@@ -1374,9 +1376,11 @@ install_deps() {
         fi
     fi
 
-    # 安装基础依赖
+    # 安装基础依赖与存储工具（含 LVM / Thin Provisioning 支持）
     wait_for_apt_locks
-    apt-get install -y -qq curl gpg >/dev/null 2>&1
+    if ! apt-get install -y -qq curl gpg lvm2 thin-provisioning-tools >/dev/null 2>&1; then
+        apt-get install -y -qq curl gpg lvm2 >/dev/null 2>&1 || true
+    fi
 
     # ---- Debian ZFS 安装策略 ----
     # 优先级: 预编译包(秒级) → DKMS 编译(分钟级) → 跳过(使用 dir 存储池)

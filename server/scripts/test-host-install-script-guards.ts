@@ -186,4 +186,12 @@ assert.ok(
   'a failed ZFS setup must degrade to the dir storage pool, not abort the host installation'
 )
 
+// 宿主机基础依赖必须包含 LVM 管理工具与 thin-provisioning，以便 Incus 创建 LVM 存储池
+assert.ok(
+  hostInstallScript.includes('lvm2') &&
+    hostInstallScript.includes('thin-provisioning-tools') &&
+    hostInstallScript.includes('dm_thin_pool'),
+  'host install script must install lvm2 and thin-provisioning-tools and load thin-pool module for LVM storage pools'
+)
+
 console.log('host install script guard tests passed')
