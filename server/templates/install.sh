@@ -199,6 +199,41 @@ backup_resolv_conf_before_incudal() {
     warn "检测到现有 /etc/resolv.conf，已备份到: ${resolv_backup}"
 }
 
+# 等待系统后台包管理工具释放锁（如 apt-daily / unattended-upgrades）
+wait_for_apt_locks() {
+    local waited=0
+    local max_wait=300
+    local warned=0
+
+    check_locks() {
+        if command -v fuser >/dev/null 2>&1; then
+            fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1
+            return $?
+        fi
+        pgrep -f "apt.systemd.daily|unattended-upgrade|dpkg|apt-get" >/dev/null 2>&1
+        return $?
+    }
+
+    while check_locks; do
+        if (( warned == 0 )); then
+            info "检测到系统后台正在执行包管理操作（如 unattended-upgrades 或 apt-daily），等待锁释放..."
+            warned=1
+        fi
+        sleep 3
+        waited=$((waited + 3))
+        if (( waited % 15 == 0 )); then
+            info "后台包管理任务仍未完成，已等待 ${waited} 秒..."
+        fi
+        if (( waited >= max_wait )); then
+            warn "等待包管理锁超时（${max_wait} 秒），尝试终止后台更新服务并继续..."
+            systemctl stop unattended-upgrades apt-daily.service apt-daily.timer apt-daily-upgrade.service apt-daily-upgrade.timer >/dev/null 2>&1 || true
+            pkill -9 -f "unattended-upgrade|apt.systemd.daily" >/dev/null 2>&1 || true
+            sleep 1
+            break
+        fi
+    done
+}
+
 # 分隔线
 divider() {
     echo -e "${DIM}────────────────────────────────────────────────────${NC}"
@@ -1305,7 +1340,8 @@ install_deps() {
     step "步骤 [2/5]  安装系统依赖..."
 
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq 2>/dev/null
+    wait_for_apt_locks
+    apt-get update -qq 2>/dev/null || true
 
     # Debian 系统需要确保 contrib 组件已启用（ZFS 包在 contrib 中）
     if [[ "$OS_ID" == "debian" ]]; then
@@ -1339,6 +1375,7 @@ install_deps() {
     fi
 
     # 安装基础依赖
+    wait_for_apt_locks
     apt-get install -y -qq curl gpg >/dev/null 2>&1
 
     # ---- Debian ZFS 安装策略 ----
@@ -1378,6 +1415,7 @@ install_deps() {
         fi
     else
         # Ubuntu: 直接安装（预编译模块随内核提供）
+        wait_for_apt_locks
         if apt-get install -y -qq zfsutils-linux >/dev/null 2>&1; then
             log "系统依赖安装完成（含 ZFS）"
         else
@@ -1751,8 +1789,11 @@ install_incus() {
 
     # 导入 Zabbly GPG 密钥
     mkdir -p /etc/apt/keyrings
-    curl -fsSL https://pkgs.zabbly.com/key.asc \
-        | gpg --yes --dearmor -o /etc/apt/keyrings/zabbly.gpg
+    if ! curl -fsSL https://pkgs.zabbly.com/key.asc \
+        | gpg --yes --dearmor -o /etc/apt/keyrings/zabbly.gpg; then
+        error "下载或导入 Zabbly GPG 密钥失败，请检查网络连接"
+        exit 1
+    fi
 
     # 添加 Zabbly APT 源（同时支持 Ubuntu 和 Debian）
     cat > /etc/apt/sources.list.d/zabbly-incus-stable.sources <<SRC
@@ -1765,8 +1806,16 @@ Architectures: ${ARCH}
 Signed-By: /etc/apt/keyrings/zabbly.gpg
 SRC
 
-    apt-get update -qq 2>/dev/null
-    apt-get install -y -qq incus >/dev/null
+    wait_for_apt_locks
+    if ! apt-get update -qq 2>/dev/null; then
+        warn "APT 源更新时有部分提示，正在继续..."
+    fi
+
+    wait_for_apt_locks
+    if ! apt-get install -y -qq incus; then
+        error "Incus 软件包安装失败！请检查系统 APT 源状态与依赖"
+        exit 1
+    fi
     log "Incus 安装完成"
 }
 
