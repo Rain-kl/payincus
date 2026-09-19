@@ -398,16 +398,14 @@ function getLocalAgentReleaseDir(): string | null {
   if (dir && dir.startsWith('/') && !dir.includes('\0') && existsSync(dir)) {
     return dir
   }
-  if (!dir) {
-    const candidates = [
-      join(process.cwd(), 'agent/dist'),
-      join(process.cwd(), '../agent/dist'),
-      '/app/agent-dist'
-    ]
-    for (const candidate of candidates) {
-      if (existsSync(join(candidate, 'manifest.json'))) {
-        return candidate
-      }
+  const candidates = [
+    join(process.cwd(), 'agent/dist'),
+    join(process.cwd(), '../agent/dist'),
+    '/app/agent-dist'
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, 'manifest.json'))) {
+      return candidate
     }
   }
   return null

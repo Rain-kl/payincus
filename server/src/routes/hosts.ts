@@ -92,6 +92,7 @@ const __dirname = dirname(__filename)
 
 function getInstallDirFromRuntime(): string | null {
   const appDir = process.env.INCUDAL_APP_DIR || process.cwd()
+  if (process.env.INCUDAL_INSTALL_DIR) return process.env.INCUDAL_INSTALL_DIR
   if (process.env.INSTALL_DIR) return process.env.INSTALL_DIR
   return appDir.endsWith('/current') ? dirname(appDir) : null
 }

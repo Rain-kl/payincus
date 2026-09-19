@@ -15,6 +15,21 @@ if [ "${RUN_DATA_MIGRATIONS:-false}" = "true" ]; then
   pnpm --dir /app/server migrate:data
 fi
 
+CERT_DIR="${INCUDAL_INSTALL_DIR:-/opt/incudal}/server/certs"
+mkdir -p "$CERT_DIR" /app/server/certs
+if [ ! -f "$CERT_DIR/client.crt" ] || [ ! -f "$CERT_DIR/client.key" ]; then
+  echo "[entrypoint] generating panel mTLS client certificate..."
+  openssl req -x509 -newkey rsa:4096 \
+    -keyout "$CERT_DIR/client.key" \
+    -out "$CERT_DIR/client.crt" \
+    -days 3650 -nodes \
+    -subj "/CN=incudal-panel/O=PayIncus" 2>/dev/null
+  chmod 600 "$CERT_DIR/client.key"
+  chmod 644 "$CERT_DIR/client.crt"
+fi
+ln -sf "$CERT_DIR/client.crt" /app/server/certs/client.crt
+ln -sf "$CERT_DIR/client.key" /app/server/certs/client.key
+
 echo "[entrypoint] configuring nginx..."
 rm -rf /etc/nginx/sites-enabled/* /etc/nginx/sites-available/*
 mkdir -p /etc/nginx/conf.d
