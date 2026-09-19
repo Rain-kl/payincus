@@ -1218,8 +1218,8 @@ async function handleSubmit(): Promise<void> {
           />
         </div>
         <!-- RIGHT: 配置区（独立滚动）-->
-        <div class="lg:flex-[2] lg:overflow-y-auto lg:pb-4 scrollbar-hide">
-          <div ref="rightPanelScrollRef" class="nimbus-pane space-y-4">
+        <div ref="rightPanelScrollRef" class="lg:flex-[2] lg:overflow-y-auto lg:pb-4 scrollbar-hide">
+          <div class="nimbus-pane space-y-4">
             <PlanSelector
               v-if="isPaidPackage"
               :plans="packagePlans"
@@ -1381,8 +1381,8 @@ async function handleSubmit(): Promise<void> {
             </div>
           </div><!-- end scrollable -->
 
-          <!-- 吸底提交区 -->
-          <div class="nimbus-submit card p-4 mt-4 space-y-3 lg:sticky lg:bottom-0 lg:z-10">
+          <!-- 提交区 -->
+          <div class="card p-4 mt-4 space-y-3">
             <div>
               <label class="block text-sm font-medium text-themed-secondary mb-1.5">{{ $t('instance.createPage.instanceName') }}</label>
               <p v-if="showDestroyTrafficNotice" class="mb-2 text-xs leading-relaxed flex items-start gap-1.5 text-amber-700 dark:text-amber-300">
@@ -1614,10 +1614,6 @@ async function handleSubmit(): Promise<void> {
 .nimbus-pane :deep(.card):nth-child(4) { animation-delay: 0.14s; }
 .nimbus-pane :deep(.card):nth-child(n + 5) { animation-delay: 0.18s; }
 
-/* Sticky submit block: soft top edge above scrolling content */
-.nimbus-submit {
-  box-shadow: 0 -10px 26px -20px rgb(0 0 0 / 0.55), 0 1px 3px 0 rgb(0 0 0 / 0.08);
-}
 
 @keyframes nimbus-rise {
   from { opacity: 0; transform: translateY(10px); }
