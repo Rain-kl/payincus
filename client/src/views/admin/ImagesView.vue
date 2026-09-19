@@ -76,6 +76,48 @@ const filteredImages = computed(() => {
   return images.value.filter(image => image.architecture === activeArchitecture.value)
 })
 
+// 批量操作与选中状态
+const selectedIds = ref<Set<number>>(new Set())
+const batchOperating = ref(false)
+
+const selectedCount = computed(() => selectedIds.value.size)
+const isAllSelected = computed(
+  () => filteredImages.value.length > 0 && filteredImages.value.every((image) => selectedIds.value.has(image.id))
+)
+const isIndeterminate = computed(() => {
+  const count = filteredImages.value.filter((image) => selectedIds.value.has(image.id)).length
+  return count > 0 && count < filteredImages.value.length
+})
+
+function toggleSelect(id: number, checked: boolean): void {
+  const next = new Set(selectedIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedIds.value = next
+}
+
+function toggleSelectAll(checked: boolean): void {
+  const next = new Set(selectedIds.value)
+  if (checked) {
+    for (const image of filteredImages.value) {
+      next.add(image.id)
+    }
+  } else {
+    for (const image of filteredImages.value) {
+      next.delete(image.id)
+    }
+  }
+  selectedIds.value = next
+}
+
+function clearSelection(): void {
+  selectedIds.value = new Set()
+}
+
+
 function getArchitectureCount(architecture: 'all' | 'x86_64' | 'aarch64'): number {
   if (architecture === 'all') {
     return images.value.length
@@ -106,6 +148,8 @@ async function loadImages(): Promise<void> {
   try {
     const response = await api.images.list()
     images.value = response.images || []
+    const validIds = new Set(images.value.map(image => image.id))
+    selectedIds.value = new Set([...selectedIds.value].filter(id => validIds.has(id)))
   } catch (err: any) {
     toast.error(err.message || t('admin.images.loadFailed'))
   } finally {
@@ -209,6 +253,87 @@ async function deleteImage(image: SystemImage): Promise<void> {
   }
 }
 
+// 批量禁用
+async function batchDisable(): Promise<void> {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  if (!confirm(t('admin.images.confirmBatchDisable', { count: ids.length }))) return
+
+  batchOperating.value = true
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => api.images.update(id, { hidden: true }))
+    )
+    const successCount = results.filter((r) => r.status === 'fulfilled').length
+    const failCount = results.length - successCount
+    if (failCount === 0) {
+      toast.success(t('admin.images.batchDisableSuccess', { count: successCount }))
+    } else {
+      toast.warning(`${t('admin.images.batchDisableSuccess', { count: successCount })}, ${failCount} failed`)
+    }
+    clearSelection()
+    await loadImages()
+  } catch (err: any) {
+    toast.error(err.message || t('admin.images.saveFailed'))
+  } finally {
+    batchOperating.value = false
+  }
+}
+
+// 批量启用
+async function batchEnable(): Promise<void> {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  if (!confirm(t('admin.images.confirmBatchEnable', { count: ids.length }))) return
+
+  batchOperating.value = true
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => api.images.update(id, { hidden: false }))
+    )
+    const successCount = results.filter((r) => r.status === 'fulfilled').length
+    const failCount = results.length - successCount
+    if (failCount === 0) {
+      toast.success(t('admin.images.batchEnableSuccess', { count: successCount }))
+    } else {
+      toast.warning(`${t('admin.images.batchEnableSuccess', { count: successCount })}, ${failCount} failed`)
+    }
+    clearSelection()
+    await loadImages()
+  } catch (err: any) {
+    toast.error(err.message || t('admin.images.saveFailed'))
+  } finally {
+    batchOperating.value = false
+  }
+}
+
+// 批量删除
+async function batchDelete(): Promise<void> {
+  const ids = Array.from(selectedIds.value)
+  if (ids.length === 0) return
+  if (!confirm(t('admin.images.confirmBatchDelete', { count: ids.length }))) return
+
+  batchOperating.value = true
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => api.images.delete(id))
+    )
+    const successCount = results.filter((r) => r.status === 'fulfilled').length
+    const failCount = results.length - successCount
+    if (failCount === 0) {
+      toast.success(t('admin.images.batchDeleteSuccess', { count: successCount }))
+    } else {
+      toast.warning(`${t('admin.images.batchDeleteSuccess', { count: successCount })}, ${failCount} failed`)
+    }
+    clearSelection()
+    await loadImages()
+  } catch (err: any) {
+    toast.error(err.message || t('admin.images.deleteFailed'))
+  } finally {
+    batchOperating.value = false
+  }
+}
+
 onMounted(() => {
   loadImages()
 })
@@ -268,6 +393,58 @@ onMounted(() => {
         </button>
       </div>
 
+      <!-- Batch Actions Toolbar -->
+      <div
+        v-if="selectedCount > 0"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-themed bg-themed-surface px-4 py-3"
+      >
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-themed">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded text-accent cursor-pointer"
+              :checked="isAllSelected"
+              :indeterminate="isIndeterminate"
+              @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+            />
+            <span>{{ t('admin.images.selectedCount', { count: selectedCount }) }}</span>
+          </label>
+          <button
+            type="button"
+            class="text-xs text-themed-muted hover:text-themed underline"
+            @click="clearSelection"
+          >
+            {{ t('admin.images.clearSelection') }}
+          </button>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="btn-secondary btn-sm"
+            :disabled="batchOperating"
+            @click="batchEnable"
+          >
+            {{ t('admin.images.batchEnable') }}
+          </button>
+          <button
+            type="button"
+            class="btn-secondary btn-sm"
+            :disabled="batchOperating"
+            @click="batchDisable"
+          >
+            {{ t('admin.images.batchDisable') }}
+          </button>
+          <button
+            type="button"
+            class="btn-sm rounded border border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 dark:text-rose-400 font-medium px-3 py-1.5 transition-colors disabled:opacity-50"
+            :disabled="batchOperating"
+            @click="batchDelete"
+          >
+            {{ t('admin.images.batchDelete') }}
+          </button>
+        </div>
+      </div>
+
       <!-- Images List -->
       <div v-if="filteredImages.length === 0" class="card p-12 text-center text-themed-muted">
         <span class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-themed-secondary text-themed-faint">
@@ -284,10 +461,19 @@ onMounted(() => {
             v-for="image in filteredImages"
             :key="image.id"
             class="card p-4"
-            :class="image.hidden ? 'opacity-70' : ''"
+            :class="[
+              image.hidden ? 'opacity-70' : '',
+              selectedIds.has(image.id) ? 'ring-1 ring-primary-500/30' : ''
+            ]"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded text-accent cursor-pointer shrink-0"
+                  :checked="selectedIds.has(image.id)"
+                  @change="toggleSelect(image.id, ($event.target as HTMLInputElement).checked)"
+                />
                 <DistroIcon :distro="image.icon" :size="32" />
                 <div class="min-w-0">
                   <div class="truncate text-sm font-medium text-themed">{{ image.name }}</div>
@@ -372,11 +558,21 @@ onMounted(() => {
           <table class="w-full table-fixed">
           <thead>
             <tr class="border-b border-themed bg-themed-secondary/60 text-left text-2xs font-medium uppercase tracking-wide text-themed-muted">
-              <th class="w-[7%] px-4 py-3">{{ t('admin.images.fields.icon') }}</th>
-              <th class="w-[17%] px-4 py-3">{{ t('admin.images.fields.name') }}</th>
-              <th class="w-[22%] px-4 py-3">{{ t('admin.images.fields.remoteAlias') }}</th>
-              <th class="w-[13%] px-4 py-3">{{ t('admin.images.fields.architecture') }}</th>
-              <th class="w-[13%] px-4 py-3">{{ t('admin.images.fields.instanceType') }}</th>
+              <th class="w-[5%] px-4 py-3">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded text-accent cursor-pointer"
+                  :checked="isAllSelected"
+                  :indeterminate="isIndeterminate"
+                  :aria-label="t('admin.images.selectAll')"
+                  @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                />
+              </th>
+              <th class="w-[6%] px-4 py-3">{{ t('admin.images.fields.icon') }}</th>
+              <th class="w-[16%] px-4 py-3">{{ t('admin.images.fields.name') }}</th>
+              <th class="w-[21%] px-4 py-3">{{ t('admin.images.fields.remoteAlias') }}</th>
+              <th class="w-[12%] px-4 py-3">{{ t('admin.images.fields.architecture') }}</th>
+              <th class="w-[12%] px-4 py-3">{{ t('admin.images.fields.instanceType') }}</th>
               <th class="w-[8%] px-4 py-3">{{ t('admin.images.fields.sortOrder') }}</th>
               <th class="w-[8%] px-4 py-3">{{ t('admin.images.fields.status') }}</th>
               <th class="w-[12%] px-4 py-3 text-right">{{ t('common.actions') }}</th>
@@ -387,8 +583,19 @@ onMounted(() => {
               v-for="image in filteredImages"
               :key="image.id"
               class="transition-colors hover:bg-themed-hover"
-              :class="image.hidden ? 'opacity-60' : ''"
+              :class="[
+                image.hidden ? 'opacity-60' : '',
+                selectedIds.has(image.id) ? 'bg-primary-500/5' : ''
+              ]"
             >
+              <td class="px-4 py-3">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded text-accent cursor-pointer"
+                  :checked="selectedIds.has(image.id)"
+                  @change="toggleSelect(image.id, ($event.target as HTMLInputElement).checked)"
+                />
+              </td>
               <td class="px-4 py-3">
                 <DistroIcon :distro="image.icon" :size="32" />
               </td>
