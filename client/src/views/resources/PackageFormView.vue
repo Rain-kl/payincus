@@ -29,7 +29,7 @@ const isEditMode = computed(() => !!route.params.id)
 const packageId = computed(() => route.params.id ? Number(route.params.id) : null)
 type PackageCreationMode = 'free' | 'paid'
 const packageCreationMode = ref<PackageCreationMode>('free')
-const showPackageLevelInstanceDefaults = computed(() => isEditMode.value || packageCreationMode.value === 'free')
+const showPackageLevelInstanceDefaults = computed(() => packageCreationMode.value === 'free')
 
 // Loading states
 const loading = ref(false)
@@ -214,7 +214,7 @@ function resetPackageLevelInstanceDefaults(): void {
 }
 
 watch(packageCreationMode, (mode) => {
-  if (!isEditMode.value && mode === 'paid') {
+  if (!loading.value && mode === 'paid') {
     resetPackageLevelInstanceDefaults()
   }
 })
@@ -630,6 +630,20 @@ async function loadPackage(id: number): Promise<void> {
       globalMaxInstances: Number.isInteger(Number(pkg.global_max_instances)) && Number(pkg.global_max_instances) >= 1 && Number(pkg.global_max_instances) <= 5 ? Number(pkg.global_max_instances) : 1,
       requiredPackageId: pkg.required_package_id ?? null
     }
+
+    // 根据已有方案或参数判断套餐用途模式，对齐展示
+    try {
+      const plansRes = await api.packages.getPlans(id)
+      if (plansRes?.plans && plansRes.plans.length > 0) {
+        packageCreationMode.value = 'paid'
+      } else if (Number(pkg.cpu_max) === 100 && Number(pkg.memory_max) === 4096 && Number(pkg.disk_max) === 51200) {
+        packageCreationMode.value = 'paid'
+      } else {
+        packageCreationMode.value = 'free'
+      }
+    } catch {
+      packageCreationMode.value = 'free'
+    }
   } catch (_err: any) {
     toast.error(t('admin.packages.loadFailed') || 'Failed to load package')
     router.push(packagesPath())
@@ -863,7 +877,7 @@ function goBack(): void {
             <input v-model="form.description" type="text" class="input" />
             <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">{{ t('common.noIncudalHint') }}</p>
           </div>
-          <div v-if="!isEditMode" class="md:col-span-2">
+          <div class="md:col-span-2">
             <label class="block text-sm font-medium text-themed-secondary mb-2">{{ t('packageForm.fields.packageCreationMode') }}</label>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
