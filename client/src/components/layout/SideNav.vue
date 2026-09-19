@@ -141,6 +141,7 @@ function toggleGroup(label?: string): void {
 
 function isActive(item: MenuItem): boolean {
   if (item.name === 'dashboard') return route.path === navDashboardPath
+  if (item.name === 'instances' && route.path.startsWith('/instances/create')) return false
   if (!item.path) return false
   return route.path.startsWith(item.path)
 }
@@ -351,6 +352,14 @@ function handleLinkClick() {
             <path
               v-else-if="item.icon === 'pulse'" stroke-linecap="round" stroke-linejoin="round"
               d="M3.75 13.5h3l2.25-6 4.5 12 2.25-6h4.5"
+            />
+            <path
+              v-else-if="item.icon === 'feather'" stroke-linecap="round" stroke-linejoin="round"
+              d="M20.24 12.24a6 6 0 00-8.49-8.49L5 10.5V19h8.5z M16 8L2 22 M17.5 15H9"
+            />
+            <path
+              v-else-if="item.icon === 'plus'" stroke-linecap="round" stroke-linejoin="round"
+              d="M12 4.5v15m7.5-7.5h-15"
             />
             <path
               v-else-if="item.icon === 'cog'" stroke-linecap="round" stroke-linejoin="round"
