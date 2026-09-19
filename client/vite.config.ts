@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import obfuscator from 'rollup-plugin-obfuscator'
 import { fileURLToPath, URL } from 'node:url'
@@ -342,9 +342,11 @@ function stripUserOnlyLocaleMessages(source: string): string {
 }
 
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, fileURLToPath(new URL('..', import.meta.url)), '')
   const isProd = mode === 'production'
   const devPort = Number(process.env.VITE_DEV_PORT || 3000)
   const devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:3001'
+  const devHost = process.env.VITE_DEV_HOST || env.VITE_DEV_HOST || process.env.HOST || env.HOST || undefined
   const appEntry = process.env.VITE_APP_ENTRY === 'admin' ? 'admin' : 'user'
   const entryScript = appEntry === 'admin' ? '/src/admin/main.ts' : '/src/main.ts'
   const apiClientEntry = appEntry === 'admin' ? './src/api/admin.ts' : './src/api/index.ts'
@@ -478,6 +480,7 @@ export default defineConfig(({ mode }) => {
     },
     
     server: {
+      host: devHost,
       port: devPort,
       proxy: {
         '/api': {

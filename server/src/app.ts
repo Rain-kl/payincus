@@ -729,7 +729,7 @@ const start = async (): Promise<void> => {
     }
 
     const port = parseInt(process.env.PORT || '3001', 10)
-    const host = process.env.HOST || '0.0.0.0'
+    const host = process.env.HOST || '127.0.0.1'
 
     await fastify.listen({ port, host })
     console.log(`🚀 Incudal 服务已启动: http://localhost:${port}`)
