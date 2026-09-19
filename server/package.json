@@ -7,7 +7,7 @@
   "types": "dist/app.d.ts",
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "cross-env NODE_ENV=development JWT_SECRET=dev-secret-12345678 HOST=127.0.0.1 PORT=3001 tsx watch src/app.ts",
+    "dev": "cross-env NODE_ENV=development JWT_SECRET=dev-secret-12345678 HOST=0.0.0.0 PORT=3001 tsx watch src/app.ts",
     "start": "node dist/app.js",
     "build": "tsc",
     "type-check": "tsc --noEmit",
