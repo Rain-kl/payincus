@@ -35,7 +35,7 @@ export const useConfigStore = defineStore('config', () => {
     const turnstileSiteKey = ref<string | null>(null)
     const transferFee = ref(0)
     const footerContactEmail = ref<string | null>('incudal@sent.com')
-    const footerTelegramLink = ref<string | null>('https://t.me/incudal_com')
+    const footerTelegramLink = ref<string | null>(null)
     const hostingMarketEntryEnabled = ref(true)
     const hostingNotice = ref<string | null>(null)
     const popupAnnouncement = ref<string | null>(null)

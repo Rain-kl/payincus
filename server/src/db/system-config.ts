@@ -89,7 +89,7 @@ export async function initSystemConfig(): Promise<void> {
         { key: 'avatar_api_base', value: 'https://api.dicebear.com/9.x', type: 'string', label: '头像 API 地址', description: 'DiceBear 头像 API 基础地址，可自建服务' },
         // 侧边栏底部联系方式
         { key: 'footer_contact_email', value: 'incudal@sent.com', type: 'string', label: '底部联系邮箱', description: '侧边栏底部邮箱按钮显示的邮箱地址或 mailto 链接' },
-        { key: 'footer_telegram_link', value: 'https://t.me/incudal_com', type: 'string', label: '底部 Telegram 群链接', description: '侧边栏底部 Telegram 按钮跳转地址' },
+        { key: 'footer_telegram_link', value: '', type: 'string', label: '底部 Telegram 群链接', description: '侧边栏底部 Telegram 按钮跳转地址' },
         // Telegram 专用机器人配置
         { key: 'telegram_bot_enabled', value: 'false', type: 'boolean', label: 'Telegram 专用机器人', description: '是否启用 Telegram 账号绑定机器人' },
         { key: 'telegram_bot_username', value: '', type: 'string', label: 'Telegram Bot 用户名', description: '机器人用户名，不含 @，用于生成绑定链接' },
@@ -137,6 +137,20 @@ export async function initSystemConfig(): Promise<void> {
             update: {},
             create: config
         })
+    }
+
+    // 清理旧的历史默认 Telegram 群链接
+    const legacyUpdateResult = await prisma.systemConfig.updateMany({
+        where: {
+            key: 'footer_telegram_link',
+            value: 'https://t.me/incudal_com'
+        },
+        data: {
+            value: ''
+        }
+    })
+    if (legacyUpdateResult.count > 0) {
+        invalidateCachedConfigs(['footer_telegram_link'])
     }
 }
 
