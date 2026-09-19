@@ -2,7 +2,7 @@
 
 > 本文件是本仓库**所有 AI agent（Claude Code、codex 等）的统一工作规范**。
 > `CLAUDE.md` 通过 `@AGENTS.md` 引用本文件 —— Claude Code 与 codex 读到的是**同一套规矩**，改这一个文件即可。
-> 权威运维/发版事实以仓库根的 `OPERATIONS_HANDOFF.md`（操作手册）与 `HANDOFF.md`（版本证据台账）为准。
+> 权威运维/发版事实以 docs 目录下的 `OPERATIONS_HANDOFF.md`（操作手册）与 `HANDOFF.md`（版本证据台账）为准。
 
 ---
 

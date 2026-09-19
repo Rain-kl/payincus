@@ -780,9 +780,6 @@ assert.ok(!readme.includes('10.0.0.12:3000'), 'README production split docs must
 assert.ok(!readme.includes('127.0.0.1:3000` 即可'), 'README same-host backend proxy example must not point to frontend port 3000')
 
 const retiredDockerDeploymentFiles = [
-  '.dockerignore',
-  'Dockerfile',
-  'docker-compose.yml',
   'docker-compose.dev.yml',
   '.github/workflows/docker.yml'
 ]

@@ -9,7 +9,7 @@
   ·
   <a href="https://payincus.com/api/overview">API 文档</a>
   ·
-  <a href="https://t.me/kqxw_chat">Telegram</a>
+  <a href="https://t.me/Payincus">Telegram</a>
   ·
   <a href="https://github.com/VipMaxxxx/payincus/releases">Releases</a>
 </p>
@@ -24,7 +24,7 @@ PayIncus 的公开文档、源码和 Release 都以当前仓库为准：
 - 文档站：<https://payincus.com>
 - 在线 Demo：<https://payincus.com/demo>
 - API 参考：<https://payincus.com/api/overview>
-- Telegram：<https://t.me/kqxw_chat>
+- Telegram：<https://t.me/Payincus>
 
 ## 核心能力
 
@@ -117,19 +117,21 @@ sudo bash install-panel.sh --uninstall
 
 ## Docker Compose 部署
 
-Docker Compose 部署适合快速试用、单机自托管或放在外部 HTTPS 反向代理后运行。当前 Compose 会启动 PostgreSQL 16、Redis 7、后端 API 和 Nginx 静态前端四个服务：
+## Docker Compose 部署
 
-- 用户端默认暴露到 `http://localhost:8080`。
-- 管理端默认暴露到 `http://localhost:8081`。
-- 前端 Nginx 通过容器内网络反向代理 `/api` 和 `/api/ws` 到后端。
-- 后端启动时默认执行 `prisma migrate deploy`。
+Docker Compose 部署适合快速试用、单机自托管或放在外部 HTTPS 反向代理后运行。Compose 包含 PostgreSQL 18-alpine 数据库和前后端一体化的 `payincus` 容器服务：
+
+- 单个 `payincus` 容器同时具备 Node.js 后端与 Nginx 静态文件托管/反代能力。
+- 用户端默认暴露到 `http://localhost:8080`（容器内端口 80）。
+- 管理端默认暴露到 `http://localhost:8081`（容器内端口 81）。
+- 容器启动时默认自动执行 `prisma migrate deploy`。
 
 快速启动：
 
 ```bash
-cp .env.docker.example .env.docker
-# 编辑 .env.docker，至少替换 POSTGRES_PASSWORD、REDIS_PASSWORD、JWT_SECRET、COOKIE_SECRET、ENCRYPTION_KEY、PLUGIN_WEBHOOK_SIGNING_SECRET、ADMIN_PASSWORD。
-docker compose --env-file .env.docker up -d --build
+cp .env.example .env
+# 编辑 .env，至少替换 POSTGRES_PASSWORD、JWT_SECRET、COOKIE_SECRET、ENCRYPTION_KEY、ADMIN_PASSWORD。
+docker compose up -d --build
 ```
 
 首次启动后访问：
@@ -141,27 +143,26 @@ docker compose --env-file .env.docker up -d --build
 
 生产使用建议：
 
-- 将 `FRONTEND_URL`、`ADMIN_FRONTEND_URL`、`SITE_URL`、`PAYMENT_CALLBACK_BASE_URL`、`VITE_CUSTOMER_BASE_URL`、`VITE_ADMIN_BASE_URL` 改为真实 HTTPS 域名。
-- 如果修改了 `VITE_*` 前端构建变量，需要重新执行 `docker compose --env-file .env.docker up -d --build`。
+- 将 `FRONTEND_URL`、`ADMIN_FRONTEND_URL`、`SITE_URL`、`PAYMENT_CALLBACK_BASE_URL` 改为真实 HTTPS 域名。
 - 真实生产环境建议在 `USER_HTTP_PORT` 和 `ADMIN_HTTP_PORT` 前面放置 Caddy、Nginx、Traefik 或云厂商负载均衡，并启用 HTTPS。
 - HTTPS 生产环境请移除 `COOKIE_SECURE=false` 或设置为 `COOKIE_SECURE=true`，`COOKIE_DOMAIN` 保持空值以隔离用户端和管理端 refresh cookie。
-- 数据库、Redis 和插件/主题/OTA 运行数据分别保存在 `postgres-data`、`redis-data`、`payincus-data` Docker volume 中。
-- 若需要手动执行数据迁移，可临时设置 `RUN_DATA_MIGRATIONS=true` 后重启后端，或执行 `docker compose --env-file .env.docker exec backend pnpm --dir /app/server migrate:data`。
+- 数据库和运行数据分别保存在 `postgres-data` 与 `payincus-data` Docker volume 中。
+- 若需要手动执行数据迁移，可设置 `RUN_DATA_MIGRATIONS=true` 后重启服务，或执行 `docker compose exec payincus pnpm --dir /app/server migrate:data`。
 
 常用命令：
 
 ```bash
 # 查看服务状态
-docker compose --env-file .env.docker ps
+docker compose ps
 
-# 查看后端日志
-docker compose --env-file .env.docker logs -f backend
+# 查看服务日志
+docker compose logs -f payincus
 
 # 停止服务但保留数据
-docker compose --env-file .env.docker down
+docker compose down
 
 # 停止并删除全部数据卷（危险）
-docker compose --env-file .env.docker down -v
+docker compose down -v
 ```
 
 ## 手动部署

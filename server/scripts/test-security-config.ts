@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkJwtConfig } from '../src/lib/security-config.js'
@@ -144,7 +144,10 @@ try {
   const hostRouteSource = readFileSync(resolve(__dirname, '../src/routes/hosts.ts'), 'utf8')
   const envExampleSource = readFileSync(resolve(__dirname, '../../.env.example'), 'utf8')
   const readmeSource = readFileSync(resolve(__dirname, '../../README.md'), 'utf8')
-  const operationsHandoffSource = readFileSync(resolve(__dirname, '../../OPERATIONS_HANDOFF.md'), 'utf8')
+  const operationsHandoffPath = existsSync(resolve(__dirname, '../../docs/OPERATIONS_HANDOFF.md'))
+    ? resolve(__dirname, '../../docs/OPERATIONS_HANDOFF.md')
+    : resolve(__dirname, '../../OPERATIONS_HANDOFF.md')
+  const operationsHandoffSource = readFileSync(operationsHandoffPath, 'utf8')
   const agentsSource = readFileSync(resolve(__dirname, '../../AGENTS.md'), 'utf8')
 
   assert.ok(
