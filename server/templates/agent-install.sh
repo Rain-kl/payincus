@@ -434,8 +434,8 @@ EOF_CONFIG
 write_file "${STAGED_SERVICE}" 0644 root:root <<EOF_SERVICE
 [Unit]
 Description=Incudal Host Agent
-After=network-online.target
-Wants=network-online.target
+After=network.target
+Wants=network.target
 
 [Service]
 Type=simple

@@ -1,6 +1,10 @@
-# syntax=docker/dockerfile:1.7
-
 ARG NODE_VERSION=22-bookworm-slim
+ARG GOLANG_VERSION=1.23-bookworm
+
+FROM golang:${GOLANG_VERSION} AS agent-builder
+WORKDIR /app
+COPY agent ./agent
+RUN bash agent/scripts/build-release.sh
 
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
@@ -35,6 +39,7 @@ ENV PORT=3001
 ENV SERVE_STATIC_CLIENT=false
 ENV INCUDAL_APP_DIR=/app
 ENV INCUDAL_INSTALL_DIR=/opt/incudal
+ENV INCUDAL_AGENT_RELEASE_DIR=/app/agent-dist
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
@@ -54,6 +59,7 @@ COPY --from=build /app/server/prisma ./server/prisma
 COPY --from=build /app/server/prisma.config.ts ./server/prisma.config.ts
 COPY --from=build /app/server/templates ./server/templates
 COPY --from=build /app/server/certs ./server/certs
+COPY --from=agent-builder /app/agent/dist /app/agent-dist
 
 COPY --from=build /app/client/dist/user /usr/share/nginx/html/user
 COPY --from=build /app/client/dist/admin /usr/share/nginx/html/admin

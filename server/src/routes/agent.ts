@@ -395,7 +395,22 @@ function getAgentReleaseRepository(): string {
 
 function getLocalAgentReleaseDir(): string | null {
   const dir = process.env.INCUDAL_AGENT_RELEASE_DIR?.trim()
-  return dir && dir.startsWith('/') && !dir.includes('\0') ? dir : null
+  if (dir && dir.startsWith('/') && !dir.includes('\0') && existsSync(dir)) {
+    return dir
+  }
+  if (!dir) {
+    const candidates = [
+      join(process.cwd(), 'agent/dist'),
+      join(process.cwd(), '../agent/dist'),
+      '/app/agent-dist'
+    ]
+    for (const candidate of candidates) {
+      if (existsSync(join(candidate, 'manifest.json'))) {
+        return candidate
+      }
+    }
+  }
+  return null
 }
 
 function hashLocalFile(path: string): string {
