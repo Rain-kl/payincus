@@ -1256,6 +1256,9 @@ net.ipv6.conf.${DEFAULT_IFACE}.proxy_ndp = 1
 EOF
     fi
 
+    # 注释清理其它 sysctl 配置文件中显式禁用的 forwarding，防止被 sysctl --system 覆盖
+    sed -i -E 's/^[[:space:]]*(net\.(ipv4|ipv6)\.conf\.(all|default)\.forwarding[[:space:]]*=[[:space:]]*0)/# \1 # disabled by incudal/' /etc/sysctl.conf /etc/sysctl.d/*.conf 2>/dev/null || true
+
     if ! sysctl -p /etc/sysctl.d/99-incus.conf >/dev/null 2>&1; then
         warn "部分可选内核参数未能应用，正在验证 Incus 必需的转发参数"
     fi
@@ -1277,6 +1280,10 @@ EOF
         sysctl_key="${required_sysctl%%=*}"
         sysctl_expected="${required_sysctl#*=}"
         sysctl_actual=$(sysctl -n "$sysctl_key" 2>/dev/null || true)
+        if [[ "$sysctl_actual" != "$sysctl_expected" ]]; then
+            sysctl -w "${required_sysctl}" >/dev/null 2>&1 || true
+            sysctl_actual=$(sysctl -n "$sysctl_key" 2>/dev/null || true)
+        fi
         if [[ "$sysctl_actual" != "$sysctl_expected" ]]; then
             error "必需内核参数未生效: ${sysctl_key}=${sysctl_actual:-unavailable}（期望 ${sysctl_expected}）"
             return 1
