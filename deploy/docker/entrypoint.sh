@@ -4,9 +4,6 @@ set -eo pipefail
 export NGINX_CLIENT_MAX_BODY_SIZE="${NGINX_CLIENT_MAX_BODY_SIZE:-50m}"
 export BACKEND_UPSTREAM="${BACKEND_UPSTREAM:-http://127.0.0.1:3001}"
 
-if [ -n "${DATABASE_URL:-}" ]; then
-  export DATABASE_URL="$(echo "$DATABASE_URL" | sed -E 's|@(127\.0\.0\.1|localhost):|@postgres:|')"
-fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   echo "[entrypoint] running Prisma migrations..."
