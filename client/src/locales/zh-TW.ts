@@ -4756,8 +4756,8 @@ const zhTW = {
             portRange: '連接埠範圍',
             portsUsed: '已用連接埠',
             recalculateResources: '對齊已用',
-            recalculateResourcesTip: '重新計算資源使用量，並將配額對齊到已用配額',
-            recalculateSuccess: '資源校對完成，配額已對齊',
+            recalculateResourcesTip: '重新計算已用資源與埠數量（不影響配額限制）',
+            recalculateSuccess: '資源校對完成，已用資源已對齊',
             recalculateNoChanges: '資源數據正確，無需修正',
             recalculateFailed: '資源校對失敗',
             ops: {

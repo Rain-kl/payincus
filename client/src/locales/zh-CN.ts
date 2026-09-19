@@ -4047,8 +4047,8 @@ export default {
             portRange: '端口范围',
             portsUsed: '已用端口',
             recalculateResources: '对齐已用',
-            recalculateResourcesTip: '重新计算资源使用量，并将配额对齐到已用配额',
-            recalculateSuccess: '资源校对完成，配额已对齐',
+            recalculateResourcesTip: '重新计算已用资源与端口数量（不影响配额限制）',
+            recalculateSuccess: '资源校对完成，已用资源已对齐',
             recalculateNoChanges: '资源数据正确，无需修正',
             recalculateFailed: '资源校对失败',
             ops: {

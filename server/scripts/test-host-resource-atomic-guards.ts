@@ -22,6 +22,7 @@ function section(source: string, startPattern: string, endPattern: string): stri
 const quotaSource = readRepoFile('server/src/db/quota-operations.ts')
 const resourcePoolSource = readRepoFile('server/src/db/resource-pool.ts')
 const hostsSource = readRepoFile('server/src/db/hosts.ts')
+const hostsRoutesSource = readRepoFile('server/src/routes/hosts.ts')
 
 const reserveSection = section(
   quotaSource,
@@ -115,6 +116,24 @@ assert.ok(
     !rollbackSection.includes('Math.max(0, host.natPortsUsedCount - portCount)') &&
     !rollbackSection.includes('where: { id: hostId },\n        data:'),
   'host resource rollback must not use stale read-modify-write updates'
+)
+
+const recalcSection = section(
+  hostsRoutesSource,
+  "('/:id/recalculate-resources',",
+  '// 批量封停实例（仅节点所有者）'
+)
+assert.ok(
+  recalcSection.includes('cpuUsed: usedResources.cpuUsed') &&
+    recalcSection.includes('memoryUsed: usedResources.memoryUsed') &&
+    recalcSection.includes('diskUsed: usedResources.diskUsed') &&
+    recalcSection.includes('natPortsUsedCount: portMappingsCount'),
+  'host recalculate-resources must update used CPU, memory, disk, and port count'
+)
+assert.ok(
+  !recalcSection.includes('cpuAllowanceMax: usedResources.cpuUsed') &&
+    !recalcSection.includes('memoryMax: usedResources.memoryUsed'),
+  'host recalculate-resources must not overwrite host resource limits/quotas'
 )
 
 console.log('host resource atomic guard checks passed')

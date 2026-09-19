@@ -1315,7 +1315,7 @@ const api = {
       ipv4ChangedCount: number
       failedCount: number
     }> => http.post(`/hosts/${hostId}/instances/sync-status`, { instanceIds }, { timeout: TIMEOUT.MEDIUM }),
-    // 资源校对：重新计算宿主机资源使用量，并将配额对齐到已用配额
+    // 资源校对：重新计算宿主机已用资源使用量与端口映射
     recalculateResources: (hostId: number): Promise<{
       message: string
       hasChanges: boolean

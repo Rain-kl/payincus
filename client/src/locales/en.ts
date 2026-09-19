@@ -3864,8 +3864,8 @@ export default {
             portRange: 'Port Range',
             portsUsed: 'Ports Used',
             recalculateResources: 'Align Used',
-            recalculateResourcesTip: 'Recalculate resource usage and align quota to used amount',
-            recalculateSuccess: 'Resources recalculated, quota aligned',
+            recalculateResourcesTip: 'Recalculate used resources and ports based on active instances (does not change limits)',
+            recalculateSuccess: 'Resource calibration complete, used amounts aligned',
             recalculateNoChanges: 'Resources are correct, no changes needed',
             recalculateFailed: 'Resource recalculation failed',
             ops: {

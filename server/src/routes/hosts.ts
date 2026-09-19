@@ -4869,21 +4869,14 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       }
     })
 
-    // 更新宿主机资源使用量
-    await db.updateHostResources(hostId, {
-      cpuUsed: usedResources.cpuUsed,
-      memoryUsed: usedResources.memoryUsed,
-      diskUsed: usedResources.diskUsed
-    })
-
-    // 更新端口使用量，同时将配额对齐到已用配额
+    // 更新宿主机已用资源使用量与端口映射使用量（保留原有的资源配额限制）
     await prisma.host.update({
       where: { id: hostId },
       data: {
-        natPortsUsedCount: portMappingsCount,
-        // 将配额对齐到已用配额
-        cpuAllowanceMax: usedResources.cpuUsed,
-        memoryMax: usedResources.memoryUsed
+        cpuUsed: usedResources.cpuUsed,
+        memoryUsed: usedResources.memoryUsed,
+        diskUsed: usedResources.diskUsed,
+        natPortsUsedCount: portMappingsCount
       }
     })
 
@@ -4892,8 +4885,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       memoryUsed: usedResources.memoryUsed,
       diskUsed: usedResources.diskUsed,
       natPortsUsedCount: portMappingsCount,
-      cpuAllowanceMax: usedResources.cpuUsed,
-      memoryMax: usedResources.memoryUsed
+      cpuAllowanceMax: host.cpu_allowance_max || 0,
+      memoryMax: host.memory_max || 0
     }
 
     // 计算差异
@@ -4902,17 +4895,17 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       memoryUsed: after.memoryUsed - before.memoryUsed,
       diskUsed: after.diskUsed - before.diskUsed,
       natPortsUsedCount: after.natPortsUsedCount - before.natPortsUsedCount,
-      cpuAllowanceMax: after.cpuAllowanceMax - before.cpuAllowanceMax,
-      memoryMax: after.memoryMax - before.memoryMax
+      cpuAllowanceMax: 0,
+      memoryMax: 0
     }
 
-    const hasChanges = diff.cpuUsed !== 0 || diff.memoryUsed !== 0 || diff.diskUsed !== 0 || diff.natPortsUsedCount !== 0 || diff.cpuAllowanceMax !== 0 || diff.memoryMax !== 0
+    const hasChanges = diff.cpuUsed !== 0 || diff.memoryUsed !== 0 || diff.diskUsed !== 0 || diff.natPortsUsedCount !== 0
 
     await createLog(
       user.id,
       'host',
       'host.recalculate_resources',
-      `Recalculated resources for host "${host.name}": CPU ${before.cpuUsed}→${after.cpuUsed}, Memory ${before.memoryUsed}→${after.memoryUsed}, Disk ${before.diskUsed}→${after.diskUsed}, Ports ${before.natPortsUsedCount}→${after.natPortsUsedCount}, CPUMax ${before.cpuAllowanceMax}→${after.cpuAllowanceMax}, MemMax ${before.memoryMax}→${after.memoryMax}`,
+      `Recalculated resources for host "${host.name}": CPU ${before.cpuUsed}→${after.cpuUsed}, Memory ${before.memoryUsed}→${after.memoryUsed}, Disk ${before.diskUsed}→${after.diskUsed}, Ports ${before.natPortsUsedCount}→${after.natPortsUsedCount}`,
       'success'
     )
 
