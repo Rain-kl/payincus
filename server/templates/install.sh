@@ -1823,13 +1823,35 @@ SRC
     log "Incus 安装完成"
 }
 
+# 配置网桥内核转发与 Docker 兼容规则（防止 Docker 默认的 FORWARD DROP 策略阻断容器出网）
+configure_bridge_forwarding() {
+    info "配置网桥转发放行规则（兼容 Docker/防火墙环境）..."
+    cat > /etc/systemd/system/incudal-bridge-forwarding.service << 'EOF'
+[Unit]
+Description=Incudal Bridge Forwarding Rules (Docker Compatibility)
+After=network.target docker.service incus.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "iptables -C FORWARD -i incusbr0 -j ACCEPT 2>/dev/null || iptables -I FORWARD -i incusbr0 -j ACCEPT; iptables -C FORWARD -o incusbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || iptables -I FORWARD -o incusbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; if iptables -L DOCKER-USER -n >/dev/null 2>&1; then iptables -C DOCKER-USER -i incusbr0 -j ACCEPT 2>/dev/null || iptables -I DOCKER-USER -i incusbr0 -j ACCEPT; iptables -C DOCKER-USER -o incusbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || iptables -I DOCKER-USER -o incusbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT; fi"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable --now incudal-bridge-forwarding.service >/dev/null 2>&1 || true
+}
+
 # 步骤 4: 初始化 Incus
 init_incus() {
     step "步骤 [4/5]  初始化 Incus..."
 
-    # 幂等性：网桥已存在则跳过
+    # 幂等性：网桥已存在则跳过初始化，但仍确保转发放行规则已配置
     if incus network show "$BRIDGE_NAME" &>/dev/null; then
         info "网桥 ${BRIDGE_NAME} 已存在，跳过初始化"
+        configure_bridge_forwarding
         return 0
     fi
 
@@ -1931,6 +1953,7 @@ cluster: null
 YAML
 
     incus admin init --preseed < "$PRESEED_FILE"
+    configure_bridge_forwarding
     log "Incus 初始化完成"
 }
 
