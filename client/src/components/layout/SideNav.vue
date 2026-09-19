@@ -56,7 +56,7 @@ const hiddenExpandMenuNames = new Set(['my-hosts', 'my-packages', 'hosting-walle
 const hiddenWhenTicketDisabledMenuNames = new Set(['tickets'])
 const hiddenWhenMailUnavailableMenuNames = new Set(['mail'])
 const collapsibleGroupLabels = new Set(['nav.operations', 'nav.billing', 'nav.resources', 'nav.system'])
-const collapsedGroupLabels = ref(new Set(['nav.operations', 'nav.billing', 'nav.resources', 'nav.system']))
+const collapsedGroupLabels = ref(new Set<string>())
 const navDashboardPath = dashboardPath()
 const shouldHideHostingFeature = computed(() =>
   !authStore.isAdmin && authStore.user?.canAccessHostingFeature === false
