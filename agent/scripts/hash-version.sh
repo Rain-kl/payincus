@@ -22,13 +22,27 @@ VERSION_FILE="${AGENT_DIR}/VERSION"
 
 compute_code_hash() {
   local files
-  files="$(cd "${AGENT_DIR}" && git ls-files --cached --others --exclude-standard 2>/dev/null || true)"
+  files="$(cd "${AGENT_DIR}" && git ls-files --cached --others --exclude-standard -z | tr '\0' '\n' || true)"
   if [[ -z "${files}" ]]; then
     echo "[agent-hash] error: not a git repository or no tracked agent files" >&2
     exit 1
   fi
+
   # 记录文件自身按 .gitignore 规则被排除, 不会参与计算。
-  printf '%s\n' "${files}" | LC_ALL=C sort | sha256sum | awk '{print $1}'
+  # 对每个文件的内容单独做 sha256(顺序按路径稳定排序), 再拼接出总 hash。
+  # 这样修改任意已跟踪文件的内容, 总 hash 必然变化。
+  local combined_file
+  combined_file="$(mktemp "${TMPDIR:-/tmp}/agent-hash.XXXXXX")"
+  trap 'rm -f "${combined_file}"' RETURN
+
+  local path
+  while IFS= read -r path; do
+    if [[ -f "${AGENT_DIR}/${path}" ]]; then
+      (cd "${AGENT_DIR}" && sha256sum "${path}") >> "${combined_file}"
+    fi
+  done <<< "${files}"
+
+  LC_ALL=C sort "${combined_file}" | sha256sum | awk '{print $1}'
 }
 
 read_current_version() {
