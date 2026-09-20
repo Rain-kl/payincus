@@ -791,10 +791,10 @@ async function saveConfig() {
       </div>
     </section>
 
-    <!-- 吸底保存条 -->
-    <div class="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t border-themed bg-themed-surface px-5 py-3.5 sm:px-6">
+    <!-- 保存操作条：与上方内容同宽同底、左右下零空隙，紧贴内容流末尾（全站表单通栏范式） -->
+    <div class="flex items-center justify-end gap-3 border-t border-themed pt-5">
       <button type="submit" class="btn-primary" :disabled="saving || !form.name || !form.hostAddress">
-        <span v-if="saving" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 " :class="themeStore.isDark ? 'border-white border-t-gray-500' : 'border-white border-t-gray-300'"></span>
+        <span v-if="saving" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2" :class="themeStore.isDark ? 'border-white border-t-gray-500' : 'border-white border-t-gray-300'"></span>
         {{ saving ? t('common.saving') : t('common.save') }}
       </button>
     </div>
