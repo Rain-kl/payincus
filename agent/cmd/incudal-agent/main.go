@@ -89,10 +89,15 @@ func main() {
 // scheduleCaddyInstall 收到面板 caddy.command=install 时，在节点本地部署 Caddy。
 // 幂等：安装进行中或已可用时跳过；成功后下个心跳自然上报 available=true。
 func scheduleCaddyInstall(ctx context.Context, result panel.HeartbeatResult, inProgress *atomic.Bool) {
+	if result.Caddy == nil {
+		log.Printf("[caddy] no instruction in heartbeat response")
+		return
+	}
+	log.Printf("[caddy] instruction: command=%q port=%d", result.Caddy.Command, result.Caddy.Port)
 	if inProgress.Load() {
 		return
 	}
-	if result.Caddy == nil || result.Caddy.Command != "install" {
+	if result.Caddy.Command != "install" {
 		return
 	}
 	if caddy.Detect().Available {

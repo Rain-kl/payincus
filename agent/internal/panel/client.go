@@ -122,6 +122,7 @@ func (client *Client) Heartbeat(ctx context.Context, payload map[string]any) (He
 	if err := json.Unmarshal(responseBody, &parsedResponse); err == nil {
 		result.Upgrade = parsedResponse.Upgrade
 		result.Tunnel = parsedResponse.Tunnel
+		result.Caddy = parsedResponse.Caddy
 	}
 
 	var parsed map[string]any
