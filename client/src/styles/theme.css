@@ -1,0 +1,135 @@
+/* ============================================================
+ * 主题系统 · 唯一色彩 Token 来源 (Single Source of Truth)
+ * ------------------------------------------------------------
+ * 所有颜色色值只允许定义在本文件内（:root 暗色默认 + .light 亮色）。
+ * 组件与全局样式一律通过 var(--xxx) 引用，禁止在组件里写死十六进制色。
+ * 唯一豁免白名单见 server/scripts/test-frontend-color-tokens.ts。
+ *
+ * 品牌色板（owner 指定）：
+ *   网页背景  #F6F4F3   按钮主色  #295BA7   选择(导航/菜单选中)  #161513
+ *   标题栏    #383632
+ *   其他色系  #E4E3E0 / #C5D8AD / #2C2A29 / #FFFFFF / #FBF9F8
+ * ============================================================ */
+
+@layer base {
+
+  /* 暗色主题变量 (默认) · OCI Dark Console */
+  :root {
+    /* ---- 背景层级 ---- */
+    --bg-primary: #161513;        /* 网页背景（深色）*/
+    --bg-secondary: #1f1d1b;      /* 次级背景（卡片/面板）*/
+    --bg-tertiary: #282522;       /* 三级背景（内嵌/表头）*/
+    --bg-elevated: #24211e;       /* 浮层背景（菜单/弹窗内部）*/
+    --bg-surface: #1f1d1b;        /* 表面白底（卡片/弹窗）→ 浅色 = #FFFFFF */
+    --bg-surface-soft: #282522;   /* 次级表面 → 浅色 = #FBF9F8 */
+    --success-soft: #1e3a2f;      /* 成功/在线标签浅底 → 浅色 = #C5D8AD */
+
+    /* ---- 边框 ---- */
+    --border-color: #2C2A29;      /* 常规边框 → 浅色 = #E4E3E0 */
+    --border-hover: #45413c;      /* 悬停边框 */
+    --border-strong: #45413c;
+
+    /* ---- 文字 ---- */
+    --text-primary: #f4f4f3;      /* 主前景（深色下反白）→ 浅色 = #161513 */
+    --text-secondary: #a29e9a;    /* 次级文字 */
+    --text-tertiary: #736f6a;     /* 弱化文字/占位 */
+
+    /* ---- 交互/语义色 ---- */
+    --accent: #4593DE;            /* 按钮主色 → 浅色 = #295BA7（owner 指定）*/
+    --accent-strong: #0b5cad;
+    --nav-active: #f4f4f3;        /* 导航/菜单选中态（深色下反白文字）→ 浅色 = #161513 */
+    --topbar-bg: #1f1d1b;         /* 标题栏背景 → 浅色 = #383632（owner 指定）*/
+    --topbar-text: #ffffff;       /* 标题栏文字 */
+    --topbar-border: #2C2A29;     /* 标题栏分隔线 */
+    --footer-bg: #1f1d1b;         /* 页脚背景 → 浅色 = #F5F4F2（近似 surface）*/
+
+    /* ---- 状态色（绿/琥珀/红 三态保留） ---- */
+    --success: #5cd887;
+    --warning: #f5c842;
+    --error: #f27568;
+
+    /* =========================================================
+     * 统一圆角规格阶梯 (集中抽离维护)
+     * ========================================================= */
+    --radius-none: 0px;
+    --radius-sm: 2px;
+    --radius-base: 4px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-xl: 8px;
+    --radius-2xl: 10px;
+    --radius-3xl: 12px;
+
+    /* 不同类型卡片与组件圆角抽离统一维护 */
+    --radius-card: 6px;          /* 1. 标准卡片/通用容器面板 (对齐 lg: 6px) */
+    --radius-card-sm: 4px;       /* 2. 小型卡片/内嵌指标卡 (对齐 md: 4px) */
+    --radius-card-lg: 8px;       /* 3. 突出大卡片/横幅展示卡 (对齐 xl: 8px) */
+    --radius-modal: 8px;         /* 4. 浮层弹窗/对话框/抽屉 (对齐 xl: 8px) */
+    --radius-panel: 6px;         /* 5. 侧边功能面板/抽屉容器 (对齐 lg: 6px) */
+    --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
+    --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
+    --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
+    --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
+    --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
+  }
+
+  /* 亮色主题变量 · owner 指定色板 */
+  .light {
+    /* ---- 背景层级 ---- */
+    --bg-primary: #F6F4F3;        /* 网页背景（owner 指定）*/
+    --bg-secondary: #ffffff;      /* 次级背景 */
+    --bg-tertiary: #FBF9F8;       /* 三级背景 */
+    --bg-elevated: #ffffff;       /* 浮层背景 */
+    --bg-surface: #FFFFFF;        /* 表面白底（owner 指定 #FFFFFF）*/
+    --bg-surface-soft: #FBF9F8;   /* 次级表面（owner 指定 #FBF9F8）*/
+    --success-soft: #C5D8AD;      /* 成功/在线标签浅底（owner 指定 #C5D8AD）*/
+
+    /* ---- 边框 ---- */
+    --border-color: #E4E3E0;      /* 常规边框（owner 指定 #E4E3E0）*/
+    --border-hover: #2C2A29;      /* 悬停边框（owner 指定加深位 #2C2A29）*/
+    --border-strong: #2C2A29;
+
+    /* ---- 文字 ---- */
+    --text-primary: #161513;      /* 主前景（owner 指定 #161513）*/
+    --text-secondary: #66615e;    /* 次级文字 */
+    --text-tertiary: #8c8984;     /* 弱化文字 */
+
+    /* ---- 交互/语义色 ---- */
+    --accent: #295BA7;            /* 按钮主色（owner 指定 #295BA7）*/
+    --accent-strong: #295BA7;
+    --nav-active: #161513;        /* 导航/菜单选中态（owner 指定 #161513）*/
+    --topbar-bg: #383632;         /* 标题栏背景（owner 指定 #383632）*/
+    --topbar-text: #ffffff;       /* 标题栏文字 */
+    --topbar-border: #2C2A29;     /* 标题栏分隔线（owner 指定 #2C2A29）*/
+    --footer-bg: #F5F4F2;         /* 页脚背景 */
+
+    /* ---- 状态色（绿/琥珀/红 三态保留） ---- */
+    --success: #1e7e34;
+    --warning: #8f5b00;
+    --error: #c74634;
+
+    /* =========================================================
+     * 统一圆角规格阶梯 (集中抽离维护)
+     * ========================================================= */
+    --radius-none: 0px;
+    --radius-sm: 2px;
+    --radius-base: 4px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-xl: 8px;
+    --radius-2xl: 10px;
+    --radius-3xl: 12px;
+
+    /* 不同类型卡片与组件圆角抽离统一维护 */
+    --radius-card: 6px;          /* 1. 标准卡片/通用容器面板 (对齐 lg: 6px) */
+    --radius-card-sm: 4px;       /* 2. 小型卡片/内嵌指标卡 (对齐 md: 4px) */
+    --radius-card-lg: 8px;       /* 3. 突出大卡片/横幅展示卡 (对齐 xl: 8px) */
+    --radius-modal: 8px;         /* 4. 浮层弹窗/对话框/抽屉 (对齐 xl: 8px) */
+    --radius-panel: 6px;         /* 5. 侧边功能面板/抽屉容器 (对齐 lg: 6px) */
+    --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
+    --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
+    --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
+    --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
+    --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
+  }
+}

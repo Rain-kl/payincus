@@ -165,7 +165,7 @@ function handleLinkClick() {
   <!-- Sidebar -->
   <aside
     :class="[
-      'kawaii-sidebar nimbus-sidebar flex flex-col h-full transition-all duration-200 border-r border-[#2c2a28] z-20 flex-shrink-0',
+      'kawaii-sidebar nimbus-sidebar flex flex-col h-full transition-all duration-200 border-r border-[var(--topbar-border)] z-40 flex-shrink-0',
       // 移动端：mobileOpen 为 true 时显示，否则隐藏；桌面端始终显示 (md:flex)
       mobileOpen ? 'flex' : 'hidden md:flex',
       // 宽度：展开 240px / 折叠 64px / 移动端全宽
@@ -382,7 +382,7 @@ function handleLinkClick() {
   background: linear-gradient(
     135deg,
     var(--kawaii-primary),
-    color-mix(in srgb, var(--kawaii-primary) 68%, #ffffff)
+    color-mix(in srgb, var(--kawaii-primary) 68%, var(--topbar-text))
   );
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--kawaii-line) 82%, transparent),
@@ -390,23 +390,23 @@ function handleLinkClick() {
 }
 
 .nimbus-brand {
-  background-color: #393632 !important;
-  border-bottom: 1px solid #2c2a28 !important;
-  border-right: 1px solid #2c2a28 !important;
+  background-color: var(--topbar-bg) !important;
+  border-bottom: 1px solid var(--topbar-border) !important;
+  border-right: 1px solid var(--topbar-border) !important;
   margin-right: -1px;
 }
 
 :global(.dark) .nimbus-brand {
-  background-color: #1f1d1b !important;
-  border-bottom: 1px solid #2c2a28 !important;
-  border-right: 1px solid #2c2a28 !important;
+  background-color: var(--topbar-bg) !important;
+  border-bottom: 1px solid var(--topbar-border) !important;
+  border-right: 1px solid var(--topbar-border) !important;
 }
 
 .nimbus-brand-name {
   font-weight: 600;
   font-size: 0.9375rem;
   letter-spacing: -0.02em;
-  color: #ffffff !important;
+  color: var(--topbar-text) !important;
 }
 
 /* Neutralize router auto-active styling on the brand link */
@@ -515,13 +515,13 @@ function handleLinkClick() {
 }
 
 .nimbus-nav-item:not(.is-active):hover {
-  background: #f5f5f4;
-  color: #161513;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 :global(.dark) .nimbus-nav-item:not(.is-active):hover {
-  background: #282522;
-  color: #f4f4f3;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .nimbus-nav-icon {
@@ -548,15 +548,15 @@ function handleLinkClick() {
   width: 3px;
   height: auto;
   border-radius: 0 2px 2px 0;
-  background: #0b5cad;
+  background: var(--nav-active);
   opacity: 0;
   transition: opacity 160ms ease;
 }
 
-/* Active state — OCI light blue tint + single clean left indicator */
+/* Active state — OCI light tint + single clean left indicator */
 .kawaii-sidebar .nimbus-nav-item.is-active {
-  background: rgba(11, 92, 173, 0.08) !important;
-  color: #0b5cad !important;
+  background: color-mix(in srgb, var(--nav-active) 8%, transparent) !important;
+  color: var(--nav-active) !important;
   border-color: transparent !important;
   outline: none !important;
   box-shadow: none !important;
@@ -564,7 +564,7 @@ function handleLinkClick() {
   border-radius: var(--radius-btn, 4px);
 }
 .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-icon {
-  color: #0b5cad;
+  color: var(--nav-active);
   opacity: 1;
 }
 .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-indicator {
@@ -572,14 +572,14 @@ function handleLinkClick() {
 }
 
 :global(.dark) .kawaii-sidebar .nimbus-nav-item.is-active {
-  background: rgba(11, 92, 173, 0.2) !important;
-  color: #4593de !important;
+  background: color-mix(in srgb, var(--nav-active) 14%, transparent) !important;
+  color: var(--nav-active) !important;
 }
 :global(.dark) .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-icon {
-  color: #4593de;
+  color: var(--nav-active);
 }
 :global(.dark) .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-indicator {
-  background: #4593de;
+  background: var(--nav-active);
 }
 
 /* Neutralize vue-router auto-active when our logic does not mark it active */

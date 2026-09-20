@@ -1080,15 +1080,15 @@ assert.ok(
     marketViewSource.includes("query: { redirect }") &&
     !marketViewSource.includes("path: '/instances/create'") &&
     !marketViewSource.includes("path: '/login'") &&
-    dashboardViewSource.includes("import { instanceCreatePath, instanceDetailPath, instancesPath } from '@/utils/app-paths'") &&
-    dashboardViewSource.includes(':to="instanceCreatePath()"') &&
+    dashboardViewSource.includes("import { instanceDetailPath, instancesPath } from '@/utils/app-paths'") &&
+    !dashboardViewSource.includes('instanceCreatePath') &&
     dashboardViewSource.includes(':to="instancesPath()"') &&
     dashboardViewSource.includes(':to="instanceDetailPath(instance.id)"') &&
     !dashboardViewSource.includes('to="/instances/create"') &&
     !dashboardViewSource.includes('to="/instances"') &&
     !dashboardViewSource.includes('to="/checkin"') &&
     !dashboardViewSource.includes(':to="`/instances/${instance.id}`"'),
-  'MarketView CTA must send authenticated users to instance creation and guests through login with a redirect'
+  'MarketView CTA must send authenticated users to instance creation and guests through login with a redirect; dashboard must route nav and detail links through app path helpers and no longer offer direct instance creation'
 )
 assert.ok(
   adminHelpManageViewSource.includes('class="card overflow-hidden"') &&

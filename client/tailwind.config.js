@@ -14,19 +14,20 @@ const neutralRamp = {
 }
 
 // OCI 云蓝色阶（Oracle Cloud Infrastructure Console 标志性云蓝）
-// 500=#0b5cad、600=#006699，用于链接、主要交互项高亮
+// 注意：与 client/src/styles/theme.css 的 --accent（浅色 #295BA7 / 深色 #4593DE）同源；
+// 主题色管理以 theme.css 唯一来源，此 ramp 仅为 Tailwind 静态色阶兼容层。
 const ociBlueRamp = {
   50: '#edf5fc',
   100: '#d6e9f8',
   200: '#b0d4f2',
   300: '#7db6e9',
   400: '#4593de',
-  500: '#0b5cad',
-  600: '#006699',
-  700: '#00507a',
-  800: '#003b5a',
-  900: '#00273d',
-  950: '#001927'
+  500: '#295BA7',
+  600: '#295BA7',
+  700: '#1f4a8a',
+  800: '#1a3d70',
+  900: '#143055',
+  950: '#0e1f38'
 }
 
 // rose 在代码里被广泛用作「危险/严重/亏损」的红色语义（非装饰），
@@ -144,8 +145,17 @@ export default {
           secondary: 'var(--accent)'
         },
         // primary 色阶 - 代码里散落 bg-primary-*/text-primary-*/ring-primary-* 作强调用；
-        // OCI 下配置为经典云蓝色阶
+        // 主题色管理：值与 theme.css 的 --accent 同步（浅色 #295BA7 / 深色 #4593DE）
         primary: ociBlueRamp,
+        // 主题 token 映射（单一来源 theme.css，运行时经 var() 跟随明暗主题切换）
+        'bg-primary': 'var(--bg-primary)',
+        'bg-surface': 'var(--bg-surface)',
+        'bg-surface-soft': 'var(--bg-surface-soft)',
+        'border-color': 'var(--border-color)',
+        'nav-active': 'var(--nav-active)',
+        'topbar-bg': 'var(--topbar-bg)',
+        'topbar-text': 'var(--topbar-text)',
+        'success-soft': 'var(--success-soft)',
         // 状态色。保留 Tailwind 自带 blue/sky/teal 等语义色，
         // 避免处理中、信息、选中和图表状态被全局灰化后失去区分。
         success: '#16a34a',

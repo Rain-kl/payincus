@@ -25,7 +25,9 @@ export const useThemeStore = defineStore('theme', () => {
 
     const metaThemeColor = document.querySelector('meta[name="theme-color"]')
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff')
+      // 背景色唯一来源 theme.css（--bg-primary），避免在 store 重复定义 hex
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim()
+      metaThemeColor.setAttribute('content', bg || (theme === 'dark' ? '#161513' : '#F6F4F3'))
     }
   }
 

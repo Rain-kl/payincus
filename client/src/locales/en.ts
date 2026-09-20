@@ -304,6 +304,10 @@ export default {
         extensionCenter: 'Extensions',
         welfareCenter: 'Benefits',
         personalSettings: 'Settings',
+        searchPlaceholder: 'Search resources, services or menus...',
+        searchNoResults: 'No matching menus found',
+        allMenus: 'All Menus',
+        menuSearchHint: 'Press ⌘K to search',
     },
 
     // Theme

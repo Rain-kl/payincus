@@ -1,5 +1,6 @@
 /* Nimbus 字体：Inter(UI) + JetBrains Mono(数据/等宽) 由 @fontsource-variable 自托管，
    在 main.ts / admin/main.ts 中 import（对 CN 受众更快，且无 Google CDN 依赖）。 */
+@import './theme.css';
 @import './kawaii-cloud.css';
 
 @tailwind base;
@@ -7,90 +8,6 @@
 @tailwind utilities;
 
 @layer base {
-
-  /* 暗色主题变量 (默认) · OCI Dark Console */
-  :root {
-    --bg-primary: #161513;
-    --bg-secondary: #1f1d1b;
-    --bg-tertiary: #282522;
-    --bg-elevated: #24211e;
-    --border-color: #312e2b;
-    --border-hover: #45413c;
-    --text-primary: #f4f4f3;
-    --text-secondary: #a29e9a;
-    --text-tertiary: #736f6a;
-    --accent: #0b5cad;
-    --success: #5cd887;
-    --warning: #f5c842;
-    --error: #f27568;
-    --oci-topbar-bg: #1f1d1b;
-
-    /* =========================================================
-     * 统一圆角规格阶梯 (集中抽离维护)
-     * ========================================================= */
-    --radius-none: 0px;
-    --radius-sm: 2px;
-    --radius-base: 4px;
-    --radius-md: 4px;
-    --radius-lg: 6px;
-    --radius-xl: 8px;
-    --radius-2xl: 10px;
-    --radius-3xl: 12px;
-
-    /* 不同类型卡片与组件圆角抽离统一维护 */
-    --radius-card: 6px;          /* 1. 标准卡片/通用容器面板 (对齐 lg: 6px) */
-    --radius-card-sm: 4px;       /* 2. 小型卡片/内嵌指标卡 (对齐 md: 4px) */
-    --radius-card-lg: 8px;       /* 3. 突出大卡片/横幅展示卡 (对齐 xl: 8px) */
-    --radius-modal: 8px;         /* 4. 浮层弹窗/对话框/抽屉 (对齐 xl: 8px) */
-    --radius-panel: 6px;         /* 5. 侧边功能面板/抽屉容器 (对齐 lg: 6px) */
-    --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
-    --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
-    --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
-    --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
-    --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
-  }
-
-  /* 亮色主题变量 · OCI Console 对标参考截图 */
-  .light {
-    --bg-primary: #F6F4F3;
-    --bg-secondary: #ffffff;
-    --bg-tertiary: #f9f9f8;
-    --bg-elevated: #ffffff;
-    --border-color: #e0dfdd;
-    --border-hover: #b8b6b2;
-    --text-primary: #161513;
-    --text-secondary: #66615e;
-    --text-tertiary: #8c8984;
-    --accent: #0b5cad;
-    --success: #1e7e34;
-    --warning: #8f5b00;
-    --error: #c74634;
-    --oci-topbar-bg: #393632;
-
-    /* =========================================================
-     * 统一圆角规格阶梯 (集中抽离维护)
-     * ========================================================= */
-    --radius-none: 0px;
-    --radius-sm: 2px;
-    --radius-base: 4px;
-    --radius-md: 4px;
-    --radius-lg: 6px;
-    --radius-xl: 8px;
-    --radius-2xl: 10px;
-    --radius-3xl: 12px;
-
-    /* 不同类型卡片与组件圆角抽离统一维护 */
-    --radius-card: 6px;          /* 1. 标准卡片/通用容器面板 (对齐 lg: 6px) */
-    --radius-card-sm: 4px;       /* 2. 小型卡片/内嵌指标卡 (对齐 md: 4px) */
-    --radius-card-lg: 8px;       /* 3. 突出大卡片/横幅展示卡 (对齐 xl: 8px) */
-    --radius-modal: 8px;         /* 4. 浮层弹窗/对话框/抽屉 (对齐 xl: 8px) */
-    --radius-panel: 6px;         /* 5. 侧边功能面板/抽屉容器 (对齐 lg: 6px) */
-    --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
-    --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
-    --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
-    --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
-    --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
-  }
 
   html {
     @apply scroll-smooth antialiased;
@@ -157,12 +74,12 @@
 
   .dark .btn-primary {
     @apply bg-white text-gray-900 hover:bg-gray-100;
-    --tw-ring-offset-color: #161513;
+    --tw-ring-offset-color: var(--bg-primary);
   }
 
   .light .btn-primary {
-    @apply bg-[#161513] text-white hover:bg-[#2c2a28];
-    --tw-ring-offset-color: #ffffff;
+    @apply bg-[var(--nav-active)] text-white hover:bg-[var(--border-strong)];
+    --tw-ring-offset-color: var(--bg-surface);
   }
 
   /* 次要按钮 - 对标参考截图「资源浏览器」白底黑线小圆角 */
@@ -171,11 +88,11 @@
   }
 
   .dark .btn-secondary {
-    @apply bg-transparent text-gray-100 border border-[#312e2b] hover:border-[#45413c] hover:bg-[#282522];
+    @apply bg-transparent text-gray-100 border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)];
   }
 
   .light .btn-secondary {
-    @apply bg-white text-[#161513] border border-[#393632] hover:bg-[#f9f9f8];
+    @apply bg-white text-[var(--text-primary)] border border-[var(--topbar-bg)] hover:bg-[var(--bg-tertiary)];
   }
 
   /* 幽灵按钮 */
@@ -259,11 +176,11 @@
   }
 
   .dark .card {
-    @apply bg-[#1f1d1b] border border-[#312e2b];
+    @apply bg-[var(--bg-surface)] border border-[var(--border-color)];
   }
 
   .light .card {
-    @apply bg-white border border-[#e0dfdd];
+    @apply bg-[var(--bg-surface)] border border-[var(--border-color)];
   }
 
   .card-hover {
@@ -272,11 +189,11 @@
   }
 
   .dark .card-hover {
-    @apply bg-[#1f1d1b] border border-[#312e2b] hover:border-[#45413c];
+    @apply bg-[var(--bg-surface)] border border-[var(--border-color)] hover:border-[var(--border-hover)];
   }
 
   .light .card-hover {
-    @apply bg-white border border-[#e0dfdd] hover:border-[#b8b6b2];
+    @apply bg-[var(--bg-surface)] border border-[var(--border-color)] hover:border-[var(--border-hover)];
   }
 
   /* 统计卡片 - 移动端优化 */
@@ -310,39 +227,39 @@
   }
 
   .badge-success {
-    @apply text-[#1e7e34];
+    @apply text-[var(--success)];
   }
 
   .dark .badge-success {
-    @apply bg-[#15321e] text-[#5cd887];
+    @apply bg-[color-mix(in_srgb,var(--success)_18%,var(--bg-surface))] text-[var(--success)];
   }
 
   .light .badge-success {
-    @apply bg-[#e2f3e8] text-[#1e7e34];
+    @apply bg-[var(--success-soft)] text-[var(--success)];
   }
 
   .badge-warning {
-    @apply text-[#8f5b00];
+    @apply text-[var(--warning)];
   }
 
   .dark .badge-warning {
-    @apply bg-[#3b2b0a] text-[#f5c842];
+    @apply bg-[color-mix(in_srgb,var(--warning)_18%,var(--bg-surface))] text-[var(--warning)];
   }
 
   .light .badge-warning {
-    @apply bg-[#fff3d6] text-[#8f5b00];
+    @apply bg-[color-mix(in_srgb,var(--warning)_16%,var(--bg-surface))] text-[var(--warning)];
   }
 
   .badge-error {
-    @apply text-[#c74634];
+    @apply text-[var(--error)];
   }
 
   .dark .badge-error {
-    @apply bg-[#3b1411] text-[#f27568];
+    @apply bg-[color-mix(in_srgb,var(--error)_18%,var(--bg-surface))] text-[var(--error)];
   }
 
   .light .badge-error {
-    @apply bg-[#fce8e6] text-[#c74634];
+    @apply bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] text-[var(--error)];
   }
 
   .badge-default {
@@ -350,11 +267,11 @@
   }
 
   .dark .badge-default {
-    @apply bg-[#282522] text-[#a29e9a];
+    @apply bg-[var(--bg-tertiary)] text-[var(--text-secondary)];
   }
 
   .light .badge-default {
-    @apply bg-[#f5f5f4] text-[#66615e];
+    @apply bg-[var(--bg-tertiary)] text-[var(--text-secondary)];
   }
 
   /* ============ 表格 - OCI 紧凑平实风格 ============ */
@@ -368,11 +285,11 @@
   }
 
   .dark .table th {
-    @apply border-b border-[#312e2b] text-[#a29e9a];
+    @apply border-b border-[var(--border-color)] text-[var(--text-secondary)];
   }
 
   .light .table th {
-    @apply border-b border-[#e0dfdd] text-[#66615e];
+    @apply border-b border-[var(--border-color)] text-[var(--text-secondary)];
   }
 
   .table td {
@@ -380,19 +297,19 @@
   }
 
   .dark .table td {
-    @apply border-b border-[#282522];
+    @apply border-b border-[var(--border-color)];
   }
 
   .light .table td {
-    @apply border-b border-[#ebeae8];
+    @apply border-b border-[var(--border-color)];
   }
 
   .dark .table tr:hover td {
-    @apply bg-[#24211e];
+    @apply bg-[var(--bg-elevated)];
   }
 
   .light .table tr:hover td {
-    @apply bg-[#f9f9f8];
+    @apply bg-[var(--bg-tertiary)];
   }
 
   /* ============ 分隔线 ============ */
@@ -401,11 +318,11 @@
   }
 
   .dark .divider {
-    @apply border-[#312e2b];
+    @apply border-[var(--border-color)];
   }
 
   .light .divider {
-    @apply border-[#e0dfdd];
+    @apply border-[var(--border-color)];
   }
 
   /* ============ 页面标题 ============ */
@@ -867,13 +784,13 @@
 
 /* ============ 输入框聚焦效果 ============ */
 .dark .input:focus {
-  border-color: #8b8ff5;
-  box-shadow: 0 0 0 1px #8b8ff5, 0 0 0 4px rgba(139, 143, 245, 0.2);
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--bg-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 68%, var(--bg-surface)), 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .light .input:focus {
-  border-color: #5e6ad2;
-  box-shadow: 0 0 0 1px #5e6ad2, 0 0 0 4px rgba(94, 106, 210, 0.14);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 /* ============ 按钮点击效果 ============ */
@@ -1328,24 +1245,24 @@
 .dark .kawaii-header-cta,
 .dark .kawaii-primary-button,
 .dark .btn-primary {
-  background-color: #4593de !important;
-  color: #161513 !important;
+  background-color: var(--accent) !important;
+  color: var(--bg-primary) !important;
 }
 .light .kawaii-header-cta,
 .light .kawaii-primary-button,
 .light .btn-primary {
-  background-color: #0b5cad !important;
-  color: #ffffff !important;
+  background-color: var(--accent) !important;
+  color: var(--bg-surface) !important;
 }
 .dark .kawaii-header-cta:hover,
 .dark .kawaii-primary-button:hover,
 .dark .btn-primary:hover {
-  background-color: #7db6e9 !important;
+  background-color: color-mix(in srgb, var(--accent) 78%, var(--bg-surface)) !important;
 }
 .light .kawaii-header-cta:hover,
 .light .kawaii-primary-button:hover,
 .light .btn-primary:hover {
-  background-color: #004f7a !important;
+  background-color: color-mix(in srgb, var(--accent) 82%, var(--bg-primary)) !important;
 }
 .kawaii-header-cta:hover,
 .kawaii-primary-button:hover,
@@ -1357,8 +1274,8 @@
 .kawaii-menu-item.is-active,
 .kawaii-sidebar a.router-link-active {
   background-image: none !important;
-  background-color: rgba(11, 92, 173, 0.08) !important;
-  color: #0b5cad !important;
+  background-color: color-mix(in srgb, var(--nav-active) 8%, transparent) !important;
+  color: var(--nav-active) !important;
   box-shadow: none !important;
   border-radius: var(--radius-btn) !important;
 }
@@ -1569,25 +1486,33 @@ textarea.input,
 }
 
 .dark .dropdown-menu,
-:global(.dark) .dropdown-menu,
-:global(.dark) .kawaii-menu-panel,
-:global(.dark) [role='menu'],
-:global(.dark) .popover,
-:global(.dark) .oci-user-dropdown {
-  background-color: #1f1d1b !important;
-  border-color: #312e2b !important;
-  color: #f4f4f3 !important;
+.dark .kawaii-menu-panel,
+.dark [role='menu'],
+.dark .popover,
+.dark .oci-user-dropdown,
+html.dark .dropdown-menu,
+html.dark .kawaii-menu-panel,
+html.dark [role='menu'],
+html.dark .popover,
+html.dark .oci-user-dropdown {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
 }
 
 .light .dropdown-menu,
-:global(.light) .dropdown-menu,
-:global(.light) .kawaii-menu-panel,
-:global(.light) [role='menu'],
-:global(.light) .popover,
-:global(.light) .oci-user-dropdown {
-  background-color: #ffffff !important;
-  border-color: #e0dfdd !important;
-  color: #161513 !important;
+.light .kawaii-menu-panel,
+.light [role='menu'],
+.light .popover,
+.light .oci-user-dropdown,
+html.light .dropdown-menu,
+html.light .kawaii-menu-panel,
+html.light [role='menu'],
+html.light .popover,
+html.light .oci-user-dropdown {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
 }
 
 .dropdown-item {
@@ -1628,7 +1553,7 @@ textarea.input,
 }
 
 .light .skeleton-bg-soft {
-  background-color: #f4f4f5;
+  background-color: var(--bg-tertiary);
 }
 
 /* ============ 创建中状态呼吸灯效果 ============ */
@@ -1663,14 +1588,14 @@ textarea.input,
   height: 16px;
   background: linear-gradient(180deg, 
     transparent 0%, 
-    #3b82f6 20%, 
-    #60a5fa 50%, 
-    #3b82f6 80%, 
+    var(--accent) 20%, 
+    color-mix(in srgb, var(--accent) 70%, var(--bg-surface)) 50%, 
+    var(--accent) 80%, 
     transparent 100%
   );
   border-radius: 1px;
   animation: creating-scan 1.8s ease-in-out infinite;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6), 0 0 16px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* 移动端卡片 - 边框流光效果 */
@@ -1701,27 +1626,27 @@ textarea.input,
     90deg,
     transparent 0%,
     transparent 30%,
-    #3b82f6 45%,
-    #60a5fa 50%,
-    #3b82f6 55%,
+    var(--accent) 45%,
+    color-mix(in srgb, var(--accent) 70%, var(--bg-surface)) 50%,
+    var(--accent) 55%,
     transparent 70%,
     transparent 100%
   );
   background-size: 300% 100%;
   animation: creating-border-flow 2.5s ease-in-out infinite;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(white 0 0) content-box, linear-gradient(white 0 0);
+  mask: linear-gradient(white 0 0) content-box, linear-gradient(white 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
 }
 
 .dark .creating-card::before {
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .light .creating-card::before {
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 /* Vercel Style Slider */
@@ -1736,11 +1661,11 @@ textarea.input,
 }
 
 .dark .vercel-slider {
-  background: linear-gradient(to right, #3b82f6 var(--slider-progress, 50%), #374151 var(--slider-progress, 50%));
+  background: linear-gradient(to right, var(--accent) var(--slider-progress, 50%), var(--border-color) var(--slider-progress, 50%));
 }
 
 .light .vercel-slider {
-  background: linear-gradient(to right, #3b82f6 var(--slider-progress, 50%), #e5e7eb var(--slider-progress, 50%));
+  background: linear-gradient(to right, var(--accent) var(--slider-progress, 50%), var(--border-color) var(--slider-progress, 50%));
 }
 
 .vercel-slider::-webkit-slider-thumb {
@@ -1749,8 +1674,8 @@ textarea.input,
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
-  border: 2px solid #3b82f6;
+  background: var(--bg-surface);
+  border: 2px solid var(--accent);
   cursor: grab;
   transition: all 0.15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -1758,22 +1683,22 @@ textarea.input,
 
 .vercel-slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .vercel-slider::-webkit-slider-thumb:active {
   cursor: grabbing;
   transform: scale(1.05);
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .vercel-slider::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
-  border: 2px solid #3b82f6;
+  background: var(--bg-surface);
+  border: 2px solid var(--accent);
   cursor: grab;
   transition: all 0.15s ease;
 }
@@ -1784,20 +1709,20 @@ textarea.input,
 }
 
 .dark .vercel-slider::-moz-range-track {
-  background: #374151;
+  background: var(--border-color);
 }
 
 .light .vercel-slider::-moz-range-track {
-  background: #e5e7eb;
+  background: var(--border-color);
 }
 
 .dark .vercel-slider::-moz-range-progress {
-  background: #3b82f6;
+  background: var(--accent);
   border-radius: 3px;
 }
 
 .light .vercel-slider::-moz-range-progress {
-  background: #3b82f6;
+  background: var(--accent);
   border-radius: 3px;
 }
 

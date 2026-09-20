@@ -484,6 +484,10 @@ export default {
         extensionCenter: '扩展中心',
         welfareCenter: '福利中心',
         personalSettings: '个人设置',
+        searchPlaceholder: '搜索资源、服务或菜单...',
+        searchNoResults: '未找到相关菜单',
+        allMenus: '全部菜单',
+        menuSearchHint: '按 ⌘K 快速搜索',
     },
 
     // 主题

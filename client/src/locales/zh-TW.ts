@@ -308,6 +308,10 @@ const zhTW = {
         extensionCenter: '擴充中心',
         welfareCenter: '福利中心',
         personalSettings: '個人設定',
+        searchPlaceholder: '搜尋資源、服務或功能表...',
+        searchNoResults: '找不到相關功能表',
+        allMenus: '全部功能表',
+        menuSearchHint: '按 ⌘K 快速搜尋',
     },
 
     // 佈景主題

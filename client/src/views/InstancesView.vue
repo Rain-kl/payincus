@@ -1637,7 +1637,7 @@ async function confirmBatchDestroy(): Promise<void> {
         {{ search ? $t('instance.noMatchingInstances') : $t('instance.noInstances') }}
       </h3>
       <p class="text-themed-muted mb-4">{{ search ? $t('instance.tryOtherKeywords') : $t('instance.createFirstInstance') }}</p>
-      <RouterLink v-if="!search" :to="instanceCreatePath()" class="btn-primary">{{ configStore.freeSiteMode ? freeSiteCopy.instanceCreateFirst : $t('instance.create') }}</RouterLink>
+      <RouterLink v-if="!search" :to="instanceCreatePath()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 transition-colors shadow-sm">{{ configStore.freeSiteMode ? freeSiteCopy.instanceCreateFirst : $t('instance.create') }}</RouterLink>
     </div>
 
     <!-- 实例列表 -->

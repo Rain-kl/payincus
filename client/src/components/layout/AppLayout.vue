@@ -9,6 +9,7 @@ import { useConfigStore } from '@/stores/config'
 import { supportedLocales, setLocale, type Locale } from '@/locales'
 import { useBrand } from '@/composables/useBrand'
 import SideNav from './SideNav.vue'
+import MenuSearchBox from './MenuSearchBox.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
 import { instancesPath, loginPath, profilePath, terminalPath } from '@/utils/app-paths'
@@ -134,7 +135,7 @@ onUnmounted(() => {
 <template>
   <div class="kawaii-app-shell h-screen flex flex-col overflow-hidden" :class="routeThemeClass">
     <!-- 顶部栏：整行贯通全屏，防止标题栏被分割线切分 -->
-    <header class="kawaii-topbar nimbus-topbar h-[62px] w-full flex items-center justify-between px-4 md:px-6 border-b border-[#2c2a28] flex-shrink-0 z-30">
+    <header class="kawaii-topbar nimbus-topbar h-[62px] w-full flex items-center justify-between px-4 md:px-6 border-b border-[var(--topbar-border)] flex-shrink-0 z-30">
       <div class="flex items-center gap-2.5 md:gap-3 min-w-0">
         <!-- Mobile: Hamburger menu -->
         <button 
@@ -171,8 +172,13 @@ onUnmounted(() => {
         </RouterLink>
       </div>
 
+      <!-- 中间：搜索框 (居中放置且拉长，随页面大小变化自适应伸缩，屏幕过小时收缩为图标) -->
+      <div class="flex-1 flex justify-center items-center px-2 sm:px-4 md:px-6 min-w-0 max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto">
+        <MenuSearchBox />
+      </div>
+
       <!-- 右侧菜单 -->
-      <div class="flex items-center gap-2 md:gap-3">
+      <div class="flex items-center gap-2 md:gap-3 flex-shrink-0">
         <!-- 终端管理入口 -->
         <button
           v-if="!isAdminEntry"
@@ -264,21 +270,21 @@ onUnmounted(() => {
           >
             <div 
               v-if="userMenuOpen"
-              class="oci-user-dropdown absolute right-0 mt-2 w-[280px] rounded border border-[#e0dfdd] dark:border-[#312e2b] bg-white dark:bg-[#1f1d1b] p-5 shadow-lg z-50 select-none text-[15px]"
+              class="dropdown-menu kawaii-menu-panel oci-user-dropdown absolute right-0 mt-2 w-[280px] rounded border border-themed bg-themed-surface p-5 shadow-xl z-50 select-none text-[15px]"
             >
               <!-- 概要信息 -->
               <div>
-                <h3 class="text-base font-bold text-[#161513] dark:text-[#f4f4f3] tracking-tight">
+                <h3 class="text-base font-bold text-[var(--text-primary)] tracking-tight">
                   {{ t('userMenu.summary') }}
                 </h3>
                 <div class="mt-3.5 space-y-2.5">
-                  <div class="text-[#0b5cad] dark:text-[#4593de] truncate">
+                  <div class="text-[var(--accent)] truncate">
                     {{ authStore.user?.email || authStore.user?.username }}
                   </div>
-                  <div class="text-[#0b5cad] dark:text-[#4593de]">
+                  <div class="text-[var(--accent)]">
                     {{ t('userMenu.identityDomain') }}：&nbsp;&nbsp;Default
                   </div>
-                  <div class="text-[#0b5cad] dark:text-[#4593de] truncate">
+                  <div class="text-[var(--accent)] truncate">
                     {{ t('userMenu.tenant') }}：&nbsp;{{ authStore.user?.username }}
                   </div>
                   
@@ -286,7 +292,7 @@ onUnmounted(() => {
                   <div class="relative">
                     <button
                       type="button"
-                      class="w-full flex items-center justify-between text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer group text-left"
+                      class="w-full flex items-center justify-between text-[var(--accent)] hover:underline cursor-pointer group text-left"
                       @click.stop="toggleLangDropdown"
                     >
                       <span>{{ t('userMenu.language') }}：&nbsp;{{ currentLocaleDisplay }}</span>
@@ -298,7 +304,7 @@ onUnmounted(() => {
                     <!-- 展开语言选择列表 -->
                     <div
                       v-if="langDropdownOpen"
-                      class="mt-2 py-1 px-1 rounded border border-[#e0dfdd] dark:border-[#312e2b] bg-[#f9f9f8] dark:bg-[#282522] space-y-0.5"
+                      class="mt-2 py-1 px-1 rounded border border-themed bg-themed-secondary space-y-0.5"
                     >
                       <button
                         v-for="lang in supportedLocales"
@@ -306,12 +312,12 @@ onUnmounted(() => {
                         type="button"
                         class="w-full flex items-center justify-between px-3 py-1.5 text-xs rounded transition-colors"
                         :class="locale === lang.code 
-                          ? 'bg-[#0b5cad]/10 text-[#0b5cad] dark:text-[#4593de] font-medium' 
-                          : 'text-[#161513] dark:text-[#f4f4f3] hover:bg-black/5 dark:hover:bg-white/5'"
+                          ? 'bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent)] font-medium' 
+                          : 'text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/5'"
                         @click.stop="changeLocale(lang.code)"
                       >
                         <span>{{ getLocaleDisplayName(lang.code) }}</span>
-                        <svg v-if="locale === lang.code" class="w-3.5 h-3.5 text-[#0b5cad] dark:text-[#4593de]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg v-if="locale === lang.code" class="w-3.5 h-3.5 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
                       </button>
@@ -321,20 +327,20 @@ onUnmounted(() => {
               </div>
 
               <!-- 分割线 -->
-              <div class="border-t border-[#e0dfdd] dark:border-[#312e2b] my-4 -mx-5"></div>
+              <div class="border-t border-themed my-4 -mx-5"></div>
 
               <!-- 操作设置项 -->
               <div class="space-y-2.5">
                 <button
                   type="button"
-                  class="block w-full text-left text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer transition-colors"
+                  class="block w-full text-left text-[var(--accent)] hover:underline cursor-pointer transition-colors"
                   @click="navigateTo(accountProfilePath)"
                 >
                   {{ t('userMenu.profile') }}
                 </button>
                 <button
                   type="button"
-                  class="block w-full text-left text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer transition-colors"
+                  class="block w-full text-left text-[var(--accent)] hover:underline cursor-pointer transition-colors"
                   @click="navigateTo(accountInstancesPath)"
                 >
                   {{ t('userMenu.consoleSettings') }}
@@ -342,13 +348,13 @@ onUnmounted(() => {
               </div>
 
               <!-- 分割线 -->
-              <div class="border-t border-[#e0dfdd] dark:border-[#312e2b] my-4 -mx-5"></div>
+              <div class="border-t border-themed my-4 -mx-5"></div>
 
               <!-- 注销 -->
               <div>
                 <button
                   type="button"
-                  class="block w-full text-left text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer transition-colors"
+                  class="block w-full text-left text-[var(--accent)] hover:underline cursor-pointer transition-colors"
                   @click="handleLogout"
                 >
                   {{ t('userMenu.logout') }}
@@ -380,12 +386,12 @@ onUnmounted(() => {
     </div>
 
     <!-- 下区：横向贯通页脚 (高度 32px / h-8) -->
-    <footer class="kawaii-app-footer h-8 w-full shrink-0 border-t border-[#e5e4e0] bg-[#F5F4F2] text-[#66615e] text-xs px-4 flex items-center justify-between select-none z-20">
+    <footer class="kawaii-app-footer h-8 w-full shrink-0 border-t border-[var(--border-color)] bg-[var(--footer-bg)] text-[var(--text-secondary)] text-xs px-4 flex items-center justify-between select-none z-20">
       <!-- 左侧：条款与隐私弹窗 + 联系方式 -->
       <div class="flex items-center gap-3 shrink-0 text-[11px] sm:text-xs">
         <button
           type="button"
-          class="hover:text-[#161513] transition-colors cursor-pointer text-[#66615e]"
+          class="hover:text-[var(--nav-active)] transition-colors cursor-pointer text-[var(--text-secondary)]"
           @click="showTermsModal = true"
         >
           {{ $t('auth.tos.title') || '使用条款和隐私声明' }}
@@ -395,7 +401,7 @@ onUnmounted(() => {
           <a
             v-if="configStore.footerContactEmail"
             :href="`mailto:${configStore.footerContactEmail}`"
-            class="hover:text-[#161513] transition-colors flex items-center gap-1 text-[#66615e]"
+            class="hover:text-[var(--nav-active)] transition-colors flex items-center gap-1 text-[var(--text-secondary)]"
             :title="configStore.footerContactEmail"
           >
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,7 +414,7 @@ onUnmounted(() => {
             :href="configStore.footerTelegramLink"
             target="_blank"
             rel="noopener noreferrer"
-            class="hover:text-[#161513] transition-colors flex items-center gap-1 text-[#66615e]"
+            class="hover:text-[var(--nav-active)] transition-colors flex items-center gap-1 text-[var(--text-secondary)]"
             title="Telegram"
           >
             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -442,19 +448,19 @@ onUnmounted(() => {
 .kawaii-topbar.nimbus-topbar {
   position: relative;
   z-index: 40;
-  background-color: #393632 !important;
+  background-color: var(--topbar-bg) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
-  border-bottom: 1px solid #2c2a28 !important;
-  border-color: #2c2a28 !important;
-  color: #ffffff !important;
+  border-bottom: 1px solid var(--topbar-border) !important;
+  border-color: var(--topbar-border) !important;
+  color: var(--topbar-text) !important;
 }
 
 :global(.dark) .kawaii-topbar.nimbus-topbar {
-  background-color: #1f1d1b !important;
-  border-bottom: 1px solid #2c2a28 !important;
-  border-color: #2c2a28 !important;
+  background-color: var(--topbar-bg) !important;
+  border-bottom: 1px solid var(--topbar-border) !important;
+  border-color: var(--topbar-border) !important;
 }
 
 /* Icon buttons — covers direct topbar buttons + child components
@@ -468,14 +474,14 @@ onUnmounted(() => {
   padding: 0 7px;
   border-radius: var(--radius-btn, 4px);
   border: 1px solid transparent;
-  color: #c7c5c2 !important;
+  color: color-mix(in srgb, var(--topbar-text) 78%, transparent) !important;
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
 .kawaii-topbar :deep(.kawaii-header-icon:hover) {
-  color: #ffffff !important;
+  color: var(--topbar-text) !important;
   border-color: transparent !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: color-mix(in srgb, var(--topbar-text) 10%, transparent) !important;
 }
 
 /* User square trigger & icon box */
@@ -503,7 +509,11 @@ onUnmounted(() => {
 }
 
 .oci-user-dropdown {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15) !important;
+  background-color: var(--kawaii-surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 1 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -515,25 +525,25 @@ onUnmounted(() => {
 
 /* Bottom Footer — compact 32px bar across full screen width */
 .kawaii-app-footer {
-  background-color: #F5F4F2 !important;
-  border-top: 1px solid #e5e4e0 !important;
-  color: #66615e !important;
+  background-color: var(--footer-bg) !important;
+  border-top: 1px solid var(--border-color) !important;
+  color: var(--text-secondary) !important;
 }
 
 :global(.light) .kawaii-app-footer,
 :global(.dark) .kawaii-app-footer {
-  background-color: #F5F4F2 !important;
-  border-top: 1px solid #e5e4e0 !important;
-  color: #66615e !important;
+  background-color: var(--footer-bg) !important;
+  border-top: 1px solid var(--border-color) !important;
+  color: var(--text-secondary) !important;
 }
 
 .kawaii-app-footer a,
 .kawaii-app-footer button {
-  color: #66615e !important;
+  color: var(--text-secondary) !important;
 }
 
 .kawaii-app-footer a:hover,
 .kawaii-app-footer button:hover {
-  color: #161513 !important;
+  color: var(--nav-active) !important;
 }
 </style>

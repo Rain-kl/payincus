@@ -1,44 +1,45 @@
 @layer base {
   /* ============================================================
-     OCI (Oracle Cloud Infrastructure) 设计系统 · 纯白画布 + #393632 暖深炭灰顶栏
-     - 顶栏固定 #393632，文本反白；
-     - 主色 --kawaii-primary=OCI 云蓝（#0b5cad），驱动交互/链接/侧栏指示条；
-     - 状态色 mint/amber/rose 语义保留为 OCI 经典柔和胶囊指示色；
+     OCI (Oracle Cloud Infrastructure) 设计系统 · 纯白画布 + 暖深炭灰顶栏
+     - 顶栏背景 --topbar-bg（浅色 #383632 / 深色 #1f1d1b），文本反白；
+     - 主色 --accent（浅色 #295BA7 / 深色 #4593DE），驱动交互/链接/侧栏指示条；
+     - 状态色 mint/amber/rose 语义保留（同 --success/--warning/--error）；
      - 阴影清零（Flat Design），保持平整企业云控制台质感。
+     - 所有色值引用 theme.css 的 token，禁止在此写死 hex。
      ============================================================ */
   .light {
-    --kawaii-bg: #F6F4F3;
-    --kawaii-surface: #ffffff;
-    --kawaii-surface-soft: #f9f9f8;
-    --kawaii-line: #e0dfdd;
-    --kawaii-line-strong: #b8b6b2;
-    --kawaii-text: #161513;
-    --kawaii-muted: #66615e;
-    --kawaii-primary: #0b5cad;
-    --kawaii-primary-strong: #006699;
+    --kawaii-bg: var(--bg-primary);
+    --kawaii-surface: var(--bg-surface);
+    --kawaii-surface-soft: var(--bg-surface-soft);
+    --kawaii-line: var(--border-color);
+    --kawaii-line-strong: var(--border-strong);
+    --kawaii-text: var(--text-primary);
+    --kawaii-muted: var(--text-secondary);
+    --kawaii-primary: var(--accent);
+    --kawaii-primary-strong: var(--accent-strong);
     --kawaii-pink: var(--kawaii-primary);
-    --kawaii-mint: #1e7e34;
+    --kawaii-mint: var(--success);
     --kawaii-lavender: var(--kawaii-primary);
-    --kawaii-amber: #8f5b00;
-    --kawaii-faint: #8c8984;
+    --kawaii-amber: var(--warning);
+    --kawaii-faint: var(--text-tertiary);
     --kawaii-shadow: none;
   }
 
   .dark {
-    --kawaii-bg: #161513;
-    --kawaii-surface: #1f1d1b;
-    --kawaii-surface-soft: #282522;
-    --kawaii-line: #312e2b;
-    --kawaii-line-strong: #45413c;
-    --kawaii-text: #f4f4f3;
-    --kawaii-muted: #a29e9a;
-    --kawaii-primary: #4593de;
-    --kawaii-primary-strong: #0b5cad;
+    --kawaii-bg: var(--bg-primary);
+    --kawaii-surface: var(--bg-surface);
+    --kawaii-surface-soft: var(--bg-surface-soft);
+    --kawaii-line: var(--border-color);
+    --kawaii-line-strong: var(--border-strong);
+    --kawaii-text: var(--text-primary);
+    --kawaii-muted: var(--text-secondary);
+    --kawaii-primary: var(--accent);
+    --kawaii-primary-strong: var(--accent-strong);
     --kawaii-pink: var(--kawaii-primary);
-    --kawaii-mint: #5cd887;
+    --kawaii-mint: var(--success);
     --kawaii-lavender: var(--kawaii-primary);
-    --kawaii-amber: #f5c842;
-    --kawaii-faint: #736f6a;
+    --kawaii-amber: var(--warning);
+    --kawaii-faint: var(--text-tertiary);
     --kawaii-shadow: none;
   }
 }
@@ -121,7 +122,7 @@
 
   .kawaii-header-cta {
     background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
-    color: #fff !important;
+    color: var(--topbar-text) !important;
     box-shadow: 0 10px 26px rgb(17 17 26 / 0.24);
   }
 
@@ -229,41 +230,41 @@
   .nimbus-topbar {
     position: relative;
     z-index: 30;
-    background-color: #393632 !important;
-    border-bottom: 1px solid #2c2a28 !important;
-    color: #ffffff !important;
+    background-color: var(--topbar-bg) !important;
+    border-bottom: 1px solid var(--topbar-border) !important;
+    color: var(--topbar-text) !important;
     box-shadow: none !important;
   }
 
   .dark .kawaii-topbar,
   .dark .nimbus-topbar {
-    background-color: #1f1d1b !important;
-    border-bottom: 1px solid #2c2a28 !important;
-    color: #ffffff !important;
+    background-color: var(--topbar-bg) !important;
+    border-bottom: 1px solid var(--topbar-border) !important;
+    color: var(--topbar-text) !important;
     box-shadow: none !important;
   }
 
   .kawaii-topbar .kawaii-header-icon,
   .nimbus-topbar .kawaii-header-icon {
-    color: #e6e4e2 !important;
+    color: color-mix(in srgb, var(--topbar-text) 84%, transparent) !important;
   }
 
   .kawaii-topbar .kawaii-header-icon:hover,
   .nimbus-topbar .kawaii-header-icon:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: #ffffff !important;
+    background-color: color-mix(in srgb, var(--topbar-text) 10%, transparent) !important;
+    color: var(--topbar-text) !important;
   }
 
   .kawaii-topbar .text-themed,
   .nimbus-topbar .text-themed {
-    color: #ffffff !important;
+    color: var(--topbar-text) !important;
   }
 
   .kawaii-topbar .text-themed-secondary,
   .nimbus-topbar .text-themed-secondary,
   .kawaii-topbar .text-themed-muted,
   .nimbus-topbar .text-themed-muted {
-    color: #c7c5c2 !important;
+    color: color-mix(in srgb, var(--topbar-text) 78%, transparent) !important;
   }
 
   .kawaii-sidebar {
@@ -275,8 +276,8 @@
   }
 
   .dark .kawaii-sidebar {
-    background: #1a1816 !important;
-    border-color: #312e2b !important;
+    background: var(--bg-elevated) !important;
+    border-color: var(--border-color) !important;
     box-shadow: none !important;
   }
 
@@ -294,8 +295,8 @@
   .kawaii-sidebar a.router-link-active,
   .kawaii-sidebar a.router-link-exact-active,
   .kawaii-sidebar a.is-active {
-    background: rgba(11, 92, 173, 0.08) !important;
-    color: #0b5cad !important;
+    background: color-mix(in srgb, var(--nav-active) 8%, transparent) !important;
+    color: var(--nav-active) !important;
     border: none !important;
     border-radius: var(--radius-btn);
     box-shadow: none !important;
@@ -304,8 +305,8 @@
   .dark .kawaii-sidebar a.router-link-active,
   .dark .kawaii-sidebar a.router-link-exact-active,
   .dark .kawaii-sidebar a.is-active {
-    background: rgba(11, 92, 173, 0.2) !important;
-    color: #4593de !important;
+    background: color-mix(in srgb, var(--nav-active) 14%, transparent) !important;
+    color: var(--nav-active) !important;
     border: none !important;
     border-radius: var(--radius-btn);
     box-shadow: none !important;
@@ -515,25 +516,25 @@
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button) {
     border: 1px solid transparent !important;
     border-radius: var(--radius-btn);
-    background: #0b5cad !important;
-    color: #fff !important;
+    background: var(--accent) !important;
+    color: var(--bg-surface) !important;
     box-shadow: none !important;
   }
 
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button):hover {
-    background: #004f7a !important;
+    background: color-mix(in srgb, var(--accent) 82%, var(--bg-primary)) !important;
   }
 
   .dark .kawaii-app-shell .btn-primary:not(.kawaii-action-button) {
-    background: #4593de !important;
-    color: #161513 !important;
+    background: var(--accent) !important;
+    color: var(--bg-primary) !important;
   }
 
   .kawaii-auth-shell .btn-primary {
     border: 1px solid transparent !important;
     border-radius: var(--radius-btn);
-    background: #0b5cad !important;
-    color: #fff !important;
+    background: var(--accent) !important;
+    color: var(--bg-surface) !important;
     box-shadow: none !important;
   }
 
@@ -541,18 +542,18 @@
   .kawaii-app-shell .btn-ghost,
   .kawaii-app-shell .btn-outline {
     border-radius: var(--radius-btn);
-    border: 1px solid #393632 !important;
-    background: #ffffff !important;
-    color: #161513 !important;
+    border: 1px solid var(--border-strong) !important;
+    background: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
     box-shadow: none !important;
   }
 
   .dark .kawaii-app-shell .btn-secondary,
   .dark .kawaii-app-shell .btn-ghost,
   .dark .kawaii-app-shell .btn-outline {
-    border: 1px solid #312e2b !important;
-    background: #1f1d1b !important;
-    color: #f4f4f3 !important;
+    border: 1px solid var(--border-color) !important;
+    background: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
   }
 
   .kawaii-app-shell [role='menu'],
@@ -643,7 +644,7 @@
   .modal-content .btn-primary {
     border-color: transparent !important;
     background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
-    color: #fff !important;
+    color: var(--topbar-text) !important;
     box-shadow: 0 12px 26px rgb(17 17 26 / 0.22) !important;
   }
 
@@ -676,11 +677,11 @@
   :where([class*='fixed'][class*='inset-0']) > :where([class*='bg-white'], [class*='bg-gray-900'], [class*='bg-gray-950']) {
     border: 1px solid var(--kawaii-line) !important;
     border-radius: var(--radius-modal);
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--kawaii-surface) 94%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 64%, transparent)) !important;
+    background: var(--kawaii-surface) !important;
     color: var(--kawaii-text) !important;
     box-shadow: var(--kawaii-shadow) !important;
-    backdrop-filter: blur(20px);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   :where([class*='fixed'][class*='inset-0']) > :where([class*='bg-white'], [class*='bg-gray-900'], [class*='bg-gray-950']) :where([class*='border-gray'], [class*='border-zinc']) {
@@ -707,17 +708,17 @@
 
   .kawaii-app-shell :where([class*='bg-white'], [class*='bg-gray-50'], [class*='bg-gray-100'], [class*='bg-gray-200'], [class*='bg-zinc-50'], [class*='bg-zinc-100']):not(.kawaii-theme-exempt):not(.terminal-area),
   .kawaii-public-shell :where([class*='bg-white'], [class*='bg-gray-50'], [class*='bg-gray-100'], [class*='bg-gray-200'], [class*='bg-zinc-50'], [class*='bg-zinc-100']):not(.kawaii-theme-exempt) {
-    background-color: color-mix(in srgb, var(--kawaii-surface) 86%, transparent) !important;
+    background-color: var(--kawaii-surface) !important;
   }
 
   .dark .kawaii-app-shell :where([class*='dark:bg-gray-700'], [class*='dark:bg-gray-800'], [class*='dark:bg-gray-900'], [class*='dark:bg-zinc-700'], [class*='dark:bg-zinc-800'], [class*='dark:bg-zinc-900']):not(.kawaii-theme-exempt):not(.terminal-area),
   .dark .kawaii-public-shell :where([class*='dark:bg-gray-700'], [class*='dark:bg-gray-800'], [class*='dark:bg-gray-900'], [class*='dark:bg-zinc-700'], [class*='dark:bg-zinc-800'], [class*='dark:bg-zinc-900']):not(.kawaii-theme-exempt) {
-    background-color: color-mix(in srgb, var(--kawaii-surface-soft) 78%, transparent) !important;
+    background-color: var(--kawaii-surface) !important;
   }
 
   .kawaii-app-shell :where([class*='hover:bg-gray-50'], [class*='hover:bg-gray-100'], [class*='hover:bg-gray-200'], [class*='hover:bg-zinc-50'], [class*='hover:bg-zinc-100']):not(.kawaii-theme-exempt):hover,
   .kawaii-public-shell :where([class*='hover:bg-gray-50'], [class*='hover:bg-gray-100'], [class*='hover:bg-gray-200'], [class*='hover:bg-zinc-50'], [class*='hover:bg-zinc-100']):not(.kawaii-theme-exempt):hover {
-    background-color: color-mix(in srgb, var(--kawaii-surface-soft) 90%, transparent) !important;
+    background-color: var(--kawaii-surface-soft) !important;
   }
 
   .kawaii-app-shell :where([class*='border-gray'], [class*='border-zinc']):not(.kawaii-theme-exempt):not(.terminal-area),
@@ -772,19 +773,19 @@
   }
 
   .kawaii-page :where([class*='bg-white'], [class*='bg-gray-50'], [class*='bg-gray-100'], [class*='bg-gray-200'], [class*='bg-zinc-50'], [class*='bg-zinc-100']) {
-    background-color: color-mix(in srgb, var(--kawaii-surface) 86%, transparent) !important;
+    background-color: var(--kawaii-surface) !important;
   }
 
   .kawaii-page :where([class*='hover:bg-gray-50'], [class*='hover:bg-gray-100'], [class*='hover:bg-gray-200'], [class*='hover:bg-zinc-50'], [class*='hover:bg-zinc-100']):hover {
-    background-color: color-mix(in srgb, var(--kawaii-surface-soft) 90%, transparent) !important;
+    background-color: var(--kawaii-surface-soft) !important;
   }
 
   .dark .kawaii-page :where([class*='dark:bg-gray-700'], [class*='dark:bg-gray-800'], [class*='dark:bg-zinc-700'], [class*='dark:bg-zinc-800']) {
-    background-color: color-mix(in srgb, var(--kawaii-surface-soft) 76%, transparent) !important;
+    background-color: var(--kawaii-surface) !important;
   }
 
   .dark .kawaii-page :where([class*='dark:hover:bg-gray-700'], [class*='dark:hover:bg-gray-800'], [class*='dark:hover:bg-zinc-700'], [class*='dark:hover:bg-zinc-800']):hover {
-    background-color: color-mix(in srgb, var(--kawaii-surface-soft) 88%, transparent) !important;
+    background-color: var(--kawaii-surface-soft) !important;
   }
 
   .kawaii-page :where([class*='border-gray'], [class*='border-zinc']) {
@@ -923,7 +924,7 @@
 
   .kawaii-primary-button {
     background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender));
-    color: #fff;
+    color: var(--topbar-text);
     box-shadow: 0 10px 26px rgb(17 17 26 / 0.26);
     position: relative;
     overflow: hidden;
@@ -1491,7 +1492,7 @@
   .kawaii-tab-active {
     border-color: var(--kawaii-primary) !important;
     background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
-    color: #fff !important;
+    color: var(--topbar-text) !important;
     box-shadow: 0 10px 24px rgb(17 17 26 / 0.2);
   }
 
@@ -1957,7 +1958,7 @@
 
   .kawaii-product-choice-action.official {
     background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender));
-    color: #fff;
+    color: var(--topbar-text);
     box-shadow: 0 12px 26px rgb(17 17 26 / 0.18);
   }
 
@@ -2268,7 +2269,7 @@
   .kawaii-market-pill.active {
     border-color: transparent;
     background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender));
-    color: #fff;
+    color: var(--topbar-text);
     box-shadow: 0 8px 18px rgb(17 17 26 / 0.2);
   }
 
@@ -2974,15 +2975,15 @@
   .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true'], .nimbus-tab.is-active, .nimbus-tab[aria-selected='true']) {
     border-radius: 0 !important;
     background: transparent !important;
-    color: #0b5cad !important;
-    border-bottom: 2px solid #0b5cad !important;
+    color: var(--accent) !important;
+    border-bottom: 2px solid var(--accent) !important;
     box-shadow: none !important;
     font-weight: 600 !important;
   }
 
   .dark .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true'], .nimbus-tab.is-active, .nimbus-tab[aria-selected='true']) {
-    color: #4593de !important;
-    border-bottom: 2px solid #4593de !important;
+    color: var(--accent) !important;
+    border-bottom: 2px solid var(--accent) !important;
   }
 
   .kawaii-app-shell :where(.badge, .tag, [class*='badge'], [class*='Badge']) {
@@ -2999,9 +3000,9 @@
   }
 
   .kawaii-app-shell :where(.pagination, .pager) :where(button[aria-current='page'], .active, .is-active) {
-    border-color: #0b5cad !important;
-    background: #0b5cad !important;
-    color: #fff !important;
+    border-color: var(--accent) !important;
+    background: var(--accent) !important;
+    color: var(--topbar-text) !important;
     box-shadow: none !important;
     border-radius: var(--radius-btn);
   }
