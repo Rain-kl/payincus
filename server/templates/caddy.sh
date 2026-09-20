@@ -248,15 +248,16 @@ chmod 0640 "$CADDYFILE_NEW"
 chown root:root "$OVERRIDE_NEW"
 chmod 0644 "$OVERRIDE_NEW"
 
-# 日志目录里可能残留旧安装/旧进程产生的 root 属主文件（如 admin-access.log），
-# caddy 以 User=caddy 打开会 permission denied 直接启动失败。目录 owner 已由
-# 前面的 install -d -o caddy 修正，这里把存量文件 owner 一并修正。
-chown -R caddy:caddy /var/log/caddy 2>/dev/null || true
-
 if ! caddy validate --config "$CADDYFILE_NEW" --adapter caddyfile; then
     error "New Caddy configuration is invalid; existing service was not changed"
     exit 1
 fi
+
+# 日志目录里可能残留旧安装/旧进程产生的 root 属主文件（如 admin-access.log），
+# caddy 以 User=caddy 打开会 permission denied 直接启动失败。注意：caddy validate
+# 以 root 运行，本身会创建 root 属主的日志 writer 文件，所以这步必须放在
+# validate 之后、systemctl restart 之前，否则 validate 会把刚才的 chown 覆盖掉。
+chown -R caddy:caddy /var/log/caddy 2>/dev/null || true
 
 HAD_OLD_CADDYFILE=false
 HAD_OLD_OVERRIDE=false
