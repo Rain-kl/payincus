@@ -1091,7 +1091,7 @@ export default {
         createdAt: 'Created At',
         publicIp: 'Public IP',
         privateIp: 'Private IP',
-        ocpuCount: 'OCPU Count',
+        ocpuCount: 'CPU Cores',
         memoryGb: 'Memory (GB)',
         availability: 'Availability',
         faultDomain: 'Fault Domain',

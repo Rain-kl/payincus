@@ -640,9 +640,9 @@ function closeRowMenu(): void {
   activeRowMenuId.value = null
 }
 
-function getInstanceFaultDomain(instance: Instance): string {
-  const seed = instance.id || 1
-  return `FD-${((seed - 1) % 3) + 1}`
+function formatCpuCores(cpu: number): string {
+  const val = cpu / 100
+  return Number.isInteger(val) ? String(val) : val.toFixed(1)
 }
 
 function getInstanceConfigSummary(instance: Instance): string {
@@ -1563,116 +1563,6 @@ async function confirmBatchDestroy(): Promise<void> {
       </div>
     </div>
 
-
-    <!-- 批量操作条 -->
-    <div
-      v-if="hasSelectedInstances && !loading && instances.length > 0"
-      class="card p-4 space-y-4"
-    >
-      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div class="flex flex-wrap items-center gap-3">
-          <div
-            class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium"
-            :class="'bg-primary-500/10 text-primary-600 dark:text-primary-300'"
-          >
-            <span class="inline-flex h-2 w-2 rounded-full bg-current"></span>
-            {{ $t('instance.batch.selectedCount', { count: selectedCount }) }}
-          </div>
-          <span class="text-sm text-themed-muted">{{ $t('instance.batch.currentPageOnly') }}</span>
-          <button class="btn-ghost btn-sm" @click="clearSelection">
-            {{ $t('instance.batch.clear') }}
-          </button>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            class="btn-ghost btn-sm"
-            :disabled="selectedStoppedCount === 0 || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="handleBatchSimpleAction('start')"
-          >
-            <svg v-if="batchActionLoading === 'start'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('instance.batch.start') }}
-          </button>
-          <button
-            class="btn-ghost btn-sm"
-            :disabled="selectedRunningCount === 0 || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="handleBatchSimpleAction('stop')"
-          >
-            <svg v-if="batchActionLoading === 'stop'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('instance.batch.stop') }}
-          </button>
-          <button
-            class="btn-ghost btn-sm"
-            :disabled="selectedRunningCount === 0 || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="handleBatchSimpleAction('restart')"
-          >
-            <svg v-if="batchActionLoading === 'restart'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('instance.batch.restart') }}
-          </button>
-          <button
-            class="btn-ghost btn-sm"
-            :disabled="!hasSelectedInstances || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="handleBatchSimpleAction('sync')"
-          >
-            <svg v-if="batchActionLoading === 'sync'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('instance.batch.sync') }}
-          </button>
-          <button
-            v-if="!isAdminEntry"
-            class="btn-ghost btn-sm"
-            :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="handleBatchAutoRenew(true)"
-          >
-            <svg v-if="batchActionLoading === 'autoRenewOn'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('instance.batch.autoRenewOn') }}
-          </button>
-          <button
-            v-if="!isAdminEntry"
-            class="btn-ghost btn-sm"
-            :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="handleBatchAutoRenew(false)"
-          >
-            <svg v-if="batchActionLoading === 'autoRenewOff'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('instance.batch.autoRenewOff') }}
-          </button>
-          <button
-            v-if="!isAdminEntry"
-            class="btn-secondary btn-sm"
-            :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="openBatchRenewModal"
-          >
-            {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewAction : $t('instance.batch.renew') }}
-          </button>
-          <button
-            v-if="!isAdminEntry"
-            class="btn-danger btn-sm"
-            :disabled="!hasSelectedInstances || isViewingAnotherUsersInstances || !!batchActionLoading || batchRenewSubmitting || batchDestroySubmitting"
-            @click="openBatchDestroyModal"
-          >
-            {{ $t('instance.batch.destroy') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- 加载骨架屏 -->
     <SkeletonLoader
       v-if="loading"
@@ -1727,12 +1617,13 @@ async function confirmBatchDestroy(): Promise<void> {
     <!-- 实例列表 -->
     <template v-else>
       <!-- 列表布局 (OCI 风格) -->
-      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card">
+      <!-- 列表布局 (OCI 风格) -->
+      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: #F6F4F3; box-shadow: none; border: 1px solid #e5e5e4;">
         <div class="overflow-x-auto oci-table-scroll">
-          <table class="w-full table-fixed" style="min-width: 1400px;">
-            <thead class="border-b border-[#e5e5e4] dark:border-[#2f2b28] bg-[#fbfbfa] dark:bg-[#1a1918]">
+          <table class="w-full table-fixed" style="min-width: 1200px;">
+            <thead class="border-b border-[#e5e5e4] dark:border-[#2f2b28] bg-[#F6F4F3] dark:bg-[#161513]">
               <tr>
-                <th class="w-10 px-3 py-3 text-center">
+                <th class="w-12 px-3 py-3 text-center">
                   <div class="flex items-center justify-center">
                     <button
                       type="button"
@@ -1744,38 +1635,38 @@ async function confirmBatchDestroy(): Promise<void> {
                     </button>
                   </div>
                 </th>
-                <th class="w-60 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
-                <th class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.statusLabel') }}</th>
-                <th class="w-36 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.publicIp') }}</th>
-                <th class="w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.privateIp') }}</th>
-                <th class="w-44 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.config') }}</th>
-                <th class="w-24 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.ocpuCount') }}</th>
-                <th class="w-24 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.memoryGb') }}</th>
-                <th class="w-24 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.faultDomain') }}</th>
-                <th class="w-36 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.availability') }}</th>
+                <th class="w-64 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
+                <th class="w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.statusLabel') }}</th>
+                <th class="w-40 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.publicIp') }}</th>
+                <th class="w-36 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.privateIp') }}</th>
+                <th class="w-48 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.config') }}</th>
+                <th class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.ocpuCount') }}</th>
+                <th class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.memoryGb') }}</th>
                 <th class="w-44 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.createdAt') }}</th>
-                <th v-if="isAdmin" class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.user') }}</th>
-                <th class="w-36 px-3.5 py-3 text-right text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('common.actions') }}</th>
+                <th v-if="isAdmin" class="w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.user') }}</th>
+                <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-[#F6F4F3] dark:bg-[#161513] border-l border-[#e5e5e4] dark:border-[#2a2826]">
+                  <span class="sr-only">{{ $t('common.actions') }}</span>
+                </th>
               </tr>
             </thead>
             <TransitionGroup
               tag="tbody"
               name="instance-table-order"
-              class="divide-y divide-[#ecebe9] dark:divide-[#282624]"
+              class="divide-y divide-[#e5e5e4] dark:divide-[#282624]"
             >
               <tr
                 v-for="instance in instances"
                 :key="instance.id"
-                class="group cursor-pointer transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+                class="group cursor-pointer transition-colors bg-[#F6F4F3] hover:bg-[#eeecea] dark:bg-[#161513] dark:hover:bg-[#1f1d1b]"
                 :class="[
-                  selectedIds.has(instance.id) ? 'bg-primary-500/10' : '',
+                  selectedIds.has(instance.id) ? 'bg-[#edf2f7] dark:bg-[#1c2228]' : '',
                   recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
                   instance.status?.toLowerCase() === 'creating' ? 'creating-row' : ''
                 ]"
                 @click="openInstanceDetail(instance.id)"
               >
                 <!-- Checkbox -->
-                <td class="w-10 px-3 py-3.5 text-center" @click.stop>
+                <td class="w-12 px-3 py-3.5 text-center" @click.stop>
                   <div class="flex items-center justify-center">
                     <input
                       type="checkbox"
@@ -1787,7 +1678,7 @@ async function confirmBatchDestroy(): Promise<void> {
                 </td>
 
                 <!-- Name -->
-                <td class="w-60 px-3.5 py-3.5">
+                <td class="w-64 px-3.5 py-3.5">
                   <div class="flex items-center gap-2 min-w-0">
                     <span
                       class="font-medium text-sm text-[#0563c1] dark:text-[#4da3ff] hover:underline truncate"
@@ -1797,7 +1688,7 @@ async function confirmBatchDestroy(): Promise<void> {
                     </span>
                     <span
                       v-if="!instance.packagePlanId"
-                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f3f3f2] text-[#444] dark:bg-[#2c2a27] dark:text-[#bbb] border border-[#e0dfdd] dark:border-[#3d3a36] shrink-0"
+                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ebe9e7] text-[#444] dark:bg-[#2c2a27] dark:text-[#bbb] border border-[#dcdad7] dark:border-[#3d3a36] shrink-0"
                     >
                       {{ $t('instance.alwaysFree') }}
                     </span>
@@ -1808,7 +1699,7 @@ async function confirmBatchDestroy(): Promise<void> {
                 </td>
 
                 <!-- Status -->
-                <td class="w-28 px-3.5 py-3.5 whitespace-nowrap">
+                <td class="w-32 px-3.5 py-3.5 whitespace-nowrap">
                   <span
                     v-if="instance.status?.toLowerCase() === 'running'"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/50"
@@ -1818,7 +1709,7 @@ async function confirmBatchDestroy(): Promise<void> {
                   </span>
                   <span
                     v-else-if="instance.status?.toLowerCase() === 'stopped'"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#e8e6e4] text-stone-600 border border-[#d8d6d4] dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
                   >
                     <span class="w-1.5 h-1.5 rounded-full bg-stone-400 shrink-0"></span>
                     {{ $t('instance.status.stopped') }}
@@ -1833,41 +1724,28 @@ async function confirmBatchDestroy(): Promise<void> {
                 </td>
 
                 <!-- Public IP -->
-                <td class="w-36 px-3.5 py-3.5 font-mono text-xs text-themed truncate" :title="getPublicIp(instance)">
+                <td class="w-40 px-3.5 py-3.5 font-mono text-xs text-themed truncate" :title="getPublicIp(instance)">
                   {{ getPublicIp(instance) }}
                 </td>
 
                 <!-- Private IP -->
-                <td class="w-32 px-3.5 py-3.5 font-mono text-xs text-themed-muted truncate" :title="getPrivateIp(instance)">
+                <td class="w-36 px-3.5 py-3.5 font-mono text-xs text-themed-muted truncate" :title="getPrivateIp(instance)">
                   {{ getPrivateIp(instance) }}
                 </td>
 
                 <!-- Shape/Config -->
-                <td class="w-44 px-3.5 py-3.5 text-xs text-themed truncate" :title="getInstancePlanName(instance)">
+                <td class="w-48 px-3.5 py-3.5 text-xs text-themed truncate" :title="getInstancePlanName(instance)">
                   {{ getInstancePlanName(instance) }}
                 </td>
 
-                <!-- OCPU -->
-                <td class="w-24 px-3.5 py-3.5 font-mono text-xs text-themed">
-                  {{ instance.cpu }}
+                <!-- CPU 核心数 -->
+                <td class="w-28 px-3.5 py-3.5 font-mono text-xs text-themed">
+                  {{ formatCpuCores(instance.cpu) }}
                 </td>
 
                 <!-- Memory (GB) -->
-                <td class="w-24 px-3.5 py-3.5 font-mono text-xs text-themed">
+                <td class="w-28 px-3.5 py-3.5 font-mono text-xs text-themed">
                   {{ (instance.memory / 1024) >= 1 ? (instance.memory / 1024).toFixed(0) : formatMemory(instance.memory) }}
-                </td>
-
-                <!-- Fault Domain (故障域) -->
-                <td class="w-24 px-3.5 py-3.5 text-xs text-themed font-mono truncate">
-                  {{ getInstanceFaultDomain(instance) }}
-                </td>
-
-                <!-- Availability (可用性域) -->
-                <td class="w-36 px-3.5 py-3.5 text-xs text-themed truncate">
-                  <div class="flex items-center gap-1.5 min-w-0">
-                    <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" class="shrink-0" />
-                    <span class="truncate">{{ getInstanceHostName(instance) }}</span>
-                  </div>
                 </td>
 
                 <!-- Created At -->
@@ -1876,118 +1754,111 @@ async function confirmBatchDestroy(): Promise<void> {
                 </td>
 
                 <!-- User (Admin only) -->
-                <td v-if="isAdmin" class="w-28 px-3.5 py-3.5 text-xs text-themed-muted truncate">
+                <td v-if="isAdmin" class="w-32 px-3.5 py-3.5 text-xs text-themed-muted truncate">
                   {{ (instance as any).username || '-' }}
                 </td>
 
-                <!-- Actions -->
-                <td class="w-36 px-3.5 py-3.5 text-right whitespace-nowrap" @click.stop>
-                  <div class="flex items-center justify-end gap-1">
-                    <InstanceOrderMenu
-                      v-if="canReorderInstances"
-                      class="mr-1"
-                      :actions="INSTANCE_ORDER_ACTIONS"
-                      :labels="instanceOrderLabels"
-                      :label="$t('instance.order.label')"
-                      :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
-                      :loading="orderLoading"
-                      :dark="themeStore.isDark"
-                      align="right"
-                      @reorder="reorderInstance(instance, $event)"
-                    />
+                <!-- Actions: Fixed/Sticky to right -->
+                <td
+                  class="sticky right-0 z-10 w-14 px-2 py-3.5 text-center border-l border-[#e5e5e4] dark:border-[#2a2826] transition-colors"
+                  :class="[
+                    selectedIds.has(instance.id)
+                      ? 'bg-[#edf2f7] dark:bg-[#1c2228]'
+                      : 'bg-[#F6F4F3] group-hover:bg-[#eeecea] dark:bg-[#161513] dark:group-hover:bg-[#1f1d1b]'
+                  ]"
+                  @click.stop
+                >
+                  <div class="relative inline-flex items-center justify-center">
                     <button
-                      v-if="canStartInstance(instance)"
-                      :disabled="!!actionLoading[instance.id]"
-                      class="p-1.5 rounded hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 transition-colors disabled:opacity-50"
-                      :title="$t('instance.actions.start')"
-                      @click.stop="handleAction(instance, 'start')"
+                      type="button"
+                      class="p-1.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-themed-muted transition-colors cursor-pointer"
+                      :title="$t('instance.actions.more') || $t('instance.details')"
+                      @click.stop="toggleRowMenu(instance.id, $event)"
                     >
-                      <svg v-if="actionLoading[instance.id] === 'start'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </button>
-                    <button
-                      v-if="instance.status?.toLowerCase() === 'running'"
-                      :disabled="!!actionLoading[instance.id]"
-                      class="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600 transition-colors disabled:opacity-50"
-                      :title="$t('instance.actions.stop')"
-                      @click.stop="handleAction(instance, 'stop')"
-                    >
-                      <svg v-if="actionLoading[instance.id] === 'stop'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M6 6h12v12H6z" />
-                      </svg>
-                    </button>
-                    <button
-                      v-if="instance.status?.toLowerCase() === 'running'"
-                      :disabled="!!actionLoading[instance.id]"
-                      class="p-1.5 rounded hover:bg-primary-500/10 text-primary-600 transition-colors disabled:opacity-50 dark:text-primary-400"
-                      :title="$t('instance.actions.restart')"
-                      @click.stop="handleAction(instance, 'restart')"
-                    >
-                      <svg v-if="actionLoading[instance.id] === 'restart'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                       </svg>
                     </button>
 
-                    <!-- 详情与更多 (OCI 风格三点按钮) -->
-                    <div class="relative inline-block text-left">
+                    <div
+                      v-if="activeRowMenuId === instance.id"
+                      class="fixed inset-0 z-20"
+                      @click.stop="closeRowMenu"
+                    ></div>
+                    <div
+                      v-if="activeRowMenuId === instance.id"
+                      class="absolute right-0 top-full mt-1 w-44 rounded-md bg-white dark:bg-[#1f1d1b] shadow-xl border border-gray-200 dark:border-gray-700 py-1.5 z-30 text-left text-xs"
+                      @click.stop
+                    >
                       <button
                         type="button"
-                        class="p-1.5 rounded hover:bg-black/[0.05] dark:hover:bg-white/[0.06] text-themed-muted transition-colors cursor-pointer"
-                        :title="$t('instance.actions.more') || $t('instance.details')"
-                        @click.stop="toggleRowMenu(instance.id, $event)"
+                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-themed"
+                        @click.stop="closeRowMenu(); openInstanceDetail(instance.id)"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
+                        {{ $t('instance.details') }}
                       </button>
 
-                      <div
-                        v-if="activeRowMenuId === instance.id"
-                        class="fixed inset-0 z-20"
-                        @click.stop="closeRowMenu"
-                      ></div>
-                      <div
-                        v-if="activeRowMenuId === instance.id"
-                        class="absolute right-0 mt-1 w-36 rounded-md bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-30 text-left text-xs"
-                        @click.stop
+                      <div class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
+
+                      <button
+                        v-if="canStartInstance(instance)"
+                        type="button"
+                        :disabled="!!actionLoading[instance.id]"
+                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
+                        @click.stop="closeRowMenu(); handleAction(instance, 'start')"
                       >
-                        <button
-                          type="button"
-                          class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-themed"
-                          @click.stop="closeRowMenu(); openInstanceDetail(instance.id)"
-                        >
-                          {{ $t('instance.details') }}
-                        </button>
-                        <button
-                          v-if="canResetInstanceTraffic(instance)"
-                          type="button"
-                          class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-themed"
-                          @click.stop="closeRowMenu(); openResetTrafficModal(instance)"
-                        >
-                          {{ $t('admin.hosts.resetTraffic') }}
-                        </button>
-                        <button
-                          v-if="canDeleteInstance(instance)"
-                          type="button"
-                          class="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 transition-colors"
-                          @click.stop="closeRowMenu(); handleAction(instance, 'delete')"
-                        >
-                          {{ $t('instance.actions.delete') }}
-                        </button>
+                        {{ $t('instance.actions.start') }}
+                      </button>
+                      <button
+                        v-if="instance.status?.toLowerCase() === 'running'"
+                        type="button"
+                        :disabled="!!actionLoading[instance.id]"
+                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-amber-600 dark:text-amber-400 disabled:opacity-50"
+                        @click.stop="closeRowMenu(); handleAction(instance, 'stop')"
+                      >
+                        {{ $t('instance.actions.stop') }}
+                      </button>
+                      <button
+                        v-if="instance.status?.toLowerCase() === 'running'"
+                        type="button"
+                        :disabled="!!actionLoading[instance.id]"
+                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-primary-600 dark:text-primary-400 disabled:opacity-50"
+                        @click.stop="closeRowMenu(); handleAction(instance, 'restart')"
+                      >
+                        {{ $t('instance.actions.restart') }}
+                      </button>
+
+                      <button
+                        v-if="canResetInstanceTraffic(instance)"
+                        type="button"
+                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-themed"
+                        @click.stop="closeRowMenu(); openResetTrafficModal(instance)"
+                      >
+                        {{ $t('admin.hosts.resetTraffic') }}
+                      </button>
+
+                      <div v-if="canReorderInstances" class="px-3.5 py-1">
+                        <InstanceOrderMenu
+                          :actions="INSTANCE_ORDER_ACTIONS"
+                          :labels="instanceOrderLabels"
+                          :label="$t('instance.order.label')"
+                          :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
+                          :loading="orderLoading"
+                          :dark="themeStore.isDark"
+                          align="left"
+                          @reorder="reorderInstance(instance, $event)"
+                        />
                       </div>
+
+                      <div v-if="canDeleteInstance(instance)" class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
+                      <button
+                        v-if="canDeleteInstance(instance)"
+                        type="button"
+                        class="w-full text-left px-3.5 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 transition-colors"
+                        @click.stop="closeRowMenu(); handleAction(instance, 'delete')"
+                      >
+                        {{ $t('instance.actions.delete') }}
+                      </button>
                     </div>
                   </div>
                 </td>
@@ -2571,12 +2442,12 @@ async function confirmBatchDestroy(): Promise<void> {
       </div>
     </template>
 
-    <div v-if="!loading && instances.length > 0" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-themed-muted py-3 px-1 border-t border-themed">
+    <div v-if="!loading && instances.length > 0" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-[#57534e] dark:text-[#a8a29e] py-3 px-1">
       <div class="flex items-center gap-2">
         <button
           :disabled="page <= 1"
           type="button"
-          class="inline-flex items-center justify-center w-8 h-8 rounded border border-themed bg-themed-surface disabled:opacity-40 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[#d0cfcd] dark:border-[#444] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
           @click="goToPage(page - 1)"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
@@ -2584,7 +2455,7 @@ async function confirmBatchDestroy(): Promise<void> {
         <button
           :disabled="page >= totalPages"
           type="button"
-          class="inline-flex items-center justify-center w-8 h-8 rounded border border-themed bg-themed-surface disabled:opacity-40 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[#d0cfcd] dark:border-[#444] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
           @click="goToPage(page + 1)"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>

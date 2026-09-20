@@ -1223,7 +1223,7 @@ const zhTW = {
         statusLabel: '狀態',
         publicIp: '公共 IP',
         privateIp: '專用 IP',
-        ocpuCount: 'OCPU 計數',
+        ocpuCount: 'CPU 核心數',
         memoryGb: '記憶體 (GB)',
         availability: '可用性',
         faultDomain: '容錯網域',

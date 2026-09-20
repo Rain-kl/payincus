@@ -1274,7 +1274,7 @@ export default {
         createdAt: '创建时间',
         publicIp: '公共 IP',
         privateIp: '专用 IP',
-        ocpuCount: 'OCPU 计数',
+        ocpuCount: 'CPU 核心数',
         memoryGb: '内存 (GB)',
         availability: '可用性',
         faultDomain: '容错域',
