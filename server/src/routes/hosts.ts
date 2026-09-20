@@ -13,6 +13,7 @@ import net from 'node:net'
 import { Agent, request as undiciRequest } from 'undici'
 import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
+import { caddyInstallRequested } from './agent.js'
 import { checkHostingAccess } from '../lib/hosting-access.js'
 import { createInboxMessage } from '../db/inbox.js'
 import { createLog } from '../db/logs.js'
@@ -4000,6 +4001,14 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     const { getProxySiteCountByHost } = await import('../db/proxy-sites.js')
     const sitesCount = await getProxySiteCountByHost(hostId)
 
+    // Agent 在线 = 心跳在线（决定能否安装）；隧道在线 = 反代站点管理可用。
+    const agent = await prisma.hostAgent.findFirst({
+      where: { hostId, enabled: true },
+      select: { status: true, lastSeenAt: true }
+    })
+    const agentOnline = !!agent && agent.status === 'online' &&
+      !!agent.lastSeenAt && (Date.now() - agent.lastSeenAt.getTime()) < 3 * 60 * 1000
+
     return {
       enabled: host.caddy_enabled || false,
       port: host.caddy_port || 2019,
@@ -4007,7 +4016,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       hasPassword: false,
       natPublicIp: host.nat_public_ip || host.ip_address || null,
       sitesCount,
-      agentOnline: hostTunnelManager.isTunnelOnline(hostId)
+      agentOnline,
+      tunnelOnline: hostTunnelManager.isTunnelOnline(hostId)
     }
   })
 
@@ -4045,9 +4055,19 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: 'Caddy 已安装' })
     }
 
-    if (!hostTunnelManager.isTunnelOnline(hostId)) {
-      return reply.code(400).send({ error: '宿主机 Agent 离线，无法安装 Caddy（请确认 Agent 已在线）' })
+    // 安装由 Agent 本地执行，只要求心跳在线（不依赖隧道）。
+    const agent = await prisma.hostAgent.findFirst({
+      where: { hostId, enabled: true },
+      select: { status: true, lastSeenAt: true }
+    })
+    const agentHeartbeatAlive = !!agent && agent.status === 'online' &&
+      !!agent.lastSeenAt && (Date.now() - agent.lastSeenAt.getTime()) < 3 * 60 * 1000
+    if (!agentHeartbeatAlive) {
+      return reply.code(400).send({ error: '宿主机 Agent 未在线，无法安装 Caddy（请确认 Agent 心跳正常）' })
     }
+
+    // 记录本次显式安装请求：之后的心跳响应据此下发 install 指令。
+    caddyInstallRequested.add(hostId)
 
     await createLog(
       user.id,
@@ -4057,8 +4077,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       'success'
     )
 
-    // 状态不落库：安装结果由 Agent 下个心跳上报驱动 caddy_enabled。
-    // 前端以 accepted=true 展示“安装中”，轮询 GET /:id/caddy 等待 enabled 翻转。
+    // 安装结果由 Agent 后续心跳上报驱动 caddy_enabled；前端轮询等待翻转。
     return {
       message: '已通知 Agent 安装 Caddy，请等候其完成上报',
       accepted: true

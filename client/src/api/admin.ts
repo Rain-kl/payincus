@@ -1318,6 +1318,7 @@ const api = {
       natPublicIp: string | null
       sitesCount: number
       agentOnline: boolean
+      tunnelOnline: boolean
     }> => http.get(`/hosts/${id}/caddy`),
     installCaddy: (id: number): Promise<{ message: string; accepted: boolean }> =>
       http.post(`/hosts/${id}/caddy/install`),

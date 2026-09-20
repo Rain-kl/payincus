@@ -110,6 +110,14 @@ const agentModel = prisma.hostAgent
 const nonceModel = prisma.hostAgentNonce
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+
+/**
+ * 显式请求过「安装 Caddy」的宿主机集合（进程内状态）。
+ * 安装指令只对集合内的宿主机下发；Agent 上报可用后清除。
+ * 重启丢失可接受：用户重新点击「安装 Caddy」即可。
+ */
+export const caddyInstallRequested = new Set<number>()
+
 const agentBinaryNamePattern = /^incudal-agent-linux-(amd64|arm64)(?:\.gz)?$/
 const agentReleaseBinaryNamePattern = /^incudal-agent-(x86_64|aarch64)-v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/
 const defaultAgentReleaseRepository = 'VipMaxxxx/payincus'
@@ -1550,12 +1558,16 @@ export default async function agentRoutes(fastify: FastifyInstance) {
         data: { caddyEnabled: true }
       })
       caddyEnabled = true
+      caddyInstallRequested.delete(agent.hostId)
       request.log.info({ agentId: agent.agentId, hostId: agent.hostId }, '[Caddy] Agent reported Caddy available; auto-enabled host')
     }
 
     const caddyPort = typeof caddyReported.port === 'number' && caddyReported.port > 0
       ? Math.min(65535, Math.floor(caddyReported.port))
       : 2019
+
+    // 安装指令只由面板显式「安装 Caddy」触发：曾请求安装且尚未启用才下发 install。
+    const caddyCommand = (!caddyEnabled && caddyInstallRequested.has(agent.hostId)) ? 'install' : 'idle'
 
     return {
       ok: true,
@@ -1564,11 +1576,12 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       instanceReport,
       upgrade: await buildAgentUpgradeInstruction(request, request.body),
       caddy: {
-        command: caddyEnabled ? 'idle' : 'install',
-        port: caddyEnabled ? 0 : caddyPort
+        command: caddyCommand,
+        port: caddyCommand === 'install' ? caddyPort : 0
       },
       tunnel: {
-        enabled: host?.tunnelEnabled ?? false,
+        // 隧道默认建立：Agent 连上面板即建 WebSocket 通道；tunnelEnabled=false 才显式禁用。
+        enabled: host?.tunnelEnabled ?? true,
         targetHost: host?.targetHost ?? '127.0.0.1',
         targetPort: host?.targetPort ?? 8443
       }
@@ -1594,7 +1607,8 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       select: { id: true, tunnelEnabled: true, targetHost: true, targetPort: true }
     })
 
-    if (!host || !host.tunnelEnabled) {
+    // 隧道默认建立（与心跳响应一致）：仅显式 tunnelEnabled=false 时禁用。
+    if (!host || host.tunnelEnabled === false) {
       try {
         socket.close(4003, 'Tunnel mode is disabled for this host')
       } catch {

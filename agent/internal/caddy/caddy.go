@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -78,20 +79,88 @@ func installPackage(ctx context.Context) error {
 		return nil // 已装
 	}
 
-	commands := [][]string{
-		{"apt-get", "update", "-qq"},
-		{"apt-get", "install", "-y", "-qq", "curl", "debian-keyring", "debian-archive-keyring", "apt-transport-https", "openssl"},
-		{"curl", "-1sLf", "https://dl.cloudsmith.io/public/caddy/stable/gpg.key", "-o", "/usr/share/keyrings/caddy-stable-archive-keyring.gpg"},
-		{"bash", "-c", "echo 'deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian/ bullseye main' > /etc/apt/sources.list.d/caddy-stable.list"},
-		{"apt-get", "update", "-qq"},
-		{"apt-get", "install", "-y", "-qq", "caddy"},
+	// 动态识别发行版 codename，避免硬编码 bullseye 导致非 Debian 11 装不上。
+	codename := detectDebianCodename()
+
+	if err := runStep(ctx, "apt-get", "update", "-qq"); err != nil {
+		return err
 	}
-	for _, args := range commands {
-		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("caddy install step %q failed: %w (output: %s)", strings.Join(args, " "), err, truncate(string(output), 512))
+	if err := runStep(ctx, "apt-get", "install", "-y", "-qq", "curl", "debian-keyring", "debian-archive-keyring", "apt-transport-https", "openssl", "gpg"); err != nil {
+		return err
+	}
+
+	// Caddy 官方源：先下载 ASCII armored 公钥，再 dearmor 为二进制 keyring，
+	// 否则 apt 报 "unsupported filetype"/NO_PUBKEY 拒绝该仓库。
+	keyring := "/usr/share/keyrings/caddy-stable-archive-keyring.gpg"
+	if err := runStep(ctx, "bash", "-c",
+		"curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor --yes -o "+keyring); err != nil {
+		return err
+	}
+	if err := runStep(ctx, "bash", "-c",
+		"echo 'deb [signed-by="+keyring+"] https://dl.cloudsmith.io/public/caddy/stable/deb/debian/ "+codename+" main' > /etc/apt/sources.list.d/caddy-stable.list"); err != nil {
+		return err
+	}
+	if err := runStep(ctx, "apt-get", "update", "-qq"); err != nil {
+		return err
+	}
+	if err := runStep(ctx, "apt-get", "install", "-y", "-qq", "caddy"); err != nil {
+		// 新发行版（如 Ubuntu 26.04）cloudsmith 可能还没有对应 codename，
+		// apt 源不可用时回退官方静态二进制，保证 Caddy 仍可安装。
+		log.Printf("[caddy] apt install failed, falling back to official static binary: %v", err)
+		if fallbackErr := installStaticBinary(ctx); fallbackErr != nil {
+			return fmt.Errorf("caddy apt install failed and static binary fallback also failed: %w (apt: %v)", fallbackErr, err)
 		}
+	}
+	return nil
+}
+
+// installStaticBinary 下载 Caddy 官方静态二进制到 /usr/bin/caddy。
+func installStaticBinary(ctx context.Context) error {
+	arch := runtime.GOARCH
+	// Go 的 amd64/arm64 映射到 Caddy 下载参数。
+	if arch == "amd64" {
+		arch = "amd64"
+	} else if arch == "arm64" {
+		arch = "arm64"
+	} else {
+		return fmt.Errorf("unsupported arch for static caddy: %s", arch)
+	}
+	url := "https://caddyserver.com/api/download?os=linux&arch=" + arch
+	tmp := "/tmp/caddy-download"
+	cmd := exec.CommandContext(ctx, "curl", "-fsSL", "-o", tmp, url)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("download caddy static binary: %w (output: %s)", err, truncate(string(output), 512))
+	}
+	if err := runStep(ctx, "install", "-m", "0755", tmp, "/usr/bin/caddy"); err != nil {
+		return err
+	}
+	_ = os.Remove(tmp)
+	return nil
+}
+
+// detectDebianCodename 从 /etc/os-release 读取 VERSION_CODENAME；失败回退 bullseye。
+func detectDebianCodename() string {
+	content, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return "bullseye"
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.HasPrefix(line, "VERSION_CODENAME=") {
+			value := strings.TrimPrefix(line, "VERSION_CODENAME=")
+			value = strings.Trim(strings.TrimSpace(value), `"'`)
+			if value != "" {
+				return value
+			}
+		}
+	}
+	return "bullseye"
+}
+
+func runStep(ctx context.Context, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("caddy install step %q failed: %w (output: %s)", strings.Join(append([]string{name}, args...), " "), err, truncate(string(output), 512))
 	}
 	return nil
 }
@@ -114,6 +183,11 @@ func writeCaddyfile() error {
 }
 
 func ensureService(ctx context.Context) error {
+	// 兼容非 deb 包安装（手动二进制）：caddy.service unit 可能不存在，
+	// 缺了直接 enable/restart 会失败。没有就写一个标准 unit。
+	if err := ensureSystemdUnit(); err != nil {
+		return err
+	}
 	for _, args := range [][]string{
 		{"daemon-reload"},
 		{"enable", "caddy"},
@@ -123,6 +197,43 @@ func ensureService(ctx context.Context) error {
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("systemctl %s failed: %w (output: %s)", strings.Join(args, " "), err, truncate(string(output), 512))
 		}
+	}
+	return nil
+}
+
+// ensureSystemdUnit 检查 caddy.service 是否存在，不存在则写入最小 unit。
+func ensureSystemdUnit() error {
+	const unitPath = "/etc/systemd/system/caddy.service"
+	if _, err := os.Stat(unitPath); err == nil {
+		return nil
+	}
+	content := `[Unit]
+Description=Caddy
+After=network.target
+
+[Service]
+Type=simple
+User=caddy
+Group=caddy
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+LimitNPROC=512
+PrivateTmp=true
+ProtectSystem=full
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
+`
+	if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil {
+		return err
+	}
+	_ = os.MkdirAll(caddyConfigDir, 0o750)
+	// unit 内 User=caddy 需要 caddy 系统用户存在；apt 包会创建，手动安装不一定。缺则用 nologin 创建。
+	if err := exec.Command("id", "-u", "caddy").Run(); err != nil {
+		_ = exec.Command("useradd", "--system", "--home", "/var/lib/caddy", "--shell", "/usr/sbin/nologin", "--no-create-home", "caddy").Run()
 	}
 	return nil
 }
