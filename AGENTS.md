@@ -49,6 +49,8 @@
 6. **本地过 ≠ 生产验证**：本地通过、GitHub Actions、Release 资产、OTA、线上实证是**分开的证据**，不可混为一谈。
 7. **每次改动必须过对应守卫**（见 §4），否则视为**未完成**。
 8. `RUN_DB_CHECKS=0 bash scripts/apply-online-update.sh <ver>` 会**跳过 DB/支付就绪校验**，仅在 owner 明确批准时使用。
+9. **禁止硬编码十六进制颜色**：前端所有颜色**必须使用主题系统提供的 token**（`var(--xxx)` / 语义 class / 集中色板常量）。组件、全局样式、scoped style 中**一律不得出现 `#hex` 色值**（如 `#F6F4F3`、`bg-[#295BA7]`、`color: #161513`、SVG `fill="#xxx"`）。唯一允许 hex 的位置是主题唯一来源 `client/src/styles/theme.css` 与守卫白名单文件（详见 `server/scripts/test-frontend-color-tokens.ts`）。`test:frontend-color-tokens` 守卫会全局扫描拦截，**违反即未完成**。
+10. **禁止在组件里指定主题色值**：背景 / 文字 / 边框 / 强调 / 选中态等颜色必须引用主题 token 层（`client/src/styles/theme.css` 是唯一事实来源，`tailwind.config.js` 的 token 映射与 `kawaii-cloud.css` 的 `--kawaii-*` 均为对它的引用）。改主题色**只改 theme.css 一处**，组件不得复制色值。
 
 ---
 
@@ -71,17 +73,18 @@
 
 - **全量**（慢，发版前跑）：`pnpm test`
 - **单个**：`pnpm --filter server test:<guard-name>`
-- **前端最常用三个**：
+- **前端最常用四个**：
   - `test:frontend-route-guards` —— 路由 / **表格布局** / `@click` 路径断言
   - `test:frontend-dist-boundary-guards` —— 双端 dist 边界
   - `test:frontend-i18n-keys` —— i18n key 完整性
+  - `test:frontend-color-tokens` —— **主题色纪律**：全局扫描 `client/src` 的 `.vue/.css/.ts`，拦截任何硬编码 hex 色值（白名单见脚本内 `EXEMPT_PATHS`）
 - **Go agent**：`pnpm test:agent`
 
 ### ⚠️ 表格布局守卫（最容易踩雷）
 一批表被守卫**锁定**为“**移动卡 + PC 定宽表（`table-fixed` / `overflow-hidden`），绝不横向滚动**”，并**反向禁止** `overflow-x-auto` / `min-w-[...]` / 去掉 `table-fixed`。
 - 想修“宽表挤压”时：**先判断该表是否在守卫清单里**。锁定表**只能在 `table-fixed` 内平衡列宽**（列宽百分比合计 = 100%）+ 允许单元格换行 + 靠移动卡应对窄屏；**不能**改成横向滚动。
 - 受锁定的表（用户端）：`MyPackagesView`、`MyHostsView`、`TransfersView`、`OrdersView`、`InvitesView`、`FlashSalesView`、`HostingWalletView`、`InstancesView`、`LogsView`、`EntertainmentView`；（管理端）`admin/BillingView`、`admin/ImagesView`、`admin/HelpManageView`、`admin/MailView`、`admin/PluginCenterView`；（组件）`HostPublicIpv4Tab`、`InstanceLogsTab`、`ConfigEditModal`。
-- 改任一前端文件后**必跑** `test:frontend-route-guards`。
+- 改任一前端文件后**必跑** `test:frontend-route-guards`（涉及颜色/样式时**同时必跑** `test:frontend-color-tokens`）。
 
 ---
 
@@ -102,8 +105,10 @@
 
 - **方向**：苹果式**纯黑白单色**（浅色=白底黑字，深色=黑底白字），去二次元/吉祥物/立绘。状态色**只保留绿/琥珀/红**三种（运行/待处理/失败）。
 - **红线**：只改**样式 / 布局 / 文案层级**，**不碰**后端接口、权限、支付/订单/实例创建/OTA 等业务逻辑与路由行为——**功能 100% 不变**。
-- **配色走 token 层**（`client/tailwind.config.js`）：一堆彩色 ramp 已映射到中性灰；`rose → 真红`（危险/亏损语义）**保留不可灰化**；游戏化模块（成就/签到/抽奖/稀有度）彩色**刻意保留**。
-- `kawaii-cloud.css` **渐进改造、不重写**；单页去色用页面 `<style scoped>`。
+- **配色走主题系统**：颜色**唯一事实来源** = `client/src/styles/theme.css`（`:root` 暗色 + `.light` 亮色两套 token，含 owner 指定品牌色：背景 `#F6F4F3`、按钮 `#295BA7`、选择/选中 `#161513`、标题栏 `#383632`、边框 `#E4E3E0`、状态浅底 `#C5D8AD`、深墨 `#2C2A29`、白 `#FFFFFF`、次级面 `#FBF9F8`）。组件一律通过 `var(--xxx)` 或语义 class 引用；改主题色只改 theme.css。
+- **禁止硬编码 hex / 在组件里指定颜色**（硬规矩 §2.9/§2.10）：由 `test:frontend-color-tokens` 守卫强制。豁免白名单：主题/内容渲染样式文件（`theme.css`、`markdown-theme.css`）、集中色板常量（`client/src/theme/**`：图表/搜索面板/终端/徽章等）、娱乐游戏化模块彩色、第三方品牌符号色（Google/GitHub/MD3/Turnstile）、帮助中心分类色（后端下发数据）。新增豁免需同步更新守卫脚本白名单。
+- `rose → 真红`（危险/亏损语义）**保留不可灰化**；游戏化模块（成就/签到/抽奖/稀有度）彩色**刻意保留**。
+- `kawaii-cloud.css` **渐进改造、不重写**（其 `--kawaii-*` 均引用 theme.css token）；单页去色用页面 `<style scoped>` + token 引用。
 - 动效可用 **GSAP**（已装 gsap-skills，见 `.claude/skills/`）；尊重 `prefers-reduced-motion`。
 
 ---
