@@ -188,237 +188,195 @@ watch(portMappings, (newMappings) => {
   <div class="space-y-4">
     <!-- Port Mappings (NAT modes) -->
     <div v-if="['nat', 'nat_ipv6', 'nat_ipv6_nat', 'ipv6_nat', 'ipv6_only'].includes(instance.network_mode || '')" class="card p-5">
-      <div class="flex items-center justify-between gap-3 mb-4">
-        <div>
+      <!-- 头部：标题 + 配额 / 公网 IP -->
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h2
-              class="text-sm font-medium"
-              :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
-            >
+            <h2 class="text-sm font-medium text-themed">
               {{ t('instance.detail.network.portMappings') }}
             </h2>
             <span
               v-if="!isIpv6OnlyInstance && hasPortQuota && portLimit !== null"
-              class="text-xs px-2 py-0.5 rounded border font-mono font-medium transition-colors"
-              :class="isPortQuotaFull
-                ? (themeStore.isDark ? 'bg-red-900/30 text-red-500 border-red-800' : 'bg-red-50 text-red-600 border-red-200')
-                : (themeStore.isDark ? 'bg-gray-800 text-gray-400 border-gray-700' : 'bg-gray-100 text-gray-500 border-gray-200')"
+              class="font-mono text-xs"
+              :class="isPortQuotaFull ? 'text-red-500' : 'text-themed-muted'"
             >
               {{ portQuotaUsed }} / {{ portLimit }}
             </span>
           </div>
           <p
             v-if="publicIpv4Address"
-            class="text-xs mt-0.5"
-            :class="themeStore.isDark ? 'text-gray-600' : 'text-gray-500'"
+            class="text-xs mt-0.5 text-themed-faint font-mono"
           >
             {{ t('instance.detail.network.publicIp') }}: {{ publicIpv4Address }}
           </p>
         </div>
 
-        <div v-if="!isIpv6OnlyInstance" class="flex items-center gap-2 sm:gap-3">
-          <div
-            class="rounded-xl border p-1.5"
-            :class="themeStore.isDark ? 'border-gray-800 bg-gray-900/60' : 'border-gray-200 bg-gray-50/90'"
-          >
-            <div class="grid grid-cols-3 gap-1">
+        <div v-if="!isIpv6OnlyInstance" class="flex items-center gap-3 shrink-0">
+          <!-- 协议筛选：扁平分段控件，无外框 -->
+          <div class="flex items-center gap-1">
+            <template
+              v-for="(option, index) in (['both', 'tcp', 'udp'] as const)"
+              :key="option"
+            >
+              <span v-if="index > 0" class="text-themed-faint" aria-hidden="true">/</span>
               <button
-                v-for="option in (['both', 'tcp', 'udp'] as const)"
-                :key="option"
-                class="rounded-lg px-3 py-2 text-xs font-medium transition-colors"
-                :class="[
-                  protocolFilter === option
-                    ? (themeStore.isDark ? 'bg-gray-700 text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm border border-gray-200')
-                    : (themeStore.isDark ? 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' : 'text-gray-600 hover:bg-white hover:text-gray-900')
-                ]"
+                class="text-xs font-medium transition-colors"
+                :class="protocolFilter === option
+                  ? 'text-themed underline underline-offset-4 decoration-1'
+                  : 'text-themed-faint hover:text-themed'"
                 @click="protocolFilter = option"
               >
                 {{ option === 'both' ? t('instance.detail.network.filterBoth') : option.toUpperCase() }}
               </button>
-            </div>
+            </template>
           </div>
 
+          <!-- 添加：唯一实心按钮，无外层包裹 -->
           <button
             v-if="canAddPorts && hasPortQuota && !isPortQuotaFull"
-            class="hidden shrink-0 rounded-xl border p-1.5 transition-colors sm:block"
-            :class="themeStore.isDark ? 'border-gray-800 bg-gray-900/60 hover:border-gray-700' : 'border-gray-200 bg-gray-50/90 hover:border-gray-300'"
+            class="btn btn-secondary btn-sm"
             @click="emit('add-port')"
           >
-            <div
-              class="flex h-[34px] items-center justify-center rounded-lg px-4"
-              :class="themeStore.isDark ? 'bg-gray-700 text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm border border-gray-200'"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              <span class="ml-2 text-xs font-medium">{{ t('instance.detail.network.add') }}</span>
-            </div>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>{{ t('instance.detail.network.add') }}</span>
           </button>
         </div>
       </div>
 
-      <!-- 批量操作栏 -->
-      <div
-        v-if="hasSelection && canMutateNetwork"
-        class="mb-3 flex flex-col gap-2 rounded-lg p-3 sm:flex-row sm:items-center sm:justify-between"
-        :class="themeStore.isDark ? 'bg-gray-800/50' : 'bg-gray-100'"
-      >
-        <span class="text-sm" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-          {{ t('instance.detail.network.selectedCount', { count: selectedPorts.size }) }}
-        </span>
-        <button
-          class="btn-sm flex items-center gap-1 text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-          :disabled="props.deletePortsLoading"
-          @click="handleBatchDelete"
-        >
-          <svg v-if="props.deletePortsLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          <span>{{ t('instance.detail.network.batchDelete') }}</span>
-        </button>
-      </div>
-
-      <div
-        v-if="isIpv6OnlyInstance"
-        class="rounded-2xl border border-dashed p-6 text-center"
-        :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/30 text-gray-500' : 'border-gray-300 bg-gray-50 text-gray-500'"
-      >
-        <div
-          class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
-          :class="themeStore.isDark ? 'bg-gray-800/80 text-gray-500' : 'bg-white text-gray-400 shadow-sm'"
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        </div>
-        <p class="mx-auto max-w-md text-sm leading-6">
+      <template v-if="isIpv6OnlyInstance">
+        <p class="mt-4 text-sm leading-6 text-themed-muted">
           {{ t('instance.detail.network.ipv6OnlyPortMappingHint') }}
         </p>
-      </div>
-      <div v-else-if="filteredPortMappings.length" class="space-y-2">
-        <!-- 全选行 -->
+      </template>
+
+      <template v-else-if="filteredPortMappings.length">
+        <!-- 批量操作：无背景操作行，挂在列表头上 -->
         <div
-	          v-if="canMutateNetwork && paginatedPorts.length > 0"
-          class="flex items-center justify-between gap-3 pb-2 border-b"
-          :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'"
+          v-if="hasSelection && canMutateNetwork"
+          class="mt-4 flex items-center justify-between gap-3 border-t border-themed pt-3"
+        >
+          <span class="text-sm text-themed-secondary">
+            {{ t('instance.detail.network.selectedCount', { count: selectedPorts.size }) }}
+          </span>
+          <button
+            class="btn btn-danger btn-sm"
+            :disabled="props.deletePortsLoading"
+            @click="handleBatchDelete"
+          >
+            <svg v-if="props.deletePortsLoading" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>{{ t('instance.detail.network.batchDelete') }}</span>
+          </button>
+        </div>
+
+        <!-- 列表：无边框行 + 细分隔线，选中用蓝色左边条 -->
+        <div
+          v-if="canMutateNetwork && paginatedPorts.length > 0"
+          class="mt-4 flex items-center justify-between gap-3 pb-2"
         >
           <div class="flex items-center gap-2">
             <button
-              class="w-5 h-5 rounded border flex items-center justify-center transition-colors"
+              class="w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0"
               :class="[
                 isSelectAll || isPartialSelect
-                  ? (themeStore.isDark ? 'bg-blue-600 border-blue-600' : 'bg-blue-500 border-blue-500')
-                  : (themeStore.isDark ? 'border-gray-600 hover:border-gray-500' : 'border-gray-300 hover:border-gray-400')
+                  ? 'bg-blue-600 border-blue-600'
+                  : 'border-themed-secondary hover:border-themed'
               ]"
               @click="toggleSelectAll"
             >
-              <svg v-if="isSelectAll" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-if="isSelectAll" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
               </svg>
-              <svg v-else-if="isPartialSelect" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-else-if="isPartialSelect" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 12h14" />
               </svg>
             </button>
-            <span class="text-xs" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+            <span class="text-xs text-themed-faint">
               {{ t('instance.detail.network.selectAll') }}
             </span>
           </div>
-
-          <button
-            v-if="canAddPorts && hasPortQuota && !isPortQuotaFull"
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors shadow-sm sm:hidden"
-            :class="themeStore.isDark ? 'border-gray-700 bg-gray-900/70 text-gray-100 hover:border-gray-600' : 'border-gray-200 bg-white text-gray-900 hover:border-gray-300'"
-            :title="t('instance.detail.network.add')"
-            @click="emit('add-port')"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
         </div>
 
-        <div
-          v-for="m in paginatedPorts"
-          :key="m.id"
-          class="group flex items-center justify-between text-sm p-3 border rounded-lg transition-colors"
-          :class="[
-            themeStore.isDark
-              ? 'bg-gray-900/50 border-gray-800 hover:border-gray-700'
-              : 'bg-gray-50 border-gray-200 hover:border-gray-300',
-            selectedPorts.has(m.id) && (themeStore.isDark ? 'border-blue-800 bg-blue-900/20' : 'border-blue-300 bg-blue-50')
-          ]"
-        >
-          <div class="flex items-center gap-3 flex-1 min-w-0">
-            <!-- 多选框 -->
-            <button
-              v-if="canMutateNetwork"
-              class="w-5 h-5 rounded border flex items-center justify-center transition-colors flex-shrink-0"
-              :class="[
-                selectedPorts.has(m.id)
-                  ? (themeStore.isDark ? 'bg-blue-600 border-blue-600' : 'bg-blue-500 border-blue-500')
-                  : (themeStore.isDark ? 'border-gray-600 hover:border-gray-500' : 'border-gray-300 hover:border-gray-400')
-              ]"
-              @click="toggleSelect(m.id)"
-            >
-              <svg v-if="selectedPorts.has(m.id)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-            <span
-              class="text-xs font-medium px-1.5 py-0.5 rounded flex-shrink-0"
-              :class="themeStore.isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'"
-            >{{ m.protocol.toUpperCase() }}</span>
-            <div class="flex items-center gap-2 min-w-0">
-              <code
-                class="font-mono text-xs"
-                :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
-              >{{ getPublicPort(m) }}</code>
+        <div class="divide-y divide-themed">
+          <div
+            v-for="m in paginatedPorts"
+            :key="m.id"
+            class="group flex items-center justify-between gap-3 py-2.5 text-sm pl-1"
+            :class="selectedPorts.has(m.id) ? 'border-l-2 border-blue-500 -ml-0.5 pl-1.5' : ''"
+          >
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+              <!-- 多选框 -->
               <button
-                class="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                :class="themeStore.isDark ? 'text-gray-600 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'"
-                :title="t('common.copy')"
-                @click="emit('copy', String(getPublicPort(m)), 'port-' + m.id)"
+                v-if="canMutateNetwork"
+                class="w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0"
+                :class="[
+                  selectedPorts.has(m.id)
+                    ? 'bg-blue-600 border-blue-600'
+                    : 'border-themed-secondary hover:border-themed'
+                ]"
+                @click="toggleSelect(m.id)"
               >
-                <svg v-if="copied !== 'port-' + m.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                <svg v-if="selectedPorts.has(m.id)" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                 </svg>
               </button>
-              <span class="text-gray-500 flex-shrink-0">→</span>
-              <span class="font-mono text-xs text-gray-500">{{ getPrivatePort(m) }}</span>
               <span
-                v-if="m.remark"
-                class="text-xs px-1.5 py-0.5 rounded truncate max-w-[120px]"
-                :class="themeStore.isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-600'"
-                :title="m.remark"
-              >{{ m.remark }}</span>
+                class="font-mono text-[10px] font-medium tracking-wider flex-shrink-0"
+                :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
+              >{{ m.protocol.toUpperCase() }}</span>
+              <div class="flex items-center gap-2 min-w-0">
+                <code
+                  class="font-mono text-sm text-themed"
+                >{{ getPublicPort(m) }}</code>
+                <button
+                  class="flex-shrink-0 transition-colors"
+                  :class="copied === 'port-' + m.id ? 'text-green-500' : 'text-themed-faint hover:text-themed'"
+                  :title="t('common.copy')"
+                  @click="emit('copy', String(getPublicPort(m)), 'port-' + m.id)"
+                >
+                  <svg v-if="copied !== 'port-' + m.id" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <span class="text-themed-faint flex-shrink-0">→</span>
+                <span class="font-mono text-sm text-themed-faint">{{ getPrivatePort(m) }}</span>
+                <span
+                  v-if="m.remark"
+                  class="text-xs px-1.5 py-0.5 rounded bg-themed-secondary text-themed-secondary truncate max-w-[120px]"
+                  :title="m.remark"
+                >{{ m.remark }}</span>
+              </div>
             </div>
+            <button
+              v-if="canMutateNetwork"
+              class="ml-2 flex-shrink-0 text-themed-faint hover:text-red-500 transition-colors"
+              :title="t('common.delete')"
+              @click="emit('delete-port', m.id)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
           </div>
-          <button
-            v-if="canMutateNetwork"
-            class="text-xs text-gray-500 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 ml-2 flex-shrink-0"
-            @click="emit('delete-port', m.id)"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
         </div>
 
         <!-- Pagination -->
-        <div class="flex flex-col gap-3 pt-3 border-t sm:flex-row sm:items-center sm:justify-between" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
+        <div class="flex flex-col gap-3 pt-3 border-t border-themed mt-1 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-xs" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">{{ t('instance.detail.network.perPage') }}</span>
+            <span class="text-xs text-themed-faint">{{ t('instance.detail.network.perPage') }}</span>
             <select
               v-model.number="portPageSize"
-              class="text-xs px-2 py-1 rounded border"
-              :class="themeStore.isDark ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-white border-gray-200 text-gray-700'"
+              class="text-xs px-2 py-1 rounded border bg-transparent border-themed-secondary text-themed"
             >
               <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
             </select>
@@ -431,7 +389,7 @@ watch(portMappings, (newMappings) => {
             >
               {{ t('instance.detail.network.prevPage') }}
             </button>
-            <span class="text-sm text-gray-500">{{ portPage }} / {{ portTotalPages }}</span>
+            <span class="text-sm text-themed-faint">{{ portPage }} / {{ portTotalPages }}</span>
             <button
               :disabled="portPage === portTotalPages"
               class="btn-ghost btn-sm"
@@ -441,43 +399,33 @@ watch(portMappings, (newMappings) => {
             </button>
           </div>
         </div>
-      </div>
-      <div
-        v-else
-        class="rounded-2xl border border-dashed p-6 text-center"
-        :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/30 text-gray-500' : 'border-gray-300 bg-gray-50 text-gray-500'"
-      >
-        <div
-          class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
-          :class="themeStore.isDark ? 'bg-gray-800/80 text-gray-500' : 'bg-white text-gray-400 shadow-sm'"
-        >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        </div>
+      </template>
 
-        <template v-if="!hasPortQuota">
-          <p class="mb-1 text-sm font-medium text-yellow-500">{{ t('instance.detail.network.noPortQuota') }}</p>
-          <p class="text-xs leading-6">{{ t('instance.detail.network.allocateQuotaHint') }}</p>
-        </template>
-        <template v-else-if="portMappings.length > 0 && filteredPortMappings.length === 0">
-          <p class="text-sm font-medium">{{ t('instance.detail.network.noFilterResults') }}</p>
-        </template>
-        <template v-else>
-          <p class="text-sm font-medium">{{ t('instance.detail.network.noPortMappings') }}</p>
-          <p class="mt-1 text-xs leading-6">{{ t('instance.detail.network.addPortMapping') }}</p>
-          <button
-            v-if="canAddPorts && hasPortQuota && !isPortQuotaFull"
-            class="btn btn-secondary btn-sm mt-4"
-            @click="emit('add-port')"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            {{ t('instance.detail.network.add') }}
-          </button>
-        </template>
-      </div>
+      <template v-else>
+        <div class="mt-4 rounded border border-dashed border-themed-secondary p-6 text-center">
+          <template v-if="!hasPortQuota">
+            <p class="text-sm font-medium text-yellow-500">{{ t('instance.detail.network.noPortQuota') }}</p>
+            <p class="mt-1 text-xs leading-6 text-themed-muted">{{ t('instance.detail.network.allocateQuotaHint') }}</p>
+          </template>
+          <template v-else-if="portMappings.length > 0 && filteredPortMappings.length === 0">
+            <p class="text-sm font-medium text-themed-muted">{{ t('instance.detail.network.noFilterResults') }}</p>
+          </template>
+          <template v-else>
+            <p class="text-sm font-medium text-themed-muted">{{ t('instance.detail.network.noPortMappings') }}</p>
+            <p class="mt-1 text-xs leading-6 text-themed-muted">{{ t('instance.detail.network.addPortMapping') }}</p>
+            <button
+              v-if="canAddPorts && hasPortQuota && !isPortQuotaFull"
+              class="btn btn-secondary btn-sm mt-4"
+              @click="emit('add-port')"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              {{ t('instance.detail.network.add') }}
+            </button>
+          </template>
+        </div>
+      </template>
     </div>
   </div>
 </template>
