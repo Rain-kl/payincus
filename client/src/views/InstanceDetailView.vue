@@ -2608,12 +2608,28 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     <span class="truncate">{{ $t('instance.actions.unsuspend') }}</span>
                   </button>
 
-                  <!-- 删除 -->
-                  <template v-if="canDeleteInstance">
+                  <!-- 销毁 / 删除 -->
+                  <template v-if="canDeleteInstance || !isHostOwnerOnly">
                     <div class="my-1 border-t border-themed/40"></div>
+                    <!-- 销毁（退款销毁，用户端可见） -->
                     <button
+                      v-if="!isHostOwnerOnly"
                       type="button"
-                      :disabled="isOperationDisabled || destroyButtonDisabled"
+                      :disabled="destroyButtonDisabled || isOperationDisabled"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      :title="$t('instance.destroy.button')"
+                      @click="showDestroyModal = true; closeActionMenu()"
+                    >
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span class="truncate">{{ $t('instance.destroy.button') }}</span>
+                    </button>
+                    <!-- 删除（免费/非付费实例直接删除） -->
+                    <button
+                      v-if="canDeleteInstance"
+                      type="button"
+                      :disabled="isOperationDisabled"
                       class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       :title="$t('common.delete')"
                       @click="handleAction('delete'); closeActionMenu()"
@@ -3086,15 +3102,6 @@ function formatShortDate(dateStr: string | null | undefined): string {
                         {{ $t('transfer.actions.transfer') }}
                       </button>
                     </div>
-
-	                    <button
-	                      :disabled="destroyButtonDisabled || isOperationDisabled"
-	                      class="btn-danger btn-sm w-full lg:w-auto lg:min-w-[110px]"
-	                      :class="(destroyButtonDisabled || isOperationDisabled) ? 'opacity-50 cursor-not-allowed' : ''"
-	                      @click="showDestroyModal = true"
-	                    >
-                      {{ $t('instance.destroy.button') }}
-                    </button>
                   </div>
                 </div>
               </div>
@@ -3834,5 +3841,52 @@ function formatShortDate(dateStr: string | null | undefined): string {
   .tab-leave-to {
     transform: none;
   }
+}
+
+/* ============================================================
+   实例操作下拉菜单：去透明毛玻璃，纯色实底 + 纯黑文字
+   （覆盖 kawaii-cloud.css 全局 .kawaii-menu-panel/.kawaii-menu-item 半透明样式）
+   ============================================================ */
+.action-menu-container :deep(.kawaii-menu-panel) {
+  background: #fff !important;
+  border-color: #e5e5e5 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.10) !important;
+}
+.action-menu-container :deep(.kawaii-menu-item) {
+  color: #000 !important;
+}
+.action-menu-container :deep(.kawaii-menu-item:hover) {
+  background: #f5f5f5 !important;
+  color: #000 !important;
+}
+.action-menu-container :deep(.kawaii-menu-item .text-themed-muted) {
+  color: #000 !important;
+}
+.action-menu-container :deep(.kawaii-menu-item.text-danger),
+.action-menu-container :deep(.kawaii-menu-item.text-danger:hover) {
+  color: #dc2626 !important;
+}
+.action-menu-container :deep(.kawaii-menu-item.text-warning) {
+  color: #d97706 !important;
+}
+.action-menu-container :deep(.kawaii-menu-item.text-success) {
+  color: #16a34a !important;
+}
+.dark .action-menu-container :deep(.kawaii-menu-panel) {
+  background: #000 !important;
+  border-color: #262626 !important;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.6) !important;
+}
+.dark .action-menu-container :deep(.kawaii-menu-item) {
+  color: #fff !important;
+}
+.dark .action-menu-container :deep(.kawaii-menu-item:hover) {
+  background: #1a1a1a !important;
+  color: #fff !important;
+}
+.dark .action-menu-container :deep(.kawaii-menu-item .text-themed-muted) {
+  color: #fff !important;
 }
 </style>
