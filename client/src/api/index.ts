@@ -1192,33 +1192,14 @@ const api = {
     // Caddy 管理
     getCaddy: (id: number): Promise<{
       enabled: boolean
-      username: string | null
       port: number
       hasPassword: boolean
       natPublicIp: string | null
       sitesCount: number
+      agentOnline: boolean
     }> => http.get(`/hosts/${id}/caddy`),
-    generateCaddyCommand: (id: number): Promise<{
-      installCommand: string
-      username: string
-      password: string
-      port: number
-      isNewCredentials: boolean
-    }> => http.post(`/hosts/${id}/caddy/generate`),
-    resetCaddyCredentials: (id: number): Promise<{
-      installCommand: string
-      username: string
-      password: string
-      port: number
-    }> => http.post(`/hosts/${id}/caddy/reset`),
-    confirmCaddyInstalled: (id: number): Promise<{ message: string }> =>
-      http.post(`/hosts/${id}/caddy/confirm`),
-    testCaddyConnection: (id: number): Promise<{
-      connected: boolean
-      sitesCount: number
-      dnsRecordType: 'A' | 'AAAA' | 'CNAME'
-      dnsRecordValue: string
-    }> => http.post(`/hosts/${id}/caddy/test`, {}, { timeout: TIMEOUT.MEDIUM }),
+    installCaddy: (id: number): Promise<{ message: string; accepted: boolean }> =>
+      http.post(`/hosts/${id}/caddy/install`),
     getCaddySites: (id: number, params: { page?: number; pageSize?: number } = {}): Promise<{
       sites: Array<{
         id: number

@@ -1,24 +1,26 @@
 /**
- * Caddy API 客户端
- * 通过 8444 端口 Basic Auth 保护的通道调用 Caddy Admin API
+ * Caddy API 客户端（纯隧道模式）
+ *
+ * 安全模型：
+ * - Caddy Admin API 只在宿主机回环 127.0.0.1:<port> 上以明文 HTTP 监听
+ *   （节点上由 agent 负责将其绑定到 localhost，绝不对外开放公网端口）。
+ * - 面板通过现有 Agent 反向 WebSocket 隧道（HMAC 鉴权）创建一条到
+ *   hostId 的对端虚拟 TCP 流，再在该流上发起 HTTP 请求。
+ * - 不依赖任何管理凭据 / TLS 证书 / Basic Auth —— 信任链完全落在
+ *   面板 <-> Agent 的 HMAC + 隧道通道上；Caddy 只信任同机 Agent。
  */
 
-import { Agent, request as undiciRequest } from 'undici'
-import { readFileSync } from 'node:fs'
-import { formatHostForUrl } from './network-address.js'
+import http from 'node:http'
+import type { Duplex } from 'node:stream'
+import { hostTunnelManager } from './incus/tunnel-manager.js'
 
 // 请求超时配置（毫秒）
 const REQUEST_TIMEOUT = 30000 // 30秒
-const CONNECT_TIMEOUT = 10000 // 10秒
-const caddyAgentCache = new Map<string, Agent>()
 
 export interface CaddyClientConfig {
-  host: string // 宿主机 IP 或域名
-  port: number // Caddy API 端口 (默认 8444)
-  username: string // Basic Auth 用户名
-  password: string // Basic Auth 密码
-  caPath?: string // Caddy 管理端 TLS CA PEM 路径（未传时使用 CADDY_CA_PATH）
-  serverName?: string // TLS 证书名称（默认匹配安装脚本生成的 caddy-admin）
+  hostId: number // 宿主机 ID（用于经 Agent 隧道建立到 Caddy Admin 的虚拟流）
+  port?: number // Caddy Admin 端口（默认 2019，本地回环监听）
+  targetHost?: string // 隧道对端地址，固定 127.0.0.1（可通过构造覆盖，仅测试用）
 }
 
 export interface CaddyRoute {
@@ -43,89 +45,113 @@ class CaddyApiError extends Error {
 }
 
 /**
+ * 隧道 duplex 是 stream.Duplex，node:http 客户端在其上会调用一些
+ * net.Socket 专属方法；补上空实现即可安全交由 http.Agent 使用。
+ */
+function patchDuplexForHttp(socket: Duplex): Duplex {
+  const patched = socket as Duplex & {
+    setNoDelay?: () => Duplex
+    setKeepAlive?: () => Duplex
+    setTimeout?: (ms: number, cb?: () => void) => Duplex
+    ref?: () => Duplex
+    unref?: () => Duplex
+  }
+  if (typeof patched.setNoDelay !== 'function') patched.setNoDelay = () => socket
+  if (typeof patched.setKeepAlive !== 'function') patched.setKeepAlive = () => socket
+  if (typeof patched.setTimeout !== 'function') {
+    patched.setTimeout = (_ms: number, cb?: () => void) => {
+      if (cb) socket.once('timeout', cb)
+      return socket
+    }
+  }
+  if (typeof patched.ref !== 'function') patched.ref = () => socket
+  if (typeof patched.unref !== 'function') patched.unref = () => socket
+  return socket
+}
+
+/**
  * Caddy API 客户端类
  */
 export class CaddyClient {
   private baseUrl: string
-  private authHeader: string
-  private agent: Agent
+  private agent: http.Agent
 
   constructor(config: CaddyClientConfig) {
-    this.baseUrl = `https://${formatHostForUrl(config.host)}:${config.port}`
-    this.authHeader = 'Basic ' + Buffer.from(`${config.username}:${config.password}`).toString('base64')
+    const port = config.port || 2019
+    const targetHost = config.targetHost || '127.0.0.1'
+    this.baseUrl = `http://127.0.0.1:${port}`
 
-    const caPath = config.caPath?.trim() || process.env.CADDY_CA_PATH?.trim()
-    if (!caPath) {
-      throw new Error('Caddy TLS trust material is missing: configure caPath or CADDY_CA_PATH')
-    }
-
-    let ca: Buffer
-    try {
-      ca = readFileSync(caPath)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      throw new Error(`Unable to read Caddy TLS CA: ${message}`)
-    }
-    const serverName = config.serverName?.trim() || process.env.CADDY_TLS_SERVER_NAME?.trim() || 'caddy-admin'
-    const agentKey = `${config.host}:${config.port}:${caPath}:${serverName}`
-    const cachedAgent = caddyAgentCache.get(agentKey)
-
-    // Basic Auth 凭证只能通过由固定 CA 验证的 TLS 连接发送。
-    if (cachedAgent) {
-      this.agent = cachedAgent
-    } else {
-      this.agent = new Agent({
-        connect: {
-          ca,
-          servername: serverName,
-          rejectUnauthorized: true,
-          timeout: CONNECT_TIMEOUT
+    // 每请求经隧道建立一条到宿主机回环 Caddy Admin 的虚拟 TCP 流。
+    // keepAlive=false：流用完即断，避免长连接占用隧道流；http.Agent 会
+    // 在请求结束后自行销毁 connect 返回的 socket。
+    type CreateConnectionCallback = (err: Error | null, socket?: Duplex) => void
+    type CreateConnectionFn = (options: Record<string, unknown>, callback: CreateConnectionCallback) => void
+    const agentOptions: http.AgentOptions & { createConnection?: CreateConnectionFn } = {
+      keepAlive: false,
+      maxSockets: 32,
+      createConnection: (_options, callback) => {
+        try {
+          const duplex = hostTunnelManager.createDuplexStream(config.hostId, targetHost, port)
+          callback(null, patchDuplexForHttp(duplex))
+        } catch (err) {
+          callback(err instanceof Error ? err : new Error(String(err)))
         }
-      })
-      caddyAgentCache.set(agentKey, this.agent)
+      }
     }
+    this.agent = new http.Agent(agentOptions)
   }
 
   /**
    * 发起 API 请求
    */
-  private async request<T>(
+  private request<T>(
     method: string,
     path: string,
     body?: unknown
   ): Promise<T> {
-    const url = `${this.baseUrl}${path}`
-    
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
-
-    try {
-      const response = await undiciRequest(url, {
+    return new Promise<T>((resolve, reject) => {
+      const request = http.request({
         method,
-        dispatcher: this.agent,
-        signal: controller.signal,
+        hostname: '127.0.0.1',
+        port: new URL(this.baseUrl).port || 2019,
+        path,
+        agent: this.agent,
         headers: {
-          'Authorization': this.authHeader,
           'Content-Type': 'application/json'
-        },
-        body: body ? JSON.stringify(body) : undefined
+        }
+      }, (response) => {
+        const chunks: Buffer[] = []
+        response.on('data', (chunk: Buffer) => chunks.push(chunk))
+        response.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8')
+          if (response.statusCode !== undefined && response.statusCode >= 400) {
+            reject(new CaddyApiError(response.statusCode, text))
+            return
+          }
+          if (!text) {
+            resolve({} as T)
+            return
+          }
+          try {
+            resolve(JSON.parse(text) as T)
+          } catch (parseError) {
+            reject(parseError instanceof Error ? parseError : new Error(String(parseError)))
+          }
+        })
       })
 
-      if (response.statusCode >= 400) {
-        const errorText = await response.body.text()
-        throw new CaddyApiError(response.statusCode, errorText)
-      }
+      const timeoutId = setTimeout(() => request.destroy(new Error('Caddy request timeout')), REQUEST_TIMEOUT)
+      request.on('error', (err: Error) => {
+        clearTimeout(timeoutId)
+        reject(err)
+      })
+      request.on('response', () => clearTimeout(timeoutId))
 
-      // 某些请求没有响应体
-      const text = await response.body.text()
-      if (!text) {
-        return {} as T
+      if (body !== undefined && body !== null) {
+        request.write(JSON.stringify(body))
       }
-      
-      return JSON.parse(text) as T
-    } finally {
-      clearTimeout(timeoutId)
-    }
+      request.end()
+    })
   }
 
   /**
@@ -140,31 +166,23 @@ export class CaddyClient {
    */
   async testConnection(): Promise<boolean> {
     try {
-      console.log(`[Caddy Client] 测试连接: ${this.baseUrl}/config/`)
       await this.getConfig()
-      console.log(`[Caddy Client] 连接成功: ${this.baseUrl}`)
       return true
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      // 检查是否是超时错误
-      const isTimeout = errorMessage.includes('abort') || errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')
-      console.error(`[Caddy Client] 连接失败: ${this.baseUrl}`, {
-        error: errorMessage,
-        isTimeout,
-        stack: error instanceof Error ? error.stack : undefined
-      })
+      console.error('[Caddy Client] 连接失败（隧道）', { error: errorMessage })
       return false
     }
   }
 
   /**
    * 添加反代站点
-   * 
+   *
    * 架构说明：
    * - 使用统一的 `sites` 服务器监听 :80 和 :443
    * - HTTPS 站点：正常配置，Caddy 自动处理证书和重定向
    * - HTTP 站点：添加 protocol 匹配，仅响应 HTTP 请求
-   * 
+   *
    * @param domain 域名
    * @param targetIp 目标 IP (实例内网 IP)
    * @param targetPort 目标端口
@@ -172,7 +190,7 @@ export class CaddyClient {
    */
   async addSite(domain: string, targetIp: string, targetPort: number, httpsEnabled: boolean = true): Promise<void> {
     const routeId = `site-${domain.replace(/\./g, '-')}`
-    
+
     // 构建路由配置
     const route: CaddyRoute = {
       '@id': routeId,
@@ -271,7 +289,7 @@ export class CaddyClient {
    */
   async deleteSite(domain: string): Promise<void> {
     const routeId = `site-${domain.replace(/\./g, '-')}`
-    
+
     try {
       await this.request('DELETE', `/id/${routeId}`)
     } catch (error) {
@@ -326,8 +344,51 @@ export class CaddyClient {
 }
 
 /**
- * 创建 Caddy 客户端实例
+ * 创建 Caddy 客户端实例（经 Agent 隧道访问宿主机回环 Caddy Admin）
  */
 export function createCaddyClient(config: CaddyClientConfig): CaddyClient {
   return new CaddyClient(config)
+}
+
+/**
+ * 宿主机的 Caddy 管理端口（该端口在节点上只绑定 localhost，由 Agent 隧道访问）。
+ * 新安装统一使用 Caddy Admin 默认端口 2019；旧值 8444 仅用于兼容判断。
+ */
+export const CADDY_ADMIN_PORT = 2019
+
+/**
+ * 从 host 行提取 Caddy 管理端口（DB 未配置或为旧值 8444 时归一为 2019）。
+ */
+function resolveCaddyAdminPort(hostPort: number | null | undefined): number {
+  const port = hostPort ?? 0
+  // 8444 是旧"公网反代层"的端口；收紧 localhost 后管理口恒定 2019。
+  return port === 8444 || port <= 0 ? CADDY_ADMIN_PORT : port
+}
+
+/**
+ * 为宿主机创建经 Agent 隧道访问 Caddy Admin 的客户端。
+ *
+ * @param host 宿主机行（Prisma 或 db 层映射对象），需含 id / caddy_enabled 等信息
+ * @param opts.port 显式指定管理端口（默认按 host.caddy_port 归一）
+ * @throws 当隧道无法建立（Agent 离线）或 Caddy 未启用时
+ */
+export function getCaddyClientForHost(
+  host: { id: number; caddy_enabled?: boolean; caddyEnabled?: boolean; caddy_port?: number | null; caddyPort?: number | null },
+  opts: { port?: number } = {}
+): CaddyClient {
+  if (!host || !host.id) {
+    throw new Error('宿主机无效，无法建立 Caddy 隧道连接')
+  }
+  const caddyEnabled = host.caddy_enabled ?? host.caddyEnabled
+  if (caddyEnabled === false) {
+    throw new Error('请先在宿主机安装 Caddy')
+  }
+  if (!hostTunnelManager.isTunnelOnline(host.id)) {
+    throw new Error('宿主机 Agent 隧道未连接，无法管理 Caddy（请确认 Agent 在线）')
+  }
+  const port = host.caddy_port ?? host.caddyPort ?? 0
+  return createCaddyClient({
+    hostId: host.id,
+    port: opts.port || resolveCaddyAdminPort(port)
+  })
 }

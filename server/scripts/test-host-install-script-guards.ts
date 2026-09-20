@@ -65,8 +65,9 @@ assert.ok(
 assert.ok(
   caddyInstallScript.includes('auto_https disable_redirects') &&
     caddyInstallScript.indexOf('auto_https disable_redirects') > caddyInstallScript.indexOf('admin localhost:2019') &&
-    caddyInstallScript.indexOf('auto_https disable_redirects') < caddyInstallScript.indexOf(':${CADDY_PORT} {'),
-  'Caddy install script must disable automatic HTTP to HTTPS redirects so it does not bind port 80 on shared hosts'
+    !caddyInstallScript.includes(':${CADDY_PORT} {') &&
+    !caddyInstallScript.includes('basicauth'),
+  'Caddy install script must keep admin on loopback only, disable HTTP->HTTPS redirects, and never expose a public listener with credentials'
 )
 
 assert.ok(

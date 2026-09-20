@@ -16,7 +16,7 @@ import { deleteSnapshot as deleteIncusSnapshot } from '../lib/incus/incus-snapsh
 import { deleteBackup as deleteIncusBackup } from '../lib/incus/incus-backups.js'
 import { renameInstance as renameIncusInstance } from '../lib/incus/incus-restore.js'
 import { getProxySitesByInstanceId, deleteProxySite } from '../db/proxy-sites.js'
-import { createCaddyClient } from '../lib/caddy-client.js'
+import { getCaddyClientForHost } from '../lib/caddy-client.js'
 import { prisma } from '../db/prisma.js'
 import {
     claimOperationVerificationRequirement
@@ -603,21 +603,13 @@ export default async function transferRoutes(fastify: FastifyInstance) {
         // 3.1 删除反代站点（Caddy 远程 + 数据库）
         const proxySites = await getProxySitesByInstanceId(transfer.instanceId)
         if (proxySites.length > 0) {
-            if (host?.caddy_enabled && host.caddy_username && host.caddy_password) {
-                const targetHost = host.nat_public_ip || host.ip_address
-                if (targetHost) {
-                    const caddyClient = createCaddyClient({
-                        host: targetHost,
-                        port: host.caddy_port || 8444,
-                        username: host.caddy_username,
-                        password: host.caddy_password
-                    })
-                    for (const site of proxySites) {
-                        try {
-                            await caddyClient.deleteSite(site.domain)
-                        } catch (err) {
-                            console.error(`[Transfer] Failed to delete Caddy site (${site.domain}):`, err)
-                        }
+            if (host?.caddy_enabled) {
+                const caddyClient = getCaddyClientForHost(host)
+                for (const site of proxySites) {
+                    try {
+                        await caddyClient.deleteSite(site.domain)
+                    } catch (err) {
+                        console.error(`[Transfer] Failed to delete Caddy site (${site.domain}):`, err)
                     }
                 }
             }
@@ -1061,21 +1053,13 @@ export default async function transferRoutes(fastify: FastifyInstance) {
         // 3.1 删除反代站点
         const proxySites = await getProxySitesByInstanceId(transfer.instanceId)
         if (proxySites.length > 0) {
-            if (host?.caddy_enabled && host.caddy_username && host.caddy_password) {
-                const targetHost = host.nat_public_ip || host.ip_address
-                if (targetHost) {
-                    const caddyClient = createCaddyClient({
-                        host: targetHost,
-                        port: host.caddy_port || 8444,
-                        username: host.caddy_username,
-                        password: host.caddy_password
-                    })
-                    for (const site of proxySites) {
-                        try {
-                            await caddyClient.deleteSite(site.domain)
-                        } catch (err) {
-                            console.error(`[Transfer] Failed to delete Caddy site (${site.domain}):`, err)
-                        }
+            if (host?.caddy_enabled) {
+                const caddyClient = getCaddyClientForHost(host)
+                for (const site of proxySites) {
+                    try {
+                        await caddyClient.deleteSite(site.domain)
+                    } catch (err) {
+                        console.error(`[Transfer] Failed to delete Caddy site (${site.domain}):`, err)
                     }
                 }
             }

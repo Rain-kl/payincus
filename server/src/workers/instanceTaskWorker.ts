@@ -47,7 +47,7 @@ import { resetInstanceCloudInitState } from '../lib/cloud-init-status.js'
 import { resolveIncusSwapValue } from '../lib/instance-swap.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
 import { getSystemImageAvailabilityForHost } from '../db/images.js'
-import { createCaddyClient } from '../lib/caddy-client.js'
+import { getCaddyClientForHost } from '../lib/caddy-client.js'
 import { resolveInstanceTrafficLimitForHost } from '../lib/traffic-multiplier.js'
 import { calculateInstanceTrafficStatus } from '../services/traffic-utils.js'
 
@@ -2050,21 +2050,13 @@ async function executeChangeHostTask(
     })
     dbSwitched = true
 
-    if (proxySites.length > 0 && sourceHost.caddy_enabled && sourceHost.caddy_username && sourceHost.caddy_password) {
-      const caddyHost = sourceHost.nat_public_ip || sourceHost.ip_address
-      if (caddyHost) {
-        const caddyClient = createCaddyClient({
-          host: caddyHost,
-          port: sourceHost.caddy_port || 8444,
-          username: sourceHost.caddy_username,
-          password: sourceHost.caddy_password
-        })
-        for (const site of proxySites) {
-          try {
-            await caddyClient.deleteSite(site.domain)
-          } catch (err) {
-            console.warn(`[ChangeHost] 删除 Caddy 站点 ${site.domain} 失败，数据库记录已清理:`, err)
-          }
+    if (proxySites.length > 0 && sourceHost.caddy_enabled) {
+      const caddyClient = getCaddyClientForHost(sourceHost)
+      for (const site of proxySites) {
+        try {
+          await caddyClient.deleteSite(site.domain)
+        } catch (err) {
+          console.warn(`[ChangeHost] 删除 Caddy 站点 ${site.domain} 失败，数据库记录已清理:`, err)
         }
       }
     }

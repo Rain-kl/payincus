@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"incudal-agent/internal/caddy"
 	"incudal-agent/internal/config"
 	"incudal-agent/internal/panel"
 	"incudal-agent/internal/report"
@@ -50,6 +51,7 @@ func main() {
 	log.Printf("incudal-agent started: panel=%s interval=%s", cfg.PanelURL, cfg.HeartbeatInterval)
 	upgradeRunner := upgrade.DefaultRunner(cfg)
 	var upgradeInProgress atomic.Bool
+	var caddyInstallInProgress atomic.Bool
 	heartbeatLogState := newHeartbeatLogState()
 	if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds); err != nil {
 		heartbeatLogState.logFailure(err)
@@ -58,6 +60,7 @@ func main() {
 		if result.Tunnel != nil {
 			tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
 		}
+		scheduleCaddyInstall(ctx, result, &caddyInstallInProgress)
 		scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 	}
 
@@ -76,10 +79,39 @@ func main() {
 				if result.Tunnel != nil {
 					tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
 				}
+				scheduleCaddyInstall(ctx, result, &caddyInstallInProgress)
 				scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 			}
 		}
 	}
+}
+
+// scheduleCaddyInstall 收到面板 caddy.command=install 时，在节点本地部署 Caddy。
+// 幂等：安装进行中或已可用时跳过；成功后下个心跳自然上报 available=true。
+func scheduleCaddyInstall(ctx context.Context, result panel.HeartbeatResult, inProgress *atomic.Bool) {
+	if inProgress.Load() {
+		return
+	}
+	if result.Caddy == nil || result.Caddy.Command != "install" {
+		return
+	}
+	if caddy.Detect().Available {
+		return
+	}
+	if !inProgress.CompareAndSwap(false, true) {
+		return
+	}
+	log.Printf("[caddy] install command received; deploying Caddy on loopback")
+	go func() {
+		defer inProgress.Store(false)
+		installCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		if err := caddy.Install(installCtx); err != nil {
+			log.Printf("[caddy] install failed: %v", err)
+			return
+		}
+		log.Printf("[caddy] install complete")
+	}()
 }
 
 func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalSeconds int) (panel.HeartbeatResult, error) {

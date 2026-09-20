@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
@@ -16,51 +16,24 @@ interface Props {
 const props = defineProps<Props>()
 
 const loading = ref(true)
-const generating = ref(false)
-const resetting = ref(false)
-const confirming = ref(false)
-const testing = ref(false)
-const copied = ref(false)
+const installing = ref(false)
 
 // Caddy 状态
 const caddyStatus = ref<{
   enabled: boolean
-  username: string | null
   port: number
   hasPassword: boolean
   natPublicIp: string | null
   sitesCount: number
+  agentOnline: boolean
 }>({
   enabled: false,
-  username: null,
-  port: 8444,
+  port: 2019,
   hasPassword: false,
   natPublicIp: null,
-  sitesCount: 0
-})
-
-// 生成的安装信息
-const installInfo = ref({
-  command: '',
-  username: '',
-  password: '',
-  port: 8444
-})
-
-// 测试结果
-const testResult = ref<{
-  connected: boolean
-  sitesCount: number
-  dnsRecordType: 'A' | 'AAAA' | 'CNAME'
-  dnsRecordValue: string
-}>({
-  connected: false,
   sitesCount: 0,
-  dnsRecordType: 'A',
-  dnsRecordValue: ''
+  agentOnline: false
 })
-
-const showInstallModal = ref(false)
 
 // 站点列表相关
 interface ProxySite {
@@ -87,43 +60,61 @@ const sitesPageSize = 5
 const sitesTotal = ref(0)
 const sitesTotalPages = ref(1)
 
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
   loadCaddyStatus()
 })
 
-// 当 Caddy 启用状态变化时，加载站点列表
-watch(() => caddyStatus.value.enabled, (enabled) => {
-  if (enabled) {
-    loadSites()
-  }
+onBeforeUnmount(() => {
+  stopPolling()
 })
 
-// 当 hostId 变化时，重置状态并重新加载数据
 watch(() => props.hostId, () => {
-  // 重置分页状态
   sitesPage.value = 1
   sites.value = []
   sitesTotal.value = 0
   sitesTotalPages.value = 1
-  // 重置其他状态
-  showInstallModal.value = false
-  testResult.value = { connected: false, sitesCount: 0, dnsRecordType: 'A', dnsRecordValue: '' }
-  // 重新加载数据
+  stopPolling()
   loadCaddyStatus()
 })
 
-async function loadCaddyStatus() {
-  loading.value = true
+function startPolling(): void {
+  stopPolling()
+  pollTimer = setInterval(() => {
+    loadCaddyStatus(true)
+  }, 3000)
+}
+
+function stopPolling(): void {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+async function loadCaddyStatus(silent = false): Promise<void> {
+  if (!silent) loading.value = true
   try {
     const res = await api.hosts.getCaddy(props.hostId)
     caddyStatus.value = res
-    // 如果 Caddy 已启用，加载站点列表
     if (res.enabled) {
-      await loadSites()
+      stopPolling()
+      // 已启用时加载站点列表
+      if (sites.value.length === 0) {
+        await loadSites()
+      }
+    } else {
+      // 未启用：若 agent 在线且安装曾触发，持续轮询等待安装完成
+      if (!silent && res.agentOnline) {
+        startPolling()
+      }
     }
   } catch (err: unknown) {
     const error = err as { message?: string }
-    toast.error(t('host.caddy.loadFailed') + ': ' + (error?.message || String(err)))
+    if (!silent) {
+      toast.error(t('host.caddy.loadFailed') + ': ' + (error?.message || String(err)))
+    }
   } finally {
     loading.value = false
   }
@@ -177,94 +168,24 @@ function getSiteStatusBadge(site: ProxySite) {
   }
 }
 
-async function generateInstallCommand() {
-  generating.value = true
+async function installCaddy() {
+  if (installing.value) return
+  installing.value = true
   try {
-    const res = await api.hosts.generateCaddyCommand(props.hostId)
-    installInfo.value = {
-      command: res.installCommand,
-      username: res.username,
-      password: res.password,
-      port: res.port
-    }
-    showInstallModal.value = true
-    // 刷新状态
-    await loadCaddyStatus()
-  } catch (err: unknown) {
-    const error = err as { message?: string }
-    toast.error(t('host.caddy.generateFailed') + ': ' + (error?.message || String(err)))
-  } finally {
-    generating.value = false
-  }
-}
-
-async function resetCredentials() {
-  if (!confirm(t('host.caddy.resetConfirm'))) {
-    return
-  }
-  
-  resetting.value = true
-  try {
-    const res = await api.hosts.resetCaddyCredentials(props.hostId)
-    installInfo.value = {
-      command: res.installCommand,
-      username: res.username,
-      password: res.password,
-      port: res.port
-    }
-    showInstallModal.value = true
-    toast.success(t('host.caddy.resetSuccess'))
-    // 刷新状态
-    await loadCaddyStatus()
-  } catch (err: unknown) {
-    const error = err as { message?: string }
-    toast.error(t('host.caddy.resetFailed') + ': ' + (error?.message || String(err)))
-  } finally {
-    resetting.value = false
-  }
-}
-
-async function confirmInstallation() {
-  confirming.value = true
-  try {
-    await api.hosts.confirmCaddyInstalled(props.hostId)
-    toast.success(t('host.caddy.confirmSuccess'))
-    showInstallModal.value = false
-    await loadCaddyStatus()
+    const res = await api.hosts.installCaddy(props.hostId)
+    toast.success(res.message || t('host.caddy.installAccepted'))
+    // 开始轮询等待 Agent 上报安装完成
+    startPolling()
   } catch (err: unknown) {
     const error = err as { response?: { data?: { error?: string } }, message?: string }
-    toast.error(error?.response?.data?.error || error?.message || t('host.caddy.confirmFailed'))
+    toast.error(error?.response?.data?.error || error?.message || t('host.caddy.installFailed'))
   } finally {
-    confirming.value = false
+    installing.value = false
   }
-}
-
-async function testConnection() {
-  testing.value = true
-  try {
-    const res = await api.hosts.testCaddyConnection(props.hostId)
-    testResult.value = res
-    if (res.connected) {
-      toast.success(t('host.caddy.testSuccess'))
-    } else {
-      toast.error(t('host.caddy.testFailed'))
-    }
-  } catch (err: unknown) {
-    const error = err as { response?: { data?: { error?: string } }, message?: string }
-    toast.error(error?.response?.data?.error || error?.message || t('host.caddy.testFailed'))
-  } finally {
-    testing.value = false
-  }
-}
-
-function copyCommand() {
-  navigator.clipboard.writeText(installInfo.value.command)
-  copied.value = true
-  toast.success(t('common.copied'))
-  setTimeout(() => { copied.value = false }, 2000)
 }
 
 const isEnabled = computed(() => caddyStatus.value.enabled)
+const agentOnline = computed(() => caddyStatus.value.agentOnline)
 </script>
 
 <template>
@@ -303,22 +224,28 @@ const isEnabled = computed(() => caddyStatus.value.enabled)
           <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
           </svg>
-          <p class="text-sm mb-4" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'">
+          <p class="text-sm mb-2" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'">
             {{ t('host.caddy.notInstalled') }}
           </p>
+          <p v-if="!agentOnline" class="text-xs mb-4" :class="themeStore.isDark ? 'text-amber-400' : 'text-amber-600'">
+            {{ t('host.caddy.agentOfflineHint') }}
+          </p>
+          <p v-else class="text-xs mb-4" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
+            {{ t('host.caddy.agentOnlineHint') }}
+          </p>
           <button
-            :disabled="generating"
+            :disabled="installing || !agentOnline"
             class="btn-primary"
-            @click="generateInstallCommand"
+            @click="installCaddy"
           >
-            <span v-if="generating" class="flex items-center gap-2">
+            <span v-if="installing" class="flex items-center gap-2">
               <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               {{ t('common.loading') }}
             </span>
-            <span v-else>{{ t('host.caddy.generateCommand') }}</span>
+            <span v-else>{{ t('host.caddy.install') }}</span>
           </button>
         </div>
       </div>
@@ -330,12 +257,6 @@ const isEnabled = computed(() => caddyStatus.value.enabled)
             <dt class="text-gray-500">{{ t('host.caddy.apiPort') }}</dt>
             <dd class="font-mono" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
               {{ caddyStatus.port }}
-            </dd>
-          </div>
-          <div>
-            <dt class="text-gray-500">{{ t('host.caddy.username') }}</dt>
-            <dd class="font-mono" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-              {{ caddyStatus.username || '-' }}
             </dd>
           </div>
           <div>
@@ -351,44 +272,6 @@ const isEnabled = computed(() => caddyStatus.value.enabled)
             </dd>
           </div>
         </dl>
-
-        <div class="flex gap-3 pt-2">
-          <button
-            :disabled="testing"
-            class="btn-ghost"
-            @click="testConnection"
-          >
-            <span v-if="testing" class="flex items-center gap-2">
-              <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              {{ t('common.loading') }}
-            </span>
-            <span v-else>{{ t('host.caddy.testConnection') }}</span>
-          </button>
-          <button
-            :disabled="generating"
-            class="btn-ghost"
-            @click="generateInstallCommand"
-          >
-            {{ t('host.caddy.viewCommand') }}
-          </button>
-          <button
-            :disabled="resetting"
-            class="btn-ghost text-amber-600 hover:text-amber-700"
-            @click="resetCredentials"
-          >
-            <span v-if="resetting" class="flex items-center gap-2">
-              <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              {{ t('common.loading') }}
-            </span>
-            <span v-else>{{ t('host.caddy.resetCredentials') }}</span>
-          </button>
-        </div>
       </div>
     </div>
 
@@ -485,110 +368,5 @@ const isEnabled = computed(() => caddyStatus.value.enabled)
         </div>
       </div>
     </div>
-
-    <!-- 安装命令模态框 -->
-    <Teleport to="body">
-      <div 
-        v-if="showInstallModal" 
-        class="modal-overlay"
-        @click.self="showInstallModal = false"
-      >
-        <div 
-          class="modal-content w-full max-w-2xl"
-        >
-          <div class="p-6">
-            <h3 class="text-lg font-medium mb-4" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-              {{ t('host.caddy.installCommand') }}
-            </h3>
-
-            <!-- 凭据信息 -->
-            <div class="mb-4 p-4 rounded-lg" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-100'">
-              <dl class="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <dt class="text-gray-500">{{ t('host.caddy.username') }}</dt>
-                  <dd class="font-mono font-medium" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                    {{ installInfo.username }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-gray-500">{{ t('host.caddy.password') }}</dt>
-                  <dd class="font-mono font-medium" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                    {{ installInfo.password }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-gray-500">{{ t('host.caddy.apiPort') }}</dt>
-                  <dd class="font-mono font-medium" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                    {{ installInfo.port }}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <!-- 安装命令 -->
-            <div class="mb-4">
-              <label class="block text-sm font-medium mb-2" :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
-                {{ t('host.caddy.commandLabel') }}
-              </label>
-              <div class="relative">
-                <pre 
-                  class="p-4 rounded-lg text-sm overflow-x-auto font-mono"
-                  :class="themeStore.isDark ? 'bg-gray-800 text-green-400' : 'bg-gray-900 text-green-400'"
-                >{{ installInfo.command }}</pre>
-                <button
-                  class="absolute top-2 right-2 p-2 rounded hover:bg-gray-700 transition-colors"
-                  :title="t('common.copy')"
-                  @click="copyCommand"
-                >
-                  <svg v-if="!copied" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  <svg v-else class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- 提示 -->
-            <div 
-              class="p-4 rounded-lg mb-6 text-sm"
-              :class="themeStore.isDark ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'"
-            >
-              <p class="font-medium mb-1">{{ t('host.caddy.installHint') }}</p>
-              <ol class="list-decimal list-inside space-y-1 text-sm opacity-90">
-                <li>{{ t('host.caddy.step1') }}</li>
-                <li>{{ t('host.caddy.step2') }}</li>
-                <li>{{ t('host.caddy.step3') }}</li>
-              </ol>
-            </div>
-
-            <!-- 操作按钮 -->
-            <div class="flex justify-end gap-3">
-              <button
-                class="btn-ghost"
-                @click="showInstallModal = false"
-              >
-                {{ t('common.close') }}
-              </button>
-              <button
-                :disabled="confirming"
-                class="btn-primary"
-                @click="confirmInstallation"
-              >
-                <span v-if="confirming" class="flex items-center gap-2">
-                  <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {{ t('common.loading') }}
-                </span>
-                <span v-else>{{ t('host.caddy.confirmInstalled') }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>

@@ -54,7 +54,7 @@ import { generateRandomIPv6 } from '../lib/ip-calculator.js'
 import { getProxySitesByInstanceId, deleteProxySite } from '../db/proxy-sites.js'
 import { calculateVipLevel, getVipBadgeStyleForLevel, getVipRules } from '../services/vip-levels.js'
 import { ProxyStrategyFactory } from '../lib/proxy/index.js'
-import { createCaddyClient } from '../lib/caddy-client.js'
+import { getCaddyClientForHost } from '../lib/caddy-client.js'
 import { sendHostManagedInstanceNotification, sendNotification } from '../lib/notifier.js'
 import {
   createInstanceTask,
@@ -3306,26 +3306,18 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         console.log(`[SyncStatus] Instance ${instanceId} IPv4 changed: ${oldIpv4} -> ${newIpv4}`)
 
         const proxySites = await getProxySitesByInstanceId(instanceId)
-        if (proxySites.length > 0 && host.caddy_enabled && host.caddy_username && host.caddy_password) {
-          const targetHost = host.nat_public_ip || host.ip_address
-          if (targetHost) {
-            const caddyClient = createCaddyClient({
-              host: targetHost,
-              port: host.caddy_port || 8444,
-              username: host.caddy_username,
-              password: host.caddy_password
-            })
+        if (proxySites.length > 0 && host.caddy_enabled) {
+          const caddyClient = getCaddyClientForHost(host)
 
-            for (const site of proxySites) {
-              if (site.status === 'active' && site.enabled) {
-                try {
-                  await caddyClient.deleteSite(site.domain)
-                  await caddyClient.addSite(site.domain, newIpv4, site.targetPort, site.httpsEnabled)
-                  proxySitesUpdated++
-                  console.log(`[SyncStatus] Updated proxy site "${site.domain}" to new IP ${newIpv4}`)
-                } catch (caddyErr) {
-                  console.error(`[SyncStatus] Failed to update proxy site "${site.domain}":`, caddyErr)
-                }
+          for (const site of proxySites) {
+            if (site.status === 'active' && site.enabled) {
+              try {
+                await caddyClient.deleteSite(site.domain)
+                await caddyClient.addSite(site.domain, newIpv4, site.targetPort, site.httpsEnabled)
+                proxySitesUpdated++
+                console.log(`[SyncStatus] Updated proxy site "${site.domain}" to new IP ${newIpv4}`)
+              } catch (caddyErr) {
+                console.error(`[SyncStatus] Failed to update proxy site "${site.domain}":`, caddyErr)
               }
             }
           }
@@ -3972,24 +3964,16 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       // ===== 1. 删除反代站点（Caddy 远程 + 数据库）=====
       const proxySites = await getProxySitesByInstanceId(instanceId)
       if (proxySites.length > 0) {
-        // 尝试删除 Caddy 远程配置
-        if (host.caddy_enabled && host.caddy_username && host.caddy_password) {
-          const targetHost = host.nat_public_ip || host.ip_address
-          if (targetHost) {
-            const caddyClient = createCaddyClient({
-              host: targetHost,
-              port: host.caddy_port || 8444,
-              username: host.caddy_username,
-              password: host.caddy_password
-            })
+        // 尝试删除 Caddy 远程配置（经 Agent 隧道）
+        if (host.caddy_enabled) {
+          const caddyClient = getCaddyClientForHost(host)
 
-            for (const site of proxySites) {
-              try {
-                await caddyClient.deleteSite(site.domain)
-              } catch (caddyError) {
-                const errorMessage = caddyError instanceof Error ? caddyError.message : String(caddyError)
-                console.error(`删除 Caddy 反代站点失败 (${site.domain}):`, errorMessage)
-              }
+          for (const site of proxySites) {
+            try {
+              await caddyClient.deleteSite(site.domain)
+            } catch (caddyError) {
+              const errorMessage = caddyError instanceof Error ? caddyError.message : String(caddyError)
+              console.error(`删除 Caddy 反代站点失败 (${site.domain}):`, errorMessage)
             }
           }
         }

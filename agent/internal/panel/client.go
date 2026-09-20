@@ -29,7 +29,13 @@ type HeartbeatResult struct {
 	OK         bool
 	Upgrade    *UpgradeInstruction
 	Tunnel     *TunnelInstruction
+	Caddy      *CaddyInstruction
 	LatencyMs  int64
+}
+
+type CaddyInstruction struct {
+	Command string `json:"command"`
+	Port    int    `json:"port"`
 }
 
 type TunnelInstruction struct {
@@ -50,6 +56,7 @@ type UpgradeInstruction struct {
 type heartbeatResponse struct {
 	Upgrade *UpgradeInstruction `json:"upgrade"`
 	Tunnel  *TunnelInstruction  `json:"tunnel"`
+	Caddy   *CaddyInstruction   `json:"caddy"`
 }
 
 func New(cfg config.Config) *Client {

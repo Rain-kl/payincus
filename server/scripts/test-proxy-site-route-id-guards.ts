@@ -68,7 +68,7 @@ assert.ok(
 assert.ok(
   caddyClientSource.includes('class CaddyApiError extends Error') &&
     caddyClientSource.includes('readonly statusCode: number') &&
-    caddyClientSource.includes('throw new CaddyApiError(response.statusCode, errorText)'),
+    caddyClientSource.includes('new CaddyApiError(response.statusCode, text)'),
   'Caddy failures must preserve the HTTP status code for exact 404 handling'
 )
 
@@ -115,36 +115,27 @@ for (const forbiddenPattern of [
   )
 }
 
-assert.doesNotMatch(
-  caddyClientSource,
-  /rejectUnauthorized\s*:\s*false/,
-  'credentialed Caddy management requests must never disable TLS certificate verification'
+// 安全模型：Caddy Admin 仅绑定宿主机回环（127.0.0.1:<port>），面板经
+// Agent 反向隧道（HMAC 鉴权）访问，不再依赖公网端口、TLS 证书或管理凭据。
+assert.ok(
+  caddyClientSource.includes('hostTunnelManager.createDuplexStream(config.hostId, targetHost, port)') &&
+    caddyClientSource.includes("config.hostId"),
+  'Caddy management must reach the host Admin API through the authenticated Agent tunnel (hostId-scoped)'
 )
 
+// 隧道目标必须固定为回环地址，绝不允许面板指定任意公网目标。
 assert.ok(
-  caddyClientSource.includes('caPath?: string') &&
-    caddyClientSource.includes('process.env.CADDY_CA_PATH') &&
-    caddyClientSource.includes('ca = readFileSync(caPath)') &&
-    caddyClientSource.includes('ca,') &&
-    caddyClientSource.includes("|| 'caddy-admin'") &&
-    caddyClientSource.includes('servername: serverName') &&
-    caddyClientSource.includes('rejectUnauthorized: true'),
-  'Caddy management TLS must verify the server with pinned CA trust material'
+  caddyClientSource.includes("targetHost || '127.0.0.1'") &&
+    caddyClientSource.includes('config.port || 2019'),
+  'Caddy tunnel target must default to loopback 127.0.0.1 / admin port 2019, never a public address'
 )
 
-assert.ok(
-  caddyClientSource.includes('Caddy TLS trust material is missing') &&
-    caddyClientSource.indexOf('Caddy TLS trust material is missing') <
-      caddyClientSource.indexOf('this.agent = new Agent'),
-  'Caddy management requests must fail closed before creating a connection without trust material'
-)
-
-assert.ok(
-  caddyClientSource.includes('const caddyAgentCache = new Map<string, Agent>()') &&
-    caddyClientSource.includes('const cachedAgent = caddyAgentCache.get(agentKey)') &&
-    caddyClientSource.includes('this.agent = cachedAgent') &&
-    caddyClientSource.includes('caddyAgentCache.set(agentKey, this.agent)'),
-  'Caddy clients must reuse a module-level TLS Agent for the same host and trust configuration'
-)
+// 新架构零管理凭据：不再存在 Basic Auth 用户名/密码或公网 TLS 证书。
+for (const forbidden of ['caddy_username', 'caddy_password', 'CADDY_CA_PATH', 'servername', 'basicauth']) {
+  assert.ok(
+    !caddyClientSource.includes(forbidden),
+    `Caddy loopback-tunnel model forbids legacy credential/TLS markers: ${forbidden}`
+  )
+}
 
 console.log('proxy site route ID guard tests passed')

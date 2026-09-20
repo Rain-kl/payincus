@@ -51,6 +51,7 @@ interface AgentHeartbeatBody {
   capabilities?: string[]
   runtime?: Record<string, unknown>
   incus?: Record<string, unknown>
+  caddy?: Record<string, unknown>
   instances?: Record<string, unknown>
   resources?: Record<string, unknown>
   metrics?: Record<string, unknown>
@@ -936,6 +937,7 @@ function buildHeartbeatReport(body: AgentHeartbeatBody): Record<string, unknown>
   return {
     runtime: body.runtime ?? {},
     incus: body.incus ?? {},
+    caddy: body.caddy ?? {},
     resources: body.resources ?? {},
     metrics: normalizeAgentMetrics(body.metrics)
   }
@@ -1533,8 +1535,27 @@ export default async function agentRoutes(fastify: FastifyInstance) {
 
     const host = await prisma.host.findUnique({
       where: { id: agent.hostId },
-      select: { tunnelEnabled: true, targetHost: true, targetPort: true }
+      select: { caddyEnabled: true, tunnelEnabled: true, targetHost: true, targetPort: true }
     })
+
+    // Agent 上报 Caddy 已可用时，自动将宿主机标记为已启用（替代人工确认）。
+    const caddyReported = typeof request.body.caddy === 'object' && request.body.caddy !== null
+      ? (request.body.caddy as Record<string, unknown>)
+      : {}
+    const caddyAvailable = caddyReported.available === true
+    let caddyEnabled = host?.caddyEnabled ?? false
+    if (caddyAvailable && !caddyEnabled) {
+      await prisma.host.update({
+        where: { id: agent.hostId },
+        data: { caddyEnabled: true }
+      })
+      caddyEnabled = true
+      request.log.info({ agentId: agent.agentId, hostId: agent.hostId }, '[Caddy] Agent reported Caddy available; auto-enabled host')
+    }
+
+    const caddyPort = typeof caddyReported.port === 'number' && caddyReported.port > 0
+      ? Math.min(65535, Math.floor(caddyReported.port))
+      : 2019
 
     return {
       ok: true,
@@ -1542,6 +1563,10 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       taskPollIntervalSeconds: 15,
       instanceReport,
       upgrade: await buildAgentUpgradeInstruction(request, request.body),
+      caddy: {
+        command: caddyEnabled ? 'idle' : 'install',
+        port: caddyEnabled ? 0 : caddyPort
+      },
       tunnel: {
         enabled: host?.tunnelEnabled ?? false,
         targetHost: host?.targetHost ?? '127.0.0.1',

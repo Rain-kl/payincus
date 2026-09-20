@@ -9,7 +9,7 @@ import { promisify } from 'util'
 import * as db from '../db/index.js'
 import { createLog } from '../db/logs.js'
 import { apiError, ErrorCode } from '../lib/errors.js'
-import { createCaddyClient } from '../lib/caddy-client.js'
+import { getCaddyClientForHost } from '../lib/caddy-client.js'
 import { getDnsRecordType } from '../lib/network-address.js'
 import { requireInstanceViewPermission } from '../lib/permission.js'
 import { resolvePublicHostname } from '../lib/outbound-security.js'
@@ -291,20 +291,11 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    // 从 Caddy 删除
+    // 从 Caddy 删除（经 Agent 隧道）
     try {
-      if (site.host.caddyEnabled && site.host.caddyUsername && site.host.caddyPassword) {
-        const targetHost = site.host.natPublicIp || site.host.ipAddress || ''
-        if (targetHost) {
-          const client = createCaddyClient({
-            host: targetHost,
-            port: site.host.caddyPort || 8444,
-            username: site.host.caddyUsername,
-            password: site.host.caddyPassword
-          })
-
-          await client.deleteSite(site.domain)
-        }
+      if (site.host.caddyEnabled) {
+        const client = getCaddyClientForHost(site.host)
+        await client.deleteSite(site.domain)
       }
     } catch (err) {
       request.log.error(err, 'Failed to remove site from Caddy')
@@ -419,7 +410,7 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
     // DNS 正确，如果站点还是 pending 状态，自动激活
     if (site.status === 'pending') {
       try {
-        if (!site.host.caddyEnabled || !site.host.caddyUsername || !site.host.caddyPassword) {
+        if (!site.host.caddyEnabled) {
           throw new Error('Caddy 未启用')
         }
 
@@ -428,12 +419,7 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
           throw new Error('实例未分配 IP')
         }
 
-        const client = createCaddyClient({
-          host: expectedIp,
-          port: site.host.caddyPort || 8444,
-          username: site.host.caddyUsername,
-          password: site.host.caddyPassword
-        })
+        const client = getCaddyClientForHost(site.host)
 
         // 先删除可能存在的旧配置（防止实例删除时 Caddy 删除失败导致残留）
         try {
@@ -534,13 +520,8 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: '站点已禁用，请先启用' })
       }
 
-      if (!site.host.caddyEnabled || !site.host.caddyUsername || !site.host.caddyPassword) {
+      if (!site.host.caddyEnabled) {
         return reply.code(400).send({ error: 'Caddy 未启用' })
-      }
-
-      const targetHost = site.host.natPublicIp || site.host.ipAddress
-      if (!targetHost) {
-        return reply.code(400).send({ error: '宿主机未配置公网 IP' })
       }
 
       const instanceIp = site.instance.ipv4
@@ -548,12 +529,7 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: '实例未分配 IP' })
       }
 
-      const client = createCaddyClient({
-        host: targetHost,
-        port: site.host.caddyPort || 8444,
-        username: site.host.caddyUsername,
-        password: site.host.caddyPassword
-      })
+      const client = getCaddyClientForHost(site.host)
 
       // 先删除旧路由（避免重复添加）
       try {
@@ -701,13 +677,8 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
 
     // 需要更新 Caddy 配置
     // 检查 Caddy 是否可用
-    if (!site.host.caddyEnabled || !site.host.caddyUsername || !site.host.caddyPassword) {
+    if (!site.host.caddyEnabled) {
       return reply.code(400).send({ error: 'Caddy 未启用' })
-    }
-
-    const targetHost = site.host.natPublicIp || site.host.ipAddress
-    if (!targetHost) {
-      return reply.code(400).send({ error: '宿主机未配置公网 IP' })
     }
 
     const instanceIp = site.instance.ipv4
@@ -725,12 +696,7 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const client = createCaddyClient({
-        host: targetHost,
-        port: site.host.caddyPort || 8444,
-        username: site.host.caddyUsername,
-        password: site.host.caddyPassword
-      })
+      const client = getCaddyClientForHost(site.host)
 
       // 先删除旧路由
       await client.deleteSite(site.domain)
@@ -812,24 +778,14 @@ export default async function proxySitesRoutes(fastify: FastifyInstance) {
     }
 
     // 检查 Caddy 是否启用
-    if (!site.host.caddyEnabled || !site.host.caddyUsername || !site.host.caddyPassword) {
+    if (!site.host.caddyEnabled) {
       return reply.code(400).send({ error: 'Caddy 未启用' })
-    }
-
-    const targetHost = site.host.natPublicIp || site.host.ipAddress
-    if (!targetHost) {
-      return reply.code(400).send({ error: '宿主机未配置公网 IP' })
     }
 
     const newEnabled = !site.enabled
 
     try {
-      const client = createCaddyClient({
-        host: targetHost,
-        port: site.host.caddyPort || 8444,
-        username: site.host.caddyUsername,
-        password: site.host.caddyPassword
-      })
+      const client = getCaddyClientForHost(site.host)
 
       if (newEnabled) {
         // 启用站点：添加 Caddy 配置

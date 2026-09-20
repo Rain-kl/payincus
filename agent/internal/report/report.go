@@ -2,6 +2,7 @@ package report
 
 import (
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -24,10 +25,46 @@ func HeartbeatPayload(version string, heartbeatIntervalSeconds int) map[string]a
 			"goarch": runtime.GOARCH,
 		},
 		"incus":     detectIncus(),
+		"caddy":     collectCaddyStatus(),
 		"instances": collectIncusInstanceReport(),
 		"resources": collectResources(),
 		"metrics":   collectMetrics(heartbeatIntervalSeconds),
 	}
+}
+
+// collectCaddyStatus 探测本机 Caddy：管理 API 是否在回环 127.0.0.1:<port> 可用。
+// Caddy Admin 仅绑定 localhost 且无凭据；面板侧通过 Agent 隧道访问它，
+// 信任链落在面板<->Agent 的 HMAC/隧道通道上，因此这里不收集任何管理密钥。
+func collectCaddyStatus() map[string]any {
+	status := map[string]any{
+		"available": true,
+		"port":      2019,
+		"version":   "",
+		"active":    false,
+	}
+
+	if _, err := exec.LookPath("caddy"); err != nil {
+		status["available"] = false
+		return status
+	}
+	if versionBytes, err := exec.Command("caddy", "version").Output(); err == nil {
+		status["version"] = strings.TrimSpace(string(versionBytes))
+	}
+	status["active"] = serviceActive("caddy")
+	if !serviceActive("caddy") {
+		status["available"] = false
+		return status
+	}
+	return status
+}
+
+func serviceActive(unit string) bool {
+	output, err := exec.Command("systemctl", "is-active", "--quiet", unit).Output()
+	if err != nil {
+		return false
+	}
+	_ = output
+	return true
 }
 
 func collectResources() map[string]any {
