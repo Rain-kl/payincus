@@ -12,6 +12,7 @@ build/
 client/dist/
 server/dist/
 agent/dist/
+agent/.package-hash
 package-lock.json
 server/package-lock.json
 client/package-lock.json
