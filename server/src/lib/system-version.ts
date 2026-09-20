@@ -97,7 +97,7 @@ async function runGit(args: string[], cwd = getProjectRoot()): Promise<string | 
 function getReleaseRepository(): string {
   return process.env.SYSTEM_UPDATE_RELEASE_REPOSITORY ||
     process.env.GITHUB_REPO ||
-    'VipMaxxxx/payincus'
+    'Rain-kl/payincus'
 }
 
 export function getReleaseToken(): string | null {

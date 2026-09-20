@@ -140,7 +140,7 @@ verify_git_control() {
   fi
   local origin
   origin="$(/usr/bin/git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null)" || fail "Git origin is missing"
-  [[ "$origin" == "https://github.com/VipMaxxxx/payincus.git" ]] || fail "Git origin is not the trusted repository"
+  [[ "$origin" == "https://github.com/Rain-kl/payincus.git" ]] || fail "Git origin is not the trusted repository"
   if /usr/bin/git -C "$INSTALL_DIR" config --local --get-regexp \
       '^(core\.hooksPath|core\.fsmonitor|filter\..*\.(clean|smudge|process)|diff\..*\.command)$' \
       >/dev/null 2>&1; then
