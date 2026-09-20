@@ -266,21 +266,21 @@ onUnmounted(() => {
 
 <template>
   <div ref="containerRef" class="relative w-full">
-    <!-- 桌面端与平板：居中、拉长、黑色背景、随页面宽度自适应伸缩 -->
+    <!-- 桌面端与平板：居中、拉长、纯黑背景、随页面宽度自适应伸缩 -->
     <div class="hidden md:block relative w-full">
       <div
-        class="relative flex items-center h-[34px] w-full rounded-[4px] bg-black border transition-all duration-150"
+        class="menu-search-bar relative flex items-center h-[33px] w-full rounded-[4px] border transition-all duration-150"
         :class="[
           isOpen
-            ? 'border-[#6e6861] ring-1 ring-[#6e6861]/30 shadow-lg'
-            : 'border-[#383531] hover:border-[#524d47]'
+            ? 'bg-white border-white text-[#161513] ring-1 ring-[#6e6861]/30 shadow-lg'
+            : 'bg-black/60 border-[#383531]'
         ]"
       >
         <!-- 放大镜图标 -->
         <span class="pl-2.5 flex items-center pointer-events-none flex-shrink-0">
           <svg
             class="w-4 h-4 transition-colors"
-            :class="isOpen ? 'text-[#e5e1da]' : 'text-[#8a857e]'"
+            :class="isOpen ? 'text-[#161513]' : 'text-[#8a857e]'"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -289,23 +289,29 @@ onUnmounted(() => {
           </svg>
         </span>
 
-        <!-- 搜索输入框 (纯黑背景，白字，灰占位符) -->
+        <!-- 搜索输入框 (纯黑背景，无默认灰色背景与边框) -->
         <input
           ref="inputRef"
           v-model="query"
           type="text"
-          class="flex-1 h-full px-2.5 text-[13px] bg-transparent text-white placeholder:text-[#78736c] outline-none caret-white transition-colors"
+          class="menu-search-input flex-1 h-full px-2.5 text-[13px] outline-none transition-colors"
+          :class="isOpen
+            ? 'text-[#161513] caret-black placeholder-[#161513]/50'
+            : 'text-white caret-white placeholder-white/50 bg-transparent'"
           :placeholder="t('nav.searchPlaceholder')"
           autocomplete="off"
           spellcheck="false"
           @focus="isOpen = true"
           @keydown="handleKeyDown"
-        />
+        />      
 
         <!-- 快捷键徽标 -->
         <div class="pr-2 flex items-center pointer-events-none select-none flex-shrink-0">
           <kbd
-            class="px-1.5 py-0.5 text-[10px] font-mono rounded bg-[#1c1a18] text-[#9c968e] border border-[#33302c] transition-colors"
+            class="px-1.5 py-0.5 text-[10px] font-mono rounded transition-colors"
+            :class="isOpen
+              ? 'bg-[#f0eeec] text-[#161513] border border-[#d8d5d2]'
+              : 'bg-[#1c1a18] text-[#9c968e] border border-[#33302c]'"
           >
             {{ shortcutKey }}
           </kbd>
@@ -473,7 +479,7 @@ onUnmounted(() => {
                 ref="mobileInputRef"
                 v-model="query"
                 type="text"
-                class="flex-1 h-9 bg-transparent outline-none text-sm text-white placeholder:text-[#78736c] caret-white"
+                class="menu-search-input flex-1 h-9 outline-none text-sm text-white caret-white"
                 :placeholder="t('nav.searchPlaceholder')"
                 autocomplete="off"
                 spellcheck="false"
@@ -529,3 +535,35 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.menu-search-bar {
+  background-color: #000000 !important;
+  background: #000000 !important;
+}
+
+:deep(.menu-search-input),
+.menu-search-input {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: #ffffff !important;
+}
+
+:deep(.menu-search-input:focus),
+.menu-search-input:focus {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+:deep(.menu-search-input::placeholder),
+.menu-search-input::placeholder {
+  color: #78736c !important;
+}
+</style>
