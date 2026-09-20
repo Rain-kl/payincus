@@ -19,10 +19,6 @@ const mobileInputRef = ref<HTMLInputElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const mobileModalOpen = ref(false)
 
-// 针对不同平台的快捷键提示
-const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
-const shortcutKey = isMac ? '⌘K' : 'Ctrl+K'
-
 // 标签映射与翻译
 const navLabelFallbacks: Record<string, string> = {
   'nav.billing': '计费',
@@ -269,18 +265,18 @@ onUnmounted(() => {
     <!-- 桌面端与平板：居中、拉长、纯黑背景、随页面宽度自适应伸缩 -->
     <div class="hidden md:block relative w-full">
       <div
-        class="menu-search-bar relative flex items-center h-[33px] w-full rounded-[4px] border transition-all duration-150"
+        class="menu-search-bar relative flex items-center h-[33px] w-full rounded-[4px] border-[0.5px] transition-all duration-150"
         :class="[
           isOpen
             ? 'bg-white border-white text-[#161513] ring-1 ring-[#6e6861]/30 shadow-lg'
-            : 'bg-black/60 border-[#383531]'
+            : 'bg-black border-white'
         ]"
       >
         <!-- 放大镜图标 -->
         <span class="pl-2.5 flex items-center pointer-events-none flex-shrink-0">
           <svg
             class="w-4 h-4 transition-colors"
-            :class="isOpen ? 'text-[#161513]' : 'text-[#8a857e]'"
+            :class="isOpen ? 'text-[#161513]' : 'text-white'"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -297,25 +293,13 @@ onUnmounted(() => {
           class="menu-search-input flex-1 h-full px-2.5 text-[13px] outline-none transition-colors"
           :class="isOpen
             ? 'text-[#161513] caret-black placeholder-[#161513]/50'
-            : 'text-white caret-white placeholder-white/50 bg-transparent'"
+            : 'text-white caret-white placeholder-white bg-transparent'"
           :placeholder="t('nav.searchPlaceholder')"
           autocomplete="off"
           spellcheck="false"
           @focus="isOpen = true"
           @keydown="handleKeyDown"
         />      
-
-        <!-- 快捷键徽标 -->
-        <div class="pr-2 flex items-center pointer-events-none select-none flex-shrink-0">
-          <kbd
-            class="px-1.5 py-0.5 text-[10px] font-mono rounded transition-colors"
-            :class="isOpen
-              ? 'bg-[#f0eeec] text-[#161513] border border-[#d8d5d2]'
-              : 'bg-[#1c1a18] text-[#9c968e] border border-[#33302c]'"
-          >
-            {{ shortcutKey }}
-          </kbd>
-        </div>
       </div>
 
       <!-- 下拉菜单面板 (居中且贴合黑色操作框宽度) -->
