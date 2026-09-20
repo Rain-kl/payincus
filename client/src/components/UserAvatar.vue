@@ -93,20 +93,28 @@ const displayInitial = computed(() => {
   return name.charAt(0).toUpperCase()
 })
 
-const imgFailed = ref(false)
+const DEFAULT_AVATAR_SRC = '/images/user-icon.png'
+
+const customImgFailed = ref(false)
+const defaultImgFailed = ref(false)
 
 watch(() => [props.avatarStyle, props.username, props.email], () => {
-  imgFailed.value = false
+  customImgFailed.value = false
+  defaultImgFailed.value = false
 })
 
 function onImgError() {
-  imgFailed.value = true
+  if (customAvatarUrl.value && !customImgFailed.value) {
+    customImgFailed.value = true
+  } else {
+    defaultImgFailed.value = true
+  }
 }
 
-const avatarUrl = computed(() => {
+const customAvatarUrl = computed(() => {
   if (!props.username) return ''
   
-  // 未设置头像风格或风格无效时，返回空字符串（触发默认背景+首字母大写展示）
+  // 未设置头像风格或风格无效时，返回空字符串
   const styleKey = props.avatarStyle?.trim()
   if (!styleKey || !styleNameMap[styleKey]) {
     return ''
@@ -116,6 +124,13 @@ const avatarUrl = computed(() => {
   const seed = encodeURIComponent(props.email || props.username)
   const apiBase = configStore.avatarApiBase
   return `${apiBase}/${styleName}/svg?seed=${seed}&size=${props.size}`
+})
+
+const currentAvatarUrl = computed(() => {
+  if (customAvatarUrl.value && !customImgFailed.value) {
+    return customAvatarUrl.value
+  }
+  return DEFAULT_AVATAR_SRC
 })
 
 const effectiveBadgeId = computed(() => {
@@ -146,8 +161,8 @@ const sizeStyle = computed(() => {
     variant="avatar"
   />
   <img 
-    v-else-if="avatarUrl && !imgFailed"
-    :src="avatarUrl" 
+    v-else-if="!defaultImgFailed"
+    :src="currentAvatarUrl" 
     :alt="username"
     class="rounded-full object-cover shrink-0 select-none"
     :style="sizeStyle"

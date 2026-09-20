@@ -179,7 +179,7 @@ defineExpose({ loadUserDetails })
             <!-- 风格选择 -->
             <div class="flex-1 w-full">
               <div class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                <!-- 默认风格（背景+首字母） -->
+                <!-- 默认头像（Oracle Redwood user-icon） -->
                 <button
                   type="button"
                   class="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all cursor-pointer"
