@@ -3113,10 +3113,15 @@ function formatShortDate(dateStr: string | null | undefined): string {
               :instance-password="instancePassword"
               :can-edit-config="instance.isHostOwner === true"
               :enable-resource-pool="!isAdminEntry && (instance as any).enableResourcePool === true"
+              :copied="copied"
+              :reassign-ipv6-loading="reassignIpv6Loading"
+              :last-ipv6-reassign-at="(instance as any).last_ipv6_reassign_at"
+              :is-instance-owner="!isHostOwnerOnly"
               @toggle-password="togglePasswordVisibility"
               @copy="copyToClipboard"
               @edit-config="openConfigEditModal"
               @redeem="openRedeemModal"
+              @reassign-ipv6="requestReassignIpv6"
             />
           </div>
 
