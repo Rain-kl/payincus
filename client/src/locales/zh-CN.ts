@@ -432,7 +432,7 @@ export default {
         admin: '管理',
         expand: '扩展',
         system: '系统',
-        systemUpdate: '版本   更新',
+        systemUpdate: '更新',
         users: '用户',
         statistics: '统计',
         hosts: '节点',
@@ -3432,6 +3432,8 @@ export default {
                 subtitleDesc: '显示在公开站头部/底部、浏览器默认标题和 SEO 默认描述中。',
                 logo: 'Logo 地址',
                 logoDesc: '支持 http(s) 图片地址或站内绝对路径，留空则使用默认 Logo。',
+                copyright: '版权所有',
+                copyrightDesc: '显示在页面底部的版权所有文案，留空则使用默认值。',
             },
             ticket: {
                 title: '工单设置',

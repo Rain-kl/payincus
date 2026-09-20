@@ -4232,6 +4232,8 @@ const zhTW = {
                 subtitleDesc: '顯示在公開站頭部/底部、瀏覽器預設標題和 SEO 預設描述中。',
                 logo: 'Logo 位址',
                 logoDesc: '支援 http(s) 圖片位址或站內絕對路徑，留空則使用預設 Logo。',
+                copyright: '版權所有',
+                copyrightDesc: '顯示在頁面底部的版權所有文案，留空則使用預設值。',
             },
             ticket: {
                 title: '工單設定',

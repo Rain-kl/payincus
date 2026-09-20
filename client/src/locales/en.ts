@@ -3249,6 +3249,8 @@ export default {
                 subtitleDesc: 'Shown in the public header/footer, default browser title, and default SEO description.',
                 logo: 'Logo URL',
                 logoDesc: 'Supports http(s) image URLs or absolute site paths. Leave empty to use the default logo.',
+                copyright: 'Copyright Notice',
+                copyrightDesc: 'Copyright notice displayed at the bottom of the page. Leave empty for default.',
             },
             ticket: {
                 title: 'Ticket Settings',

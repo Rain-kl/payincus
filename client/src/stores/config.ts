@@ -26,6 +26,7 @@ export const useConfigStore = defineStore('config', () => {
     const brandName = ref('Incudal')
     const brandSubtitle = ref('基于 Incus 的低价 NAT VPS')
     const brandLogoUrl = ref('/incudal_logo.webp')
+    const brandCopyright = ref('版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。')
     const registrationEnabled = ref(true)
     const requireInviteCode = ref(true)
     const ticketEnabled = ref(true)
@@ -65,6 +66,7 @@ export const useConfigStore = defineStore('config', () => {
                 brandName.value = config.brandName?.trim() || 'Incudal'
                 brandSubtitle.value = config.brandSubtitle?.trim() || '基于 Incus 的低价 NAT VPS'
                 brandLogoUrl.value = config.brandLogoUrl?.trim() || '/incudal_logo.webp'
+                brandCopyright.value = config.brandCopyright?.trim() || '版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。'
                 transferFee.value = config.transferFee || 0
                 footerContactEmail.value = config.footerContactEmail ?? null
                 footerTelegramLink.value = config.footerTelegramLink ?? null
@@ -93,6 +95,7 @@ export const useConfigStore = defineStore('config', () => {
         brandName,
         brandSubtitle,
         brandLogoUrl,
+        brandCopyright,
         registrationEnabled,
         requireInviteCode,
         ticketEnabled,

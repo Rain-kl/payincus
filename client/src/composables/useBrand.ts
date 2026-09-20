@@ -12,6 +12,9 @@ export function useBrand() {
     },
     get brandLogoUrl() {
       return configStore.brandLogoUrl?.trim() || '/incudal_logo.webp'
+    },
+    get brandCopyright() {
+      return configStore.brandCopyright?.trim() || '版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。'
     }
   }
 }
