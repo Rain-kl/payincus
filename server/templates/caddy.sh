@@ -97,6 +97,27 @@ CADDYFILE_NEW=""
 OVERRIDE_NEW=""
 CADDY_INSTALL_COMPLETE=false
 ROLLBACK_HANDLED=false
+# 旧安装残留的预期路径（每次重新安装前都会清除/修正）
+readonly OLD_AUTOSAVE_FILE="/var/lib/caddy/.config/caddy/autosave.json"
+readonly OLD_CADDY_STORAGE_DIR="/var/lib/caddy/.local/share/caddy"
+readonly OLD_OVERRIDE_FILE="/etc/systemd/system/caddy.service.d/override.conf"
+readonly OLD_LOG_DIR="/var/log/caddy"
+
+cleanup_old_installation() {
+    # 删除旧脚本/旧版本 Caddy 留下的运行期残留，防止 --resume 恢复旧配置、或旧 override 干扰新安装。
+    rm -f "$OLD_AUTOSAVE_FILE" 2>/dev/null || true
+    rm -rf "$OLD_CADDY_STORAGE_DIR" 2>/dev/null || true
+    rm -f "$OLD_OVERRIDE_FILE" 2>/dev/null || true
+    # 清除历次脚本留下的配置备份（这些都是旧安装的垃圾，重装后不再需要）
+    rm -f /etc/caddy/Caddyfile.before-incudal.* 2>/dev/null || true
+    rm -f /etc/systemd/system/caddy.service.d/*.before-incudal.* 2>/dev/null || true
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    # 重置旧日志目录的归属：caddy 以 User=caddy 运行，目录必须可写，
+    # 否则新配置里的日志输出会在启动时 permission denied。
+    install -d -o caddy -g caddy -m 0750 "$OLD_LOG_DIR"
+    # 旧日志文件可能属 root（旧脚本/旧包产生），caddy 打开会 permission denied，一并清掉
+    rm -f "$OLD_LOG_DIR"/*.log 2>/dev/null || true
+}
 
 cleanup_caddy_install() {
     local exit_status=$?
@@ -118,6 +139,9 @@ cleanup_caddy_install() {
 trap cleanup_caddy_install EXIT
 
 log "Installing Caddy Web Server & Dependencies..."
+
+# 清理旧安装残留（autosave/老配置 storage/旧 override），确保从干净状态安装
+cleanup_old_installation
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -206,7 +230,7 @@ EOF
 cat > "$OVERRIDE_NEW" <<'EOF'
 [Service]
 ExecStart=
-ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile --resume
+ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
 EOF
 
 chown root:caddy "$CADDYFILE_NEW"
@@ -308,7 +332,7 @@ echo -e "\033[1;36m========================================\033[0m"
 echo -e "\033[1;33m  API Port:     ${CADDY_PORT}\033[0m"
 echo -e "\033[1;33m  Username:     ${CADDY_USER}\033[0m"
 echo -e "\033[1;33m  Auth:         Basic Auth + HTTPS\033[0m"
-echo -e "\033[1;33m  Persistence:  API (--resume mode)\033[0m"
+echo -e "\033[1;33m  Persistence:  Config file (--config mode)\033[0m"
 echo -e "\033[1;36m========================================\033[0m"
 echo ""
 echo -e "\033[1;32mPlease return to the panel and confirm the installation.\033[0m"
