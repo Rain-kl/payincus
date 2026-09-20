@@ -373,6 +373,16 @@ done
 SED_BIN="sed"
 SSH_CONFIG="/etc/ssh/sshd_config"
 
+if [ -d "/etc/ssh/sshd_config.d" ]; then
+    rm -f /etc/ssh/sshd_config.d/*cloud-init*.conf 2>/dev/null || true
+    for f in /etc/ssh/sshd_config.d/*.conf; do
+        if [ -f "$f" ]; then
+            $SED_BIN -i 's/^PasswordAuthentication no/PasswordAuthentication yes/g' "$f" 2>/dev/null || true
+            $SED_BIN -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/g' "$f" 2>/dev/null || true
+        fi
+    done
+fi
+
 $SED_BIN -i 's/^PermitRootLogin/#PermitRootLogin/g' $SSH_CONFIG 2>/dev/null || true
 $SED_BIN -i 's/^PasswordAuthentication/#PasswordAuthentication/g' $SSH_CONFIG 2>/dev/null || true
 $SED_BIN -i 's/^PubkeyAuthentication/#PubkeyAuthentication/g' $SSH_CONFIG 2>/dev/null || true
@@ -583,7 +593,7 @@ export function generateContainerConfig(params: IncusConfigParams): IncusConfigR
   const bootcmdList = getBootcmd(osInfo)
   const bootcmdSection = bootcmdList.length > 0 ? `bootcmd:\n${bootcmdList.map(cmd => `  - ${cmd}`).join('\n')}\n` : ''
   const yamlSafePassword = rootPassword.replace(/'/g, "''").replace(/\\/g, '\\\\')
-  const sshPwauth = isAlpine ? 'false' : 'true'
+  const sshPwauth = 'true'
   const packagesSection = packages.length > 0
     ? `packages:\n${packagesYaml}\n\n`
     : ''
