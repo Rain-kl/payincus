@@ -281,43 +281,28 @@ function handleClose() {
     <Transition name="modal">
       <div
         v-if="show"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="handleClose"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50" @click="handleClose" />
-        
+        <div class="modal-backdrop" @click="handleClose" />
+
         <!-- Modal -->
-        <div
-          class="relative w-full max-w-lg rounded-lg shadow-xl max-h-[90vh] overflow-y-auto"
-          :class="themeStore.isDark ? 'bg-gray-900' : 'bg-white'"
-        >
+        <div class="modal-content max-w-lg">
           <!-- Header -->
-          <div
-            class="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10"
-            :class="themeStore.isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'"
-          >
+          <div class="modal-header sticky top-0 z-10">
             <div class="flex items-center gap-2">
-              <h3 
-                class="text-lg font-medium"
-                :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-              >
-                {{ t('billing.changePlanTitle') }}
-              </h3>
+              <h3 class="modal-title">{{ t('billing.changePlanTitle') }}</h3>
               <!-- 查看规则按钮 -->
               <button
-                class="text-xs px-2 py-0.5 rounded-full transition-colors"
-                :class="themeStore.isDark 
-                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                class="text-xs px-2 py-0.5 rounded border border-themed text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
                 @click="showRules = !showRules"
               >
                 {{ showRules ? t('billing.hideRules') : t('billing.viewRules') }}
               </button>
             </div>
             <button
-              class="p-1 rounded hover:bg-gray-500/20"
-              :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'"
+              class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
               @click="handleClose"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -327,15 +312,15 @@ function handleClose() {
           </div>
 
           <!-- Content -->
-          <div class="px-6 py-4">
+          <div class="modal-body">
             <!-- Loading -->
             <div v-if="loading" class="flex justify-center py-8">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
             </div>
 
             <!-- Error -->
-            <div v-else-if="error && !plans.length" class="py-4">
-              <div class="p-3 rounded-lg bg-red-500/10 text-red-500 text-sm">
+            <div v-else-if="error && !plans.length" class="py-2">
+              <div class="p-3 rounded bg-error/10 text-error text-sm">
                 {{ error }}
               </div>
             </div>
@@ -343,24 +328,17 @@ function handleClose() {
             <!-- Content -->
             <template v-else>
               <!-- 变更规则面板 -->
-              <div 
+              <div
                 v-if="showRules"
-                class="mb-4 p-4 rounded-lg text-sm"
-                :class="themeStore.isDark ? 'bg-blue-900/20 border border-blue-800/50' : 'bg-blue-50 border border-blue-200'"
+                class="p-4 rounded border border-themed-hover bg-themed-secondary text-sm"
               >
-                <div 
-                  class="font-medium mb-2 flex items-center gap-1"
-                  :class="themeStore.isDark ? 'text-blue-300' : 'text-blue-700'"
-                >
+                <div class="font-medium mb-2 flex items-center gap-1 text-themed">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {{ t('billing.changePlanRulesTitle') }}
                 </div>
-                <ul 
-                  class="list-disc list-inside space-y-1"
-                  :class="themeStore.isDark ? 'text-blue-200' : 'text-blue-600'"
-                >
+                <ul class="list-disc list-inside space-y-1 text-themed-secondary">
                   <li>{{ t('billing.changePlanRule1') }}</li>
                   <li>{{ t('billing.changePlanRule2') }}</li>
                   <li>{{ t('billing.changePlanRule3') }}</li>
@@ -369,57 +347,38 @@ function handleClose() {
               </div>
 
               <!-- KVM/LXC 重启提示 -->
-              <div 
-                class="mb-4 p-3 rounded-lg text-sm flex items-start gap-2"
+              <div
+                class="p-3 rounded border text-sm flex items-start gap-2"
                 :class="instanceType === 'vm'
-                  ? (themeStore.isDark ? 'bg-amber-900/20 border border-amber-800/50' : 'bg-amber-50 border border-amber-200')
-                  : (themeStore.isDark ? 'bg-green-900/20 border border-green-800/50' : 'bg-green-50 border border-green-200')"
+                  ? 'border-warning/30 bg-warning/10'
+                  : 'border-success/30 bg-success/10'"
               >
-                <svg 
-                  class="w-4 h-4 mt-0.5 flex-shrink-0" 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  class="w-4 h-4 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
-                  :class="instanceType === 'vm'
-                    ? (themeStore.isDark ? 'text-amber-400' : 'text-amber-600')
-                    : (themeStore.isDark ? 'text-green-400' : 'text-green-600')"
+                  :class="instanceType === 'vm' ? 'text-warning' : 'text-success'"
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span
-                  :class="instanceType === 'vm'
-                    ? (themeStore.isDark ? 'text-amber-300' : 'text-amber-700')
-                    : (themeStore.isDark ? 'text-green-300' : 'text-green-700')"
-                >
+                <span :class="instanceType === 'vm' ? 'text-warning' : 'text-success'">
                   {{ instanceType === 'vm' ? t('billing.kvmRestartHint') : t('billing.lxcInstantHint') }}
                 </span>
               </div>
 
               <!-- 已是最高方案提示 -->
-              <div 
+              <div
                 v-if="isHighestPlan"
-                class="mb-4 p-4 rounded-lg text-sm text-center"
-                :class="themeStore.isDark ? 'bg-blue-900/20 border border-blue-800/50' : 'bg-blue-50 border border-blue-200'"
+                class="p-4 rounded border border-themed bg-themed-secondary text-sm text-center"
               >
-                <div 
-                  class="font-medium mb-1"
-                  :class="themeStore.isDark ? 'text-blue-300' : 'text-blue-700'"
-                >
-                  {{ t('billing.alreadyHighestPlan') }}
-                </div>
-                <div 
-                  :class="themeStore.isDark ? 'text-blue-200' : 'text-blue-600'"
-                >
-                  {{ t('billing.contactForCustomPlan') }}
-                </div>
+                <div class="font-medium mb-1 text-themed">{{ t('billing.alreadyHighestPlan') }}</div>
+                <div class="text-themed-secondary">{{ t('billing.contactForCustomPlan') }}</div>
               </div>
 
               <!-- 方案列表 -->
-              <div v-if="!isHighestPlan" class="mb-4">
-                <label 
-                  class="block text-sm font-medium mb-2"
-                  :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
-                >
+              <div v-if="!isHighestPlan">
+                <label class="block text-sm font-medium mb-2 text-themed-secondary">
                   {{ t('billing.selectNewPlan') }}
                 </label>
                 <div class="space-y-2">
@@ -427,64 +386,37 @@ function handleClose() {
                     v-for="plan in availablePlans"
                     :key="plan.id"
                     :disabled="!plan.isActive || plan.isSoldOut"
-                    class="w-full p-3 rounded-lg border text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="w-full p-3 rounded border text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     :class="[
                       selectedPlanId === plan.id && !plan.isSoldOut
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : plan.isSoldOut
-                          ? themeStore.isDark
-                            ? 'border-gray-700 bg-gray-800/40'
-                            : 'border-gray-200 bg-gray-50'
-                          : themeStore.isDark
-                            ? 'border-gray-700 hover:border-gray-600'
-                            : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-accent bg-accent/10'
+                        : 'border-themed hover:border-themed-hover'
                     ]"
                     @click="!plan.isSoldOut && plan.isActive && (selectedPlanId = plan.id)"
                   >
                     <div class="flex justify-between items-start">
                       <div>
-                        <div 
-                          class="font-medium"
-                          :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-                        >
-                          {{ plan.name }}
-                        </div>
-                        <div 
-                          class="text-xs mt-1"
-                          :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-                        >
+                        <div class="font-medium text-themed">{{ plan.name }}</div>
+                        <div class="text-xs mt-1 text-themed-muted">
                           {{ plan.cpu }}% CPU · {{ formatMemory(plan.memory) }} · {{ formatDisk(plan.disk) }}
                         </div>
                         <div
                           v-if="props.instanceType !== 'vm' && plan.swapSize > 0"
-                          class="text-xs mt-1"
-                          :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
+                          class="text-xs mt-1 text-themed-muted"
                         >
                           {{ t('resources.plans.swapSize') }} · {{ plan.swapSize }} MB
                         </div>
                       </div>
                       <div class="text-right">
-                        <div 
-                          class="font-medium"
-                          :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-                        >
-                          ¥{{ formatPriceCents(plan.price) }}
-                        </div>
-                        <div 
-                          class="text-xs"
-                          :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-                        >
-                          {{ getBillingCycleText(plan.billingCycle) }}
-                        </div>
+                        <div class="font-medium text-themed">¥{{ formatPriceCents(plan.price) }}</div>
+                        <div class="text-xs text-themed-muted">{{ getBillingCycleText(plan.billingCycle) }}</div>
                       </div>
                     </div>
                     <!-- 状态标签 -->
                     <div v-if="!plan.isActive || plan.isSoldOut" class="mt-2">
-                      <span 
-                        class="text-xs px-1.5 py-0.5 rounded"
-                        :class="plan.isSoldOut
-                          ? (themeStore.isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-50 text-red-700')
-                          : (themeStore.isDark ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-500')"
+                      <span
+                        class="text-xs px-1.5 py-0.5 rounded badge"
+                        :class="plan.isSoldOut ? 'badge-error' : 'badge-default'"
                       >
                         {{ plan.isSoldOut ? t('billing.planSoldOut') : t('billing.planInactive') }}
                       </span>
@@ -495,188 +427,127 @@ function handleClose() {
 
               <!-- 预览加载中 -->
               <div v-if="loadingPreview" class="flex justify-center py-4">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
               </div>
 
               <!-- 预览详情 -->
-              <div 
+              <div
                 v-else-if="preview"
-                class="p-4 rounded-lg mb-4"
-                :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'"
+                class="p-4 rounded border border-themed bg-themed-secondary text-sm space-y-2"
               >
                 <!-- 不能变更提示 -->
-                <div 
+                <div
                   v-if="!preview.canChange"
-                  class="p-3 rounded-lg mb-3 text-sm"
-                  :class="themeStore.isDark ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'"
+                  class="p-3 rounded border border-error/30 bg-error/10 text-sm"
                 >
-                  <div class="flex items-center gap-1 font-medium">
+                  <div class="flex items-center gap-1 font-medium text-error">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     {{ t('billing.cannotChange') }}
                   </div>
-                  <div class="mt-1">{{ cannotChangeReasonText }}</div>
-                  <ul v-if="preview.resourceWarnings?.length" class="mt-2 list-disc list-inside space-y-1">
+                  <div class="mt-1 text-error">{{ cannotChangeReasonText }}</div>
+                  <ul v-if="preview.resourceWarnings?.length" class="mt-2 list-disc list-inside space-y-1 text-error">
                     <li v-for="warning in preview.resourceWarnings" :key="warning">{{ warning }}</li>
                   </ul>
                 </div>
 
                 <!-- 升级标识 -->
-                <div class="flex items-center gap-2 mb-3">
-                  <span 
-                    class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-500"
-                  >
+                <div class="flex items-center gap-2">
+                  <span class="text-xs px-2 py-0.5 rounded badge badge-success">
                     {{ t('billing.isUpgrade') }}
                   </span>
                 </div>
 
-                <div class="space-y-2 text-sm">
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ t('billing.remainingDays') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      {{ Math.ceil(preview.remainingDays) }} {{ t('billing.days') }}
-                    </span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.oldDailyPrice : t('billing.oldDailyPrice') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      ¥{{ preview.oldDailyPrice.toFixed(4) }}/{{ t('billing.day') }}
-                    </span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.remainingValue : t('billing.remainingValue') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      ¥{{ formatMoney(preview.remainingValue) }}
-                    </span>
-                  </div>
-                  <div class="border-t my-2" :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-200'" />
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.newDailyPrice : t('billing.newDailyPrice') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      ¥{{ preview.newDailyPrice.toFixed(4) }}/{{ t('billing.day') }}
-                    </span>
-                  </div>
-                  <!-- 新方案剩余费用：无折扣时直接显示一行，有折扣时显示原价+折扣+折后 -->
-                  <div v-if="preview.discountAmount > 0" class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.newPlanCost : t('billing.newPlanCostOriginal') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      ¥{{ formatMoney(preview.newPlanCost + preview.discountAmount) }}
-                    </span>
-                  </div>
-                  <!-- 折扣信息 -->
-                  <div 
-                    v-if="preview.discountAmount > 0"
-                    class="flex justify-between"
-                  >
-                    <span :class="themeStore.isDark ? 'text-green-400' : 'text-green-600'">
-                      {{ t('billing.discountAmount') }} (-{{ (preview.discountRate * 100).toFixed(0) }}%)
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-green-400' : 'text-green-600'">
-                      -¥{{ formatMoney(preview.discountAmount) }}
-                    </span>
-                  </div>
-                  <div v-if="preview.discountAmount > 0" class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.newPlanCost : t('billing.newPlanCostFinal') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      ¥{{ formatMoney(preview.newPlanCost) }}
-                    </span>
-                  </div>
-                  <!-- 无折扣时直接显示新方案剩余费用 -->
-                  <div v-if="preview.discountAmount <= 0" class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.newPlanCost : t('billing.newPlanCostOriginal') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      ¥{{ formatMoney(preview.newPlanCost) }}
-                    </span>
-                  </div>
-                  <div class="border-t my-2" :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-200'" />
-                  <div class="flex justify-between font-medium">
-                    <span :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.needPay : t('billing.needPay') }}
-                    </span>
-                    <span 
-                      :class="insufficientBalance ? 'text-red-500' : 'text-blue-500'"
-                    >
-                      ¥{{ formatMoney(preview.priceDiff) }}
-                    </span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ t('billing.newExpiresAt') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
-                      {{ formatDate(preview.newExpiresAt) }}
-                    </span>
-                  </div>
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">{{ t('billing.remainingDays') }}</span>
+                  <span class="text-themed">{{ Math.ceil(preview.remainingDays) }} {{ t('billing.days') }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.oldDailyPrice : t('billing.oldDailyPrice') }}</span>
+                  <span class="text-themed">¥{{ preview.oldDailyPrice.toFixed(4) }}/{{ t('billing.day') }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.remainingValue : t('billing.remainingValue') }}</span>
+                  <span class="text-themed">¥{{ formatMoney(preview.remainingValue) }}</span>
+                </div>
+                <div class="border-t border-themed my-1" />
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.newDailyPrice : t('billing.newDailyPrice') }}</span>
+                  <span class="text-themed">¥{{ preview.newDailyPrice.toFixed(4) }}/{{ t('billing.day') }}</span>
+                </div>
+                <!-- 新方案剩余费用：有折扣时显示原价+折扣+折后 -->
+                <div v-if="preview.discountAmount > 0" class="flex justify-between">
+                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.newPlanCost : t('billing.newPlanCostOriginal') }}</span>
+                  <span class="text-themed">¥{{ formatMoney(preview.newPlanCost + preview.discountAmount) }}</span>
+                </div>
+                <!-- 折扣信息 -->
+                <div v-if="preview.discountAmount > 0" class="flex justify-between">
+                  <span class="text-success">{{ t('billing.discountAmount') }} (-{{ (preview.discountRate * 100).toFixed(0) }}%)</span>
+                  <span class="text-success">-¥{{ formatMoney(preview.discountAmount) }}</span>
+                </div>
+                <div v-if="preview.discountAmount > 0" class="flex justify-between">
+                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.newPlanCost : t('billing.newPlanCostFinal') }}</span>
+                  <span class="text-themed">¥{{ formatMoney(preview.newPlanCost) }}</span>
+                </div>
+                <!-- 无折扣时直接显示新方案剩余费用 -->
+                <div v-if="preview.discountAmount <= 0" class="flex justify-between">
+                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.newPlanCost : t('billing.newPlanCostOriginal') }}</span>
+                  <span class="text-themed">¥{{ formatMoney(preview.newPlanCost) }}</span>
+                </div>
+                <div class="border-t border-themed my-1" />
+                <div class="flex justify-between font-medium">
+                  <span class="text-themed-secondary">{{ configStore.freeSiteMode ? freeSiteCopy.needPay : t('billing.needPay') }}</span>
+                  <span :class="insufficientBalance ? 'text-error' : 'text-accent'">
+                    ¥{{ formatMoney(preview.priceDiff) }}
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">{{ t('billing.newExpiresAt') }}</span>
+                  <span class="text-themed">{{ formatDate(preview.newExpiresAt) }}</span>
                 </div>
 
                 <!-- 新配置 -->
-                <div 
-                  class="mt-3 pt-3 border-t text-xs"
-                  :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-200'"
-                >
-                  <div :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-                    {{ t('billing.newConfig') }}: 
-                    {{ preview.newConfig.cpu }}% CPU · 
-                    {{ formatMemory(preview.newConfig.memory) }} · 
-                    {{ formatDisk(preview.newConfig.disk) }}
-                  </div>
+                <div class="mt-3 pt-3 border-t border-themed text-xs text-themed-muted">
+                  {{ t('billing.newConfig') }}:
+                  {{ preview.newConfig.cpu }}% CPU ·
+                  {{ formatMemory(preview.newConfig.memory) }} ·
+                  {{ formatDisk(preview.newConfig.disk) }}
                 </div>
               </div>
 
               <!-- 余额不足提示 -->
-              <div 
+              <div
                 v-if="preview && insufficientBalance"
-                class="p-3 rounded-lg mb-4 text-sm"
-                :class="themeStore.isDark ? 'bg-yellow-900/20 text-yellow-400' : 'bg-yellow-50 text-yellow-600'"
+                class="p-3 rounded border border-warning/30 bg-warning/10 text-sm text-warning"
               >
                 {{ t('billing.insufficientBalance') }}
                 <RouterLink :to="walletPath()" class="underline ml-1">{{ t('billing.goRecharge') }}</RouterLink>
               </div>
 
               <!-- 错误提示 -->
-              <div 
+              <div
                 v-if="error && plans.length"
-                class="p-3 rounded-lg mb-4 bg-red-500/10 text-red-500 text-sm"
+                class="p-3 rounded bg-error/10 text-error text-sm"
               >
-                {{ error }}
+              {{ error }}
               </div>
             </template>
           </div>
 
           <!-- Footer -->
-          <div
-            class="flex justify-end gap-3 px-6 py-4 border-t sticky bottom-0"
-            :class="themeStore.isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'"
-          >
+          <div class="modal-footer sticky bottom-0">
             <button
-              class="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-              :class="themeStore.isDark
-                ? 'text-gray-300 hover:bg-gray-800'
-                : 'text-gray-700 hover:bg-gray-100'"
+              class="btn btn-secondary"
               @click="handleClose"
             >
               {{ t('common.cancel') }}
             </button>
             <button
-              :disabled="loading || loadingPreview || changing || !preview || 
+              :disabled="loading || loadingPreview || changing || !preview ||
                 !preview.canChange ||
                 insufficientBalance"
-              class="px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-accent text-white dark:text-black hover:opacity-90"
+              class="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               @click="handleChangePlan"
             >
               {{ changing ? t('billing.changePlanInProgress') : t('billing.upgrade') }}
@@ -688,24 +559,3 @@ function handleClose() {
   </Teleport>
 </template>
 
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-active .relative,
-.modal-leave-active .relative {
-  transition: transform 0.2s ease;
-}
-
-.modal-enter-from .relative,
-.modal-leave-to .relative {
-  transform: scale(0.95);
-}
-</style>

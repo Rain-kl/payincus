@@ -191,29 +191,19 @@ function close(): void {
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
-          class="absolute inset-0 backdrop-blur-sm"
-          :class="themeStore.isDark ? 'bg-black/60' : 'bg-black/30'"
+      <div v-if="visible" class="modal-overlay">
+        <div
+          class="modal-backdrop"
           @click="close"
         ></div>
-        
-        <div 
-          class="modal-content relative w-full max-w-md border rounded-xl shadow-2xl"
-          :class="themeStore.isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'"
-        >
-          <div 
-            class="flex items-center justify-between p-5 border-b"
-            :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'"
-          >
-            <h3 
-              class="text-base font-medium"
-              :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'"
-            >
+
+        <div class="modal-content max-w-md">
+          <div class="modal-header">
+            <h3 class="modal-title">
               {{ t('portModal.title') }}
             </h3>
-            <button 
-              :class="themeStore.isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'" 
+            <button
+              class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
               @click="close"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,6 +211,7 @@ function close(): void {
               </svg>
             </button>
           </div>
+
         
           <form class="p-5" @submit.prevent="handleSubmit">
             <div class="space-y-4">

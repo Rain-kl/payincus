@@ -3125,22 +3125,18 @@ function formatShortDate(dateStr: string | null | undefined): string {
             />
           </div>
 
-          <!-- Network Tab -->
+          <!-- Network (Port Mappings) Tab -->
           <InstanceNetworkTab
             v-if="activeTab === 'network' && instance"
             :instance="instance"
             :copied="copied"
             :can-manage-ports="canManagePorts"
-            :is-instance-owner="!isHostOwnerOnly"
-            :reassign-ipv6-loading="reassignIpv6Loading"
-            :last-ipv6-reassign-at="(instance as any).last_ipv6_reassign_at"
-	            :delete-ports-loading="deletePortsLoading"
-	            @copy="copyToClipboard"
-	            @add-port="requestAddPort"
-	            @delete-port="deletePort"
-	            @delete-ports="deletePorts"
-	            @reassign-ipv6="requestReassignIpv6"
-	          />
+            :delete-ports-loading="deletePortsLoading"
+            @copy="copyToClipboard"
+            @add-port="requestAddPort"
+            @delete-port="deletePort"
+            @delete-ports="deletePorts"
+          />
 
           <!-- Sites Tab -->
 	          <InstanceSitesTab
@@ -3624,45 +3620,39 @@ function formatShortDate(dateStr: string | null | undefined): string {
       <Transition name="modal">
         <div
           v-if="!isAdminEntry && showAutoRenewModal && instance"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          class="modal-overlay"
         >
           <!-- 背景遮罩 -->
           <div
-            class="absolute inset-0 bg-black/50"
+            class="modal-backdrop"
             @click="showAutoRenewModal = false"
           />
           <!-- 弹窗内容 -->
-          <div
-            class="relative w-full max-w-md rounded-xl shadow-xl overflow-hidden"
-            :class="themeStore.isDark ? 'bg-neutral-800' : 'bg-white'"
-          >
+          <div class="modal-content max-w-md">
             <!-- 标题 -->
-            <div
-              class="px-6 py-4 border-b"
-              :class="themeStore.isDark ? 'border-neutral-700' : 'border-gray-100'"
-            >
-              <h3
-                class="text-lg font-semibold"
-                :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-              >
+            <div class="modal-header">
+              <h3 class="modal-title">
                 {{ $t('instance.subscription.autoRenew') }}
               </h3>
+              <button
+                class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
+                @click="showAutoRenewModal = false"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             <!-- 内容 -->
-            <div class="px-6 py-5">
+            <div class="modal-body">
               <!-- 当前状态 -->
-              <div
-                class="flex items-center justify-between p-4 rounded-lg mb-4"
-                :class="themeStore.isDark ? 'bg-neutral-700/50' : 'bg-gray-50'"
-              >
-                <span :class="themeStore.isDark ? 'text-slate-300' : 'text-gray-600'">
+              <div class="flex items-center justify-between p-4 rounded border border-themed bg-themed-secondary">
+                <span class="text-themed-secondary">
                   {{ $t('instance.subscription.currentStatus') }}
                 </span>
                 <span
                   class="font-medium"
-                  :class="(instance as any).autoRenew
-                    ? (themeStore.isDark ? 'text-emerald-400' : 'text-emerald-600')
-                    : (themeStore.isDark ? 'text-slate-400' : 'text-gray-500')"
+                  :class="(instance as any).autoRenew ? 'text-success' : 'text-themed-muted'"
                 >
                   {{ (instance as any).autoRenew
                     ? $t('instance.subscription.autoRenewEnabled')
@@ -3670,20 +3660,14 @@ function formatShortDate(dateStr: string | null | undefined): string {
                 </span>
               </div>
               <!-- 说明 -->
-              <p
-                class="text-sm mb-4"
-                :class="themeStore.isDark ? 'text-slate-400' : 'text-gray-500'"
-              >
+              <p class="text-sm text-themed-secondary">
                 {{ $t('instance.subscription.autoRenewDesc', {
                   cycle: getBillingCycleText((instance as any).billingCycle),
                   price: getRenewPrice(instance).toFixed(2)
                 }) }}
               </p>
               <!-- 提示 -->
-              <div
-                class="flex items-start gap-2 p-3 rounded-lg text-sm"
-                :class="themeStore.isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'"
-              >
+              <div class="flex items-start gap-2 p-3 rounded border border-accent/20 bg-accent/5 text-sm text-accent">
                 <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -3691,25 +3675,16 @@ function formatShortDate(dateStr: string | null | undefined): string {
               </div>
             </div>
             <!-- 操作按钮 -->
-            <div
-              class="px-6 py-4 border-t flex gap-3"
-              :class="themeStore.isDark ? 'border-neutral-700' : 'border-gray-100'"
-            >
+            <div class="modal-footer">
               <button
-                class="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="themeStore.isDark
-                  ? 'bg-neutral-700 text-white hover:bg-neutral-600'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                class="btn btn-secondary"
                 @click="showAutoRenewModal = false"
               >
                 {{ $t('common.cancel') }}
               </button>
               <button
                 v-if="(instance as any).autoRenew"
-                class="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="themeStore.isDark
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-red-500 hover:bg-red-600 text-white'"
+                class="btn btn-danger disabled:opacity-50"
                 :disabled="autoRenewLoading"
                 @click="handleSetAutoRenew(false)"
               >
@@ -3724,10 +3699,7 @@ function formatShortDate(dateStr: string | null | undefined): string {
               </button>
               <button
                 v-else
-                class="flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-                :class="themeStore.isDark
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-white'"
+                class="btn btn-primary disabled:opacity-50"
                 :disabled="autoRenewLoading"
                 @click="handleSetAutoRenew(true)"
               >
@@ -3745,6 +3717,7 @@ function formatShortDate(dateStr: string | null | undefined): string {
         </div>
       </Transition>
     </Teleport>
+
 
     <InstanceBadgeModal
       v-if="!isAdminEntry && instance"

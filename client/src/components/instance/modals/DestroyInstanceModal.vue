@@ -86,39 +86,33 @@ function formatCurrency(value: number): string {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div v-if="visible" class="modal-overlay">
       <!-- Backdrop -->
-      <div 
-        class="absolute inset-0 backdrop-blur-sm"
-        :class="themeStore.isDark ? 'bg-black/60' : 'bg-black/30'"
+      <div
+        class="modal-backdrop"
         @click="close"
       ></div>
-      
+
       <!-- Modal -->
-      <div 
-        class="relative w-full max-w-lg border rounded-xl shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto"
-        :class="themeStore.isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'"
+      <div
+        class="modal-content max-w-lg"
       >
         <!-- Header -->
-        <div 
-          class="flex items-center justify-between p-5 border-b sticky top-0 z-10"
-          :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-white'"
+        <div
+          class="modal-header sticky top-0 z-10"
         >
           <div class="flex items-center gap-3">
-            <div class="p-2 rounded-lg bg-red-500/10">
+            <div class="p-2 rounded bg-red-500/10">
               <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
-            <h3 
-              class="text-base font-medium"
-              :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'"
-            >
+            <h3 class="modal-title">
               {{ t('instance.destroy.title') }}
             </h3>
           </div>
-          <button 
-            :class="themeStore.isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'" 
+          <button
+            class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
             @click="close"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,6 +120,7 @@ function formatCurrency(value: number): string {
             </svg>
           </button>
         </div>
+
         
         <div class="p-5 space-y-4">
           <!-- Loading state -->

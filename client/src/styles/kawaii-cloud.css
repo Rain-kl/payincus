@@ -556,13 +556,20 @@
 
   .kawaii-app-shell [role='menu'],
   .kawaii-app-shell .dropdown-menu,
-  .kawaii-app-shell .popover,
-  .kawaii-app-shell .modal-content {
+  .kawaii-app-shell .popover {
     border-color: var(--kawaii-line) !important;
     background: color-mix(in srgb, var(--kawaii-surface) 90%, transparent) !important;
     color: var(--kawaii-text) !important;
     box-shadow: var(--kawaii-shadow);
     backdrop-filter: blur(18px);
+  }
+
+  /* OCI 弹窗：实色不透明背景，去掉半透明渐变 */
+  .kawaii-app-shell .modal-content {
+    border-color: var(--kawaii-line) !important;
+    background: var(--kawaii-surface) !important;
+    color: var(--kawaii-text) !important;
+    box-shadow: none !important;
   }
 
   .modal-backdrop {
@@ -577,17 +584,15 @@
   .modal-content {
     border: 1px solid var(--kawaii-line) !important;
     border-radius: var(--radius-modal);
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--kawaii-surface) 94%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 64%, transparent)) !important;
+    background: var(--kawaii-surface) !important;
     color: var(--kawaii-text) !important;
-    box-shadow: var(--kawaii-shadow) !important;
-    backdrop-filter: blur(20px);
+    box-shadow: none !important;
   }
 
   .modal-header,
   .modal-footer {
     border-color: var(--kawaii-line) !important;
-    background: color-mix(in srgb, var(--kawaii-surface) 66%, transparent) !important;
+    background: var(--kawaii-surface) !important;
   }
 
   .modal-title {

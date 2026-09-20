@@ -171,31 +171,19 @@ function handleClose() {
     <Transition name="modal">
       <div
         v-if="show"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="handleClose"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50" @click="handleClose" />
-        
+        <div class="modal-backdrop" @click="handleClose" />
+
         <!-- Modal -->
-        <div
-          class="relative w-full max-w-md rounded-lg shadow-xl"
-          :class="themeStore.isDark ? 'bg-gray-900' : 'bg-white'"
-        >
+        <div class="modal-content max-w-md">
           <!-- Header -->
-          <div
-            class="flex items-center justify-between px-6 py-4 border-b"
-            :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-200'"
-          >
-            <h3 
-              class="text-lg font-medium"
-              :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-            >
-              {{ t('billing.renewTitle') }}
-            </h3>
+          <div class="modal-header">
+            <h3 class="modal-title">{{ t('billing.renewTitle') }}</h3>
             <button
-              class="p-1 rounded hover:bg-gray-500/20"
-              :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'"
+              class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
               @click="handleClose"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,15 +193,15 @@ function handleClose() {
           </div>
 
           <!-- Content -->
-          <div class="px-6 py-4">
+          <div class="modal-body">
             <!-- Loading -->
             <div v-if="loading" class="flex justify-center py-8">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
             </div>
 
             <!-- Error -->
-            <div v-else-if="error" class="py-4">
-              <div class="p-3 rounded-lg bg-red-500/10 text-red-500 text-sm">
+            <div v-else-if="error" class="py-2">
+              <div class="p-3 rounded-lg bg-error/10 text-error text-sm">
                 {{ error }}
               </div>
             </div>
@@ -221,24 +209,19 @@ function handleClose() {
             <!-- Content -->
             <template v-else-if="billingInfo">
               <!-- 续费选项 -->
-              <div class="mb-4">
-                <label 
-                  class="block text-sm font-medium mb-2"
-                  :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
-                >
+              <div>
+                <label class="block text-sm font-medium mb-2 text-themed-secondary">
                   {{ t('billing.selectRenewPeriod') }}
                 </label>
                 <div class="grid grid-cols-3 gap-2">
                   <button
                     v-for="option in renewOptions"
                     :key="option.months"
-                    class="py-2 px-3 rounded-lg border text-sm transition-colors"
+                    class="py-2 px-3 rounded border text-sm transition-colors"
                     :class="[
                       selectedMonths === option.months
-                        ? 'border-blue-500 bg-blue-500/10 text-blue-500'
-                        : themeStore.isDark
-                          ? 'border-gray-700 text-gray-300 hover:border-gray-600'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-themed text-themed-secondary hover:border-themed-hover'
                     ]"
                     @click="selectedMonths = option.months"
                   >
@@ -248,121 +231,92 @@ function handleClose() {
               </div>
 
               <!-- 费用详情 -->
-              <div 
+              <div
                 v-if="selectedRenewOption"
-                class="p-4 rounded-lg mb-4"
-                :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'"
+                class="p-4 rounded border border-themed bg-themed-secondary text-sm space-y-2"
               >
-                <div class="space-y-2 text-sm">
-                  <!-- 原价（有折扣时显示） -->
-                  <div v-if="hasDiscount" class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.originalPrice : t('billing.originalPrice') }}
-                    </span>
-                    <span 
-                      class="line-through"
-                      :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-                    >
-                      ¥{{ formatMoney(selectedRenewOption.price) }}
-                    </span>
-                  </div>
-                  <!-- 折扣信息 -->
-                  <div v-if="hasDiscount" class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ t('billing.affDiscount') }}
-                    </span>
-                    <span class="text-green-500">
-                      -{{ discountPercent }}%
-                    </span>
-                  </div>
-                  <!-- 实付金额 -->
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.finalPrice : (hasDiscount ? t('billing.actualPrice') : t('billing.renewPrice')) }}
-                    </span>
-                    <span 
-                      class="font-medium"
-                      :class="hasDiscount ? 'text-green-500' : (themeStore.isDark ? 'text-white' : 'text-gray-900')"
-                    >
-                      ¥{{ formatMoney(actualPrice) }}
-                    </span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ t('billing.newExpiresAt') }}
-                    </span>
-                    <span 
-                      class="font-medium"
-                      :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-                    >
-                      {{ formatDate(selectedRenewOption.expiresAt) }}
-                    </span>
-                  </div>
-                  <div class="border-t my-2" :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-200'" />
-                  <div class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.currentBalance : t('billing.currentBalance') }}
-                    </span>
-                    <span 
-                      :class="insufficientBalance ? 'text-red-500' : themeStore.isDark ? 'text-white' : 'text-gray-900'"
-                    >
-                      ¥{{ formatMoney(userBalance) }}
-                    </span>
-                  </div>
-                  <div v-if="!insufficientBalance" class="flex justify-between">
-                    <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.balanceAfterRenew : t('billing.balanceAfterRenew') }}
-                    </span>
-                    <span :class="themeStore.isDark ? 'text-green-400' : 'text-green-600'">
-                      ¥{{ formatMoney(balanceAfterRenew) }}
-                    </span>
-                  </div>
+                <!-- 原价（有折扣时显示） -->
+                <div v-if="hasDiscount" class="flex justify-between">
+                  <span class="text-themed-muted">
+                    {{ configStore.freeSiteMode ? freeSiteCopy.originalPrice : t('billing.originalPrice') }}
+                  </span>
+                  <span class="line-through text-themed-muted">
+                    ¥{{ formatMoney(selectedRenewOption.price) }}
+                  </span>
+                </div>
+                <!-- 折扣信息 -->
+                <div v-if="hasDiscount" class="flex justify-between">
+                  <span class="text-themed-muted">{{ t('billing.affDiscount') }}</span>
+                  <span class="text-success">-{{ discountPercent }}%</span>
+                </div>
+                <!-- 实付金额 -->
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">
+                    {{ configStore.freeSiteMode ? freeSiteCopy.finalPrice : (hasDiscount ? t('billing.actualPrice') : t('billing.renewPrice')) }}
+                  </span>
+                  <span
+                    class="font-medium"
+                    :class="hasDiscount ? 'text-success' : 'text-themed'"
+                  >
+                    ¥{{ formatMoney(actualPrice) }}
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">{{ t('billing.newExpiresAt') }}</span>
+                  <span class="font-medium text-themed">{{ formatDate(selectedRenewOption.expiresAt) }}</span>
+                </div>
+                <div class="border-t border-themed my-1" />
+                <div class="flex justify-between">
+                  <span class="text-themed-muted">
+                    {{ configStore.freeSiteMode ? freeSiteCopy.currentBalance : t('billing.currentBalance') }}
+                  </span>
+                  <span :class="insufficientBalance ? 'text-error' : 'text-themed'">
+                    ¥{{ formatMoney(userBalance) }}
+                  </span>
+                </div>
+                <div v-if="!insufficientBalance" class="flex justify-between">
+                  <span class="text-themed-muted">
+                    {{ configStore.freeSiteMode ? freeSiteCopy.balanceAfterRenew : t('billing.balanceAfterRenew') }}
+                  </span>
+                  <span class="text-success">¥{{ formatMoney(balanceAfterRenew) }}</span>
                 </div>
               </div>
 
               <!-- 余额不足提示 -->
-              <div 
+              <div
                 v-if="insufficientBalance"
-                class="p-3 rounded-lg mb-4 text-sm"
-                :class="themeStore.isDark ? 'bg-yellow-900/20 text-yellow-400' : 'bg-yellow-50 text-yellow-600'"
+                class="p-3 rounded border border-warning/30 bg-warning/10 text-sm text-warning"
               >
                 {{ t('billing.insufficientBalance') }}
                 <RouterLink :to="walletPath()" class="underline ml-1">{{ t('billing.goRecharge') }}</RouterLink>
               </div>
-              
+
               <!-- 托管实例续费限制提示 -->
-              <div 
+              <div
                 v-if="isHostedInstance && !canHostedInstanceRenew && daysUntilExpire !== null"
-                class="p-3 rounded-lg mb-4 text-sm"
-                :class="themeStore.isDark ? 'bg-orange-900/20 text-orange-400' : 'bg-orange-50 text-orange-600'"
+                class="p-3 rounded border border-warning/30 bg-warning/10 text-sm"
               >
                 <div class="flex items-start gap-2">
-                  <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
-                  <span>{{ t('billing.hostingRenewTooEarly', { days: daysUntilExpire }) }}</span>
+                  <span class="text-warning">{{ t('billing.hostingRenewTooEarly', { days: daysUntilExpire }) }}</span>
                 </div>
               </div>
             </template>
           </div>
 
           <!-- Footer -->
-          <div
-            class="flex justify-end gap-3 px-6 py-4 border-t"
-            :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-200'"
-          >
+          <div class="modal-footer">
             <button
-              class="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-              :class="themeStore.isDark
-                ? 'text-gray-300 hover:bg-gray-800'
-                : 'text-gray-700 hover:bg-gray-100'"
+              class="btn btn-secondary"
               @click="handleClose"
             >
               {{ t('common.cancel') }}
             </button>
             <button
               :disabled="loading || renewing || insufficientBalance || !selectedRenewOption || !canHostedInstanceRenew"
-              class="px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-accent text-white dark:text-black hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               @click="handleRenew"
             >
               {{ renewing ? t('billing.renewing') : t('billing.renew') }}
@@ -373,25 +327,3 @@ function handleClose() {
     </Transition>
   </Teleport>
 </template>
-
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-active .relative,
-.modal-leave-active .relative {
-  transition: transform 0.2s ease;
-}
-
-.modal-enter-from .relative,
-.modal-leave-to .relative {
-  transform: scale(0.95);
-}
-</style>
