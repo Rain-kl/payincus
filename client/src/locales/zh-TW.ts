@@ -1630,7 +1630,7 @@ const zhTW = {
             tabs: {
                 info: '資訊',
                 overview: '總覽',
-                network: '網路',
+                network: '連接埠映射',
                 siteProxy: '建站',
                 traffic: '流量',
                 quota: '配額',

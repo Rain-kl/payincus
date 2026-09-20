@@ -41,10 +41,6 @@ const searchQuery = ref<string>('')
 
 // 展开的内容行
 const expandedRows = ref<Set<number>>(new Set())
-
-const highRiskLogs = computed(() => logs.value.filter(log => log.risk_level === 'high' || log.risk_level === 'critical'))
-const approvalRequiredCount = computed(() => logs.value.filter(log => log.approval_required).length)
-const verificationRequiredCount = computed(() => logs.value.filter(log => log.verification_required).length)
 const canAccessAudit = computed(() => authStore.isAdmin)
 
 // 加载日志
@@ -234,25 +230,6 @@ onMounted(async () => {
         </svg>
         {{ $t('logs.exportAudit') }}
       </button>
-    </div>
-
-    <div class="grid gap-3" :class="canAccessAudit ? 'md:grid-cols-4' : 'md:grid-cols-3'">
-      <div v-if="canAccessAudit" class="card p-4">
-        <div class="text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('logs.auditSummary.riskDefinitions') }}</div>
-        <div class="mt-2 font-mono text-2xl font-semibold tabular-nums text-themed">{{ riskDefinitions.length }}</div>
-      </div>
-      <div class="card p-4">
-        <div class="text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('logs.auditSummary.highRiskCurrentPage') }}</div>
-        <div class="mt-2 font-mono text-2xl font-semibold tabular-nums text-themed">{{ highRiskLogs.length }}</div>
-      </div>
-      <div class="card p-4">
-        <div class="text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('logs.auditSummary.approvalRequired') }}</div>
-        <div class="mt-2 font-mono text-2xl font-semibold tabular-nums text-themed">{{ approvalRequiredCount }}</div>
-      </div>
-      <div class="card p-4">
-        <div class="text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('logs.auditSummary.verificationRequired') }}</div>
-        <div class="mt-2 font-mono text-2xl font-semibold tabular-nums text-themed">{{ verificationRequiredCount }}</div>
-      </div>
     </div>
 
     <!-- Filters -->

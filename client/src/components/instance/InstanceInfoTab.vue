@@ -286,6 +286,96 @@ const canReassignIpv6 = computed(() => {
             </span>
           </dd>
         </div>
+        <!-- 网络地址 -->
+        <div>
+          <dl class="space-y-3 text-sm">
+            <!-- NAT 模式 -->
+            <template v-if="isNatMode">
+              <!-- 内网 IPv4 -->
+              <div class="flex justify-between items-center">
+                <dt class="text-themed-muted">{{ t('instance.detail.network.privateIpv4') }}</dt>
+                <dd v-if="instance.ipv4" class="flex items-center gap-2">
+                  <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{{ instance.ipv4 }}</code>
+                  <button class="text-themed-muted hover:text-themed transition-colors" :title="t('common.copy')" @click="emit('copy', instance.ipv4, 'ipv4')">
+                    <svg v-if="copied !== 'ipv4'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  </button>
+                </dd>
+                <dd v-else class="text-themed-muted">-</dd>
+              </div>
+              <!-- 公网 IPv4 -->
+              <div v-if="publicIpv4Address" class="flex justify-between items-center">
+                <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv4') }}</dt>
+                <dd class="flex items-center gap-2">
+                  <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{{ publicIpv4Address }}</code>
+                  <button class="text-themed-muted hover:text-themed transition-colors" :title="t('common.copy')" @click="emit('copy', publicIpv4Address, 'nat_public_ip')">
+                    <svg v-if="copied !== 'nat_public_ip'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  </button>
+                </dd>
+              </div>
+              <!-- 公网 IPv6（仅有 IPv6 的模式） -->
+              <div v-if="['nat_ipv6', 'nat_ipv6_nat', 'ipv6_nat', 'ipv6_only'].includes(networkMode)" class="flex justify-between items-center">
+                <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv6') }}</dt>
+                <dd v-if="displayIpv6" class="flex items-center gap-2">
+                  <!-- 重新分配 IPv6 按钮 -->
+                  <button
+                      v-if="isInstanceOwner !== false && instance.network_mode === 'nat_ipv6'"
+                      class="text-xs px-2 py-0.5 rounded transition-colors flex-shrink-0"
+                      :class="[
+                      canReassignIpv6
+                        ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500'
+                    ]"
+                      :disabled="!canReassignIpv6 || reassignIpv6Loading"
+                      :title="ipv6ReassignCooldown.inCooldown
+                      ? t('instance.detail.network.reassignIpv6Cooldown', { hours: ipv6ReassignCooldown.remainingHours })
+                      : (instance.status !== 'stopped'
+                        ? t('instance.detail.network.reassignIpv6StopRequired')
+                        : t('instance.detail.network.reassignIpv6'))"
+                      @click="emit('reassign-ipv6')"
+                  >
+                    <span v-if="reassignIpv6Loading" class="flex items-center gap-1">
+                      <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    </span>
+                    <span v-else-if="ipv6ReassignCooldown.inCooldown">{{ t('instance.detail.network.reassignIpv6CooldownShort', { hours: ipv6ReassignCooldown.remainingHours }) }}</span>
+                    <span v-else>{{ t('instance.detail.network.reassignIpv6') }}</span>
+                  </button>
+                  <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 truncate max-w-[220px] sm:max-w-[280px]" :title="displayIpv6 || undefined">{{ displayIpv6 }}</code>
+                  <button class="text-themed-muted hover:text-themed transition-colors flex-shrink-0" :title="t('common.copy')" @click="emit('copy', displayIpv6 || '', 'ipv6')">
+                    <svg v-if="copied !== 'ipv6'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  </button>
+                </dd>
+                <dd v-else class="text-themed-muted">-</dd>
+              </div>
+            </template>
+            <!-- 非 NAT 模式 -->
+            <template v-else>
+              <div class="flex justify-between items-center">
+                <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv4') }}</dt>
+                <dd v-if="instance.ipv4" class="flex items-center gap-2">
+                  <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{{ instance.ipv4 }}</code>
+                  <button class="text-themed-muted hover:text-themed transition-colors" :title="t('common.copy')" @click="emit('copy', instance.ipv4, 'ipv4')">
+                    <svg v-if="copied !== 'ipv4'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  </button>
+                </dd>
+                <dd v-else class="text-themed-muted">-</dd>
+              </div>
+              <div v-if="instance.ipv6" class="flex justify-between items-center">
+                <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv6') }}</dt>
+                <dd class="flex items-center gap-2">
+                  <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 truncate max-w-[220px] sm:max-w-[280px]" :title="instance.ipv6">{{ instance.ipv6 }}</code>
+                  <button class="text-themed-muted hover:text-themed transition-colors flex-shrink-0" :title="t('common.copy')" @click="emit('copy', instance.ipv6, 'ipv6')">
+                    <svg v-if="copied !== 'ipv6'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  </button>
+                </dd>
+              </div>
+            </template>
+          </dl>
+        </div>
         <div v-if="instance.ssh_port" class="flex justify-between">
           <dt class="text-themed-muted">{{ t('instance.detail.info.sshPort') }}</dt>
           <dd class="flex items-center gap-2 text-themed font-medium">
@@ -337,6 +427,7 @@ const canReassignIpv6 = computed(() => {
             <span class="uppercase">{{ (instance as any).host?.name || (instance as any).host || '-' }}</span>
           </dd>
         </div>
+
         <div class="flex justify-between">
           <dt class="text-themed-muted">{{ t('instance.detail.info.createdAt') }}</dt>
           <dd class="text-xs text-themed-muted">
@@ -347,8 +438,8 @@ const canReassignIpv6 = computed(() => {
         <div v-if="instance.expires_at" class="flex justify-between">
           <dt class="text-themed-muted">{{ t('instance.detail.info.expiresAt') }}</dt>
           <dd
-            class="text-xs"
-            :class="new Date(instance.expires_at) <= new Date() ? 'text-rose-600 dark:text-rose-400' : 'text-themed-muted'"
+              class="text-xs"
+              :class="new Date(instance.expires_at) <= new Date() ? 'text-rose-600 dark:text-rose-400' : 'text-themed-muted'"
           >
             {{ formatDate(instance.expires_at) }}
           </dd>
@@ -538,100 +629,6 @@ const canReassignIpv6 = computed(() => {
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Network Addresses (inline in info tab) -->
-    <div class="col-span-1 md:col-span-2 card p-5 rounded-2xl border-2 border-themed">
-      <h2 class="text-themed font-semibold text-sm mb-4">
-        {{ t('instance.detail.network.title') }}
-      </h2>
-      <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3 text-sm">
-        <!-- NAT modes -->
-        <template v-if="isNatMode">
-          <!-- 内网 IPv4 -->
-          <div class="flex justify-between items-center">
-            <dt class="text-themed-muted">{{ t('instance.detail.network.privateIpv4') }}</dt>
-            <dd v-if="instance.ipv4" class="flex items-center gap-2">
-              <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{{ instance.ipv4 }}</code>
-              <button class="text-themed-muted hover:text-themed transition-colors" :title="t('common.copy')" @click="emit('copy', instance.ipv4, 'ipv4')">
-                <svg v-if="copied !== 'ipv4'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-              </button>
-            </dd>
-            <dd v-else class="text-themed-muted">-</dd>
-          </div>
-          <!-- 公网 IPv4 -->
-          <div v-if="publicIpv4Address" class="flex justify-between items-center">
-            <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv4') }}</dt>
-            <dd class="flex items-center gap-2">
-              <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{{ publicIpv4Address }}</code>
-              <button class="text-themed-muted hover:text-themed transition-colors" :title="t('common.copy')" @click="emit('copy', publicIpv4Address, 'nat_public_ip')">
-                <svg v-if="copied !== 'nat_public_ip'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-              </button>
-            </dd>
-          </div>
-          <!-- 公网 IPv6（仅有 IPv6 的模式） -->
-          <div v-if="['nat_ipv6', 'nat_ipv6_nat', 'ipv6_nat', 'ipv6_only'].includes(networkMode)" class="flex justify-between items-center">
-            <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv6') }}</dt>
-            <dd v-if="displayIpv6" class="flex items-center gap-2">
-              <!-- 重新分配 IPv6 按钮 -->
-              <button
-                v-if="isInstanceOwner !== false && instance.network_mode === 'nat_ipv6'"
-                class="text-xs px-2 py-0.5 rounded transition-colors flex-shrink-0"
-                :class="[
-                  canReassignIpv6
-                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500'
-                ]"
-                :disabled="!canReassignIpv6 || reassignIpv6Loading"
-                :title="ipv6ReassignCooldown.inCooldown
-                  ? t('instance.detail.network.reassignIpv6Cooldown', { hours: ipv6ReassignCooldown.remainingHours })
-                  : (instance.status !== 'stopped'
-                    ? t('instance.detail.network.reassignIpv6StopRequired')
-                    : t('instance.detail.network.reassignIpv6'))"
-                @click="emit('reassign-ipv6')"
-              >
-                <span v-if="reassignIpv6Loading" class="flex items-center gap-1">
-                  <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                </span>
-                <span v-else-if="ipv6ReassignCooldown.inCooldown">{{ t('instance.detail.network.reassignIpv6CooldownShort', { hours: ipv6ReassignCooldown.remainingHours }) }}</span>
-                <span v-else>{{ t('instance.detail.network.reassignIpv6') }}</span>
-              </button>
-              <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 truncate max-w-[220px] sm:max-w-[280px]" :title="displayIpv6 || undefined">{{ displayIpv6 }}</code>
-              <button class="text-themed-muted hover:text-themed transition-colors flex-shrink-0" :title="t('common.copy')" @click="emit('copy', displayIpv6 || '', 'ipv6')">
-                <svg v-if="copied !== 'ipv6'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-              </button>
-            </dd>
-            <dd v-else class="text-themed-muted">-</dd>
-          </div>
-        </template>
-        <!-- 非 NAT 模式 -->
-        <template v-else>
-          <div class="flex justify-between items-center">
-            <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv4') }}</dt>
-            <dd v-if="instance.ipv4" class="flex items-center gap-2">
-              <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{{ instance.ipv4 }}</code>
-              <button class="text-themed-muted hover:text-themed transition-colors" :title="t('common.copy')" @click="emit('copy', instance.ipv4, 'ipv4')">
-                <svg v-if="copied !== 'ipv4'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-              </button>
-            </dd>
-            <dd v-else class="text-themed-muted">-</dd>
-          </div>
-          <div v-if="instance.ipv6" class="flex justify-between items-center">
-            <dt class="text-themed-muted">{{ t('instance.detail.network.publicIpv6') }}</dt>
-            <dd class="flex items-center gap-2">
-              <code class="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 truncate max-w-[220px] sm:max-w-[280px]" :title="instance.ipv6">{{ instance.ipv6 }}</code>
-              <button class="text-themed-muted hover:text-themed transition-colors flex-shrink-0" :title="t('common.copy')" @click="emit('copy', instance.ipv6, 'ipv6')">
-                <svg v-if="copied !== 'ipv6'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-              </button>
-            </dd>
-          </div>
-        </template>
-      </dl>
     </div>
 
     <!-- Traffic Stats (inline in info tab) -->

@@ -1188,54 +1188,6 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <div class="kawaii-page animate-fade-in lg:h-full lg:flex lg:flex-col">
-    <!-- 套餐来源切换器 -->
-    <div v-if="!loading" class="flex justify-center mb-4 lg:mb-3 shrink-0">
-      <div
-        class="nimbus-segmented inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-themed bg-themed-surface p-1 shadow-sm scrollbar-hide"
-      >
-        <button
-          v-for="source in sourceTabs"
-          :key="source.key"
-          type="button"
-          :disabled="sourceLoading"
-          class="nimbus-seg-pill relative shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200"
-          :class="[
-            packageSource === source.key ? 'active' : '',
-            sourceLoading ? 'cursor-not-allowed opacity-50' : ''
-          ]"
-          @click="switchPackageSource(source.key)"
-        >
-          <span class="relative z-10 flex items-center gap-1.5">
-            <!-- 加载中 -->
-            <svg 
-              v-if="sourceLoading && packageSource === source.key"
-              class="w-4 h-4 animate-spin" 
-              fill="none" viewBox="0 0 24 24"
-            >
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <!-- 图标 -->
-            <template v-else>
-              <svg v-if="source.type === 'official'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              <img
-                v-else-if="source.type === 'zone'"
-                :src="source.logoUrl"
-                :alt="source.label"
-                class="w-5 h-5 rounded-full object-cover"
-              />
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </template>
-            {{ source.label }}
-          </span>
-        </button>
-      </div>
-    </div>
-
     <div v-if="loading" class="card p-8 text-center text-themed-muted">
       <svg class="w-8 h-8 mx-auto mb-2 animate-spin icon-themed-muted" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -1248,6 +1200,53 @@ async function handleSubmit(): Promise<void> {
       <div class="lg:flex lg:flex-1 lg:min-h-0 lg:gap-6">
         <!-- LEFT: 选择区（独立滚动）-->
         <div class="nimbus-pane space-y-4 mb-4 lg:mb-0 lg:flex-[3] lg:overflow-y-auto lg:pr-1 lg:pb-4 scrollbar-hide">
+          <!-- 套餐来源切换器（随内容滚动） -->
+          <div class="flex justify-center">
+            <div
+              class="nimbus-segmented inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-themed bg-themed-surface p-1 shadow-sm scrollbar-hide"
+            >
+              <button
+                v-for="source in sourceTabs"
+                :key="source.key"
+                type="button"
+                :disabled="sourceLoading"
+                class="nimbus-seg-pill relative shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200"
+                :class="[
+                  packageSource === source.key ? 'active' : '',
+                  sourceLoading ? 'cursor-not-allowed opacity-50' : ''
+                ]"
+                @click="switchPackageSource(source.key)"
+              >
+                <span class="relative z-10 flex items-center gap-1.5">
+                  <!-- 加载中 -->
+                  <svg
+                    v-if="sourceLoading && packageSource === source.key"
+                    class="w-4 h-4 animate-spin"
+                    fill="none" viewBox="0 0 24 24"
+                  >
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <!-- 图标 -->
+                  <template v-else>
+                    <svg v-if="source.type === 'official'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <img
+                      v-else-if="source.type === 'zone'"
+                      :src="source.logoUrl"
+                      :alt="source.label"
+                      class="w-5 h-5 rounded-full object-cover"
+                    />
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </template>
+                  {{ source.label }}
+                </span>
+              </button>
+            </div>
+          </div>
           <div
             v-if="selectedHostingZone"
             class="flex items-center gap-3 rounded-xl border border-themed bg-themed-tertiary px-5 py-3"
@@ -1276,34 +1275,34 @@ async function handleSubmit(): Promise<void> {
             @select="selectPackage"
             @show-owner-info="(packageId) => loadHostOwnerInfo(packageId)"
           />
+          <PlanSelector
+            v-if="isPaidPackage"
+            :plans="packagePlans"
+            :selected-plan-id="form.planId"
+            :instance-type="(selectedPackage?.instance_type === 'vm' ? 'vm' : 'container')"
+            :loading="plansLoading"
+            :step-number="regions.length > 0 ? 3 : 2"
+            :prerequisite-message="prerequisiteMissing ? prerequisiteMessage : null"
+            :free-site-mode="configStore.freeSiteMode"
+            :title="getCreatePageText('selectPlan')"
+            :description="getCreatePageText('planDesc')"
+            :empty-message="getCreatePageText('noPlans')"
+            :sold-out-label="getCreatePageText('planSoldOut')"
+            :custom-plan-hint="getCreatePageText('customPlanHint')"
+            @select="selectPlan"
+          />
         </div>
         <!-- RIGHT: 配置区（独立滚动）-->
         <div ref="rightPanelScrollRef" class="lg:flex-[2] lg:overflow-y-auto lg:pb-4 scrollbar-hide">
           <div class="nimbus-pane space-y-4">
-            <PlanSelector
-              v-if="isPaidPackage"
-              :plans="packagePlans"
-              :selected-plan-id="form.planId"
-              :instance-type="(selectedPackage?.instance_type === 'vm' ? 'vm' : 'container')"
-              :loading="plansLoading"
-              :step-number="regions.length > 0 ? 3 : 2"
-              :prerequisite-message="prerequisiteMissing ? prerequisiteMessage : null"
-              :free-site-mode="configStore.freeSiteMode"
-              :title="getCreatePageText('selectPlan')"
-              :description="getCreatePageText('planDesc')"
-              :empty-message="getCreatePageText('noPlans')"
-              :sold-out-label="getCreatePageText('planSoldOut')"
-              :custom-plan-hint="getCreatePageText('customPlanHint')"
-              @select="selectPlan"
-            />
             <div
-              v-else-if="prerequisiteMissing"
+              v-if="!isPaidPackage && prerequisiteMissing"
               class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
             >
               {{ prerequisiteMessage }}
             </div>
             <ResourceSliders
-              v-else
+              v-if="!isPaidPackage"
               :selected-package="selectedPackage || null"
               :user-quota="userQuota"
               :cpu="form.cpu"

@@ -221,7 +221,16 @@ watch(() => props.hostId, () => {
         </div>
 
         <div v-if="images.length === 0" class="py-10 text-center text-themed-muted">
-          <div class="text-4xl mb-3">💿</div>
+          <svg
+            class="w-12 h-12 mx-auto mb-3 text-themed-muted"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="2.5" />
+            <path stroke-linecap="round" d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.64 5.64l1.77 1.77M16.59 16.59l1.77 1.77M18.36 5.64l-1.77 1.77M7.41 16.59l-1.77 1.77" />
+          </svg>
           <p>{{ t('admin.hosts.imagePolicy.noImages') }}</p>
         </div>
 
