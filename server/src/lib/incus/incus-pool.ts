@@ -118,7 +118,11 @@ export async function getIncusClient(host: Host): Promise<IncusClient> {
       const client = new Client({
         url: host.url,
         certPath: host.cert_path || host.certPath || null,
-        keyPath: host.key_path || host.keyPath || null
+        keyPath: host.key_path || host.keyPath || null,
+        tunnelEnabled: (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false,
+        hostId: host.id,
+        targetHost: (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
+        targetPort: (host as any).targetPort ?? (host as any).target_port ?? 8443
       })
 
       await client.connect()

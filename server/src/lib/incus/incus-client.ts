@@ -5,21 +5,25 @@
 
 import { Agent, request } from 'undici'
 import { readFileSync } from 'fs'
+import tls from 'node:tls'
 import type {
   IncusClientOptions,
   IncusApiResponse
 } from '../../types/incus.js'
 import { waitForOperation } from './incus-utils.js'
 import { resolveCertificatePair } from './certificate-paths.js'
+import { hostTunnelManager } from './tunnel-manager.js'
 
 export class IncusClient {
   baseUrl: string
   certPath: string | null
   keyPath: string | null
+  options: IncusClientOptions
   agent: Agent | null = null
   connected: boolean = false
 
   constructor(options: IncusClientOptions) {
+    this.options = options
     this.baseUrl = IncusClient.normalizeUrl(options.url)
     const certificatePair = resolveCertificatePair(options.certPath, options.keyPath)
     this.certPath = certificatePair.certPath
@@ -72,16 +76,44 @@ export class IncusClient {
       const cert = readFileSync(this.certPath)
       const key = readFileSync(this.keyPath)
 
-      this.agent = new Agent({
-        connect: {
-          cert,
-          key,
-          rejectUnauthorized: false // Incus 使用自签名证书
-        },
-        // 超时配置，防止 Headers Timeout Error
-        headersTimeout: 120000, // 2分钟
-        bodyTimeout: 300000     // 5分钟（对于大数据传输）
-      })
+      if (this.options.tunnelEnabled && this.options.hostId) {
+        if (!hostTunnelManager.isTunnelOnline(this.options.hostId)) {
+          throw new Error('宿主机内网穿透通道未连接（Agent 离线），无法连接到 Incus API')
+        }
+        this.agent = new Agent({
+          connect: (_opts: any, cb: (err: Error | null, socket: any) => void) => {
+            try {
+              const duplex = hostTunnelManager.createDuplexStream(
+                this.options.hostId!,
+                this.options.targetHost || '127.0.0.1',
+                this.options.targetPort || 8443
+              )
+              const tlsSocket = tls.connect({
+                socket: duplex,
+                cert,
+                key,
+                rejectUnauthorized: false
+              })
+              cb(null, tlsSocket)
+            } catch (err: any) {
+              cb(err, null as any)
+            }
+          },
+          headersTimeout: 120000,
+          bodyTimeout: 300000
+        })
+      } else {
+        this.agent = new Agent({
+          connect: {
+            cert,
+            key,
+            rejectUnauthorized: false // Incus 使用自签名证书
+          },
+          // 超时配置，防止 Headers Timeout Error
+          headersTimeout: 120000, // 2分钟
+          bodyTimeout: 300000     // 5分钟（对于大数据传输）
+        })
+      }
 
       // 测试连接
       const info = await this.getServerInfo()

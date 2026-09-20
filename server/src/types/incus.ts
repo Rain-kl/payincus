@@ -6,6 +6,10 @@ export interface IncusClientOptions {
   url: string
   certPath: string | null
   keyPath: string | null
+  tunnelEnabled?: boolean
+  hostId?: number
+  targetHost?: string
+  targetPort?: number
 }
 
 export interface IncusApiResponse<T = unknown> {
