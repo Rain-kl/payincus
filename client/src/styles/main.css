@@ -1366,14 +1366,23 @@
   background-color: var(--kawaii-surface) !important;
 }
 
-/* 7) 页头 / 仪表盘 hero → 扁平，无渐变无动画 */
+/* 7) 页头 / 仪表盘 hero → 扁平，无外框无渐变，单线分割上下 */
 .page-header,
 .kawaii-dashboard-hero,
 .kawaii-page-header {
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--border-color, var(--kawaii-line)) !important;
+  border-radius: 0 !important;
   background-image: none !important;
   background-color: transparent !important;
   box-shadow: none !important;
   animation: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 1.25rem !important;
 }
 
 /* ============================================================

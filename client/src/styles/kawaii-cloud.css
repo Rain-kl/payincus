@@ -418,12 +418,12 @@
   }
 
   .kawaii-app-shell .page-header:not(.kawaii-dashboard-hero) {
-    border: 1px solid var(--kawaii-line) !important;
-    border-radius: var(--radius-card);
-    padding: 1.25rem;
-    background:
-      linear-gradient(135deg, color-mix(in srgb, var(--kawaii-surface) 92%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 82%, transparent));
-    box-shadow: var(--kawaii-shadow);
+    border: none !important;
+    border-bottom: 1px solid var(--border-color, var(--kawaii-line)) !important;
+    border-radius: 0 !important;
+    padding: 0 0 1.25rem 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .kawaii-app-shell .page-title {
