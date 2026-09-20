@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
@@ -178,8 +178,35 @@ const normalizedUserSearchFields = computed(() => {
   return USER_SEARCH_FIELDS.filter(field => userSearchFields.value.includes(field))
 })
 
+// 操作菜单状态
+const activeActionMenuUserId = ref(null)
+
+function toggleActionMenu(userId) {
+  activeActionMenuUserId.value = activeActionMenuUserId.value === userId ? null : userId
+}
+
+function closeActionMenu() {
+  activeActionMenuUserId.value = null
+}
+
+function isNearBottom(index) {
+  return index > 0 && index >= users.value.length - 2
+}
+
+function handleGlobalClick(event) {
+  const target = event.target
+  if (target && !target.closest('.action-menu-container')) {
+    activeActionMenuUserId.value = null
+  }
+}
+
 onMounted(async () => {
+  document.addEventListener('click', handleGlobalClick)
   await loadUsers()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleGlobalClick)
 })
 
 // 搜索防抖
@@ -326,6 +353,7 @@ function copyLink() {
 
 // 切换用户状态（封禁/解封）
 async function toggleUserStatus(user) {
+  closeActionMenu()
   const newStatus = user.status === 'active' ? 'banned' : 'active'
   
   const confirmMsg = newStatus === 'banned' 
@@ -351,6 +379,7 @@ async function toggleUserStatus(user) {
 
 // 切换用户管理员角色
 async function toggleUserRole(user) {
+  closeActionMenu()
   const newRole = user.role === 'admin' ? 'user' : 'admin'
 
   if (newRole === 'admin' && user.status !== 'active') {
@@ -379,11 +408,13 @@ async function toggleUserRole(user) {
 
 // 查看用户实例
 function viewUserInstances(user) {
+  closeActionMenu()
   router.push({ path: instancesPath(), query: { userId: user.id } })
 }
 
 // 打开重置密码确认弹窗
 function openResetPasswordModal(user) {
+  closeActionMenu()
   resetPasswordUser.value = user
   resetPasswordForm.value = { password: '', confirmPassword: '' }
   showResetPasswordModal.value = true
@@ -412,6 +443,7 @@ async function resetPassword() {
 
 // 打开取消2FA弹窗
 function openDisable2FAModal(user) {
+  closeActionMenu()
   disable2FAUser.value = user
   showDisable2FAModal.value = true
 }
@@ -434,6 +466,7 @@ async function disable2FA() {
 
 // 打开解绑GitHub弹窗
 function openUnbindGitHubModal(user) {
+  closeActionMenu()
   unbindGitHubUser.value = user
   showUnbindGitHubModal.value = true
 }
@@ -529,6 +562,7 @@ function toggleUsernameGroup(pattern) {
 
 // 打开发送站内信弹窗
 function openSendMessageModal(user) {
+  closeActionMenu()
   sendMessageUser.value = user
   sendMessageForm.value = { title: '', content: '' }
   showSendMessageModal.value = true
@@ -1125,7 +1159,7 @@ function _getQuotaPercent(used, limit) {
       <template v-else>
         <div class="space-y-3 lg:hidden">
           <div
-            v-for="user in users"
+            v-for="(user, index) in users"
             :key="user.id"
             class="card p-4"
           >
@@ -1227,66 +1261,25 @@ function _getQuotaPercent(used, limit) {
               </button>
             </div>
 
-            <div class="mt-4 flex flex-wrap justify-end gap-1 border-t border-themed pt-3">
-              <button class="btn-ghost btn-sm" :title="t('admin.users.viewInstances')" @click="viewUserInstances(user)">
+            <div class="mt-4 flex items-center justify-end gap-1 border-t border-themed pt-3">
+              <!-- 实例管理 -->
+              <button
+                type="button"
+                class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                :title="t('admin.users.viewInstances')"
+                @click="viewUserInstances(user)"
+              >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
                 </svg>
               </button>
-              <button
-                v-if="user.id !== authStore.user?.id"
-                class="btn-ghost btn-sm"
-                :title="t('admin.users.sendMessage')"
-                @click="openSendMessageModal(user)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </button>
-              <button class="btn-ghost btn-sm" :title="t('admin.users.resetPassword')" @click="openResetPasswordModal(user)">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-              </button>
-              <button
-                v-if="user.id !== authStore.user?.id"
-                class="btn-ghost btn-sm"
-                :class="user.role === 'admin' ? 'text-warning' : 'text-themed-muted'"
-                :title="user.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin')"
-                @click="toggleUserRole(user)"
-              >
-                <svg v-if="user.role === 'admin'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
-                </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3.75l7.5 3v5.25c0 4.35-2.94 8.4-7.5 9.75-4.56-1.35-7.5-5.4-7.5-9.75V6.75l7.5-3z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 12.25l1.5 1.5 3.5-3.75" />
-                </svg>
-              </button>
-              <button
-                v-if="user.twoFAEnabled"
-                class="btn-ghost btn-sm text-warning"
-                :title="t('admin.users.disable2FA')"
-                @click="openDisable2FAModal(user)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </button>
-              <button
-                v-if="user.hasGithubBinding"
-                class="btn-ghost btn-sm"
-                :title="t('admin.users.unbindGitHub')"
-                @click="openUnbindGitHubModal(user)"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                </svg>
-              </button>
+
+              <!-- 封禁 / 解封 -->
               <button
                 v-if="user.role !== 'admin'"
-                class="btn-ghost btn-sm"
-                :class="user.status === 'active' ? 'text-warning' : 'text-success'"
+                type="button"
+                class="p-1.5 rounded transition-colors cursor-pointer hover:bg-themed-hover"
+                :class="user.status === 'active' ? 'text-themed-muted hover:text-rose-500' : 'text-warning hover:text-success'"
                 :title="user.status === 'active' ? t('admin.users.ban') : t('admin.users.unban')"
                 @click="toggleUserStatus(user)"
               >
@@ -1297,6 +1290,110 @@ function _getQuotaPercent(used, limit) {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
+
+              <!-- 更多选项 -->
+              <div class="relative inline-block text-left action-menu-container">
+                <button
+                  type="button"
+                  class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                  :class="{ 'text-themed bg-themed-hover': activeActionMenuUserId === user.id }"
+                  :title="t('admin.users.moreActions')"
+                  @click.stop="toggleActionMenu(user.id)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                  </svg>
+                </button>
+
+                <Transition
+                  enter-active-class="transition ease-out duration-100"
+                  enter-from-class="transform opacity-0 scale-95"
+                  enter-to-class="transform opacity-100 scale-100"
+                  leave-active-class="transition ease-in duration-75"
+                  leave-from-class="transform opacity-100 scale-100"
+                  leave-to-class="transform opacity-0 scale-95"
+                >
+                  <div
+                    v-if="activeActionMenuUserId === user.id"
+                    class="kawaii-menu-panel absolute right-0 z-50 min-w-[9.5rem] rounded py-1 border shadow-lg"
+                    :class="isNearBottom(index) ? 'bottom-full mb-1' : 'top-full mt-1'"
+                  >
+                    <!-- 发送站内信 -->
+                    <button
+                      v-if="user.id !== authStore.user?.id"
+                      type="button"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                      :title="t('admin.users.sendMessage')"
+                      @click="openSendMessageModal(user)"
+                    >
+                      <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <span class="truncate">{{ t('admin.users.sendMessage') }}</span>
+                    </button>
+
+                    <!-- 重置密码 -->
+                    <button
+                      type="button"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                      :title="t('admin.users.resetPassword')"
+                      @click="openResetPasswordModal(user)"
+                    >
+                      <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                      <span class="truncate">{{ t('admin.users.resetPassword') }}</span>
+                    </button>
+
+                    <!-- 设为管理员 / 取消管理员 -->
+                    <button
+                      v-if="user.id !== authStore.user?.id"
+                      type="button"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                      :class="user.role === 'admin' ? 'text-warning' : ''"
+                      :title="user.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin')"
+                      @click="toggleUserRole(user)"
+                    >
+                      <svg v-if="user.role === 'admin'" class="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                      </svg>
+                      <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3.75l7.5 3v5.25c0 4.35-2.94 8.4-7.5 9.75-4.56-1.35-7.5-5.4-7.5-9.75V6.75l7.5-3z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 12.25l1.5 1.5 3.5-3.75" />
+                      </svg>
+                      <span class="truncate">{{ user.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin') }}</span>
+                    </button>
+
+                    <!-- 取消2FA -->
+                    <button
+                      v-if="user.twoFAEnabled"
+                      type="button"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-warning transition-colors cursor-pointer"
+                      :title="t('admin.users.disable2FA')"
+                      @click="openDisable2FAModal(user)"
+                    >
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      <span class="truncate">{{ t('admin.users.disable2FA') }}</span>
+                    </button>
+
+                    <!-- 解绑GitHub -->
+                    <button
+                      v-if="user.hasGithubBinding"
+                      type="button"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                      :title="t('admin.users.unbindGitHub')"
+                      @click="openUnbindGitHubModal(user)"
+                    >
+                      <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                      </svg>
+                      <span class="truncate">{{ t('admin.users.unbindGitHub') }}</span>
+                    </button>
+                  </div>
+                </Transition>
+              </div>
             </div>
           </div>
         </div>
@@ -1318,7 +1415,7 @@ function _getQuotaPercent(used, limit) {
               </tr>
             </thead>
             <tbody class="divide-y divide-themed">
-              <tr v-for="user in users" :key="user.id" class="hover:bg-themed-hover transition-colors">
+              <tr v-for="(user, index) in users" :key="user.id" class="hover:bg-themed-hover transition-colors">
                 <!-- 用户 ID -->
                 <td class="px-4 py-3 whitespace-nowrap">
                   <span class="text-sm font-mono tabular-nums text-themed-muted">#{{ user.id }}</span>
@@ -1461,71 +1558,25 @@ function _getQuotaPercent(used, limit) {
                 </td>
                 <!-- 操作 -->
                 <td class="px-4 py-3 text-right whitespace-nowrap">
-                  <div class="flex items-center justify-end gap-1">
-                    <button class="btn-ghost btn-sm" :title="t('admin.users.viewInstances')" @click="viewUserInstances(user)">
+                  <div class="inline-flex items-center justify-end gap-1">
+                    <!-- 实例管理 -->
+                    <button
+                      type="button"
+                      class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                      :title="t('admin.users.viewInstances')"
+                      @click="viewUserInstances(user)"
+                    >
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
                       </svg>
                     </button>
-                    <!-- 发送站内信 -->
-                    <button 
-                      v-if="user.id !== authStore.user?.id"
-                      class="btn-ghost btn-sm"
-                      :title="t('admin.users.sendMessage')" 
-                      @click="openSendMessageModal(user)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    <!-- 重置密码 -->
-                    <button class="btn-ghost btn-sm" :title="t('admin.users.resetPassword')" @click="openResetPasswordModal(user)">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                      </svg>
-                    </button>
-                    <!-- 管理员角色 -->
-                    <button
-                      v-if="user.id !== authStore.user?.id"
-                      class="btn-ghost btn-sm"
-                      :class="user.role === 'admin' ? 'text-warning' : 'text-themed-muted'"
-                      :title="user.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin')"
-                      @click="toggleUserRole(user)"
-                    >
-                      <svg v-if="user.role === 'admin'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
-                      </svg>
-                      <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3.75l7.5 3v5.25c0 4.35-2.94 8.4-7.5 9.75-4.56-1.35-7.5-5.4-7.5-9.75V6.75l7.5-3z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 12.25l1.5 1.5 3.5-3.75" />
-                      </svg>
-                    </button>
-                    <!-- 取消2FA -->
-                    <button 
-                      v-if="user.twoFAEnabled"
-                      class="btn-ghost btn-sm text-warning" 
-                      :title="t('admin.users.disable2FA')" 
-                      @click="openDisable2FAModal(user)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </button>
-                    <!-- 解绑GitHub -->
-                    <button 
-                      v-if="user.hasGithubBinding"
-                      class="btn-ghost btn-sm"
-                      :title="t('admin.users.unbindGitHub')" 
-                      @click="openUnbindGitHubModal(user)"
-                    >
-                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                      </svg>
-                    </button>
+
+                    <!-- 封禁 / 解封 -->
                     <button 
                       v-if="user.role !== 'admin'"
-                      class="btn-ghost btn-sm"
-                      :class="user.status === 'active' ? 'text-warning' : 'text-success'"
+                      type="button"
+                      class="p-1.5 rounded transition-colors cursor-pointer hover:bg-themed-hover"
+                      :class="user.status === 'active' ? 'text-themed-muted hover:text-rose-500' : 'text-warning hover:text-success'"
                       :title="user.status === 'active' ? t('admin.users.ban') : t('admin.users.unban')"
                       @click="toggleUserStatus(user)"
                     >
@@ -1536,6 +1587,110 @@ function _getQuotaPercent(used, limit) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </button>
+
+                    <!-- 更多选项 -->
+                    <div class="relative inline-block text-left action-menu-container">
+                      <button
+                        type="button"
+                        class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                        :class="{ 'text-themed bg-themed-hover': activeActionMenuUserId === user.id }"
+                        :title="t('admin.users.moreActions')"
+                        @click.stop="toggleActionMenu(user.id)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                        </svg>
+                      </button>
+
+                      <Transition
+                        enter-active-class="transition ease-out duration-100"
+                        enter-from-class="transform opacity-0 scale-95"
+                        enter-to-class="transform opacity-100 scale-100"
+                        leave-active-class="transition ease-in duration-75"
+                        leave-from-class="transform opacity-100 scale-100"
+                        leave-to-class="transform opacity-0 scale-95"
+                      >
+                        <div
+                          v-if="activeActionMenuUserId === user.id"
+                          class="kawaii-menu-panel absolute right-0 z-50 min-w-[9.5rem] rounded py-1 border shadow-lg"
+                          :class="isNearBottom(index) ? 'bottom-full mb-1' : 'top-full mt-1'"
+                        >
+                          <!-- 发送站内信 -->
+                          <button 
+                            v-if="user.id !== authStore.user?.id"
+                            type="button"
+                            class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                            :title="t('admin.users.sendMessage')" 
+                            @click="openSendMessageModal(user)"
+                          >
+                            <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <span class="truncate">{{ t('admin.users.sendMessage') }}</span>
+                          </button>
+
+                          <!-- 重置密码 -->
+                          <button
+                            type="button"
+                            class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                            :title="t('admin.users.resetPassword')"
+                            @click="openResetPasswordModal(user)"
+                          >
+                            <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                            <span class="truncate">{{ t('admin.users.resetPassword') }}</span>
+                          </button>
+
+                          <!-- 管理员角色 -->
+                          <button
+                            v-if="user.id !== authStore.user?.id"
+                            type="button"
+                            class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                            :class="user.role === 'admin' ? 'text-warning' : ''"
+                            :title="user.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin')"
+                            @click="toggleUserRole(user)"
+                          >
+                            <svg v-if="user.role === 'admin'" class="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                            </svg>
+                            <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3.75l7.5 3v5.25c0 4.35-2.94 8.4-7.5 9.75-4.56-1.35-7.5-5.4-7.5-9.75V6.75l7.5-3z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 12.25l1.5 1.5 3.5-3.75" />
+                            </svg>
+                            <span class="truncate">{{ user.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin') }}</span>
+                          </button>
+
+                          <!-- 取消2FA -->
+                          <button 
+                            v-if="user.twoFAEnabled"
+                            type="button"
+                            class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-warning transition-colors cursor-pointer"
+                            :title="t('admin.users.disable2FA')" 
+                            @click="openDisable2FAModal(user)"
+                          >
+                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <span class="truncate">{{ t('admin.users.disable2FA') }}</span>
+                          </button>
+
+                          <!-- 解绑GitHub -->
+                          <button 
+                            v-if="user.hasGithubBinding"
+                            type="button"
+                            class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                            :title="t('admin.users.unbindGitHub')" 
+                            @click="openUnbindGitHubModal(user)"
+                          >
+                            <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                            </svg>
+                            <span class="truncate">{{ t('admin.users.unbindGitHub') }}</span>
+                          </button>
+                        </div>
+                      </Transition>
+                    </div>
                   </div>
                 </td>
               </tr>
