@@ -44,5 +44,9 @@ canary:
 #   - fails if agent code changed without agent/VERSION also changing
 .PHONY: agent-hash
 
+check:
+	@echo "Checking agent code changes..."
+	@make agent-hash
+
 agent-hash:
 	@bash agent/scripts/hash-version.sh
