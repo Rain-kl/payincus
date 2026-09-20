@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 地区选择器组件
- * 用于创建实例时选择国家/地区（横向卡片单选风格）
+ * 用于创建实例时选择国家/地区（横向卡片风格）
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -100,10 +100,10 @@ function getPackageCountLabel(count: number): string {
       {{ t('instance.selector.noRegions') }}
     </div>
 
-    <!-- 区域横向长方形卡片网格 -->
+    <!-- 区域横向长方形卡片网格：一行 3 个，高度 65px -->
     <div
       v-else
-      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
       role="radiogroup"
     >
       <!-- "全部"选项 -->
@@ -112,29 +112,16 @@ function getPackageCountLabel(count: number): string {
         role="radio"
         :aria-checked="isAllSelected"
         :class="[
-          'group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-left transition-all duration-150 cursor-pointer select-none',
+          'group relative flex items-center gap-3.5 h-[65px] px-4 rounded-xl border text-left transition-all duration-150 cursor-pointer select-none',
           isAllSelected
-            ? 'border-primary-500 dark:border-primary-400 bg-primary-500/10 dark:bg-primary-500/15 ring-1 ring-primary-500/40 dark:ring-primary-400/40'
+            ? 'border-primary-500 dark:border-primary-400 bg-primary-500/10 dark:bg-primary-500/15 ring-1 ring-primary-500/40 dark:ring-primary-400/40 shadow-xs'
             : 'border-themed bg-themed-surface hover:border-themed-strong hover:bg-themed-secondary/50'
         ]"
         @click="selectRegion(null)"
       >
-        <!-- 单选框圆点 -->
-        <span
-          class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
-          :class="isAllSelected
-            ? 'border-primary-500 dark:border-primary-400'
-            : 'border-themed-strong bg-transparent group-hover:border-primary-500/60'"
-        >
-          <span
-            v-if="isAllSelected"
-            class="w-2 h-2 rounded-full bg-primary-500 dark:bg-primary-400"
-          ></span>
-        </span>
-
         <!-- 图标容器 -->
-        <div class="w-9 h-7 rounded overflow-hidden flex items-center justify-center shrink-0 border border-themed bg-themed-secondary shadow-sm">
-          <svg class="w-4 h-4 text-primary-500 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-11 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-themed bg-themed-secondary shadow-xs">
+          <svg class="w-5 h-5 text-primary-500 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
@@ -147,7 +134,7 @@ function getPackageCountLabel(count: number): string {
           >
             {{ t('instance.selector.allRegions') }}
           </div>
-          <div class="text-xs text-themed-muted truncate leading-normal">
+          <div class="text-xs text-themed-muted truncate leading-normal mt-0.5">
             ALL · {{ getPackageCountLabel(totalPackageCount) }}
           </div>
         </div>
@@ -161,29 +148,16 @@ function getPackageCountLabel(count: number): string {
         role="radio"
         :aria-checked="selectedRegion === region.code"
         :class="[
-          'group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-left transition-all duration-150 cursor-pointer select-none',
+          'group relative flex items-center gap-3.5 h-[65px] px-4 rounded-xl border text-left transition-all duration-150 cursor-pointer select-none',
           selectedRegion === region.code
-            ? 'border-primary-500 dark:border-primary-400 bg-primary-500/10 dark:bg-primary-500/15 ring-1 ring-primary-500/40 dark:ring-primary-400/40'
+            ? 'border-primary-500 dark:border-primary-400 bg-primary-500/10 dark:bg-primary-500/15 ring-1 ring-primary-500/40 dark:ring-primary-400/40 shadow-xs'
             : 'border-themed bg-themed-surface hover:border-themed-strong hover:bg-themed-secondary/50'
         ]"
         @click="selectRegion(region.code)"
       >
-        <!-- 单选框圆点 -->
-        <span
-          class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
-          :class="selectedRegion === region.code
-            ? 'border-primary-500 dark:border-primary-400'
-            : 'border-themed-strong bg-transparent group-hover:border-primary-500/60'"
-        >
-          <span
-            v-if="selectedRegion === region.code"
-            class="w-2 h-2 rounded-full bg-primary-500 dark:bg-primary-400"
-          ></span>
-        </span>
-
         <!-- 国旗容器 -->
-        <div class="w-9 h-7 rounded overflow-hidden flex items-center justify-center shrink-0 border border-themed bg-themed-secondary shadow-sm">
-          <FlagIcon :code="region.code" size="lg" class="scale-105" />
+        <div class="w-11 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-themed bg-themed-secondary shadow-xs">
+          <FlagIcon :code="region.code" size="lg" class="scale-110" />
         </div>
 
         <!-- 文本信息 -->
@@ -194,7 +168,7 @@ function getPackageCountLabel(count: number): string {
           >
             {{ getRegionLabel(region.code) }}
           </div>
-          <div class="text-xs text-themed-muted truncate leading-normal">
+          <div class="text-xs text-themed-muted truncate leading-normal mt-0.5">
             {{ region.code.toUpperCase() }} · {{ getPackageCountLabel(region.packageCount) }}
           </div>
         </div>
