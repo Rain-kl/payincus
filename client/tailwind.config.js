@@ -13,20 +13,20 @@ const neutralRamp = {
   950: '#0a0a0a'
 }
 
-// Nimbus 信号色阶（Linear 靛紫）：给散落的 bg-primary-*/text-primary-*/ring-primary-* 等
-// accent 死类恢复为可见的靛紫主色（与 --kawaii-primary=#5e6ad2 一致，500=#5e6ad2、600=#4f5bc9）。
-const indigoRamp = {
-  50: '#f0f1fb',
-  100: '#e2e4f7',
-  200: '#c9ccf0',
-  300: '#a9ade6',
-  400: '#868cdc',
-  500: '#5e6ad2',
-  600: '#4f5bc9',
-  700: '#4149a8',
-  800: '#373d85',
-  900: '#31376b',
-  950: '#1f2140'
+// OCI 云蓝色阶（Oracle Cloud Infrastructure Console 标志性云蓝）
+// 500=#0b5cad、600=#006699，用于链接、主要交互项高亮
+const ociBlueRamp = {
+  50: '#edf5fc',
+  100: '#d6e9f8',
+  200: '#b0d4f2',
+  300: '#7db6e9',
+  400: '#4593de',
+  500: '#0b5cad',
+  600: '#006699',
+  700: '#00507a',
+  800: '#003b5a',
+  900: '#00273d',
+  950: '#001927'
 }
 
 // rose 在代码里被广泛用作「危险/严重/亏损」的红色语义（非装饰），
@@ -55,19 +55,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 中性灰阶 - 保留作为文本/边框基底
+        // OCI 中性石墨灰阶 - 保留作为文本/边框基底（700=#393632 顶栏色，900=#161513 深石墨底）
         gray: {
           50: '#fafafa',
-          100: '#f5f5f5',
+          100: '#f5f5f4',
           200: '#e5e5e5',
-          300: '#d4d4d4',
-          400: '#a3a3a3',
-          500: '#737373',
-          600: '#525252',
-          700: '#404040',
-          800: '#262626',
-          900: '#171717',
-          950: '#0a0a0a'
+          300: '#d5d4d2',
+          400: '#a3a19d',
+          500: '#73716d',
+          600: '#52504c',
+          700: '#393632',
+          800: '#262422',
+          900: '#161513',
+          950: '#0d0c0b'
         },
         // 主强调色 - 已收敛为中性墨阶（纯黑白，保留 sakura 名以兼容既有 class）
         sakura: {
@@ -144,8 +144,8 @@ export default {
           secondary: 'var(--accent)'
         },
         // primary 色阶 - 代码里散落 bg-primary-*/text-primary-*/ring-primary-* 作强调用；
-        // Nimbus 下恢复为靛蓝信号色阶（选中态/复选框/强调可见且成品牌）
-        primary: indigoRamp,
+        // OCI 下配置为经典云蓝色阶
+        primary: ociBlueRamp,
         // 状态色。保留 Tailwind 自带 blue/sky/teal 等语义色，
         // 避免处理中、信息、选中和图表状态被全局灰化后失去区分。
         success: '#16a34a',
@@ -194,23 +194,25 @@ export default {
         '2xs': ['0.6875rem', { lineHeight: '1rem' }],
       },
       borderRadius: {
-        DEFAULT: '6px',
-        'lg': '8px',
-        'xl': '10px',
-        '2xl': '12px',
-        '3xl': '16px'
+        DEFAULT: '4px',
+        'sm': '2px',
+        'md': '4px',
+        'lg': '6px',
+        'xl': '8px',
+        '2xl': '10px',
+        '3xl': '12px'
       },
       boxShadow: {
-        'sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'DEFAULT': '0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10)',
-        'border': '0 0 0 1px rgb(0 0 0 / 0.06)',
-        // 发光阴影已统一收敛为细微中性阴影（保留别名以兼容既有 class）
-        'glow-sakura': '0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10)',
-        'glow-sky': '0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10)',
-        'glow-lavender': '0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10)',
-        'glow-sunny': '0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10)',
-        'glow-mint': '0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10)',
-        'pop': '0 4px 12px -2px rgb(0 0 0 / 0.12), 0 2px 6px -2px rgb(0 0 0 / 0.08)'
+        'sm': 'none',
+        'DEFAULT': 'none',
+        'border': '0 0 0 1px var(--border-color)',
+        // OCI 规范：全面消除所有彩色发光与 pop 浮层阴影，保持平整
+        'glow-sakura': 'none',
+        'glow-sky': 'none',
+        'glow-lavender': 'none',
+        'glow-sunny': 'none',
+        'glow-mint': 'none',
+        'pop': '0 4px 12px rgba(0, 0, 0, 0.06)'
       },
       animation: {
         'fade-in': 'fadeIn 0.15s ease-out',
