@@ -1066,6 +1066,49 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* 下拉窗 100% 实色不透明背景，覆盖全局透明度规则 */
+.scope-dropdown-menu {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+:global(.dark) .scope-dropdown-menu {
+  background-color: #18181b !important;
+}
+
+.scope-dropdown-header {
+  background-color: #f8fafc !important;
+}
+
+:global(.dark) .scope-dropdown-header {
+  background-color: #1f2024 !important;
+}
+
+.scope-search-input {
+  background-color: #ffffff !important;
+}
+
+:global(.dark) .scope-search-input {
+  background-color: #141416 !important;
+}
+
+.scope-item:hover {
+  background-color: #f1f5f9 !important;
+}
+
+:global(.dark) .scope-item:hover {
+  background-color: #222327 !important;
+}
+
+.scope-item-selected {
+  background-color: #e2e8f0 !important;
+}
+
+:global(.dark) .scope-item-selected {
+  background-color: #2a2b30 !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nimbus-view *,
   .nimbus-view *::before,
