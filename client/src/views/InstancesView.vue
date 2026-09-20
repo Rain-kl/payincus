@@ -744,6 +744,35 @@ async function confirmResetTraffic(): Promise<void> {
   }
 }
 
+function getInstanceTrafficPercent(instance: Instance): number | null {
+  const limit = Number((instance as any).monthlyTrafficLimit || 0)
+  if (limit <= 0) return null
+  const used = Number((instance as any).monthlyTrafficUsed || 0)
+  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)))
+}
+
+function getInstanceTrafficBarColor(instance: Instance): string {
+  const percent = getInstanceTrafficPercent(instance)
+  if (percent === null) {
+    return themeStore.isDark ? 'bg-primary-400' : 'bg-primary-600'
+  }
+  if (percent >= 95) return 'bg-rose-500'
+  if (percent >= 80) return 'bg-amber-500'
+  return themeStore.isDark ? 'bg-primary-400' : 'bg-primary-600'
+}
+
+async function copyIp(ip: string): Promise<void> {
+  if (!ip || ip === '-') return
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(ip)
+      toast.success(t('common.copied'))
+    }
+  } catch {
+    // ignore clipboard error
+  }
+}
+
 function getInstanceMonthlyPrice(instance: Instance): string {
   const price = Number(instance.billingPrice ?? instance.planPrice ?? 0)
   if (price <= 0) return '-'
@@ -1813,9 +1842,9 @@ async function confirmBatchDestroy(): Promise<void> {
                     >
                       {{ formatImageName(instance.image, (instance as any).imageName) }}
                     </div>
-	                  </div>
-	                </div>
-	              </td>
+                  </div>
+                </div>
+              </td>
               <td class="px-3 py-3">
                 <span :class="['inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[11px] tabular-nums', getStatusInfo(instance.status, t).class]">
                   <span :class="['w-1.5 h-1.5 rounded-full', getStatusInfo(instance.status, t).dot]"></span>
@@ -1979,239 +2008,260 @@ async function confirmBatchDestroy(): Promise<void> {
           <div
             v-for="instance in instances"
             :key="instance.id"
-            class="nimbus-card-lift card overflow-hidden transition-all"
+            class="nimbus-card-lift card overflow-hidden transition-all rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-white dark:bg-[#121212]"
             :class="[
               instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
               recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
-              selectedIds.has(instance.id) ? ('ring-1 ring-primary-500/40') : ''
+              selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : ''
             ]"
           >
-            <div class="block p-4">
-              <div class="flex items-start gap-3 mb-3">
-                <div class="pt-1 shrink-0" @click.stop>
+            <div class="p-4 space-y-3">
+              <!-- Header: Checkbox + Icon + Name & Status -->
+              <div class="flex items-start gap-3">
+                <div class="pt-0.5 shrink-0" @click.stop>
                   <input
                     type="checkbox"
-                    class="w-5 h-5 rounded border-gray-300 accent-primary-600 cursor-pointer touch-manipulation"
+                    class="w-4 h-4 rounded border-gray-300 accent-primary-600 cursor-pointer touch-manipulation"
                     :checked="selectedIds.has(instance.id)"
                     @click.stop
-                    @change.stop="toggleSelect(instance.id)"
+                    @change="toggleSelect(instance.id)"
                   />
                 </div>
                 <div
-                  class="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
-                  :class="'bg-themed-secondary'"
+                  class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] cursor-pointer"
+                  @click="openInstanceDetail(instance.id)"
                 >
                   <InstanceDisplayIcon
                     v-if="instance.iconBadgeId || getPaidIconType(instance)"
                     :badge-id="instance.iconBadgeId"
                     :fallback-icon="getPaidIconType(instance)"
                     :alt="instance.name"
-                    :size="44"
+                    :size="36"
                   />
                   <DistroIcon
                     v-else
                     :distro="getDistroFromName(instance.image)"
-                    :size="40"
+                    :size="32"
                   />
                 </div>
                 <div class="flex-1 min-w-0 cursor-pointer" @click="openInstanceDetail(instance.id)">
-                  <div class="flex items-center gap-2 mb-1">
-                    <div
-                      class="font-semibold truncate"
-                      :class="'text-themed'"
-                    >
+                  <div class="flex items-center justify-between gap-2">
+                    <h3 class="font-semibold text-themed truncate text-sm">
                       {{ instance.name }}
-                    </div>
-                    <span :class="['inline-flex items-center gap-1 flex-shrink-0 rounded-full px-2 py-0.5 font-mono', getStatusInfo(instance.status, t).class]">
+                    </h3>
+                    <span :class="['inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 font-mono text-[11px] border', getStatusInfo(instance.status, t).class]">
                       <span :class="['w-1 h-1 rounded-full', getStatusInfo(instance.status, t).dot]"></span>
-                      <span class="text-[10px]">{{ getStatusInfo(instance.status, t).label }}</span>
+                      <span :class="getInstanceStatusTextClass(instance)">{{ getStatusInfo(instance.status, t).label }}</span>
                     </span>
                   </div>
-                  <div
-                    class="text-xs truncate"
-                    :class="'text-themed-muted'"
-                  >
-                    {{ formatImageName(instance.image, (instance as any).imageName) }}
-                  </div>
-                  <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                  <div class="mt-1 flex flex-wrap items-center gap-1.5">
                     <span
-                      class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                      class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
                       :class="getInstanceTypeBadgeClass(instance)"
                     >
                       {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
                     </span>
                     <span
-                      class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                      class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
                       :class="getInstanceNetworkBadgeClass(instance)"
+                      :title="getInstanceNetworkSummary(instance)"
                     >
                       {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
                     </span>
+                    <span class="text-[11px] text-themed-muted truncate max-w-[140px]" :title="getInstancePlanName(instance)">
+                      {{ getInstancePlanName(instance) }}
+                    </span>
                   </div>
-                </div>
-                <div
-                  v-if="(instance as any).packageName"
-                  class="text-xs px-2 py-1 rounded truncate max-w-[180px]"
-                  :class="'bg-themed-secondary text-themed-muted'"
-                  :title="(instance as any).packageName"
-                  @click="openInstanceDetail(instance.id)"
-                >
-                  {{ (instance as any).packageName }}
                 </div>
               </div>
 
-              <div class="space-y-2 text-sm cursor-pointer" @click="openInstanceDetail(instance.id)">
-                <div class="flex items-start justify-between">
-                  <span class="text-themed-muted text-xs mt-0.5">{{ $t('instance.mobileCard.ipAddress') }}</span>
-                  <div class="flex flex-col items-end gap-1">
-                    <template v-if="getIps(instance).length > 0">
-                      <span
-                        v-for="(ipObj, idx) in getIps(instance)"
-                        :key="idx"
-                        class="font-mono text-xs max-w-[220px] break-all text-right"
-                        :class="['text-themed', ipObj.type === 'ipv6' ? 'opacity-75' : '']"
-                        :title="ipObj.ip"
-                      >
-                        {{ ipObj.ip }}
-                      </span>
-                    </template>
-                    <span v-else class="text-themed-muted text-xs">-</span>
+              <!-- IP Address Row -->
+              <div
+                class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04] text-xs cursor-pointer"
+                @click="openInstanceDetail(instance.id)"
+              >
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-themed-muted shrink-0">IP</span>
+                  <span class="font-mono text-themed truncate font-medium" :title="getPrimaryIp(instance)">
+                    {{ getPrimaryIp(instance) }}
+                  </span>
+                </div>
+                <button
+                  v-if="getPrimaryIp(instance) && getPrimaryIp(instance) !== '-'"
+                  type="button"
+                  class="shrink-0 p-1 text-themed-muted hover:text-themed rounded hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
+                  :title="$t('common.copy')"
+                  @click.stop="copyIp(getPrimaryIp(instance))"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Hardware Specs Ribbon -->
+              <div class="grid grid-cols-3 gap-1.5 text-center cursor-pointer" :title="getInstanceConfigSummary(instance)" @click="openInstanceDetail(instance.id)">
+                <div class="p-1.5 rounded-md bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
+                  <div class="text-[9px] uppercase font-semibold tracking-wider text-themed-muted">CPU</div>
+                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
+                    {{ instance.cpu }} {{ $t('instance.mobileCard.cpuCore') }}
                   </div>
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-themed-muted text-xs">{{ $t('instance.mobileCard.config') }}</span>
-                  <span
-                    class="text-xs font-mono tabular-nums"
-                    :class="'text-themed'"
-                  >
-                    {{ instance.cpu }}{{ $t('instance.mobileCard.cpuCore') }} / {{ formatMemory(instance.memory) }} / {{ formatDisk(instance.disk) }}
+                <div class="p-1.5 rounded-md bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
+                  <div class="text-[9px] uppercase font-semibold tracking-wider text-themed-muted">RAM</div>
+                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
+                    {{ formatMemory(instance.memory) }}
+                  </div>
+                </div>
+                <div class="p-1.5 rounded-md bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
+                  <div class="text-[9px] uppercase font-semibold tracking-wider text-themed-muted">DISK</div>
+                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
+                    {{ formatDisk(instance.disk) }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Traffic Progress Bar -->
+              <div class="space-y-1 cursor-pointer" @click="openInstanceDetail(instance.id)">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-themed-muted text-[11px]">{{ $t('instance.mobileCard.traffic') }}</span>
+                  <span class="font-mono text-themed tabular-nums text-[11px]">
+                    {{ getInstanceTrafficUsage(instance) }}
                   </span>
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-themed-muted text-xs">{{ $t('instance.mobileCard.quota') }}</span>
-                  <span
-                    class="text-xs"
-                    :class="'text-themed'"
-                  >
-                    {{ getInstanceQuotaSummary(instance) }}
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
+                  <div
+                    class="h-full rounded-full transition-all duration-300"
+                    :class="getInstanceTrafficBarColor(instance)"
+                    :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
+                  ></div>
+                </div>
+              </div>
+
+              <!-- Region, Quota & Expiry Details -->
+              <div class="space-y-1.5 pt-1 text-xs cursor-pointer" @click="openInstanceDetail(instance.id)">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-themed-muted">{{ $t('instance.mobileCard.host') }}</span>
+                  <span class="inline-flex items-center gap-1 text-themed" :title="getInstanceRegionLabel(instance)">
+                    <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" />
+                    <span>{{ getInstanceHostName(instance) }}</span>
                   </span>
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-themed-muted text-xs">{{ $t('instance.mobileCard.traffic') }}</span>
-                  <span
-                    class="text-xs font-mono tabular-nums"
-                    :class="'text-themed'"
-                  >
-                    <template v-if="(instance as any).monthlyTrafficLimit">
-                      {{ formatBytes(Number((instance as any).monthlyTrafficUsed || 0)) }} / {{ formatBytes(Number((instance as any).monthlyTrafficLimit)) }}
-                    </template>
-                    <template v-else>
-                      {{ formatBytes(Number((instance as any).monthlyTrafficUsed || 0)) }} / {{ $t('instance.mobileCard.unlimited') }}
-                    </template>
-                  </span>
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-themed-muted">{{ $t('instance.mobileCard.quota') }}</span>
+                  <span class="font-mono tabular-nums text-themed">{{ getInstanceQuotaSummary(instance) }}</span>
                 </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-themed-muted text-xs">{{ $t('instance.mobileCard.host') }}</span>
-                  <span class="inline-flex items-center gap-1.5">
-                    <FlagIcon :code="(instance as any).host?.country_code || (instance as any).hostCountryCode || 'us'" size="xs" />
-                    <span
-                      class="uppercase text-xs font-medium"
-                      :class="'text-themed'"
-                    >{{ (instance as any).host?.name || (instance as any).host || '-' }}</span>
-                  </span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-themed-muted text-xs">{{ $t('instance.expireAt') }}</span>
-                  <span class="text-xs text-right" :title="getInstanceExpiryInfo(instance).title || ''">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="text-themed-muted">{{ $t('instance.expireAt') }}</span>
+                  <span :class="getInstanceExpiryInfo(instance).className" :title="getInstanceExpiryInfo(instance).title || ''">
                     <template v-if="getInstanceExpiryInfo(instance).dateText">
-                      <span class="font-mono tabular-nums text-themed-muted">{{ getInstanceExpiryInfo(instance).dateText }}</span>
-                      <span class="mx-1 text-themed-muted">|</span>
+                      <span class="font-mono tabular-nums text-themed-muted mr-1">{{ getInstanceExpiryInfo(instance).dateText }}</span>
                     </template>
-                    <span class="font-medium" :class="getInstanceExpiryInfo(instance).className">
-                      {{ getInstanceExpiryInfo(instance).remainingText }}
-                    </span>
+                    <span class="font-medium">{{ getInstanceExpiryInfo(instance).remainingText }}</span>
                   </span>
                 </div>
-                <div v-if="isAdmin" class="flex items-center justify-between">
-                  <span class="text-themed-muted text-xs">{{ $t('instance.mobileCard.user') }}</span>
-                  <span
-                    class="text-xs"
-                    :class="'text-themed'"
-                  >
-                    {{ (instance as any).username || '-' }}
-                  </span>
+                <div v-if="isAdmin && (instance as any).username" class="flex items-center justify-between text-[11px]">
+                  <span class="text-themed-muted">{{ $t('instance.mobileCard.user') }}</span>
+                  <span class="text-themed font-medium">{{ (instance as any).username }}</span>
                 </div>
               </div>
             </div>
 
+            <!-- Mobile Card Actions Bar -->
             <div
-              class="flex items-center justify-center gap-2 px-4 py-3 border-t"
-              :class="'border-themed bg-themed-secondary'"
+              class="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.01] dark:bg-white/[0.01]"
             >
-              <InstanceOrderMenu
-                v-if="canReorderInstances"
-                :actions="INSTANCE_ORDER_ACTIONS"
-                :labels="instanceOrderLabels"
-                :label="$t('instance.order.label')"
-                :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
-                :loading="orderLoading"
-                :dark="themeStore.isDark"
-                align="left"
-                @reorder="reorderInstance(instance, $event)"
-              />
-              <button
-                v-if="canStartInstance(instance)"
-                :disabled="!!actionLoading[instance.id]"
-                class="btn-ghost btn-sm flex-1"
-                @click.stop="handleAction(instance, 'start')"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span class="text-xs">{{ actionLoading[instance.id] === 'start' ? '...' : $t('instance.actions.start') }}</span>
-              </button>
-              <button
-                v-if="instance.status?.toLowerCase() === 'running'"
-                :disabled="!!actionLoading[instance.id]"
-                class="btn-ghost btn-sm flex-1"
-                @click.stop="handleAction(instance, 'stop')"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                </svg>
-                <span class="text-xs">{{ actionLoading[instance.id] === 'stop' ? '...' : $t('instance.actions.stop') }}</span>
-              </button>
-              <button
-                v-if="instance.status?.toLowerCase() === 'running'"
-                :disabled="!!actionLoading[instance.id]"
-                class="btn-ghost btn-sm flex-1"
-                @click.stop="handleAction(instance, 'restart')"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span class="text-xs">{{ actionLoading[instance.id] === 'restart' ? '...' : $t('instance.actions.restart') }}</span>
-              </button>
-              <button
-                v-if="canResetInstanceTraffic(instance)"
-                :disabled="!!actionLoading[instance.id]"
-                class="btn-ghost btn-sm flex-1"
-                @click.stop="openResetTrafficModal(instance)"
-              >
-                <span class="text-xs">{{ actionLoading[instance.id] === 'resetTraffic' ? '...' : $t('admin.hosts.resetTraffic') }}</span>
-              </button>
-              <button
-                v-if="canDeleteInstance(instance)"
-                :disabled="!!actionLoading[instance.id]"
-                class="btn-ghost btn-sm flex-1 text-red-500 hover:text-red-400"
-                @click.stop="handleAction(instance, 'delete')"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span class="text-xs">{{ actionLoading[instance.id] === 'delete' ? '...' : $t('instance.actions.delete') }}</span>
-              </button>
+              <div class="flex items-center gap-1">
+                <InstanceOrderMenu
+                  v-if="canReorderInstances"
+                  :actions="INSTANCE_ORDER_ACTIONS"
+                  :labels="instanceOrderLabels"
+                  :label="$t('instance.order.label')"
+                  :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
+                  :loading="orderLoading"
+                  :dark="themeStore.isDark"
+                  align="left"
+                  @reorder="reorderInstance(instance, $event)"
+                />
+                <button
+                  v-if="canStartInstance(instance)"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                  @click.stop="handleAction(instance, 'start')"
+                >
+                  <svg v-if="actionLoading[instance.id] === 'start'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{{ actionLoading[instance.id] === 'start' ? '...' : $t('instance.actions.start') }}</span>
+                </button>
+                <button
+                  v-if="instance.status?.toLowerCase() === 'running'"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-themed"
+                  @click.stop="handleAction(instance, 'restart')"
+                >
+                  <svg v-if="actionLoading[instance.id] === 'restart'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{{ actionLoading[instance.id] === 'restart' ? '...' : $t('instance.actions.restart') }}</span>
+                </button>
+                <button
+                  v-if="instance.status?.toLowerCase() === 'running'"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-themed-muted hover:text-red-500"
+                  @click.stop="handleAction(instance, 'stop')"
+                >
+                  <svg v-if="actionLoading[instance.id] === 'stop'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                  </svg>
+                  <span>{{ actionLoading[instance.id] === 'stop' ? '...' : $t('instance.actions.stop') }}</span>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-1">
+                <button
+                  v-if="canResetInstanceTraffic(instance)"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs"
+                  @click.stop="openResetTrafficModal(instance)"
+                >
+                  <span>{{ actionLoading[instance.id] === 'resetTraffic' ? '...' : $t('admin.hosts.resetTraffic') }}</span>
+                </button>
+                <button
+                  v-if="canDeleteInstance(instance)"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-red-500 hover:text-red-400"
+                  @click.stop="handleAction(instance, 'delete')"
+                >
+                  <span>{{ actionLoading[instance.id] === 'delete' ? '...' : $t('instance.actions.delete') }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex h-7 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black px-2.5 text-xs font-medium hover:opacity-90 transition-opacity"
+                  @click.stop="openInstanceDetail(instance.id)"
+                >
+                  {{ $t('instance.card.manage') }}
+                </button>
+              </div>
             </div>
           </div>
         </TransitionGroup>
@@ -2224,137 +2274,199 @@ async function confirmBatchDestroy(): Promise<void> {
           <article
             v-for="instance in instances"
             :key="instance.id"
-            class="kawaii-instance-card kawaii-instance-cloud-card group relative min-w-0 rounded-2xl border p-4 shadow-sm transition-[border-color,box-shadow,transform] duration-200"
+            class="nimbus-instance-card group relative flex flex-col justify-between rounded-xl border p-4 sm:p-5 transition-all duration-200"
             :class="[
               instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
               recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
-              selectedIds.has(instance.id) ? ('ring-1 ring-primary-500/40') : '',
-              'border-themed bg-themed-surface hover:border-primary-500/40'
+              selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : 'border-black/[0.08] dark:border-white/[0.08]',
+              'bg-white dark:bg-[#121212] hover:border-black/20 dark:hover:border-white/20'
             ]"
           >
-            <div class="flex items-start justify-between gap-4">
-              <button type="button" class="min-w-0 flex-1 text-left" @click="openInstanceDetail(instance.id)">
-                <h2
-                  class="truncate text-xl font-semibold leading-7 text-themed"
-                  :title="instance.name"
-                >
-                  {{ instance.name }}
-                </h2>
-                <div class="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-                  <span :class="['inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[11px]', getStatusInfo(instance.status, t).class]">
-                    {{ getStatusInfo(instance.status, t).label }}
-                  </span>
-                  <span class="inline-flex min-w-0 items-center gap-1.5 text-sm" :class="'text-themed-muted'">
-                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span class="truncate font-mono">{{ getPrimaryIp(instance) }}</span>
-                  </span>
-                  <span
-                    class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
-                    :class="getInstanceTypeBadgeClass(instance)"
+            <div>
+              <!-- Header: Icon, Name, Type/Network Badges, Status Pill & Select Checkbox -->
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3 min-w-0 flex-1">
+                  <!-- Distro / Custom Icon -->
+                  <div
+                    class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] cursor-pointer"
+                    @click="openInstanceDetail(instance.id)"
                   >
-                    {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
-                  </span>
-                  <span
-                    class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
-                    :class="getInstanceNetworkBadgeClass(instance)"
-                  >
-                    {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
-                  </span>
+                    <InstanceDisplayIcon
+                      v-if="instance.iconBadgeId || getPaidIconType(instance)"
+                      :badge-id="instance.iconBadgeId"
+                      :fallback-icon="getPaidIconType(instance)"
+                      :alt="instance.name"
+                      :size="36"
+                    />
+                    <DistroIcon
+                      v-else
+                      :distro="getDistroFromName(instance.image)"
+                      :size="32"
+                    />
+                  </div>
+
+                  <!-- Name and Metadata -->
+                  <div class="min-w-0 flex-1">
+                    <h2
+                      class="text-base font-semibold leading-snug text-themed truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer"
+                      :title="instance.name"
+                      @click="openInstanceDetail(instance.id)"
+                    >
+                      {{ instance.name }}
+                    </h2>
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span
+                        class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                        :class="getInstanceTypeBadgeClass(instance)"
+                      >
+                        {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
+                      </span>
+                      <span
+                        class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
+                        :class="getInstanceNetworkBadgeClass(instance)"
+                        :title="getInstanceNetworkSummary(instance)"
+                      >
+                        {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
+                      </span>
+                      <span class="inline-flex items-center gap-1 text-xs text-themed-muted truncate" :title="getInstanceRegionLabel(instance)">
+                        <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" />
+                        <span>{{ getInstanceHostName(instance) }}</span>
+                      </span>
+                      <span class="text-xs text-themed-muted truncate max-w-[140px]" :title="getInstancePlanName(instance)">
+                        · {{ getInstancePlanName(instance) }}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </button>
 
-              <button
-                type="button"
-                class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors"
-                :class="selectedIds.has(instance.id)
-                  ? 'border-accent bg-accent text-white dark:text-black'
-                  : 'border-themed bg-themed-surface text-transparent hover:border-primary-500/50'"
-                :aria-pressed="selectedIds.has(instance.id)"
-                @click.stop="toggleSelect(instance.id)"
-              >
-                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
+                <!-- Status pill & selection toggle -->
+                <div class="flex items-center gap-2 shrink-0">
+                  <span :class="['inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-xs font-medium border', getStatusInfo(instance.status, t).class]">
+                    <span :class="['w-1.5 h-1.5 rounded-full', getStatusInfo(instance.status, t).dot]"></span>
+                    <span :class="getInstanceStatusTextClass(instance)">{{ getStatusInfo(instance.status, t).label }}</span>
+                  </span>
 
-            <dl class="mt-3 grid grid-cols-[86px_minmax(0,1fr)] gap-y-1.5 text-[14px] leading-6">
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.card.region') }}</dt>
-              <dd class="min-w-0 truncate" :class="'text-themed-muted'">
-                <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" class="mr-1 inline-flex align-[-1px]" />
-                {{ getInstanceRegionLabel(instance) }}
-              </dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.host') }}</dt>
-              <dd class="min-w-0 truncate" :class="'text-themed-muted'">{{ getInstanceHostName(instance) }}</dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.package') }}</dt>
-              <dd class="min-w-0 truncate" :class="'text-themed-muted'" :title="getInstancePlanName(instance)">
-                {{ getInstancePlanName(instance) }}
-              </dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.config') }}</dt>
-              <dd class="min-w-0 truncate font-mono tabular-nums" :class="'text-themed-muted'">{{ getInstanceConfigSummary(instance) }}</dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.quotaLabel') }}</dt>
-              <dd class="min-w-0 truncate font-mono tabular-nums" :class="'text-themed-muted'">{{ getInstanceQuotaSummary(instance) }}</dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.card.network') }}</dt>
-              <dd class="min-w-0 truncate" :class="'text-themed-muted'" :title="getInstanceNetworkSummary(instance)">
-                {{ getInstanceNetworkSummary(instance) }}
-              </dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.trafficLabel') }}</dt>
-              <dd class="min-w-0 truncate font-mono tabular-nums" :class="'text-themed-muted'">{{ getInstanceTrafficUsage(instance) }}</dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.card.trafficReset') }}</dt>
-              <dd class="min-w-0 truncate font-mono tabular-nums text-themed">{{ getInstanceResetTrafficPrice(instance) }}</dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.card.price') }}</dt>
-              <dd class="min-w-0 truncate font-mono tabular-nums text-themed">{{ getInstanceMonthlyPrice(instance) }}</dd>
-
-              <dt class="font-semibold" :class="'text-themed'">{{ $t('instance.expireAt') }}</dt>
-              <dd class="min-w-0 truncate font-mono tabular-nums" :class="'text-themed-muted'">
-                {{ getInstanceExpiryInfo(instance).dateText || '-' }}
-              </dd>
-
-              <dt class="font-semibold" :class="'text-themed'">
-                <span class="inline-flex items-center gap-1">
-                  {{ $t('instance.card.autoRenew') }}
-                  <svg class="h-3.5 w-3.5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                  </svg>
-                </span>
-              </dt>
-              <dd>
-                <button
-                  type="button"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  :class="(instance as any).autoRenew
-                    ? 'bg-primary-600'
-                    : (themeStore.isDark ? 'bg-gray-700' : 'bg-gray-300')"
-                  :disabled="!canUseInstanceBillingAction(instance) || !!actionLoading[instance.id]"
-                  :aria-pressed="!!(instance as any).autoRenew"
-                  @click.stop="handleSingleAutoRenew(instance, !(instance as any).autoRenew)"
-                >
-                  <span
-                    class="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform"
-                    :class="(instance as any).autoRenew ? 'translate-x-5' : 'translate-x-0.5'"
-                  ></span>
-                </button>
-              </dd>
-            </dl>
-
-            <div class="mt-4 flex items-center justify-between gap-3">
-              <div class="inline-flex min-w-0 items-center gap-2">
-                <span :class="['h-5 w-5 rounded-full border-4 border-themed', getStatusInfo(instance.status, t).dot]"></span>
-                <span class="truncate text-sm font-semibold" :class="getInstanceStatusTextClass(instance)">{{ getStatusInfo(instance.status, t).label }}</span>
+                  <button
+                    type="button"
+                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer"
+                    :class="selectedIds.has(instance.id)
+                      ? 'border-primary-600 bg-primary-600 text-white'
+                      : 'border-black/20 dark:border-white/20 bg-transparent text-transparent hover:border-black/40 dark:hover:border-white/40'"
+                    :aria-pressed="selectedIds.has(instance.id)"
+                    @click.stop="toggleSelect(instance.id)"
+                  >
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <!-- IP Address Row -->
+              <div class="mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.05]">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-[11px] font-semibold uppercase tracking-wider text-themed-muted shrink-0">IP</span>
+                  <span class="font-mono text-xs text-themed truncate font-medium select-all" :title="getPrimaryIp(instance)">
+                    {{ getPrimaryIp(instance) }}
+                  </span>
+                </div>
+                <button
+                  v-if="getPrimaryIp(instance) && getPrimaryIp(instance) !== '-'"
+                  type="button"
+                  class="shrink-0 p-1 text-themed-muted hover:text-themed rounded hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
+                  :title="$t('common.copy')"
+                  @click.stop="copyIp(getPrimaryIp(instance))"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Hardware Specs Ribbon -->
+              <div class="mt-3 grid grid-cols-3 gap-2 text-center cursor-pointer" :title="getInstanceConfigSummary(instance)" @click="openInstanceDetail(instance.id)">
+                <div class="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
+                  <div class="text-[10px] uppercase font-semibold tracking-wider text-themed-muted">CPU</div>
+                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
+                    {{ instance.cpu }} {{ $t('instance.mobileCard.cpuCore') }}
+                  </div>
+                </div>
+                <div class="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
+                  <div class="text-[10px] uppercase font-semibold tracking-wider text-themed-muted">RAM</div>
+                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
+                    {{ formatMemory(instance.memory) }}
+                  </div>
+                </div>
+                <div class="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
+                  <div class="text-[10px] uppercase font-semibold tracking-wider text-themed-muted">DISK</div>
+                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
+                    {{ formatDisk(instance.disk) }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Traffic Section (Progress Bar) -->
+              <div class="mt-3 space-y-1.5 cursor-pointer" @click="openInstanceDetail(instance.id)">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-themed-muted flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                    {{ $t('instance.trafficLabel') }}
+                  </span>
+                  <span class="font-mono text-themed tabular-nums text-xs">
+                    {{ getInstanceTrafficUsage(instance) }}
+                  </span>
+                </div>
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
+                  <div
+                    class="h-full rounded-full transition-all duration-300"
+                    :class="getInstanceTrafficBarColor(instance)"
+                    :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
+                  ></div>
+                </div>
+                <div class="flex items-center justify-between pt-0.5 text-[11px] text-themed-muted">
+                  <span>{{ $t('instance.quotaLabel') }}</span>
+                  <span class="font-mono tabular-nums text-themed">{{ getInstanceQuotaSummary(instance) }}</span>
+                </div>
+              </div>
+
+              <!-- Billing & Expiry Strip -->
+              <div class="mt-3 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06] pt-3 text-xs">
+                <div class="flex items-center gap-1.5 min-w-0" :title="getInstanceExpiryInfo(instance).title || ''">
+                  <span class="text-themed-muted">{{ $t('instance.expireAt') }}:</span>
+                  <span class="font-mono font-medium truncate" :class="getInstanceExpiryInfo(instance).className">
+                    {{ getInstanceExpiryInfo(instance).remainingText || getInstanceExpiryInfo(instance).dateText || '-' }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-3 shrink-0">
+                  <span class="font-mono font-semibold text-themed">{{ getInstanceMonthlyPrice(instance) }}</span>
+                  <div class="flex items-center gap-1.5" :title="$t('instance.card.autoRenew')">
+                    <span class="text-[11px] text-themed-muted">{{ $t('instance.card.autoRenew') }}</span>
+                    <button
+                      type="button"
+                      class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      :class="(instance as any).autoRenew
+                        ? 'bg-primary-600'
+                        : (themeStore.isDark ? 'bg-zinc-700' : 'bg-zinc-300')"
+                      :disabled="!canUseInstanceBillingAction(instance) || !!actionLoading[instance.id]"
+                      :aria-pressed="!!(instance as any).autoRenew"
+                      @click.stop="handleSingleAutoRenew(instance, !(instance as any).autoRenew)"
+                    >
+                      <span
+                        class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
+                        :class="(instance as any).autoRenew ? 'translate-x-4' : 'translate-x-0.5'"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer: Power buttons + Order Menu + Action Buttons -->
+            <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] dark:border-white/[0.06] pt-3">
+              <!-- Left side: Order & Power -->
+              <div class="flex items-center gap-1.5">
                 <InstanceOrderMenu
                   v-if="canReorderInstances"
                   :actions="INSTANCE_ORDER_ACTIONS"
@@ -2363,42 +2475,99 @@ async function confirmBatchDestroy(): Promise<void> {
                   :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
                   :loading="orderLoading"
                   :dark="themeStore.isDark"
-                  align="right"
+                  align="left"
                   @reorder="reorderInstance(instance, $event)"
                 />
+
                 <button
+                  v-if="canStartInstance(instance)"
                   type="button"
-                  class="kawaii-action-button inline-flex h-8 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors"
-                  :class="'bg-themed-secondary text-themed'"
-                  @click.stop="openInstanceDetail(instance.id)"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
+                  :title="$t('instance.actions.start')"
+                  @click.stop="handleAction(instance, 'start')"
                 >
-                  {{ $t('instance.card.manage') }}
+                  <svg v-if="actionLoading[instance.id] === 'start'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{{ actionLoading[instance.id] === 'start' ? '...' : $t('instance.actions.start') }}</span>
+                </button>
+
+                <button
+                  v-if="instance.status?.toLowerCase() === 'running'"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-themed transition-colors disabled:opacity-50"
+                  :title="$t('instance.actions.restart')"
+                  @click.stop="handleAction(instance, 'restart')"
+                >
+                  <svg v-if="actionLoading[instance.id] === 'restart'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{{ actionLoading[instance.id] === 'restart' ? '...' : $t('instance.actions.restart') }}</span>
+                </button>
+
+                <button
+                  v-if="instance.status?.toLowerCase() === 'running'"
+                  type="button"
+                  :disabled="!!actionLoading[instance.id]"
+                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-themed-muted hover:text-red-500 transition-colors disabled:opacity-50"
+                  :title="$t('instance.actions.stop')"
+                  @click.stop="handleAction(instance, 'stop')"
+                >
+                  <svg v-if="actionLoading[instance.id] === 'stop'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                  </svg>
+                  <span>{{ actionLoading[instance.id] === 'stop' ? '...' : $t('instance.actions.stop') }}</span>
+                </button>
+              </div>
+
+              <!-- Right side: Actions -->
+              <div class="flex items-center gap-1.5">
+                <button
+                  v-if="canResetInstanceTraffic(instance)"
+                  type="button"
+                  class="inline-flex h-7 items-center justify-center rounded-md border border-black/10 dark:border-white/10 px-2.5 text-xs font-medium text-themed hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  :disabled="!!actionLoading[instance.id]"
+                  @click.stop="openResetTrafficModal(instance)"
+                >
+                  {{ actionLoading[instance.id] === 'resetTraffic' ? '...' : $t('admin.hosts.resetTraffic') }}
                 </button>
                 <button
                   type="button"
-                  class="kawaii-action-button inline-flex h-8 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors"
-                  :class="'bg-themed-secondary text-themed'"
+                  class="inline-flex h-7 items-center justify-center rounded-md border border-black/10 dark:border-white/10 px-2.5 text-xs font-medium text-themed hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   @click.stop="openInstanceTransfer(instance)"
                 >
                   {{ $t('instance.card.push') }}
                 </button>
                 <button
                   type="button"
-                  class="inline-flex h-8 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-white dark:text-black transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:bg-gray-400"
+                  class="inline-flex h-7 items-center justify-center rounded-md border border-black/10 dark:border-white/10 px-2.5 text-xs font-medium text-themed hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                   :disabled="!canUseInstanceBillingAction(instance) || !!actionLoading[instance.id]"
                   @click.stop="openSingleRenewModal(instance)"
                 >
                   {{ $t('instance.card.renew') }}
                 </button>
                 <button
-                  v-if="canResetInstanceTraffic(instance)"
                   type="button"
-                  class="kawaii-action-button inline-flex h-8 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors"
-                  :class="'bg-themed-secondary text-themed'"
-                  :disabled="!!actionLoading[instance.id]"
-                  @click.stop="openResetTrafficModal(instance)"
+                  class="inline-flex h-7 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black px-3 text-xs font-medium hover:opacity-90 transition-opacity"
+                  @click.stop="openInstanceDetail(instance.id)"
                 >
-                  {{ actionLoading[instance.id] === 'resetTraffic' ? '...' : $t('admin.hosts.resetTraffic') }}
+                  {{ $t('instance.card.manage') }}
                 </button>
               </div>
             </div>
@@ -2898,6 +3067,36 @@ async function confirmBatchDestroy(): Promise<void> {
   }
 
   .nimbus-card-lift:hover {
+    transform: none;
+  }
+}
+
+/* Nimbus: desktop instance grid card lift */
+.nimbus-instance-card {
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nimbus-instance-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgb(15 23 42 / 0.08);
+  }
+
+  :global(.dark) .nimbus-instance-card:hover {
+    box-shadow: 0 14px 30px rgb(0 0 0 / 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nimbus-instance-card {
+    transition-duration: 1ms;
+  }
+
+  .nimbus-instance-card:hover {
     transform: none;
   }
 }
