@@ -190,7 +190,7 @@ function handleLinkClick() {
   >
     <!-- Brand -->
     <div
-      class="nimbus-brand h-14 flex items-center border-b border-themed flex-shrink-0"
+      class="nimbus-brand h-14 flex items-center border-b border-[#2c2a28] flex-shrink-0"
       :class="collapsed && !mobileOpen ? 'justify-center px-2' : 'px-4'"
     >
       <RouterLink :to="navDashboardPath" class="nimbus-brand-link flex items-center gap-2.5 min-w-0" @click="handleLinkClick">
@@ -201,7 +201,7 @@ function handleLinkClick() {
         />
         <span
           v-if="!collapsed || mobileOpen"
-          class="nimbus-brand-name text-themed truncate"
+          class="nimbus-brand-name !text-white truncate"
         >{{ brand.brandName }}</span>
       </RouterLink>
     </div>
@@ -443,11 +443,14 @@ function handleLinkClick() {
 .nimbus-brand {
   background-color: #393632 !important;
   border-bottom: 1px solid #2c2a28 !important;
+  border-right: 1px solid #2c2a28 !important;
+  margin-right: -1px;
 }
 
 :global(.dark) .nimbus-brand {
   background-color: #1f1d1b !important;
   border-bottom: 1px solid #2c2a28 !important;
+  border-right: 1px solid #2c2a28 !important;
 }
 
 .nimbus-brand-name {
@@ -471,6 +474,25 @@ function handleLinkClick() {
   flex-direction: column;
   gap: 2px;
   padding: 10px 10px 16px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nimbus-nav::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+:global(.kawaii-sidebar) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+:global(.kawaii-sidebar)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Group labels — monospace, uppercase, faint */

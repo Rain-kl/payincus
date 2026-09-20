@@ -128,7 +128,7 @@ onUnmounted(() => {
     <!-- 主内容区 -->
     <div class="flex-1 flex flex-col min-w-0 h-full">
       <!-- 顶部栏 -->
-      <header class="kawaii-topbar nimbus-topbar h-14 flex items-center justify-between px-4 md:px-6 border-b border-themed">
+      <header class="kawaii-topbar nimbus-topbar h-14 flex items-center justify-between px-4 md:px-6 border-b border-[#2c2a28]">
         <div class="flex items-center gap-2 md:gap-4">
           <!-- Mobile: Hamburger menu -->
           <button 
