@@ -210,8 +210,8 @@ function handleSelect(plan: PackagePlan): void {
           isPlanDisabled(plan) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           isPlanSelected(plan)
             ? (themeStore.isDark
-              ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
-              : 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/10')
+              ? 'border-white bg-[var(--bg-surface-soft)] ring-1 ring-white/20'
+              : 'border-[var(--text-primary)] bg-[var(--bg-surface-soft)] ring-1 ring-[var(--text-primary)]/20')
             : isPlanDisabled(plan)
               ? (themeStore.isDark ? 'border-gray-800 bg-gray-900/40' : 'border-gray-200 bg-gray-50')
               : (themeStore.isDark
@@ -223,9 +223,9 @@ function handleSelect(plan: PackagePlan): void {
         <!-- 选中标识 -->
         <div
           v-if="isPlanSelected(plan)"
-          class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg"
+          class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--text-primary)] flex items-center justify-center shadow-lg"
         >
-          <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <svg class="w-4 h-4 text-[var(--text-primary)]" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
           </svg>
         </div>
