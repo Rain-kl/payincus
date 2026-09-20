@@ -135,11 +135,13 @@ const instancePassword = ref<Record<string, string | null>>({})  // 存储实例
 
 // 资源统计
 interface ResourceStats {
+  cpu: { usagePercent: number }
   memory: { usage: number; limit: number; usagePercent: number }
   disk: { usage: number; limit: number; usagePercent: number }
   network: { bytesReceived: number; bytesSent: number }
 }
 const stats = ref<ResourceStats>({
+  cpu: { usagePercent: 0 },
   memory: { usage: 0, limit: 0, usagePercent: 0 },
   disk: { usage: 0, limit: 0, usagePercent: 0 },
   network: { bytesReceived: 0, bytesSent: 0 }
@@ -581,6 +583,7 @@ watch(() => route.params.id, async (newId, oldId) => {
       showPassword.value = {}
       instancePassword.value = {}
       stats.value = {
+        cpu: { usagePercent: 0 },
         memory: { usage: 0, limit: 0, usagePercent: 0 },
         disk: { usage: 0, limit: 0, usagePercent: 0 },
         network: { bytesReceived: 0, bytesSent: 0 }
@@ -999,6 +1002,9 @@ async function loadStats(): Promise<void> {
     if (newStats) {
       // 确保完整更新stats对象，保持响应式
       stats.value = {
+        cpu: {
+          usagePercent: newStats.cpu?.usagePercent ?? 0
+        },
         memory: {
           usage: newStats.memory?.usage ?? 0,
           limit: newStats.memory?.limit ?? 0,

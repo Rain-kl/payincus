@@ -24,6 +24,7 @@ import {
   getTrafficCountersFromState
 } from '../lib/incus/index.js'
 import { deleteSnapshot } from '../lib/incus/incus-snapshots.js'
+import { allowanceToCores } from '../lib/cpu-allowance.js'
 import { generateIncusConfig, generateRandomPassword } from '../lib/incus-config-generator.js'
 import { encryptSensitiveData, decryptSensitiveData, validateName, validatePassword } from '../lib/security.js'
 import {
@@ -2715,6 +2716,30 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
   })
 
   // 获取实例实时资源使用情况
+
+  // CPU 实时占用：Incus 的 state.cpu.usage 是累计纳秒，需两次采样差值 / 时间差 / 分配核心数 计算。
+  // 后端单实例运行（架构约束），进程内缓存上次采样是安全的。
+  const cpuSampleCache = new Map<number, { usageNs: number; ts: number }>()
+
+  function computeCpuUsagePercent(
+    instanceId: number,
+    usageNs: number,
+    allocatedCores: number
+  ): number {
+    if (usageNs <= 0 || allocatedCores <= 0) return 0
+    const prev = cpuSampleCache.get(instanceId)
+    const now = Date.now()
+    cpuSampleCache.set(instanceId, { usageNs, ts: now })
+    if (!prev) return 0 // 首次采样，无基准
+    const dtMs = now - prev.ts
+    if (dtMs <= 0) return 0
+    const deltaNs = usageNs - prev.usageNs
+    if (deltaNs < 0) return 0 // 计数器重置/迁移
+    const totalCellsNs = dtMs * 1_000_000 * allocatedCores
+    if (totalCellsNs <= 0) return 0
+    return Math.max(0, Math.min(100, Math.round((deltaNs / totalCellsNs) * 100)))
+  }
+
   fastify.get<{ Params: { id: string } }>('/:id/stats', {
     onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -2741,6 +2766,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     if (instance.status !== 'running') {
       return {
         stats: {
+          cpu: { usage: 0, usagePercent: 0 },
           memory: { usage: 0, limit: instance.memory, usagePercent: 0 },
           disk: { usage: 0, limit: instance.disk, usagePercent: 0 },
           network: { bytesReceived: 0, bytesSent: 0 }
@@ -2757,6 +2783,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
       const state = await getInstanceState(client, instance.incus_id) as {
         status?: string
+        cpu?: { usage?: number }
         memory?: { usage?: number }
         disk?: { root?: { usage?: number } }
         network?: Record<string, {
@@ -2779,6 +2806,11 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       const memoryLimit = instance.memory * 1024 * 1024
       const memoryPercent = memoryLimit > 0 ? Math.round((memoryUsage / memoryLimit) * 100) : 0
 
+      // CPU 实时占用：基于两次采样差值
+      const cpuUsageNs = state.cpu?.usage || 0
+      const allocatedCores = allowanceToCores(instance.cpu)
+      const cpuPercent = computeCpuUsagePercent(instance.id, cpuUsageNs, allocatedCores)
+
       let diskUsage = 0
       const diskLimit = instance.disk * 1024 * 1024
       if (state.disk?.root) {
@@ -2796,6 +2828,10 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
       return {
         stats: {
+          cpu: {
+            usage: cpuUsageNs,
+            usagePercent: cpuPercent
+          },
           memory: {
             usage: Math.round(memoryUsage / 1024 / 1024),
             limit: instance.memory,
@@ -2819,6 +2855,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       console.error('获取实例资源状态失败:', errorMessage)
       return {
         stats: {
+          cpu: { usage: 0, usagePercent: 0 },
           memory: { usage: 0, limit: instance.memory, usagePercent: 0 },
           disk: { usage: 0, limit: instance.disk, usagePercent: 0 },
           network: { bytesReceived: 0, bytesSent: 0 }

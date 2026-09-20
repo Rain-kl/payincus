@@ -17,6 +17,7 @@ const showSshHelpModal = ref(false)
 const showHostOwnerModal = ref(false)
 
 interface ResourceStats {
+  cpu: { usagePercent: number }
   memory: { usage: number; limit: number; usagePercent: number }
   disk: { usage: number; limit: number; usagePercent: number }
 }
@@ -517,7 +518,14 @@ const canReassignIpv6 = computed(() => {
               </svg>
               {{ t('instance.detail.info.cpu') }}
             </span>
-            <span class="text-themed font-medium">{{ instance.cpu }}%</span>
+            <span class="text-themed font-medium">{{ stats.cpu.usagePercent }}%</span>
+          </div>
+          <div class="h-2 rounded-full overflow-hidden bg-themed/20">
+            <div
+              class="h-full rounded-full transition-all duration-500"
+              :class="stats.cpu.usagePercent > 80 ? 'bg-red-500' : stats.cpu.usagePercent > 60 ? 'bg-yellow-500' : 'bg-green-500'"
+              :style="{ width: stats.cpu.usagePercent + '%' }"
+            ></div>
           </div>
         </div>
         <!-- Memory -->
