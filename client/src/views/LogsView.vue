@@ -310,6 +310,20 @@ onMounted(async () => {
             <span :class="['badge whitespace-nowrap', getRiskClass(log.risk_level)]">
               {{ formatRiskLevel(log.risk_level) }}
             </span>
+            <span
+              v-if="log.approval_required"
+              class="badge whitespace-nowrap bg-themed-secondary text-themed"
+              :title="$t('logs.auditSummary.approvalRequired')"
+            >
+              {{ log.approval_required ? $t('logs.auditSummary.approvalRequired') : '' }}
+            </span>
+            <span
+              v-if="log.verification_required"
+              class="badge whitespace-nowrap bg-themed-secondary text-themed"
+              :title="$t('logs.auditSummary.verificationRequired')"
+            >
+              {{ log.verification_required ? $t('logs.auditSummary.verificationRequired') : '' }}
+            </span>
             <span v-if="log.risk_title" class="min-w-0 truncate text-xs text-themed-muted">
               {{ log.risk_title }}
             </span>

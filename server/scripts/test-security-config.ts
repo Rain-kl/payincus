@@ -191,10 +191,14 @@ try {
     'OAuth state and login-code signing must use the shared JWT signing secret helper'
   )
 
+  // Caddy 已改为仅回环 + Agent 隧道管理，不再有 Caddy 脚本下载 token；
+  // 此用途的 JWT secret 消费点必须彻底移除，防止旧凭据通道残留。
   assert.ok(
-    hostRouteSource.includes("getJwtSigningSecret('Caddy script token signing')") &&
-      hostRouteSource.includes("getJwtSigningSecret('Caddy script token verification')"),
-    'Caddy script tokens must use the shared JWT signing secret helper'
+    !hostRouteSource.includes("getJwtSigningSecret('Caddy script token signing')") &&
+      !hostRouteSource.includes("getJwtSigningSecret('Caddy script token verification')") &&
+      !hostRouteSource.includes('generateCaddyScriptToken') &&
+      !hostRouteSource.includes('verifyCaddyScriptToken'),
+    'Caddy script token generation/verification must be removed (loopback-tunnel management has no script endpoint)'
   )
 
   for (const forbiddenPattern of [

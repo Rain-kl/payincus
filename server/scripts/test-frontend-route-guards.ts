@@ -383,9 +383,10 @@ assert.ok(
     publicHeaderSource.includes('router.push(loginPath())') &&
     !publicHeaderSource.includes("router.push('/register')") &&
     !publicHeaderSource.includes("router.push('/login')") &&
-    publicFooterSource.includes("{ to: '/', label: t('publicSite.nav.overview') }") &&
+    publicFooterSource.includes('to="/"') &&
+    publicFooterSource.includes("t('publicSite.nav.home')") &&
     publicFooterSource.includes("import { dashboardPath, forgotPasswordPath, helpPath, loginPath, marketPath, registerPath } from '@/utils/app-paths'") &&
-    publicFooterSource.includes("to: marketPath()") &&
+    publicFooterSource.includes(':to="marketPath()"') &&
     publicFooterSource.includes(':to="helpPath()"') &&
     publicFooterSource.includes("to: loginPath()") &&
     publicFooterSource.includes("to: registerPath()") &&
