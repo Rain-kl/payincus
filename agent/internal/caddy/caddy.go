@@ -179,6 +179,15 @@ func writeCaddyfile() error {
 	if err := os.WriteFile(caddyfilePath, []byte(content), 0o640); err != nil {
 		return err
 	}
+	// 确保 caddy 系统用户存在（手动安装二进制时 apt 不会创建它）。
+	if err := exec.Command("id", "-u", "caddy").Run(); err != nil {
+		_ = exec.Command("useradd", "--system", "--home", "/var/lib/caddy", "--shell", "/usr/sbin/nologin", "--no-create-home", "caddy").Run()
+	}
+	// systemd unit 以 User=caddy 运行，Caddyfile 与目录必须 root:caddy 可读，
+	// 否则 caddy 进程报 "reading config from file: permission denied" 起不来。
+	_ = exec.Command("chown", "-R", "root:caddy", caddyConfigDir).Run()
+	_ = exec.Command("chmod", "0640", caddyfilePath).Run()
+	_ = exec.Command("chmod", "0750", caddyConfigDir).Run()
 	return nil
 }
 
