@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useThemeStore } from '@/stores/theme'
 import { useConfigStore } from '@/stores/config'
 import api from '@/api'
 import type { InstanceBillingInfo, RenewPreview } from '@/types/api'
@@ -9,7 +8,6 @@ import { freeSiteCopy } from '@/utils/freeSiteFun'
 import { walletPath } from '@/utils/app-paths'
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
 const configStore = useConfigStore()
 
 interface Props {
