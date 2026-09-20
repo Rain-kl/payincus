@@ -440,10 +440,21 @@ function handleLinkClick() {
     0 2px 10px -2px color-mix(in srgb, var(--kawaii-primary) 34%, transparent);
 }
 
+.nimbus-brand {
+  background-color: #393632 !important;
+  border-bottom: 1px solid #2c2a28 !important;
+}
+
+:global(.dark) .nimbus-brand {
+  background-color: #1f1d1b !important;
+  border-bottom: 1px solid #2c2a28 !important;
+}
+
 .nimbus-brand-name {
   font-weight: 600;
   font-size: 0.9375rem;
   letter-spacing: -0.02em;
+  color: #ffffff !important;
 }
 
 /* Neutralize router auto-active styling on the brand link */
@@ -515,17 +526,31 @@ function handleLinkClick() {
   align-items: center;
   gap: 11px;
   padding: 8px 10px;
-  border-radius: 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  outline: none !important;
   color: var(--kawaii-muted);
   font-size: 0.84375rem;
-  font-weight: 520;
+  font-weight: 500;
   line-height: 1.2;
   transition: color 160ms ease, background-color 160ms ease;
 }
 
+.nimbus-nav-item:focus,
+.nimbus-nav-item:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
 .nimbus-nav-item:not(.is-active):hover {
-  background: color-mix(in srgb, var(--kawaii-primary) 9%, transparent);
-  color: var(--kawaii-text);
+  background: #f5f5f4;
+  color: #161513;
+}
+
+:global(.dark) .nimbus-nav-item:not(.is-active):hover {
+  background: #282522;
+  color: #f4f4f3;
 }
 
 .nimbus-nav-icon {
@@ -543,33 +568,47 @@ function handleLinkClick() {
   white-space: nowrap;
 }
 
-/* Left active indicator bar */
+/* Left active indicator bar - OCI signature clean line */
 .nimbus-nav-indicator {
   position: absolute;
-  left: 2px;
-  top: 50%;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
   width: 3px;
-  height: 18px;
-  transform: translateY(-50%);
-  border-radius: 3px;
-  background: var(--kawaii-primary);
+  height: auto;
+  border-radius: 0 2px 2px 0;
+  background: #0b5cad;
   opacity: 0;
   transition: opacity 160ms ease;
 }
 
-/* Active state — override the legacy gradient with a flat indigo tint */
+/* Active state — OCI light blue tint + single clean left indicator */
 .kawaii-sidebar .nimbus-nav-item.is-active {
-  background: color-mix(in srgb, var(--kawaii-primary) 15%, transparent) !important;
-  color: var(--kawaii-text) !important;
+  background: rgba(11, 92, 173, 0.08) !important;
+  color: #0b5cad !important;
+  border-color: transparent !important;
+  outline: none !important;
   box-shadow: none !important;
   font-weight: 600;
+  border-radius: 4px;
 }
 .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-icon {
-  color: var(--kawaii-primary);
+  color: #0b5cad;
   opacity: 1;
 }
 .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-indicator {
   opacity: 1;
+}
+
+:global(.dark) .kawaii-sidebar .nimbus-nav-item.is-active {
+  background: rgba(11, 92, 173, 0.2) !important;
+  color: #4593de !important;
+}
+:global(.dark) .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-icon {
+  color: #4593de;
+}
+:global(.dark) .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-indicator {
+  background: #4593de;
 }
 
 /* Neutralize vue-router auto-active when our logic does not mark it active */

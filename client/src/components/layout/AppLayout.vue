@@ -160,8 +160,7 @@ onUnmounted(() => {
               class="w-6 h-6 rounded flex-shrink-0"
             />
             <span
-              class="font-semibold text-sm"
-              :class="'text-themed'"
+              class="font-semibold text-sm text-white"
             >{{ brand.brandName }}</span>
           </div>
 
@@ -284,8 +283,8 @@ onUnmounted(() => {
                 :avatar-style="authStore.user?.avatarStyle || 'bigSmile'"
                 :size="28"
               />
-              <span class="hidden sm:block text-sm text-themed">{{ authStore.user?.username }}</span>
-              <svg class="hidden sm:block w-4 h-4 transition-transform text-themed-muted" :class="userMenuOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span class="hidden sm:block text-sm text-white">{{ authStore.user?.username }}</span>
+              <svg class="hidden sm:block w-4 h-4 transition-transform text-white/70" :class="userMenuOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -358,11 +357,19 @@ onUnmounted(() => {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: color-mix(in srgb, var(--kawaii-surface) 72%, transparent) !important;
-  backdrop-filter: blur(14px) saturate(1.4) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
+  background-color: #393632 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
-  border-color: var(--kawaii-line) !important;
+  border-bottom: 1px solid #2c2a28 !important;
+  border-color: #2c2a28 !important;
+  color: #ffffff !important;
+}
+
+:global(.dark) .kawaii-topbar.nimbus-topbar {
+  background-color: #1f1d1b !important;
+  border-bottom: 1px solid #2c2a28 !important;
+  border-color: #2c2a28 !important;
 }
 
 /* Icon buttons — covers direct topbar buttons + child components
@@ -374,34 +381,33 @@ onUnmounted(() => {
   height: 32px;
   min-width: 32px;
   padding: 0 7px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid transparent;
-  color: var(--kawaii-muted) !important;
+  color: #c7c5c2 !important;
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
 .kawaii-topbar :deep(.kawaii-header-icon:hover) {
-  color: var(--kawaii-text) !important;
+  color: #ffffff !important;
   border-color: transparent !important;
-  background: color-mix(in srgb, var(--kawaii-primary) 10%, transparent) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Account chip keeps avatar + name; resting hairline border, indigo glow on hover */
+/* Account chip keeps avatar + name; resting hairline border */
 .kawaii-topbar :deep(.nimbus-userpill) {
   gap: 8px;
   padding: 0 10px 0 6px;
-  border-color: var(--kawaii-line) !important;
-  color: var(--kawaii-text) !important;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 4px;
+  color: #ffffff !important;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
 .kawaii-topbar :deep(.nimbus-userpill:hover) {
-  border-color: color-mix(in srgb, var(--kawaii-primary) 45%, transparent) !important;
-  background: color-mix(in srgb, var(--kawaii-primary) 7%, transparent) !important;
-  color: var(--kawaii-text) !important;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 22%, transparent),
-    0 4px 18px -8px color-mix(in srgb, var(--kawaii-primary) 45%, transparent) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

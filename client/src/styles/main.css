@@ -1267,48 +1267,50 @@
   box-shadow: var(--kawaii-shadow) !important;
 }
 
-/* 6) 渐变 CTA / 主按钮 / 选中态 → Linear 靛紫（明暗各一，accent 微光） */
+/* 6) 主按钮 / CTA → OCI 云蓝与 4px 小圆角 */
 .kawaii-header-cta,
 .kawaii-primary-button,
 .btn-primary {
   background-image: none !important;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 6px 18px -6px color-mix(in srgb, var(--kawaii-primary) 45%, transparent) !important;
+  box-shadow: none !important;
+  border-radius: 4px !important;
 }
 .dark .kawaii-header-cta,
 .dark .kawaii-primary-button,
 .dark .btn-primary {
-  background-color: #8b8ff5 !important;
-  color: #0a0b0d !important;
+  background-color: #4593de !important;
+  color: #161513 !important;
 }
 .light .kawaii-header-cta,
 .light .kawaii-primary-button,
 .light .btn-primary {
-  background-color: #5e6ad2 !important;
+  background-color: #0b5cad !important;
   color: #ffffff !important;
 }
 .dark .kawaii-header-cta:hover,
 .dark .kawaii-primary-button:hover,
 .dark .btn-primary:hover {
-  background-color: #a3a6f8 !important;
+  background-color: #7db6e9 !important;
 }
 .light .kawaii-header-cta:hover,
 .light .kawaii-primary-button:hover,
 .light .btn-primary:hover {
-  background-color: #4f5bc9 !important;
+  background-color: #004f7a !important;
 }
 .kawaii-header-cta:hover,
 .kawaii-primary-button:hover,
 .btn-primary:hover {
   filter: none !important;
-  transform: translateY(-1px) !important;
+  transform: none !important;
 }
 .kawaii-public-nav-link.is-active,
 .kawaii-menu-item.is-active,
 .kawaii-sidebar a.router-link-active {
   background-image: none !important;
-  background-color: color-mix(in srgb, var(--kawaii-primary) 12%, transparent) !important;
-  color: var(--kawaii-primary-strong) !important;
+  background-color: rgba(11, 92, 173, 0.08) !important;
+  color: #0b5cad !important;
   box-shadow: none !important;
+  border-radius: 4px !important;
 }
 .kawaii-brand-mark,
 .kawaii-footer-logo {
@@ -1326,7 +1328,7 @@
   animation: none !important;
 }
 
-/* 8) 大圆角收敛 */
+/* 8) 容器与卡片小圆角收敛 (4px) */
 .kawaii-card,
 .kawaii-card-soft,
 .kawaii-panel,
@@ -1335,7 +1337,7 @@
 .modal-content,
 .kawaii-auth-card,
 .kawaii-page-header {
-  border-radius: 8px !important;
+  border-radius: 4px !important;
 }
 
 /* 9) 关闭花哨关键帧动画 */

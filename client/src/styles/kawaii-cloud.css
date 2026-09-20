@@ -253,6 +253,18 @@
     color: #ffffff !important;
   }
 
+  .kawaii-topbar .text-themed,
+  .nimbus-topbar .text-themed {
+    color: #ffffff !important;
+  }
+
+  .kawaii-topbar .text-themed-secondary,
+  .nimbus-topbar .text-themed-secondary,
+  .kawaii-topbar .text-themed-muted,
+  .nimbus-topbar .text-themed-muted {
+    color: #c7c5c2 !important;
+  }
+
   .kawaii-sidebar {
     border-color: var(--kawaii-line) !important;
     background: var(--kawaii-surface) !important;
@@ -274,7 +286,8 @@
 
   .kawaii-sidebar a,
   .kawaii-sidebar button {
-    border-radius: 4px;
+    border-radius: 4px !important;
+    outline: none !important;
   }
 
   .kawaii-sidebar a.router-link-active,
@@ -282,8 +295,8 @@
   .kawaii-sidebar a.is-active {
     background: rgba(11, 92, 173, 0.08) !important;
     color: #0b5cad !important;
-    border-left: 3px solid #0b5cad !important;
-    border-radius: 0 4px 4px 0 !important;
+    border: none !important;
+    border-radius: 4px !important;
     box-shadow: none !important;
   }
 
@@ -292,8 +305,8 @@
   .dark .kawaii-sidebar a.is-active {
     background: rgba(11, 92, 173, 0.2) !important;
     color: #4593de !important;
-    border-left: 3px solid #4593de !important;
-    border-radius: 0 4px 4px 0 !important;
+    border: none !important;
+    border-radius: 4px !important;
     box-shadow: none !important;
   }
 
@@ -499,26 +512,46 @@
   }
 
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button) {
-    border-color: transparent !important;
-    background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px !important;
+    background: #0b5cad !important;
     color: #fff !important;
-    box-shadow: 0 10px 24px rgb(17 17 26 / 0.18);
+    box-shadow: none !important;
+  }
+
+  .kawaii-app-shell .btn-primary:not(.kawaii-action-button):hover {
+    background: #004f7a !important;
+  }
+
+  .dark .kawaii-app-shell .btn-primary:not(.kawaii-action-button) {
+    background: #4593de !important;
+    color: #161513 !important;
   }
 
   .kawaii-auth-shell .btn-primary {
-    border-color: transparent !important;
-    border-radius: 14px !important;
-    background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px !important;
+    background: #0b5cad !important;
     color: #fff !important;
-    box-shadow: 0 12px 26px rgb(17 17 26 / 0.22);
+    box-shadow: none !important;
   }
 
   .kawaii-app-shell .btn-secondary,
   .kawaii-app-shell .btn-ghost,
   .kawaii-app-shell .btn-outline {
-    border-color: var(--kawaii-line) !important;
-    background: color-mix(in srgb, var(--kawaii-surface) 76%, transparent) !important;
-    color: var(--kawaii-text) !important;
+    border-radius: 4px !important;
+    border: 1px solid #393632 !important;
+    background: #ffffff !important;
+    color: #161513 !important;
+    box-shadow: none !important;
+  }
+
+  .dark .kawaii-app-shell .btn-secondary,
+  .dark .kawaii-app-shell .btn-ghost,
+  .dark .kawaii-app-shell .btn-outline {
+    border: 1px solid #312e2b !important;
+    background: #1f1d1b !important;
+    color: #f4f4f3 !important;
   }
 
   .kawaii-app-shell [role='menu'],
@@ -2643,12 +2676,12 @@
   .kawaii-app-shell .btn-secondary,
   .kawaii-app-shell .btn-ghost,
   .kawaii-app-shell .btn-outline {
-    border-radius: 0.875rem !important;
+    border-radius: 4px !important;
   }
 
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button),
   .kawaii-auth-shell .btn-primary {
-    border-radius: 0.875rem !important;
+    border-radius: 4px !important;
   }
 
   .kawaii-app-companion {
@@ -2906,47 +2939,63 @@
 
   .kawaii-app-shell :where(.table-container, .table-wrapper, .overflow-x-auto:has(table)) {
     border: 1px solid var(--kawaii-line);
-    border-radius: 1.125rem;
-    background: color-mix(in srgb, var(--kawaii-surface) 88%, transparent);
-    box-shadow: 0 12px 34px rgb(17 17 26 / 0.08);
-    backdrop-filter: blur(16px);
+    border-radius: 4px;
+    background: var(--kawaii-surface);
+    box-shadow: none;
   }
 
-  .kawaii-app-shell :where(.tabs, [role='tablist']) {
-    gap: 0.35rem;
+  .kawaii-app-shell :where(.tabs, [role='tablist'], .nimbus-tabs) {
+    gap: 0.5rem;
     border-color: var(--kawaii-line) !important;
   }
 
-  .kawaii-app-shell :where(.tab, [role='tab']) {
-    border-radius: 999px;
+  .kawaii-app-shell :where(.tab, [role='tab'], .nimbus-tab) {
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
     color: var(--kawaii-muted) !important;
-    transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    border-bottom: 2px solid transparent !important;
+    padding-bottom: 8px !important;
+    transition: color 160ms ease, border-color 160ms ease;
   }
 
-  .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true']) {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--kawaii-primary) 16%, var(--kawaii-surface)), color-mix(in srgb, var(--kawaii-lavender) 16%, var(--kawaii-surface))) !important;
-    color: var(--kawaii-primary-strong) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 24%, transparent), 0 8px 18px rgb(17 17 26 / 0.12);
+  .kawaii-app-shell :where(.tab, [role='tab'], .nimbus-tab):hover {
+    color: var(--kawaii-text) !important;
+  }
+
+  .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true'], .nimbus-tab.is-active, .nimbus-tab[aria-selected='true']) {
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #0b5cad !important;
+    border-bottom: 2px solid #0b5cad !important;
+    box-shadow: none !important;
+    font-weight: 600 !important;
+  }
+
+  .dark .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true'], .nimbus-tab.is-active, .nimbus-tab[aria-selected='true']) {
+    color: #4593de !important;
+    border-bottom: 2px solid #4593de !important;
   }
 
   .kawaii-app-shell :where(.badge, .tag, [class*='badge'], [class*='Badge']) {
-    border-radius: 999px;
+    border-radius: 4px !important;
     letter-spacing: 0;
   }
 
   .kawaii-app-shell :where(.pagination, .pager) :where(button, a),
   .kawaii-app-shell :where(.page-size, .view-toggle) :where(button, select) {
     border-color: var(--kawaii-line) !important;
-    border-radius: 0.875rem !important;
+    border-radius: 4px !important;
     background: color-mix(in srgb, var(--kawaii-surface) 78%, transparent) !important;
     color: var(--kawaii-text) !important;
   }
 
   .kawaii-app-shell :where(.pagination, .pager) :where(button[aria-current='page'], .active, .is-active) {
-    border-color: transparent !important;
-    background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
+    border-color: #0b5cad !important;
+    background: #0b5cad !important;
     color: #fff !important;
-    box-shadow: 0 10px 22px rgb(17 17 26 / 0.18);
+    box-shadow: none !important;
+    border-radius: 4px !important;
   }
 
   .kawaii-app-shell :where(.alert, .notice, .callout) {
