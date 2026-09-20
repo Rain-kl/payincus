@@ -962,9 +962,14 @@ export default {
 
     // User Menu
     userMenu: {
-        profile: 'Profile',
+        summary: 'Summary',
+        profile: 'User Settings',
+        consoleSettings: 'Console Settings',
         myInstances: 'My Instances',
-        logout: 'Logout',
+        logout: 'Sign Out',
+        identityDomain: 'Identity Domain',
+        tenant: 'Tenant',
+        language: 'Language',
     },
 
     // Quota
@@ -1083,6 +1088,21 @@ export default {
             all: 'All Status',
         },
         createdAt: 'Created At',
+        publicIp: 'Public IP',
+        privateIp: 'Private IP',
+        ocpuCount: 'OCPU Count',
+        memoryGb: 'Memory (GB)',
+        availability: 'Availability',
+        faultDomain: 'Fault Domain',
+        searchAndFilter: 'Search and filter',
+        appliedFilters: 'Applied filters',
+        itemsPerPage: 'Items per page',
+        actionsDropdown: 'Actions',
+        allInstancesTip: 'Each instance is equipped with dedicated compute, memory, and storage resources. Configure network addresses and port forwarding in instance details.',
+        alwaysFree: 'Always Free',
+        compartment: 'Compartment',
+        rootCompartment: 'root',
+        pageInfo: 'Page {page} of {totalPages} ({start} - {end} of {total} items)',
         manageDesc: 'Manage your container instances',
         userInstances: 'Instances of user "{name}"',
         clearFilter: 'Clear filter',

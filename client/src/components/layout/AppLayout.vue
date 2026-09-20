@@ -9,7 +9,6 @@ import { useConfigStore } from '@/stores/config'
 import { supportedLocales, setLocale, type Locale } from '@/locales'
 import { useBrand } from '@/composables/useBrand'
 import SideNav from './SideNav.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
 import { instancesPath, loginPath, profilePath, terminalPath } from '@/utils/app-paths'
@@ -33,11 +32,10 @@ const titleBrandName = computed(() => {
   return (!name || name === 'Incudal') ? 'Cloud' : name
 })
 const showTermsModal = ref(false)
-const langMenuOpen = ref(false)
-const langMenuRef = ref<HTMLElement | null>(null)
 const sidebarCollapsed = ref<boolean>(false)
 const mobileMenuOpen = ref<boolean>(false)
 const userMenuOpen = ref<boolean>(false)
+const langDropdownOpen = ref<boolean>(false)
 const userMenuRef = ref<HTMLElement | null>(null)
 const accountProfilePath = profilePath()
 const accountTerminalPath = terminalPath()
@@ -53,6 +51,7 @@ const routeThemeClass = computed(() => {
 
 async function handleLogout(): Promise<void> {
   userMenuOpen.value = false
+  langDropdownOpen.value = false
   inboxStore.stopPolling()
   await authStore.logout()
   router.push(accountLoginPath)
@@ -78,42 +77,48 @@ function closeMobileMenu() {
 
 function toggleUserMenu() {
   userMenuOpen.value = !userMenuOpen.value
+  if (!userMenuOpen.value) {
+    langDropdownOpen.value = false
+  }
+}
+
+function toggleLangDropdown() {
+  langDropdownOpen.value = !langDropdownOpen.value
 }
 
 function navigateTo(path: string) {
   router.push(path)
   userMenuOpen.value = false
+  langDropdownOpen.value = false
 }
 
 function handleClickOutside(event: MouseEvent) {
   if (userMenuRef.value && !userMenuRef.value.contains(event.target as Node)) {
     userMenuOpen.value = false
+    langDropdownOpen.value = false
   }
-  if (langMenuRef.value && !langMenuRef.value.contains(event.target as Node)) {
-    langMenuOpen.value = false
-  }
-}
-
-function toggleLangMenu() {
-  langMenuOpen.value = !langMenuOpen.value
 }
 
 function changeLocale(code: Locale) {
   setLocale(code)
-  langMenuOpen.value = false
+  langDropdownOpen.value = false
 }
 
-function getCurrentLocaleShort(): string {
-  switch (locale.value) {
+function getLocaleDisplayName(code: Locale): string {
+  switch (code) {
     case 'zh-CN':
-      return '简'
+      return '中文 (简体)'
     case 'zh-TW':
-      return '繁'
+      return '中文 (繁體)'
     case 'en':
     default:
-      return 'EN'
+      return 'English'
   }
 }
+
+const currentLocaleDisplay = computed(() => {
+  return getLocaleDisplayName(locale.value as Locale)
+})
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
@@ -231,62 +236,21 @@ onUnmounted(() => {
           </span>
         </button>
 
-        <!-- 语言切换 -->
-        <div ref="langMenuRef" class="relative">
-          <button
-            class="kawaii-header-icon relative group px-2 py-1.5 rounded transition-colors touch-target text-xs font-medium"
-            :title="$t('language.' + (locale === 'zh-CN' ? 'zh' : 'en'))"
-            :aria-label="t('nav.toggleLanguage')"
-            @click.stop="toggleLangMenu"
-          >
-            {{ getCurrentLocaleShort() }}
-          </button>
-
-          <!-- 语言下拉菜单 -->
-          <Transition
-            enter-active-class="transition ease-out duration-100"
-            enter-from-class="transform opacity-0 scale-95"
-            enter-to-class="transform opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-75"
-            leave-from-class="transform opacity-100 scale-100"
-            leave-to-class="transform opacity-0 scale-95"
-          >
-            <div 
-              v-if="langMenuOpen"
-              class="kawaii-menu-panel absolute right-0 mt-2 w-36 rounded py-1 z-50 border"
-            >
-              <button
-                v-for="lang in supportedLocales"
-                :key="lang.code"
-                class="kawaii-menu-item w-full flex items-center justify-between px-3 py-2 text-sm transition-colors"
-                :class="{ 'is-active': locale === lang.code }"
-                @click="changeLocale(lang.code)"
-              >
-                {{ lang.name }}
-                <svg v-if="locale === lang.code" class="w-4 h-4 -scale-x-100 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
-          </Transition>
-        </div>
-
-        <!-- 用户菜单 -->
+        <!-- 用户菜单 (仅显示方形图标) -->
         <div ref="userMenuRef" class="relative">
           <button
-            class="kawaii-header-icon nimbus-userpill flex items-center gap-2 px-2 py-1 rounded transition-colors cursor-pointer"
+            type="button"
+            class="nimbus-user-trigger flex items-center justify-center p-0.5 rounded transition-all cursor-pointer focus:outline-none"
+            :class="userMenuOpen ? 'ring-1 ring-white/60' : ''"
+            :title="authStore.user?.username || t('userMenu.profile')"
+            :aria-label="t('userMenu.profile')"
             @click.stop="toggleUserMenu"
           >
-            <UserAvatar 
-              :username="authStore.user?.username || ''" 
-              :email="authStore.user?.email"
-              :avatar-style="authStore.user?.avatarStyle || ''"
-              :size="28"
-            />
-            <span class="hidden sm:block text-sm text-white">{{ authStore.user?.username }}</span>
-            <svg class="hidden sm:block w-4 h-4 transition-transform text-white/70" :class="userMenuOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+            <div class="nimbus-user-icon-box w-[32px] h-[32px] rounded flex items-center justify-center overflow-hidden shadow-sm select-none">
+              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
           </button>
           
           <!-- 下拉菜单 -->
@@ -300,37 +264,96 @@ onUnmounted(() => {
           >
             <div 
               v-if="userMenuOpen"
-              class="kawaii-menu-panel absolute right-0 mt-2 w-48 rounded py-1 z-50 border"
+              class="oci-user-dropdown absolute right-0 mt-2 w-[280px] rounded border border-[#e0dfdd] dark:border-[#312e2b] bg-white dark:bg-[#1f1d1b] p-5 shadow-lg z-50 select-none text-[15px]"
             >
-              <button
-                class="kawaii-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
-                @click="navigateTo(accountProfilePath)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                {{ $t('userMenu.profile') }}
-              </button>
-              <button
-                v-if="!isAdminEntry"
-                class="kawaii-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
-                @click="navigateTo(accountInstancesPath)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                </svg>
-                {{ $t('userMenu.myInstances') }}
-              </button>
-              <div class="my-1 border-t border-themed"></div>
-              <button
-                class="kawaii-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 transition-colors"
-                @click="handleLogout"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                {{ $t('userMenu.logout') }}
-              </button>
+              <!-- 概要信息 -->
+              <div>
+                <h3 class="text-base font-bold text-[#161513] dark:text-[#f4f4f3] tracking-tight">
+                  {{ t('userMenu.summary') }}
+                </h3>
+                <div class="mt-3.5 space-y-2.5">
+                  <div class="text-[#0b5cad] dark:text-[#4593de] truncate">
+                    {{ authStore.user?.email || authStore.user?.username }}
+                  </div>
+                  <div class="text-[#0b5cad] dark:text-[#4593de]">
+                    {{ t('userMenu.identityDomain') }}：&nbsp;&nbsp;Default
+                  </div>
+                  <div class="text-[#0b5cad] dark:text-[#4593de] truncate">
+                    {{ t('userMenu.tenant') }}：&nbsp;{{ authStore.user?.username }}
+                  </div>
+                  
+                  <!-- 语言设置移入这里 -->
+                  <div class="relative">
+                    <button
+                      type="button"
+                      class="w-full flex items-center justify-between text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer group text-left"
+                      @click.stop="toggleLangDropdown"
+                    >
+                      <span>{{ t('userMenu.language') }}：&nbsp;{{ currentLocaleDisplay }}</span>
+                      <svg class="w-3.5 h-3.5 transition-transform opacity-70 group-hover:opacity-100" :class="langDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    <!-- 展开语言选择列表 -->
+                    <div
+                      v-if="langDropdownOpen"
+                      class="mt-2 py-1 px-1 rounded border border-[#e0dfdd] dark:border-[#312e2b] bg-[#f9f9f8] dark:bg-[#282522] space-y-0.5"
+                    >
+                      <button
+                        v-for="lang in supportedLocales"
+                        :key="lang.code"
+                        type="button"
+                        class="w-full flex items-center justify-between px-3 py-1.5 text-xs rounded transition-colors"
+                        :class="locale === lang.code 
+                          ? 'bg-[#0b5cad]/10 text-[#0b5cad] dark:text-[#4593de] font-medium' 
+                          : 'text-[#161513] dark:text-[#f4f4f3] hover:bg-black/5 dark:hover:bg-white/5'"
+                        @click.stop="changeLocale(lang.code)"
+                      >
+                        <span>{{ getLocaleDisplayName(lang.code) }}</span>
+                        <svg v-if="locale === lang.code" class="w-3.5 h-3.5 text-[#0b5cad] dark:text-[#4593de]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 分割线 -->
+              <div class="border-t border-[#e0dfdd] dark:border-[#312e2b] my-4 -mx-5"></div>
+
+              <!-- 操作设置项 -->
+              <div class="space-y-2.5">
+                <button
+                  type="button"
+                  class="block w-full text-left text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer transition-colors"
+                  @click="navigateTo(accountProfilePath)"
+                >
+                  {{ t('userMenu.profile') }}
+                </button>
+                <button
+                  type="button"
+                  class="block w-full text-left text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer transition-colors"
+                  @click="navigateTo(accountInstancesPath)"
+                >
+                  {{ t('userMenu.consoleSettings') }}
+                </button>
+              </div>
+
+              <!-- 分割线 -->
+              <div class="border-t border-[#e0dfdd] dark:border-[#312e2b] my-4 -mx-5"></div>
+
+              <!-- 注销 -->
+              <div>
+                <button
+                  type="button"
+                  class="block w-full text-left text-[#0b5cad] dark:text-[#4593de] hover:underline cursor-pointer transition-colors"
+                  @click="handleLogout"
+                >
+                  {{ t('userMenu.logout') }}
+                </button>
+              </div>
             </div>
           </Transition>
         </div>
@@ -455,26 +478,37 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Account chip keeps avatar + name; resting hairline border */
-.kawaii-topbar :deep(.nimbus-userpill) {
-  gap: 8px;
-  padding: 0 10px 0 6px;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+/* User square trigger & icon box */
+.nimbus-user-trigger {
   border-radius: var(--radius-btn, 4px);
-  color: #ffffff !important;
-  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  padding: 1px;
 }
 
-.kawaii-topbar :deep(.nimbus-userpill:hover) {
-  border-color: rgba(255, 255, 255, 0.3) !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #ffffff !important;
-  box-shadow: none !important;
+.nimbus-user-icon-box {
+  background-color: #745872;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.1) 0px,
+    rgba(255, 255, 255, 0.1) 1.5px,
+    transparent 1.5px,
+    transparent 3.5px
+  );
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transition: border-color 160ms ease, filter 160ms ease;
+}
+
+.nimbus-user-trigger:hover .nimbus-user-icon-box {
+  border-color: rgba(255, 255, 255, 0.45);
+  filter: brightness(1.08);
+}
+
+.oci-user-dropdown {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .kawaii-topbar :deep(.kawaii-header-icon),
-  .kawaii-topbar :deep(.nimbus-userpill) {
+  .nimbus-user-icon-box {
     transition: none;
   }
 }

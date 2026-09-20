@@ -1145,9 +1145,14 @@ export default {
 
     // 用户菜单
     userMenu: {
-        profile: '个人设置',
+        summary: '概要信息',
+        profile: '用户设置',
+        consoleSettings: '控制台设置',
         myInstances: '我的实例',
-        logout: '退出登录',
+        logout: '注销',
+        identityDomain: '身份域',
+        tenant: '租户',
+        language: '语言',
     },
 
     // 配额
@@ -1266,6 +1271,21 @@ export default {
             all: '全部状态',
         },
         createdAt: '创建时间',
+        publicIp: '公共 IP',
+        privateIp: '专用 IP',
+        ocpuCount: 'OCPU 计数',
+        memoryGb: '内存 (GB)',
+        availability: '可用性',
+        faultDomain: '容错域',
+        searchAndFilter: '搜索和筛选',
+        appliedFilters: '应用的筛选器',
+        itemsPerPage: '每页的项数',
+        actionsDropdown: '操作',
+        allInstancesTip: '每个实例均配备独立的计算、内存与存储资源。请在实例详情中配置网络地址与端口映射。',
+        alwaysFree: '始终免费',
+        compartment: '区间',
+        rootCompartment: '根',
+        pageInfo: '第 {page} 页/共 {totalPages} 页 (第 {start} - {end} 项/共 {total} 项)',
         manageDesc: '管理您的容器实例',
         userInstances: '用户 "{name}" 的实例',
         clearFilter: '清除筛选',
