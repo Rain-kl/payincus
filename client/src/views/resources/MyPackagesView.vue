@@ -934,12 +934,12 @@ function getBillingCycleLabel(months: number): string {
           <table class="w-full table-fixed text-sm">
             <thead>
               <tr class="border-b border-themed bg-themed-secondary">
-                <th class="w-[18%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.name') }}</th>
+                <th class="w-[26%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.name') }}</th>
                 <th v-if="isAdmin && scope === 'hosted'" class="w-[20%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.owner') }}</th>
-                <th class="w-[9%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.status') }}</th>
+                <th class="w-[8%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.status') }}</th>
                 <th class="w-[11%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.networkModeColumn') }}</th>
-                <th class="w-[11%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceTypeColumn') }}</th>
-                <th class="w-[10%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.trafficMultiplierColumn') }}</th>
+                <th class="w-[8%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceTypeColumn') }}</th>
+                <th class="w-[6%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.trafficMultiplierColumn') }}</th>
                 <th class="w-[13%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.hostColumn') }}</th>
                 <th class="w-[8%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceColumn') }}</th>
                 <th v-if="scope === 'mine'" class="w-[20%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('common.actions') }}</th>
