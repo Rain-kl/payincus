@@ -1,44 +1,45 @@
 @layer base {
   /* ============================================================
-     Nimbus 设计系统 · 白色为主 + 单一靛蓝信号色（明暗双主题）
-     - 正文/标题用墨色（--kawaii-text），保持克制；
-     - 主色 --kawaii-primary=靛蓝，只驱动 交互/选中/CTA/链接；
-     - 状态色 mint/amber 语义保留；中性色带冷 slate 偏色（刻意选，非默认灰）。
+     OCI (Oracle Cloud Infrastructure) 设计系统 · 纯白画布 + #393632 暖深炭灰顶栏
+     - 顶栏固定 #393632，文本反白；
+     - 主色 --kawaii-primary=OCI 云蓝（#0b5cad），驱动交互/链接/侧栏指示条；
+     - 状态色 mint/amber/rose 语义保留为 OCI 经典柔和胶囊指示色；
+     - 阴影清零（Flat Design），保持平整企业云控制台质感。
      ============================================================ */
   .light {
-    --kawaii-bg: #fbfbfc;
+    --kawaii-bg: #ffffff;
     --kawaii-surface: #ffffff;
-    --kawaii-surface-soft: #f4f5f7;
-    --kawaii-line: #e9ebf0;
-    --kawaii-line-strong: #dfe2e9;
-    --kawaii-text: #0b0e14;
-    --kawaii-muted: #525a68;
-    --kawaii-primary: #5e6ad2;
-    --kawaii-primary-strong: #4f5bc9;
+    --kawaii-surface-soft: #f9f9f8;
+    --kawaii-line: #e0dfdd;
+    --kawaii-line-strong: #b8b6b2;
+    --kawaii-text: #161513;
+    --kawaii-muted: #66615e;
+    --kawaii-primary: #0b5cad;
+    --kawaii-primary-strong: #006699;
     --kawaii-pink: var(--kawaii-primary);
-    --kawaii-mint: #16a34a;
+    --kawaii-mint: #1e7e34;
     --kawaii-lavender: var(--kawaii-primary);
-    --kawaii-amber: #c2770b;
-    --kawaii-faint: #868e9c;
-    --kawaii-shadow: 0 0 0 1px rgb(17 17 26 / .04), 0 1px 2px rgb(17 17 26 / .04), 0 8px 24px -14px rgb(17 17 26 / .12);
+    --kawaii-amber: #8f5b00;
+    --kawaii-faint: #8c8984;
+    --kawaii-shadow: none;
   }
 
   .dark {
-    --kawaii-bg: #08090a;
-    --kawaii-surface: #131417;
-    --kawaii-surface-soft: #17181b;
-    --kawaii-line: #1e222b;
-    --kawaii-line-strong: #2a303b;
-    --kawaii-text: #eef1f6;
-    --kawaii-muted: #98a1b0;
-    --kawaii-primary: #8b8ff5;
-    --kawaii-primary-strong: #a3a6f8;
+    --kawaii-bg: #161513;
+    --kawaii-surface: #1f1d1b;
+    --kawaii-surface-soft: #282522;
+    --kawaii-line: #312e2b;
+    --kawaii-line-strong: #45413c;
+    --kawaii-text: #f4f4f3;
+    --kawaii-muted: #a29e9a;
+    --kawaii-primary: #4593de;
+    --kawaii-primary-strong: #0b5cad;
     --kawaii-pink: var(--kawaii-primary);
-    --kawaii-mint: #3ad07f;
+    --kawaii-mint: #5cd887;
     --kawaii-lavender: var(--kawaii-primary);
-    --kawaii-amber: #e0a13a;
-    --kawaii-faint: #6b7280;
-    --kawaii-shadow: 0 0 0 1px rgb(255 255 255 / .05), 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -14px rgb(0 0 0 / .6);
+    --kawaii-amber: #f5c842;
+    --kawaii-faint: #736f6a;
+    --kawaii-shadow: none;
   }
 }
 
@@ -223,32 +224,47 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 40%, transparent), 0 4px 20px -6px color-mix(in srgb, var(--kawaii-primary) 30%, transparent) !important;
   }
 
-  .kawaii-topbar {
+  .kawaii-topbar,
+  .nimbus-topbar {
     position: relative;
     z-index: 30;
-    border-color: var(--kawaii-line) !important;
-    background: color-mix(in srgb, var(--kawaii-surface) 78%, transparent) !important;
-    color: var(--kawaii-text);
-    backdrop-filter: blur(18px);
-    box-shadow: 0 10px 30px rgb(17 17 26 / 0.06);
+    background-color: #393632 !important;
+    border-bottom: 1px solid #2c2a28 !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
   }
 
-  .dark .kawaii-topbar {
-    box-shadow: 0 10px 34px rgb(0 0 0 / 0.22);
+  .dark .kawaii-topbar,
+  .dark .nimbus-topbar {
+    background-color: #1f1d1b !important;
+    border-bottom: 1px solid #2c2a28 !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  .kawaii-topbar .kawaii-header-icon,
+  .nimbus-topbar .kawaii-header-icon {
+    color: #e6e4e2 !important;
+  }
+
+  .kawaii-topbar .kawaii-header-icon:hover,
+  .nimbus-topbar .kawaii-header-icon:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
   }
 
   .kawaii-sidebar {
     border-color: var(--kawaii-line) !important;
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--kawaii-surface) 94%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 70%, transparent)) !important;
+    background: var(--kawaii-surface) !important;
     color: var(--kawaii-text);
-    box-shadow: 12px 0 34px rgb(17 17 26 / 0.08);
-    backdrop-filter: blur(18px);
-    transition: width 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    box-shadow: none !important;
+    transition: width 180ms ease, background-color 180ms ease, border-color 180ms ease;
   }
 
   .dark .kawaii-sidebar {
-    box-shadow: 12px 0 38px rgb(0 0 0 / 0.28);
+    background: #1a1816 !important;
+    border-color: #312e2b !important;
+    box-shadow: none !important;
   }
 
   .kawaii-sidebar > div,
@@ -258,15 +274,27 @@
 
   .kawaii-sidebar a,
   .kawaii-sidebar button {
-    border-radius: 12px;
+    border-radius: 4px;
   }
 
   .kawaii-sidebar a.router-link-active,
   .kawaii-sidebar a.router-link-exact-active,
   .kawaii-sidebar a.is-active {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--kawaii-primary) 16%, var(--kawaii-surface)), color-mix(in srgb, var(--kawaii-lavender) 16%, var(--kawaii-surface))) !important;
-    color: var(--kawaii-primary-strong) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 22%, transparent);
+    background: rgba(11, 92, 173, 0.08) !important;
+    color: #0b5cad !important;
+    border-left: 3px solid #0b5cad !important;
+    border-radius: 0 4px 4px 0 !important;
+    box-shadow: none !important;
+  }
+
+  .dark .kawaii-sidebar a.router-link-active,
+  .dark .kawaii-sidebar a.router-link-exact-active,
+  .dark .kawaii-sidebar a.is-active {
+    background: rgba(11, 92, 173, 0.2) !important;
+    color: #4593de !important;
+    border-left: 3px solid #4593de !important;
+    border-radius: 0 4px 4px 0 !important;
+    box-shadow: none !important;
   }
 
   .kawaii-app-shell main,
