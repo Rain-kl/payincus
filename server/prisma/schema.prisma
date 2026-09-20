@@ -696,6 +696,10 @@ model Host {
   // API 与内核配置
   enableApi           Boolean      @default(true) @map("enable_api")
   sysctlConfig        String?      @map("sysctl_config") // 自定义内核参数
+  // 内网穿透反向隧道配置
+  tunnelEnabled     Boolean      @default(false) @map("tunnel_enabled")
+  targetHost        String       @default("127.0.0.1") @map("target_host")
+  targetPort        Int          @default(8443) @map("target_port")
   // 安装流程
   installToken        String?      @unique @map("install_token")
   installTokenExpire  DateTime?    @map("install_token_expire")

@@ -289,6 +289,9 @@ export async function getHostsPaginated(options: PaginationOptions = {}): Promis
     createdAt: true,
     updatedAt: true,
     userId: true,
+    tunnelEnabled: true,
+    targetHost: true,
+    targetPort: true,
   } as const
 
   // 获取数据

@@ -1087,6 +1087,9 @@ export interface Host {
   notify_purchase?: boolean
   notify_renew?: boolean
   notify_destroy?: boolean
+  tunnel_enabled?: boolean
+  target_host?: string
+  target_port?: number
   created_at: string
   updated_at: string
 }
@@ -1108,6 +1111,9 @@ export interface HostWithDetails extends Host {
   notifyRenew?: boolean
   notifyDestroy?: boolean
   architecture?: 'x86_64' | 'aarch64'
+  tunnelEnabled?: boolean
+  targetHost?: string
+  targetPort?: number
   natConfig?: {
     publicIp: string | null
     publicIpv6?: string | null
@@ -1232,6 +1238,10 @@ export interface CreateHostRequest {
   ipv6Subnet?: string
   ipv6Gateway?: string
   ipv6ParentInterface?: string
+  // 内网穿透反向隧道
+  tunnelEnabled?: boolean
+  targetHost?: string
+  targetPort?: number
 }
 
 export interface UpdateHostRequest {
@@ -1255,6 +1265,9 @@ export interface UpdateHostRequest {
   enableResourcePool?: boolean  // 是否参与资源池玩法
   announcement?: string | null  // 节点公告
   probeUrl?: string | null  // 探针地址
+  tunnelEnabled?: boolean
+  targetHost?: string
+  targetPort?: number
   natConfig?: {
     publicIp?: string
     publicIpv6?: string
