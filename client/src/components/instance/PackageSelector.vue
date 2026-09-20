@@ -247,7 +247,9 @@ onBeforeUnmount(() => {
             ? (themeStore.isDark ? 'border-gray-800 bg-gray-900/50 opacity-60' : 'border-gray-200 bg-gray-50 opacity-60')
             : selectedPackageId === pkg.id 
               ? (themeStore.isDark ? 'border-white bg-gray-900 ring-1 ring-white/20' : 'border-gray-900 bg-gray-50 ring-1 ring-gray-900/20')
-              : (themeStore.isDark ? 'border-gray-800 hover:border-gray-700' : 'border-gray-200 hover:border-gray-300')
+              : (themeStore.isDark
+                  ? 'border-gray-800 hover:border-gray-700 hover:bg-themed-hover'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-themed-hover')
         ]"
         @click="emit('select', pkg)"
       >
