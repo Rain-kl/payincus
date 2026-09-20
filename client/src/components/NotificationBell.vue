@@ -155,7 +155,7 @@ onUnmounted(() => {
     >
       <div
         v-if="isOpen"
-        class="kawaii-menu-panel fixed sm:absolute left-0 right-0 sm:left-auto sm:right-0 top-[72px] sm:top-auto sm:mt-2 sm:w-80 sm:rounded-2xl py-2 z-50 border-y sm:border"
+        class="kawaii-menu-panel fixed sm:absolute left-0 right-0 sm:left-auto sm:right-0 top-[62px] sm:top-auto sm:mt-2 sm:w-80 sm:rounded-2xl py-2 z-50 border-y sm:border"
         :class="themeStore.isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'"
       >
         <!-- 标题栏 -->

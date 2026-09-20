@@ -129,7 +129,7 @@ onUnmounted(() => {
 <template>
   <div class="kawaii-app-shell h-screen flex flex-col overflow-hidden" :class="routeThemeClass">
     <!-- 顶部栏：整行贯通全屏，防止标题栏被分割线切分 -->
-    <header class="kawaii-topbar nimbus-topbar h-[72px] w-full flex items-center justify-between px-4 md:px-6 border-b border-[#2c2a28] flex-shrink-0 z-30">
+    <header class="kawaii-topbar nimbus-topbar h-[62px] w-full flex items-center justify-between px-4 md:px-6 border-b border-[#2c2a28] flex-shrink-0 z-30">
       <div class="flex items-center gap-2.5 md:gap-3 min-w-0">
         <!-- Mobile: Hamburger menu -->
         <button 

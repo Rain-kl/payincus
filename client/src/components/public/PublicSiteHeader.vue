@@ -152,7 +152,7 @@ onUnmounted(() => {
     :class="scrolled ? 'is-scrolled' : ''"
   >
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="flex h-[72px] items-center justify-between gap-3 sm:gap-4">
+      <div class="flex h-[62px] items-center justify-between gap-3 sm:gap-4">
         <div class="flex min-w-0 items-center gap-3 sm:gap-6">
           <RouterLink to="/" class="flex items-center gap-2 sm:gap-3">
             <div

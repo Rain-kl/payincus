@@ -156,7 +156,7 @@ function handleLinkClick() {
     >
       <div
         v-if="mobileOpen"
-        class="fixed inset-0 top-[72px] bg-black/50 z-30 md:hidden"
+        class="fixed inset-0 top-[62px] bg-black/50 z-30 md:hidden"
         @click="emit('closeMobile')"
       ></div>
     </Transition>
@@ -172,7 +172,7 @@ function handleLinkClick() {
       collapsed ? 'md:w-16' : 'md:w-60',
       'w-64',
       // 移动端固定在顶栏下方滑出，桌面端在顶栏下方流式相对定位
-      'md:relative fixed top-[72px] md:top-0 bottom-0 left-0',
+      'md:relative fixed top-[62px] md:top-0 bottom-0 left-0',
       // 滑动动画的 transform
       mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       collapsed && !mobileOpen ? 'is-collapsed' : ''
