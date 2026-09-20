@@ -136,7 +136,7 @@ else
 fi
 
 log "Generating password hash..."
-PASS_HASH=$(printf '%s' "$CADDY_PASS" | caddy hash-password)
+PASS_HASH=$(printf '%s\n' "$CADDY_PASS" | caddy hash-password)
 unset CADDY_PASS INJECT_CADDY_PASSWORD_B64
 
 install -d -o root -g caddy -m 0750 "$CADDY_CONFIG_DIR"
