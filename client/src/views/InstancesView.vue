@@ -1645,7 +1645,7 @@ async function confirmBatchDestroy(): Promise<void> {
       <!-- 列表布局 (OCI 风格) -->
       <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: #ffffff; box-shadow: none; border: 1px solid #e5e5e4;">
         <div class="overflow-x-auto oci-table-scroll bg-white dark:bg-[#161513]">
-          <table class="w-full table-fixed" style="min-width: 1200px;">
+          <table class="w-full table-fixed" style="table-layout: auto;">
             <thead class="border-b border-[#e5e5e4] dark:border-[#2f2b28] bg-white dark:bg-[#161513]">
               <tr>
                 <th class="w-12 px-3 py-3 text-center">
@@ -1660,15 +1660,16 @@ async function confirmBatchDestroy(): Promise<void> {
                     </button>
                   </div>
                 </th>
-                <th class="w-64 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
-                <th class="w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.statusLabel') }}</th>
-                <th class="w-40 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.publicIp') }}</th>
-                <th class="w-36 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.privateIp') }}</th>
-                <th class="w-48 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.config') }}</th>
-                <th class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.ocpuCount') }}</th>
-                <th class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.memoryGb') }}</th>
-                <th class="w-44 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.createdAt') }}</th>
-                <th v-if="isAdmin" class="w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.user') }}</th>
+                <th class="max-w-64 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
+                <th class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
+                <th class="max-w-40 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
+                <th class="max-w-36 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.privateIp') }}</th>
+                <th class="max-w-48 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.config') }}</th>
+                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.ocpuCount') }}</th>
+                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.memoryGb') }}</th>
+                <th class="max-w-44 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.createdAt') }}</th>
+                <th v-if="isAdmin" class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.user') }}</th>
+                <th class="w-full"></th>
                 <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-white dark:bg-[#161513] border-l border-[#e5e5e4] dark:border-[#2a2826]">
                   <span class="sr-only">{{ $t('common.actions') }}</span>
                 </th>
@@ -1703,28 +1704,30 @@ async function confirmBatchDestroy(): Promise<void> {
                 </td>
 
                 <!-- Name -->
-                <td class="w-64 px-3.5 py-3.5">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span
-                      class="font-medium text-sm text-[#0563c1] dark:text-[#4da3ff] hover:underline truncate"
-                      :title="instance.name"
-                    >
-                      {{ instance.name }}
-                    </span>
-                    <span
-                      v-if="!instance.packagePlanId"
-                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ebe9e7] text-[#444] dark:bg-[#2c2a27] dark:text-[#bbb] border border-[#dcdad7] dark:border-[#3d3a36] shrink-0"
-                    >
-                      {{ $t('instance.alwaysFree') }}
-                    </span>
-                  </div>
-                  <div class="text-[11px] text-[#716c67] dark:text-[#9e9892] truncate mt-0.5" :title="formatImageName(instance.image, (instance as any).imageName)">
-                    {{ formatImageName(instance.image, (instance as any).imageName) }}
+                <td class="max-w-64 px-3.5 py-3.5">
+                  <div class="flex flex-col min-w-0 max-w-64">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="font-medium text-sm text-[#0563c1] dark:text-[#4da3ff] hover:underline truncate"
+                        :title="instance.name"
+                      >
+                        {{ instance.name }}
+                      </span>
+                      <span
+                        v-if="!instance.packagePlanId"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ebe9e7] text-[#444] dark:bg-[#2c2a27] dark:text-[#bbb] border border-[#dcdad7] dark:border-[#3d3a36] shrink-0"
+                      >
+                        {{ $t('instance.alwaysFree') }}
+                      </span>
+                    </div>
+                    <div class="text-[11px] text-[#716c67] dark:text-[#9e9892] truncate mt-0.5" :title="formatImageName(instance.image, (instance as any).imageName)">
+                      {{ formatImageName(instance.image, (instance as any).imageName) }}
+                    </div>
                   </div>
                 </td>
 
                 <!-- Status -->
-                <td class="w-32 px-3.5 py-3.5 whitespace-nowrap">
+                <td class="max-w-32 px-3.5 py-3.5 whitespace-nowrap">
                   <span
                     v-if="instance.status?.toLowerCase() === 'running'"
                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/50"
@@ -1749,39 +1752,42 @@ async function confirmBatchDestroy(): Promise<void> {
                 </td>
 
                 <!-- Public IP -->
-                <td class="w-40 px-3.5 py-3.5 font-mono text-xs text-themed truncate" :title="getPublicIp(instance)">
+                <td class="max-w-40 px-3.5 py-3.5 font-mono text-xs text-themed whitespace-nowrap truncate" :title="getPublicIp(instance)">
                   {{ getPublicIp(instance) }}
                 </td>
 
                 <!-- Private IP -->
-                <td class="w-36 px-3.5 py-3.5 font-mono text-xs text-themed-muted truncate" :title="getPrivateIp(instance)">
+                <td class="max-w-36 px-3.5 py-3.5 font-mono text-xs text-themed-muted whitespace-nowrap truncate" :title="getPrivateIp(instance)">
                   {{ getPrivateIp(instance) }}
                 </td>
 
                 <!-- Shape/Config -->
-                <td class="w-48 px-3.5 py-3.5 text-xs text-themed truncate" :title="getInstancePlanName(instance)">
+                <td class="max-w-48 px-3.5 py-3.5 text-xs text-themed whitespace-nowrap truncate" :title="getInstancePlanName(instance)">
                   {{ getInstancePlanName(instance) }}
                 </td>
 
                 <!-- CPU 核心数 -->
-                <td class="w-28 px-3.5 py-3.5 font-mono text-xs text-themed">
+                <td class="max-w-28 px-3.5 py-3.5 font-mono text-xs text-themed whitespace-nowrap">
                   {{ formatCpuCores(instance.cpu) }}
                 </td>
 
                 <!-- Memory (GB) -->
-                <td class="w-28 px-3.5 py-3.5 font-mono text-xs text-themed">
+                <td class="max-w-28 px-3.5 py-3.5 font-mono text-xs text-themed whitespace-nowrap">
                   {{ (instance.memory / 1024) >= 1 ? (instance.memory / 1024).toFixed(0) : formatMemory(instance.memory) }}
                 </td>
 
                 <!-- Created At -->
-                <td class="w-44 px-3.5 py-3.5 font-mono text-xs text-themed-muted whitespace-nowrap">
+                <td class="max-w-44 px-3.5 py-3.5 font-mono text-xs text-themed-muted whitespace-nowrap">
                   {{ instance.created_at ? formatDate(instance.created_at) : '-' }}
                 </td>
 
                 <!-- User (Admin only) -->
-                <td v-if="isAdmin" class="w-32 px-3.5 py-3.5 text-xs text-themed-muted truncate">
+                <td v-if="isAdmin" class="max-w-32 px-3.5 py-3.5 text-xs text-themed-muted whitespace-nowrap truncate" :title="(instance as any).username || '-'">
                   {{ (instance as any).username || '-' }}
                 </td>
+
+                <!-- Spacer Column -->
+                <td class="w-full"></td>
 
                 <!-- Actions: Fixed/Sticky to right -->
                 <td
