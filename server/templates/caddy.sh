@@ -15,6 +15,10 @@ readonly CADDY_CERT_FILE="/etc/caddy/cert.pem"
 readonly CADDY_KEY_FILE="/etc/caddy/key.pem"
 readonly CADDY_OVERRIDE_DIR="/etc/systemd/system/caddy.service.d"
 readonly CADDY_OVERRIDE_FILE="/etc/systemd/system/caddy.service.d/override.conf"
+# 旧安装残留路径（成功安装后清理，绝不提前删 —— 备份/回滚依据）
+readonly OLD_AUTOSAVE_FILE="/var/lib/caddy/.config/caddy/autosave.json"
+readonly OLD_CADDY_STORAGE_DIR="/var/lib/caddy/.local/share/caddy"
+readonly OLD_LOG_DIR="/var/log/caddy"
 
 CADDY_USER=""
 CADDY_PASS=""
@@ -97,54 +101,40 @@ CADDYFILE_NEW=""
 OVERRIDE_NEW=""
 CADDY_INSTALL_COMPLETE=false
 ROLLBACK_HANDLED=false
-# 旧安装残留的预期路径（每次重新安装前都会清除/修正）
-readonly OLD_AUTOSAVE_FILE="/var/lib/caddy/.config/caddy/autosave.json"
-readonly OLD_CADDY_STORAGE_DIR="/var/lib/caddy/.local/share/caddy"
-readonly OLD_OVERRIDE_FILE="/etc/systemd/system/caddy.service.d/override.conf"
-readonly OLD_LOG_DIR="/var/log/caddy"
+# 安装状态机路径（供 EXIT trap 判断是否已显式回滚）
+ROLLBACK_EXPLICIT=false
 
+# 成功安装后的残留清理：只在「新配置已生效」之后执行，绝不碰备份源。
+# 备份（.before-incudal.*）是回滚的唯一依据，安装期间任何时候都不得删除。
 cleanup_old_installation() {
-    # 删除旧脚本/旧版本 Caddy 留下的运行期残留，防止 --resume 恢复旧配置、或旧 override 干扰新安装。
+    # 旧 Caddy API autosave / 存储：--config 模式不用 --resume，autosave 无意义，
+    # 但必须在新配置稳定运行后才清 —— 安装中途清掉它，回滚时就丢掉了旧运行时状态。
     rm -f "$OLD_AUTOSAVE_FILE" 2>/dev/null || true
     rm -rf "$OLD_CADDY_STORAGE_DIR" 2>/dev/null || true
-    rm -f "$OLD_OVERRIDE_FILE" 2>/dev/null || true
-    # 清除历次脚本留下的配置备份（这些都是旧安装的垃圾，重装后不再需要）
-    rm -f /etc/caddy/Caddyfile.before-incudal.* 2>/dev/null || true
-    rm -f /etc/systemd/system/caddy.service.d/*.before-incudal.* 2>/dev/null || true
-    systemctl daemon-reload >/dev/null 2>&1 || true
-    # 重置旧日志目录：caddy 以 User=caddy 运行，目录必须可写，
-    # 否则新配置里的日志输出会在启动时 permission denied。
-    # 注意：这里只重建目录、不设属主 —— cleanup 在 apt 安装 caddy 之前执行，
-    # 此时 caddy 系统用户可能还不存在（全新安装场景），-o caddy 会直接报
-    # "invalid user 'caddy'" 退出；属主由装包后的 install -d -o caddy 统一设置。
-    install -d -m 0750 "$OLD_LOG_DIR"
-    # 旧日志文件可能属 root（旧脚本/旧包产生），caddy 打开会 permission denied，一并清掉
-    rm -f "$OLD_LOG_DIR"/*.log 2>/dev/null || true
 }
 
+# EXIT trap：只在「未显式回滚」且「未完成」时，把服务还原到进入脚本前的状态。
+# 这是个兜底（信号中断/意外退出），正常失败路径已由显式回滚处理，不重复操作配置文件。
 cleanup_caddy_install() {
     local exit_status=$?
     rm -f "${CERT_TMP:-}" "${KEY_TMP:-}" "${CADDYFILE_NEW:-}" "${OVERRIDE_NEW:-}" 2>/dev/null || true
     if [[ "$exit_status" -ne 0 && "$CADDY_INSTALL_COMPLETE" != "true" && "$ROLLBACK_HANDLED" != "true" ]]; then
         set +e
         if [[ "$OLD_SERVICE_ENABLED" == "true" ]]; then
-            systemctl enable caddy >/dev/null 2>&1
+            systemctl enable caddy >/dev/null 2>&1 || true
         else
-            systemctl disable caddy >/dev/null 2>&1
+            systemctl disable caddy >/dev/null 2>&1 || true
         fi
         if [[ "$OLD_SERVICE_ACTIVE" == "true" ]]; then
             systemctl is-active --quiet caddy 2>/dev/null || systemctl start caddy >/dev/null 2>&1
         else
-            systemctl stop caddy >/dev/null 2>&1
+            systemctl stop caddy >/dev/null 2>&1 || true
         fi
     fi
 }
 trap cleanup_caddy_install EXIT
 
 log "Installing Caddy Web Server & Dependencies..."
-
-# 清理旧安装残留（autosave/老配置 storage/旧 override），确保从干净状态安装
-cleanup_old_installation
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -338,6 +328,8 @@ fi
 
 CADDY_INSTALL_COMPLETE=true
 log "Caddy installation complete!"
+# 新配置已稳定运行，此刻才清理旧 autosave/storage 残留（备份源已在切换前妥善保存）
+cleanup_old_installation
 if [[ -n "$CADDYFILE_BACKUP" ]]; then
     warn "Previous Caddyfile backup preserved at: ${CADDYFILE_BACKUP}"
 fi
