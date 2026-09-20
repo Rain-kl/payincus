@@ -108,7 +108,7 @@ function formatTraffic(bytes: string | null | undefined): string {
       </div>
     </div>
     
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div v-else class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3">
       <div
         v-for="host in availableHosts"
         :key="host.id"
