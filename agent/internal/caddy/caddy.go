@@ -166,7 +166,7 @@ func runStep(ctx context.Context, name string, args ...string) error {
 }
 
 func writeCaddyfile() error {
-	if err := os.MkdirAll(caddyConfigDir, 0o750); err != nil {
+	if err := os.MkdirAll(caddyConfigDir, 0o755); err != nil {
 		return err
 	}
 	content := `# Managed by incudal-agent: Caddy Admin API on loopback only.
@@ -176,18 +176,9 @@ func writeCaddyfile() error {
     auto_https disable_redirects
 }
 `
-	if err := os.WriteFile(caddyfilePath, []byte(content), 0o640); err != nil {
+	if err := os.WriteFile(caddyfilePath, []byte(content), 0o644); err != nil {
 		return err
 	}
-	// 确保 caddy 系统用户存在（手动安装二进制时 apt 不会创建它）。
-	if err := exec.Command("id", "-u", "caddy").Run(); err != nil {
-		_ = exec.Command("useradd", "--system", "--home", "/var/lib/caddy", "--shell", "/usr/sbin/nologin", "--no-create-home", "caddy").Run()
-	}
-	// systemd unit 以 User=caddy 运行，Caddyfile 与目录必须 root:caddy 可读，
-	// 否则 caddy 进程报 "reading config from file: permission denied" 起不来。
-	_ = exec.Command("chown", "-R", "root:caddy", caddyConfigDir).Run()
-	_ = exec.Command("chmod", "0640", caddyfilePath).Run()
-	_ = exec.Command("chmod", "0750", caddyConfigDir).Run()
 	return nil
 }
 
@@ -222,8 +213,6 @@ After=network.target
 
 [Service]
 Type=simple
-User=caddy
-Group=caddy
 ExecStart=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile
 ExecReload=/usr/bin/caddy reload --config /etc/caddy/Caddyfile
 TimeoutStopSec=5s
@@ -239,11 +228,7 @@ WantedBy=multi-user.target
 	if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil {
 		return err
 	}
-	_ = os.MkdirAll(caddyConfigDir, 0o750)
-	// unit 内 User=caddy 需要 caddy 系统用户存在；apt 包会创建，手动安装不一定。缺则用 nologin 创建。
-	if err := exec.Command("id", "-u", "caddy").Run(); err != nil {
-		_ = exec.Command("useradd", "--system", "--home", "/var/lib/caddy", "--shell", "/usr/sbin/nologin", "--no-create-home", "caddy").Run()
-	}
+	_ = os.MkdirAll(caddyConfigDir, 0o755)
 	return nil
 }
 
