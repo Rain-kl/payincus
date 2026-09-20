@@ -37,3 +37,11 @@ canary:
 	git merge --no-edit "$$orig"; \
 	git push -u origin canary; \
 	echo "Done: $$orig merged into canary and pushed."
+
+# Compute the agent package hash into/against agent/.package-hash.
+# Usage: make agent-hash            # default package: agent/dist/manifest.json
+#        make agent-hash PACKAGE=agent/dist/incudal-agent-linux-amd64.gz
+.PHONY: agent-hash
+
+agent-hash:
+	@bash agent/scripts/hash-version.sh "$(PACKAGE)"
