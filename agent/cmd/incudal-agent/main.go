@@ -13,6 +13,7 @@ import (
 	"incudal-agent/internal/config"
 	"incudal-agent/internal/panel"
 	"incudal-agent/internal/report"
+	"incudal-agent/internal/tunnel"
 	"incudal-agent/internal/upgrade"
 )
 
@@ -39,6 +40,13 @@ func main() {
 		return
 	}
 
+	tunnelWorker := tunnel.NewWorker(tunnel.WorkerConfig{
+		PanelURL:    cfg.PanelURL,
+		AgentID:     cfg.AgentID,
+		AgentSecret: cfg.AgentSecret,
+	})
+	defer tunnelWorker.SyncConfig(false, "", 0)
+
 	log.Printf("incudal-agent started: panel=%s interval=%s", cfg.PanelURL, cfg.HeartbeatInterval)
 	upgradeRunner := upgrade.DefaultRunner(cfg)
 	var upgradeInProgress atomic.Bool
@@ -47,6 +55,9 @@ func main() {
 		heartbeatLogState.logFailure(err)
 	} else {
 		heartbeatLogState.logSuccess(result)
+		if result.Tunnel != nil {
+			tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
+		}
 		scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 	}
 
@@ -62,6 +73,9 @@ func main() {
 				heartbeatLogState.logFailure(err)
 			} else {
 				heartbeatLogState.logSuccess(result)
+				if result.Tunnel != nil {
+					tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
+				}
 				scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 			}
 		}

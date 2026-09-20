@@ -28,7 +28,14 @@ type HeartbeatResult struct {
 	Body       string
 	OK         bool
 	Upgrade    *UpgradeInstruction
+	Tunnel     *TunnelInstruction
 	LatencyMs  int64
+}
+
+type TunnelInstruction struct {
+	Enabled    bool   `json:"enabled"`
+	TargetHost string `json:"targetHost"`
+	TargetPort int    `json:"targetPort"`
 }
 
 type UpgradeInstruction struct {
@@ -42,6 +49,7 @@ type UpgradeInstruction struct {
 
 type heartbeatResponse struct {
 	Upgrade *UpgradeInstruction `json:"upgrade"`
+	Tunnel  *TunnelInstruction  `json:"tunnel"`
 }
 
 func New(cfg config.Config) *Client {
@@ -106,6 +114,7 @@ func (client *Client) Heartbeat(ctx context.Context, payload map[string]any) (He
 	var parsedResponse heartbeatResponse
 	if err := json.Unmarshal(responseBody, &parsedResponse); err == nil {
 		result.Upgrade = parsedResponse.Upgrade
+		result.Tunnel = parsedResponse.Tunnel
 	}
 
 	var parsed map[string]any
