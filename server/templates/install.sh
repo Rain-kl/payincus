@@ -199,19 +199,44 @@ backup_resolv_conf_before_incudal() {
     warn "检测到现有 /etc/resolv.conf，已备份到: ${resolv_backup}"
 }
 
-# 等待系统后台包管理工具释放锁（如 apt-daily / unattended-upgrades）
+# 等待系统后台包管理工具释放锁（如 apt-daily / unattended-upgrades）。
+# 只根据「锁文件是否真的被进程持有」判断，绝不按进程名猜测：
+# Ubuntu/Debian 常驻的 unattended-upgrade-shutdown --wait-for-signal 并不持有
+# dpkg 锁，用 pgrep -f 按名字匹配会把无锁状态误判成「后台正在包管理」，
+# 结果永远卡在等待直到超时强杀 —— 这正是历史上长时间假死的原因。
 wait_for_apt_locks() {
     local waited=0
     local max_wait=300
     local warned=0
 
     check_locks() {
+        local lock_paths=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock)
+        local p
+        # 第一种：fuser 直接探测锁文件是否有进程持有（最精确）。
         if command -v fuser >/dev/null 2>&1; then
-            fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1
+            fuser "${lock_paths[@]}" >/dev/null 2>&1
             return $?
         fi
-        pgrep -f "apt.systemd.daily|unattended-upgrade|dpkg|apt-get" >/dev/null 2>&1
-        return $?
+        # 第二种：lslocks（util-linux 标准工具）看锁文件是否有持有者。
+        # COMMAND 列非空即代表有进程真正持有该文件锁，与进程名无关。
+        if command -v lslocks >/dev/null 2>&1; then
+            for p in "${lock_paths[@]}"; do
+                if lslocks -o COMMAND -r -n 2>/dev/null | grep -q "$(basename "$p")"; then
+                    return 0
+                fi
+            done
+            return 1
+        fi
+        # 第三种：退到 flock 独占尝试 —— 能加上锁说明没人持有。
+        if command -v flock >/dev/null 2>&1; then
+            for p in "${lock_paths[@]}"; do
+                flock -n "$p" true 2>/dev/null && return 1
+            done
+            return 0
+        fi
+        # 最后兜底：没有任何检测手段时不再阻塞安装，直接放行。
+        # 宁可让随后的 apt-get 自己失败报错，也不能无限期假死。
+        return 1
     }
 
     while check_locks; do
@@ -225,9 +250,18 @@ wait_for_apt_locks() {
             info "后台包管理任务仍未完成，已等待 ${waited} 秒..."
         fi
         if (( waited >= max_wait )); then
-            warn "等待包管理锁超时（${max_wait} 秒），尝试终止后台更新服务并继续..."
+            warn "等待包管理锁超时（${max_wait} 秒），尝试终止持有锁的更新进程并继续..."
+            # 只停止系统自动更新服务并终结真正持锁的进程，不用 pkill 按名字
+            # 无差别杀 —— 那会把客户自己正在跑的 apt-get 一并误杀。
             systemctl stop unattended-upgrades apt-daily.service apt-daily.timer apt-daily-upgrade.service apt-daily-upgrade.timer >/dev/null 2>&1 || true
-            pkill -9 -f "unattended-upgrade|apt.systemd.daily" >/dev/null 2>&1 || true
+            if command -v fuser >/dev/null 2>&1; then
+                fuser -k /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 || true
+            elif command -v lslocks >/dev/null 2>&1; then
+                local lock_pid
+                lock_pid=$(lslocks -o PID,COMMAND -r -n 2>/dev/null \
+                    | awk '/dpkg|apt/ {print $1}' | head -n1)
+                [[ -n "$lock_pid" ]] && kill -9 "$lock_pid" >/dev/null 2>&1 || true
+            fi
             sleep 1
             break
         fi
@@ -1343,7 +1377,11 @@ install_deps() {
 
     export DEBIAN_FRONTEND=noninteractive
     wait_for_apt_locks
-    apt-get update -qq 2>/dev/null || true
+    # apt-get update 的失败不能静默吞掉 —— 历史上安装在这里「无日志死掉」的
+    # 主要原因就是 2>/dev/null || true 把 apt 的真实报错和 stderr 全丢了。
+    if ! apt-get update -qq; then
+        warn "apt-get update 返回非零（详见上方输出），继续尝试安装依赖..."
+    fi
 
     # Debian 系统需要确保 contrib 组件已启用（ZFS 包在 contrib 中）
     if [[ "$OS_ID" == "debian" ]]; then
@@ -1372,14 +1410,15 @@ install_deps() {
                 sed -i '/^deb.*main/ { /contrib/! s/main/main contrib/ }' \
                     /etc/apt/sources.list 2>/dev/null || true
             fi
-            apt-get update -qq 2>/dev/null
+            apt-get update -qq
         fi
     fi
 
     # 安装基础依赖与存储工具（含 LVM / Thin Provisioning 支持）
     wait_for_apt_locks
-    if ! apt-get install -y -qq curl gpg lvm2 thin-provisioning-tools >/dev/null 2>&1; then
-        apt-get install -y -qq curl gpg lvm2 >/dev/null 2>&1 || true
+    if ! apt-get install -y -qq curl gpg lvm2 thin-provisioning-tools; then
+        warn "thin-provisioning-tools 安装失败，回退到仅基础依赖（LVM 可用，thin-pool 不可用）"
+        apt-get install -y -qq curl gpg lvm2 || true
     fi
 
     # ---- Debian ZFS 安装策略 ----
@@ -1420,10 +1459,10 @@ install_deps() {
     else
         # Ubuntu: 直接安装（预编译模块随内核提供）
         wait_for_apt_locks
-        if apt-get install -y -qq zfsutils-linux >/dev/null 2>&1; then
+        if apt-get install -y -qq zfsutils-linux; then
             log "系统依赖安装完成（含 ZFS）"
         else
-            warn "ZFS 工具安装失败，已跳过（面板可使用 dir/btrfs 存储池）"
+            warn "ZFS 工具安装失败（详见上方 apt 输出），已跳过（面板可使用 dir/btrfs 存储池）"
             log "基础依赖安装完成"
         fi
     fi
@@ -1661,8 +1700,8 @@ install_zfs_dkms() {
     done
 
     # 优先安装通用编译核心工具，防止一处失败导致全部跳过
-    if ! apt-get install -y -qq build-essential dkms >/dev/null 2>&1; then
-        warn "DKMS 基础编译工具安装失败"
+    if ! apt-get install -y -qq build-essential dkms; then
+        warn "DKMS 基础编译工具安装失败（详见上方 apt 输出）"
         return 1
     fi
 
@@ -1676,7 +1715,7 @@ install_zfs_dkms() {
     # 拿不到就不编译，返回 2 让调用方去走「换内核」这条路，绝不对着另一个内核编译。
     local running_kernel
     running_kernel="$(uname -r)"
-    if ! apt-get install -y -qq "linux-headers-${running_kernel}" >/dev/null 2>&1; then
+    if ! apt-get install -y -qq "linux-headers-${running_kernel}"; then
         info "当前内核 ${running_kernel} 在软件源里没有对应的头文件（linux-headers-${running_kernel}）"
         return 2
     fi
@@ -1690,8 +1729,8 @@ install_zfs_dkms() {
     if ! dpkg -s zfs-dkms >/dev/null 2>&1; then
         ZFS_BUILD_PKGS_ADDED_BY_US="${ZFS_BUILD_PKGS_ADDED_BY_US} zfs-dkms"
     fi
-    if ! apt-get install -y -qq zfs-dkms zfsutils-linux >/dev/null 2>&1; then
-        warn "ZFS DKMS 软件包安装失败"
+    if ! apt-get install -y -qq zfs-dkms zfsutils-linux; then
+        warn "ZFS DKMS 软件包安装失败（详见上方 apt 输出）"
         return 1
     fi
 
@@ -3286,6 +3325,21 @@ main() {
         error "请以 root 权限运行此脚本"
         echo -e "  ${DIM}用法: sudo bash $0${NC}"
         exit 1
+    fi
+
+    # 全程日志落盘：stdout/stderr 同时镜像到 /var/log/incudal-install.log。
+    # 交互式执行时 TTY 一断（SSH 掉线、终端关闭），管道里的 bash 会收到
+    # SIGHUP 直接消失，当时的输出无处可查。落盘后即使进程被杀，死在哪一步
+    # 也一眼可见。注意只重定向 stdout/stderr，绝不碰 stdin —— 脚本依赖
+    # [ -t 0 ] 判断是否交互。
+    local install_log="${INCUDAL_INSTALL_LOG:-/var/log/incudal-install.log}"
+    local log_dir
+    log_dir=$(dirname "$install_log")
+    if mkdir -p "$log_dir" 2>/dev/null && touch "$install_log" 2>/dev/null; then
+        info "本次安装日志已同时写入: ${install_log}"
+        exec > >(tee -a "$install_log") 2>&1
+    else
+        warn "无法写入安装日志 ${install_log}，仅输出到终端"
     fi
 
     # ---- 解析命令行参数（兼容非交互模式）----

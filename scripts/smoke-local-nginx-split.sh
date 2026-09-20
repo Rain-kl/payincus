@@ -111,6 +111,21 @@ http {
       expires 1y;
     }
 
+    location /api/agent/tunnel {
+      proxy_pass ${BACKEND_URL}/api/agent/tunnel;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade \$http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-Host \$incudal_forwarded_host;
+      proxy_set_header X-Real-IP \$remote_addr;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto \$incudal_forwarded_proto;
+      proxy_read_timeout 3600s;
+      proxy_send_timeout 3600s;
+      proxy_buffering off;
+    }
+
     location /api/ws/ {
       proxy_pass ${BACKEND_URL}/api/ws/;
       proxy_http_version 1.1;
@@ -169,6 +184,21 @@ http {
     location /assets/ {
       try_files \$uri =404;
       expires 1y;
+    }
+
+    location /api/agent/tunnel {
+      proxy_pass ${BACKEND_URL}/api/agent/tunnel;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade \$http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host \$host;
+      proxy_set_header X-Forwarded-Host \$incudal_forwarded_host;
+      proxy_set_header X-Real-IP \$remote_addr;
+      proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto \$incudal_forwarded_proto;
+      proxy_read_timeout 3600s;
+      proxy_send_timeout 3600s;
+      proxy_buffering off;
     }
 
     location /api/ws/ {
