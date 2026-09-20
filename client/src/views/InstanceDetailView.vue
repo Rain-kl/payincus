@@ -374,8 +374,27 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 let statsInterval: ReturnType<typeof setInterval> | null = null
 let isComponentMounted = ref<boolean>(true)  // 组件挂载状态标志
 
+// 头部操作下拉菜单状态
+const isActionMenuOpen = ref<boolean>(false)
+
+function toggleActionMenu(): void {
+  isActionMenuOpen.value = !isActionMenuOpen.value
+}
+
+function closeActionMenu(): void {
+  isActionMenuOpen.value = false
+}
+
+function handleGlobalClick(event: MouseEvent): void {
+  const target = event.target as HTMLElement | null
+  if (target && !target.closest('.action-menu-container')) {
+    isActionMenuOpen.value = false
+  }
+}
+
 onMounted(async (): Promise<void> => {
   isComponentMounted.value = true
+  document.addEventListener('click', handleGlobalClick)
   await configStore.loadPublicConfig()
   await loadInstance()
   // 注意：loadInstance() 内部已经处理了 loadStats() 和 loadTrafficData() 的调用
@@ -387,6 +406,7 @@ onMounted(async (): Promise<void> => {
 
 onUnmounted(() => {
   isComponentMounted.value = false
+  document.removeEventListener('click', handleGlobalClick)
   // 关闭终端模态框（确保断开连接）
   showTerminalModal.value = false
   terminalConnected.value = false
@@ -2353,106 +2373,345 @@ function formatShortDate(dateStr: string | null | undefined): string {
 
     <template v-else-if="instance">
       <!-- Header -->
-      <div class="page-header flex-col lg:flex-row gap-4 lg:gap-0">
-        <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+      <div class="space-y-4">
+        <!-- Back Link -->
+        <div>
           <RouterLink
             :to="getReturnPath()"
-            class="nimbus-back flex h-11 w-11 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-xl border border-themed bg-themed-surface text-themed-muted shadow-sm transition-all duration-200 hover:text-themed hover:bg-themed-hover"
+            class="inline-flex items-center gap-1.5 text-sm text-themed-muted hover:text-themed transition-colors"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7" />
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
+            <span>{{ $t('nav.instances') }}</span>
           </RouterLink>
+        </div>
 
-          <div class="relative flex-shrink-0">
-            <div class="nimbus-icon-glow absolute inset-0 rounded-[1.4rem] blur-xl" />
-            <button
-              v-if="!isAdminEntry"
-              type="button"
-              class="nimbus-icon-btn relative flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-[1.4rem] border border-themed bg-themed-surface shadow-sm transition-all duration-200 hover:bg-themed-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/60"
-              :aria-label="$t('instance.badgeModal.open')"
-              :title="$t('instance.badgeModal.open')"
-              @click="showInstanceBadgeModal = true"
-            >
-              <InstanceDisplayIcon
-                :badge-id="instance.iconBadgeId"
-                :fallback-icon="getInstanceIconType(instance)"
-                :alt="instance.name"
-                :size="36"
-              />
-            </button>
-            <div
-              v-else
-              class="relative flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-[1.4rem] border border-themed bg-themed-surface shadow-sm"
-            >
-              <InstanceDisplayIcon
-                :badge-id="instance.iconBadgeId"
-                :fallback-icon="getInstanceIconType(instance)"
-                :alt="instance.name"
-                :size="36"
-              />
-            </div>
-            <div
-              class="absolute -bottom-1 -right-1 rounded-full border border-themed bg-themed-surface px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-themed-muted shadow-sm"
-            >
-              {{ $t(`common.instanceType.${instance.instanceType}`) }}
-            </div>
-          </div>
-
+        <!-- Title Row: Title & Status on left, Actions on right -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="min-w-0">
-            <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <h1 class="page-title max-w-full truncate">{{ instance.name }}</h1>
-              <span :class="['badge nimbus-status-pill gap-1.5 font-mono tabular-nums', getStatusInfo(instance.status, t).class]">
+            <div class="flex items-center gap-3 flex-wrap">
+              <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-themed truncate">
+                {{ instance.name }}
+              </h1>
+              <span :class="['badge nimbus-status-pill gap-1.5 font-mono tabular-nums text-xs', getStatusInfo(instance.status, t).class]">
                 <span :class="['nimbus-status-dot', getStatusInfo(instance.status, t).dot]"></span>
                 {{ getStatusInfo(instance.status, t).label }}
               </span>
+              <button
+                v-if="!isAdminEntry && instance"
+                type="button"
+                class="inline-flex items-center justify-center p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
+                :title="$t('instance.badgeModal.open')"
+                @click="showInstanceBadgeModal = true"
+              >
+                <InstanceDisplayIcon
+                  :badge-id="instance.iconBadgeId"
+                  :fallback-icon="getInstanceIconType(instance)"
+                  :alt="instance.name"
+                  :size="16"
+                />
+              </button>
             </div>
-            <p class="page-description mt-0.5 font-mono tabular-nums">{{ formatImageName(instance.image, (instance as any).imageName) }} · <span class="uppercase">{{ (instance as any).host?.name || (instance as any).host || '-' }}</span></p>
+            <p class="text-xs sm:text-sm text-themed-muted mt-1 font-mono tabular-nums">
+              {{ formatImageName(instance.image, (instance as any).imageName) }} · <span class="uppercase">{{ (instance as any).host?.name || (instance as any).host || '-' }}</span><span v-if="instance.instanceType"> · {{ $t(`common.instanceType.${instance.instanceType}`) }}</span>
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- 操作下拉菜单 -->
+            <div class="relative inline-block text-left action-menu-container">
+              <button
+                type="button"
+                class="btn-secondary inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                :class="{ 'border-primary-500': isActionMenuOpen }"
+                @click.stop="toggleActionMenu"
+              >
+                <span>{{ $t('common.actions') }}</span>
+                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-180': isActionMenuOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <Transition
+                enter-active-class="transition ease-out duration-100"
+                enter-from-class="transform opacity-0 scale-95"
+                enter-to-class="transform opacity-100 scale-100"
+                leave-active-class="transition ease-in duration-75"
+                leave-from-class="transform opacity-100 scale-100"
+                leave-to-class="transform opacity-0 scale-95"
+              >
+                <div
+                  v-if="isActionMenuOpen"
+                  class="kawaii-menu-panel absolute right-0 top-full mt-1.5 z-50 min-w-[10.5rem] rounded py-1 border shadow-lg"
+                >
+                  <!-- 终端 (运行中可见) -->
+                  <button
+                    v-if="isRunning"
+                    type="button"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                    :title="$t('terminal.title')"
+                    @click="showTerminalModal = true; closeActionMenu()"
+                  >
+                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="truncate">{{ $t('terminal.title') }}</span>
+                  </button>
+
+                  <!-- 重启 (运行中可见) -->
+                  <button
+                    v-if="isRunning"
+                    type="button"
+                    :disabled="isOperationDisabled"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.actions.restart')"
+                    @click="handleAction('restart'); closeActionMenu()"
+                  >
+                    <svg v-if="actionLoading === 'restart'" class="w-3.5 h-3.5 animate-spin text-themed-muted shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.actions.restart') }}</span>
+                  </button>
+
+                  <!-- 重命名 -->
+                  <button
+                    type="button"
+                    :disabled="isOperationDisabled"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.actions.rename')"
+                    @click="openRenameModal(); closeActionMenu()"
+                  >
+                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.actions.rename') }}</span>
+                  </button>
+
+                  <!-- 重建 / 重装系统 -->
+                  <button
+                    v-if="canRebuild"
+                    type="button"
+                    :disabled="isOperationDisabled"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.detail.rebuild.title')"
+                    @click="handleRebuildClick(); closeActionMenu()"
+                  >
+                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.detail.rebuild.title') }}</span>
+                  </button>
+
+                  <!-- 克隆 / 复制 -->
+                  <button
+                    v-if="canClone"
+                    type="button"
+                    :disabled="isOperationDisabled || isRunning"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="isRunning ? $t('instance.detail.actions.stopRequiredHint') : $t('instance.actions.clone')"
+                    @click="handleAction('clone'); closeActionMenu()"
+                  >
+                    <svg v-if="actionLoading === 'clone'" class="w-3.5 h-3.5 animate-spin text-themed-muted shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.actions.clone') }}</span>
+                  </button>
+
+                  <!-- 同步状态 -->
+                  <button
+                    v-if="canSyncStatus"
+                    type="button"
+                    :disabled="syncStatusLoading"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.detail.actions.syncStatus')"
+                    @click="handleSyncStatus(); closeActionMenu()"
+                  >
+                    <svg v-if="syncStatusLoading" class="w-3.5 h-3.5 animate-spin text-themed-muted shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.detail.actions.syncStatus') }}</span>
+                  </button>
+
+                  <!-- 移转 -->
+                  <button
+                    v-if="!isAdminEntry && canTransfer && !showPaidSubscriptionCard"
+                    type="button"
+                    :disabled="isOperationDisabled"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('transfer.actions.transfer')"
+                    @click="handleTransferBtnClick(); closeActionMenu()"
+                  >
+                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span class="truncate">{{ $t('transfer.actions.transfer') }}</span>
+                  </button>
+
+                  <!-- 帮助 -->
+                  <RouterLink
+                    :to="helpPath()"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                    :title="$t('instance.detail.actions.help')"
+                    @click="closeActionMenu"
+                  >
+                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.detail.actions.help') }}</span>
+                  </RouterLink>
+
+                  <!-- 封停 / 解封 -->
+                  <button
+                    v-if="canSuspend && !isSuspended"
+                    type="button"
+                    :disabled="suspendLoading"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-warning transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.detail.actions.suspend')"
+                    @click="handleSuspend(); closeActionMenu()"
+                  >
+                    <svg v-if="suspendLoading" class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.actions.suspend') }}</span>
+                  </button>
+                  <button
+                    v-if="canSuspend && isSuspended"
+                    type="button"
+                    :disabled="suspendLoading"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.detail.actions.unsuspend')"
+                    @click="handleUnsuspend(); closeActionMenu()"
+                  >
+                    <svg v-if="suspendLoading" class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="truncate">{{ $t('instance.actions.unsuspend') }}</span>
+                  </button>
+
+                  <!-- 删除 -->
+                  <template v-if="canDeleteInstance">
+                    <div class="my-1 border-t border-themed/40"></div>
+                    <button
+                      type="button"
+                      :disabled="isOperationDisabled || destroyButtonDisabled"
+                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      :title="$t('common.delete')"
+                      @click="handleAction('delete'); closeActionMenu()"
+                    >
+                      <svg v-if="actionLoading === 'delete'" class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                      <svg v-else class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span class="truncate">{{ $t('common.delete') }}</span>
+                    </button>
+                  </template>
+                </div>
+              </Transition>
+            </div>
+
+            <!-- 启动 / 停止主按钮 -->
+            <button
+              v-if="isRunning"
+              :disabled="isOperationDisabled"
+              class="btn-primary min-w-[72px]"
+              @click="handleAction('stop')"
+            >
+              <svg v-if="actionLoading === 'stop' || actionLoading === 'restart'" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span v-if="actionLoading === 'restart'">{{ $t('instance.actions.restart') }}</span>
+              <span v-else>{{ $t('instance.actions.stop') }}</span>
+            </button>
+            <button
+              v-else
+              :disabled="isOperationDisabled || !isStopped"
+              class="btn-primary min-w-[72px]"
+              @click="handleAction('start')"
+            >
+              <svg v-if="actionLoading === 'start'" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span>{{ $t('instance.actions.start') }}</span>
+            </button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap">
+        <!-- Active Task / Alert Status Indicators (if any active) -->
+        <div
+          v-if="activeTask || (!isAdminEntry && hasPendingTransfer) || isSuspended || (isRunning && !cloudInitReady)"
+          class="flex flex-wrap items-center gap-2 pt-1 pb-1"
+        >
           <!-- Active Task Indicator -->
           <div
             v-if="activeTask"
-            class="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm"
-            :class="themeStore.isDark ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-700'"
+            class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium"
+            :class="themeStore.isDark ? 'bg-blue-900/30 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-700 border border-blue-200'"
           >
             <svg class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <span class="hidden sm:inline">{{ $t(`instance.detail.task.${activeTask.taskType}`) }}</span>
+            <span>{{ $t(`instance.detail.task.${activeTask.taskType}`) }}</span>
           </div>
+
           <!-- Transfer Lock Warning -->
           <div
             v-if="!isAdminEntry && hasPendingTransfer"
-            class="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm"
-            :class="themeStore.isDark ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'"
+            class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium"
+            :class="themeStore.isDark ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/20' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'"
           >
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span class="hidden sm:inline">{{ $t('transfer.messages.instanceLocked') }}</span>
+            <span>{{ $t('transfer.messages.instanceLocked') }}</span>
           </div>
+
           <!-- Suspended Warning -->
           <div
             v-if="isSuspended"
-            class="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm"
-            :class="themeStore.isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'"
+            class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium"
+            :class="themeStore.isDark ? 'bg-red-900/30 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-700 border border-red-200'"
           >
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
-            <span class="hidden sm:inline">{{ $t('instance.detail.info.suspended') }}</span>
+            <span>{{ $t('instance.detail.info.suspended') }}</span>
           </div>
+
           <!-- Cloud-init Initializing -->
           <div
             v-if="isRunning && !cloudInitReady"
             class="flex items-center gap-2"
           >
             <button
-              class="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
+              class="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
               :class="[
                 themeStore.isDark ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200',
                 cloudInitChecking ? 'opacity-70 cursor-wait' : 'hover:opacity-80 cursor-pointer'
@@ -2471,7 +2730,7 @@ function formatShortDate(dateStr: string | null | undefined): string {
               <span class="sm:hidden">{{ cloudInitBannerShort }}</span>
               <span class="hidden sm:inline">{{ cloudInitBannerTitle }}</span>
               <span
-                class="hidden sm:inline text-xs font-medium"
+                class="text-xs font-medium"
                 :class="themeStore.isDark ? 'text-amber-300' : 'text-amber-700'"
               >
                 · {{ cloudInitBannerRetryText }}
@@ -2479,199 +2738,18 @@ function formatShortDate(dateStr: string | null | undefined): string {
             </button>
             <button
               v-if="canManualCompleteCloudInit"
-              class="btn-secondary btn-sm sm:btn inline-flex"
+              class="btn-secondary px-2.5 py-1.5 text-xs sm:text-sm rounded-lg inline-flex"
               :disabled="cloudInitChecking || cloudInitManualCompleting"
               :title="$t('instance.detail.cloudInit.manualComplete')"
               @click="manualCompleteCloudInit"
             >
-              <svg v-if="cloudInitManualCompleting" class="w-4 h-4 sm:hidden animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg v-if="cloudInitManualCompleting" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
-              <span class="sm:hidden">{{ $t('instance.detail.cloudInit.manualShort') }}</span>
-              <span class="hidden sm:inline">{{ $t('instance.detail.cloudInit.manualComplete') }}</span>
+              <span>{{ $t('instance.detail.cloudInit.manualComplete') }}</span>
             </button>
           </div>
-          <!-- Rename Button -->
-          <button
-            :disabled="isOperationDisabled"
-            class="btn-ghost btn-sm sm:btn inline-flex"
-            :title="$t('instance.actions.rename')"
-            @click="openRenameModal"
-          >
-            <svg class="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            <span class="hidden sm:inline">{{ $t('instance.actions.rename') }}</span>
-          </button>
-          <!-- Terminal Button -->
-          <button
-            v-if="isRunning"
-            class="btn-sm sm:btn inline-flex rounded-lg"
-            :class="themeStore.isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'"
-            :title="$t('terminal.title')"
-            @click="showTerminalModal = true"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span class="hidden sm:inline ml-1">{{ $t('terminal.title') }}</span>
-          </button>
-          <!-- Terminal Button (Disabled when not running) -->
-          <button
-            v-if="isStopped"
-            disabled
-            class="btn-sm sm:btn inline-flex rounded-lg opacity-50 cursor-not-allowed"
-            :class="themeStore.isDark ? 'bg-green-600/50 text-white' : 'bg-green-500/50 text-white'"
-            :title="$t('terminal.requiresRunning')"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span class="hidden sm:inline ml-1">{{ $t('terminal.title') }}</span>
-          </button>
-          <button v-if="isStopped" :disabled="isOperationDisabled" class="btn-secondary btn-sm sm:btn" @click="handleAction('start')">
-            <svg v-if="actionLoading === 'start'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ $t('instance.actions.start') }}</span>
-          </button>
-          <button v-if="isRunning" :disabled="isOperationDisabled" class="btn-secondary btn-sm sm:btn" @click="handleAction('stop')">
-            <svg v-if="actionLoading === 'stop'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ $t('instance.actions.stop') }}</span>
-          </button>
-          <button v-if="isRunning" :disabled="isOperationDisabled" class="btn-secondary btn-sm sm:btn" @click="handleAction('restart')">
-            <svg v-if="actionLoading === 'restart'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ $t('instance.actions.restart') }}</span>
-          </button>
-          <!-- 复制按钮（特殊颜色标记，只在停机时可用） -->
-          <button
-            v-if="isStopped && canClone"
-            :disabled="isOperationDisabled"
-            class="btn-sm sm:btn inline-flex rounded-lg"
-            :class="themeStore.isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-800 hover:bg-gray-900 text-white'"
-            :title="actionLoading === 'clone' ? '' : $t('instance.actions.clone')"
-            @click="handleAction('clone')"
-          >
-            <svg v-if="actionLoading === 'clone'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <span v-if="actionLoading !== 'clone'" class="hidden sm:inline ml-1">{{ $t('instance.actions.clone') }}</span>
-          </button>
-          <!-- 复制按钮（运行时显示但禁用，hover 提示） -->
-          <button
-            v-if="isRunning && canClone"
-            disabled
-            class="btn-sm sm:btn inline-flex rounded-lg opacity-50 cursor-not-allowed"
-            :class="themeStore.isDark ? 'bg-gray-700/50 text-white' : 'bg-gray-800/50 text-white'"
-            :title="$t('instance.detail.actions.stopRequiredHint')"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <span class="hidden sm:inline ml-1">{{ $t('instance.actions.clone') }}</span>
-          </button>
-          <!-- 重建按钮（始终可点击，运行时提示需要先关机） -->
-          <button
-            v-if="canRebuild"
-            :disabled="isOperationDisabled"
-            class="btn-secondary btn-sm sm:btn inline-flex"
-            :title="$t('instance.detail.rebuild.title')"
-            @click="handleRebuildClick"
-          >
-            <span class="sm:hidden">{{ $t('instance.detail.rebuild.title') }}</span>
-            <span class="hidden sm:inline">{{ $t('instance.detail.rebuild.title') }}</span>
-          </button>
-          <!-- 同步状态按钮 -->
-          <button
-            v-if="canSyncStatus"
-            :disabled="syncStatusLoading"
-            class="btn-secondary btn-sm sm:btn inline-flex"
-            :title="$t('instance.detail.actions.syncStatus')"
-            @click="handleSyncStatus"
-          >
-            <svg v-if="syncStatusLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else class="sm:hidden">{{ $t('instance.detail.actions.syncStatus') }}</span>
-            <span class="hidden sm:inline">{{ $t('instance.detail.actions.syncStatus') }}</span>
-          </button>
-          <button
-            v-if="!isAdminEntry && canTransfer && !showPaidSubscriptionCard"
-            :disabled="isOperationDisabled"
-            class="btn-secondary btn-sm sm:btn inline-flex"
-            :title="$t('transfer.actions.transfer')"
-            @click="handleTransferBtnClick"
-          >
-            <span class="sm:hidden">{{ $t('transfer.actions.transfer') }}</span>
-            <span class="hidden sm:inline">{{ $t('transfer.actions.transfer') }}</span>
-          </button>
-          <!-- 帮助按钮 -->
-          <RouterLink
-            :to="helpPath()"
-            class="btn-secondary btn-sm sm:btn inline-flex items-center"
-            :title="$t('instance.detail.actions.help')"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="hidden sm:inline ml-1">{{ $t('instance.detail.actions.help') }}</span>
-          </RouterLink>
-          <!-- 封停按钮（仅宿主机所有者可见，实例未封停时） -->
-          <button
-            v-if="canSuspend && !isSuspended"
-            :disabled="suspendLoading"
-            class="btn-sm sm:btn inline-flex rounded-lg"
-            :class="themeStore.isDark ? 'bg-warning hover:bg-warning/90 text-white' : 'bg-warning hover:bg-warning/90 text-white'"
-            :title="$t('instance.detail.actions.suspend')"
-            @click="handleSuspend"
-          >
-            <svg v-if="suspendLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>
-            <span class="hidden sm:inline ml-1">{{ $t('instance.actions.suspend') }}</span>
-          </button>
-          <!-- 解封按钮（仅宿主机所有者可见，实例已封停时） -->
-          <button
-            v-if="canSuspend && isSuspended"
-            :disabled="suspendLoading"
-            class="btn-sm sm:btn inline-flex rounded-lg"
-            :class="themeStore.isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'"
-            :title="$t('instance.detail.actions.unsuspend')"
-            @click="handleUnsuspend"
-          >
-            <svg v-if="suspendLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="hidden sm:inline ml-1">{{ $t('instance.actions.unsuspend') }}</span>
-          </button>
-          <button v-if="canDeleteInstance" :disabled="isOperationDisabled" class="btn-danger btn-sm sm:btn" @click="handleAction('delete')">
-            <svg v-if="actionLoading === 'delete'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ $t('common.delete') }}</span>
-          </button>
         </div>
       </div>
 
