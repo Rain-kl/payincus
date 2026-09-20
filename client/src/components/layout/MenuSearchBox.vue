@@ -265,7 +265,7 @@ onUnmounted(() => {
     <!-- 桌面端与平板：居中、拉长、纯黑背景、随页面宽度自适应伸缩 -->
     <div class="hidden md:block relative w-full">
       <div
-        class="menu-search-bar relative flex items-center h-[33px] w-full rounded-[4px] border-[0.5px] transition-all duration-150"
+        class="menu-search-bar relative flex items-center h-[33px] w-full rounded-[4px] border-[length:0.5px] transition-all duration-150"
         :class="[
           isOpen
             ? 'bg-white border-white text-[#161513] ring-1 ring-[#6e6861]/30 shadow-lg'
