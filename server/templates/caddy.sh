@@ -112,9 +112,12 @@ cleanup_old_installation() {
     rm -f /etc/caddy/Caddyfile.before-incudal.* 2>/dev/null || true
     rm -f /etc/systemd/system/caddy.service.d/*.before-incudal.* 2>/dev/null || true
     systemctl daemon-reload >/dev/null 2>&1 || true
-    # 重置旧日志目录的归属：caddy 以 User=caddy 运行，目录必须可写，
+    # 重置旧日志目录：caddy 以 User=caddy 运行，目录必须可写，
     # 否则新配置里的日志输出会在启动时 permission denied。
-    install -d -o caddy -g caddy -m 0750 "$OLD_LOG_DIR"
+    # 注意：这里只重建目录、不设属主 —— cleanup 在 apt 安装 caddy 之前执行，
+    # 此时 caddy 系统用户可能还不存在（全新安装场景），-o caddy 会直接报
+    # "invalid user 'caddy'" 退出；属主由装包后的 install -d -o caddy 统一设置。
+    install -d -m 0750 "$OLD_LOG_DIR"
     # 旧日志文件可能属 root（旧脚本/旧包产生），caddy 打开会 permission denied，一并清掉
     rm -f "$OLD_LOG_DIR"/*.log 2>/dev/null || true
 }
@@ -157,6 +160,13 @@ if ! command -v caddy &> /dev/null; then
 else
     log "Caddy already installed, updating..."
     apt-get install -y -qq caddy >/dev/null
+fi
+
+# 后续所有 install -o/-g caddy 都依赖 caddy 系统用户存在（apt 包通常会创建）。
+# 极少数场景（包已装但用户缺失/被清理）会报晦涩的 "invalid user 'caddy'"，这里显式拦截。
+if ! id -u caddy >/dev/null 2>&1; then
+    error "Caddy package installed but system user 'caddy' does not exist; refusing to continue"
+    exit 1
 fi
 
 log "Generating password hash..."
@@ -237,6 +247,11 @@ chown root:caddy "$CADDYFILE_NEW"
 chmod 0640 "$CADDYFILE_NEW"
 chown root:root "$OVERRIDE_NEW"
 chmod 0644 "$OVERRIDE_NEW"
+
+# 日志目录里可能残留旧安装/旧进程产生的 root 属主文件（如 admin-access.log），
+# caddy 以 User=caddy 打开会 permission denied 直接启动失败。目录 owner 已由
+# 前面的 install -d -o caddy 修正，这里把存量文件 owner 一并修正。
+chown -R caddy:caddy /var/log/caddy 2>/dev/null || true
 
 if ! caddy validate --config "$CADDYFILE_NEW" --adapter caddyfile; then
     error "New Caddy configuration is invalid; existing service was not changed"
