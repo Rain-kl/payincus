@@ -206,7 +206,7 @@ function handleSelect(plan: PackagePlan): void {
         v-for="plan in plans"
         :key="plan.id"
         :class="[
-          'group relative rounded-xl border-2 p-4 transition-all duration-200',
+          'relative rounded-xl border-2 p-4 transition-all duration-200',
           isPlanDisabled(plan) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           isPlanSelected(plan)
             ? (themeStore.isDark
@@ -284,13 +284,8 @@ function handleSelect(plan: PackagePlan): void {
           </div>
         </div>
 
-        <!-- 资源配置区域 - 分组展示 -->
-        <div
-          class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg transition-colors duration-200"
-          :class="themeStore.isDark
-            ? 'bg-gray-800/50 group-hover:bg-gray-700/50'
-            : 'bg-gray-100/50 group-hover:bg-gray-200/60'"
-        >
+        <!-- 资源配置区域 - 分组展示（透明，跟随卡片单一背景） -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg">
           <!-- CPU -->
           <div class="text-center">
             <div class="text-xs text-themed-muted mb-0.5">CPU</div>
