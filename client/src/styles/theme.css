@@ -22,7 +22,7 @@
     --bg-elevated: #24211e;       /* 浮层背景（菜单/弹窗内部）*/
     --bg-surface: #1f1d1b;        /* 表面白底（卡片/弹窗）→ 浅色 = #FFFFFF */
     --bg-surface-soft: #282522;   /* 次级表面 → 浅色 = #FBF9F8 */
-    --sidebar-bg: #1a1816;        /* 侧边栏背景 → 浅色 = #F6F4F3（owner 指定）*/
+    --sidebar-bg: #1a1816;        /* 侧边栏背景 → 浅色 = #E4E3E0（owner 指定）*/
     --success-soft: #1e3a2f;      /* 成功/在线标签浅底 → 浅色 = #C5D8AD */
 
     /* ---- 边框 ---- */

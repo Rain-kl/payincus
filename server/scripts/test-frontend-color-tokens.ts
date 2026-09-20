@@ -3,7 +3,9 @@
  * --------------------------
  * 钉死「主题颜色统一管理、禁止组件指定颜色」这个验收线：
  *  - client/src/** 下的 .vue 组件不得散落十六进制色值；
- *  - 全局样式（main.css / kawaii-cloud.css）不得写死 hex（变量定义已收敛到 theme.css）。
+ *  - 全局样式（main.css / kawaii-cloud.css）不得写死 hex（变量定义已收敛到 theme.css）；
+ *  - theme.css 必须保持完整（关键 token 明暗两套都在，防止 AI 重构误删）；
+ *  - tailwind.config.js 的 primary 静态 ramp 必须与 theme.css 的 --accent 同步。
  *
  * 允许 hex 的白名单（集中管理或豁免区域）：
  *  - client/src/styles/theme.css      —— 唯一色彩 Token 来源
@@ -25,9 +27,11 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const repoRoot = resolve(__dirname, '../..')
 const clientSrc = resolve(repoRoot, 'client/src')
+const themeSource = readFileSync(resolve(clientSrc, 'styles/theme.css'), 'utf8')
+const tailwindConfigSource = readFileSync(resolve(repoRoot, 'client/tailwind.config.js'), 'utf8')
 
-// 正则：6 位 hex（含 #a1b2c3），也捕获 3 位缩写（#abc），排除 #{ 插值
-const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g
+// 正则：3/4/6/8 位 hex（#abc / #abcd / #a1b2c3 / #a1b2c3d4），排除 #{ 插值
+const HEX_RE = /#[\da-fA-F]{3,8}\b/g
 
 // 豁免白名单（相对 client/src 的路径，支持目录前缀）
 const EXEMPT_PATHS = [
@@ -72,6 +76,66 @@ const EXEMPT_PATHS = [
   'composables/useM3Auth.ts',
 ]
 
+// theme.css 必须存在的关键 token（:root 暗色 + .light 亮色两套都要有）。
+// 防止 AI / 重构过程误删核心色板导致主题缺色。
+const REQUIRED_TOKENS = [
+  '--bg-primary',
+  '--bg-secondary',
+  '--bg-tertiary',
+  '--bg-elevated',
+  '--bg-surface',
+  '--bg-surface-soft',
+  '--sidebar-bg',
+  '--border-color',
+  '--border-hover',
+  '--border-strong',
+  '--text-primary',
+  '--text-secondary',
+  '--text-tertiary',
+  '--accent',
+  '--accent-strong',
+  '--nav-active',
+  '--topbar-bg',
+  '--topbar-text',
+  '--topbar-border',
+  '--footer-bg',
+  '--terminal-bg',
+  '--success',
+  '--warning',
+  '--error',
+  '--success-soft',
+  '--chart-1',
+  '--chart-2',
+  '--chart-3',
+  '--chart-4',
+  '--radius-card',
+  '--radius-modal',
+  '--radius-btn',
+]
+
+// 明暗两套都校验的 token（其余允许只用一套，如状态色）
+const DUAL_THEME_TOKENS: string[] = [
+  '--bg-primary',
+  '--bg-surface',
+  '--bg-surface-soft',
+  '--sidebar-bg',
+  '--border-color',
+  '--text-primary',
+  '--text-secondary',
+  '--accent',
+  '--nav-active',
+  '--topbar-bg',
+  '--topbar-text',
+  '--footer-bg',
+  '--success',
+  '--warning',
+  '--error',
+  '--chart-1',
+  '--chart-2',
+  '--chart-3',
+  '--chart-4',
+]
+
 function walk(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
@@ -103,6 +167,59 @@ for (const file of walk(clientSrc)) {
 assert.ok(
   violations.length === 0,
   `组件/全局样式中发现硬编码十六进制色（应改用 theme.css 的 token 或集中色板）：\n${violations.join('\n')}`,
+)
+
+// ---- theme.css 完整性：关键 token 必须存在 ----
+const missingTokens = REQUIRED_TOKENS.filter((tok) => !themeSource.includes(`${tok}:`))
+assert.ok(
+  missingTokens.length === 0,
+  `theme.css 缺少关键 token（主题色板不完整）：\n${missingTokens.join('\n')}\n请补回 client/src/styles/theme.css`,
+)
+
+// ---- theme.css 明暗双套：核心 token 在 :root 与 .light 都要有 ----
+// 按块提取（避免头部注释里的 ".light" 字样干扰 indexOf）
+function blockOf(selector: string): string {
+  const start = themeSource.indexOf(`${selector} {`)
+  assert.notEqual(start, -1, `theme.css 缺少 ${selector} 块`)
+  const open = start + themeSource.slice(start).indexOf('{')
+  const close = themeSource.indexOf('}', open)
+  assert.notEqual(close, -1, `theme.css ${selector} 块未闭合`)
+  return themeSource.slice(open, close)
+}
+const darkBlock = blockOf(':root')
+const lightBlock = blockOf('.light')
+const missingDual = DUAL_THEME_TOKENS.filter(
+  (tok) => !darkBlock.includes(`${tok}:`) || !lightBlock.includes(`${tok}:`),
+)
+assert.ok(
+  missingDual.length === 0,
+  `theme.css 中以下 token 未同时定义在 :root 与 .light（明暗双主题缺色）：\n${missingDual.join('\n')}`,
+)
+
+// ---- tailwind.config.js 与 theme.css 同步：primary 静态 ramp 500 对齐 --accent 浅色 ----
+// 取 .light 块内的 --accent（浅色主题主色），tailwind primary-500 同源。
+function hexFromVarIn(block: string, token: string): string {
+  const re = new RegExp(`${token}\\s*:\\s*(#[\\da-fA-F]{6})\\b`)
+  const m = block.match(re)
+  return m ? m[1].toLowerCase() : ''
+}
+
+const lightBlock3 = blockOf('.light')
+const accentLight = hexFromVarIn(lightBlock3, '--accent')
+// 取 ociBlueRamp 常量块内的 500 级（tailwind primary 映射到该 ramp）
+const rampStart = tailwindConfigSource.indexOf('const ociBlueRamp')
+assert.notEqual(rampStart, -1, 'tailwind.config.js 缺少 ociBlueRamp 常量')
+const rampBlock = tailwindConfigSource.slice(rampStart, tailwindConfigSource.indexOf('}\n', rampStart))
+const rampMatch = rampBlock.match(/500:\s*'(#[0-9a-fA-F]{6})'/)
+assert.ok(
+  rampMatch !== null,
+  'tailwind.config.js 里 primary ramp 缺少 500 级色值',
+)
+const ramp500 = rampMatch ? rampMatch[1].toLowerCase() : ''
+const rampCommentSynced = tailwindConfigSource.includes('theme.css')
+assert.ok(
+  ramp500 === accentLight && rampCommentSynced,
+  `tailwind.config.js 的 primary-500（#${ramp500}）与 theme.css 的 .light --accent（#${accentLight}）不同步，或缺少"与 theme.css 同源"注释。两处必须一致（单一来源）。`,
 )
 
 console.log('frontend color token guard passed')
