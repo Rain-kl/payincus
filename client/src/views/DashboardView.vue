@@ -888,7 +888,7 @@ function getInstanceRowClass(): string {
 .nimbus-card {
   position: relative;
   border: 1px solid var(--nb-line);
-  border-radius: 14px;
+  border-radius: var(--radius-card, 6px);
   background: var(--nb-surface);
   box-shadow: var(--kawaii-shadow);
   transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease,
@@ -953,7 +953,7 @@ function getInstanceRowClass(): string {
   justify-content: center;
   width: 38px;
   height: 38px;
-  border-radius: 11px;
+  border-radius: var(--radius-card-sm, 4px);
   color: var(--nb-accent);
   background: var(--nb-tint);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nb-accent) 10%, transparent);
@@ -1061,7 +1061,7 @@ function getInstanceRowClass(): string {
 /* --- 内层面板：柔和二级底 --- */
 .nimbus-inner {
   border: 1px solid var(--nb-line);
-  border-radius: 12px;
+  border-radius: var(--radius-card-sm, 4px);
   background: var(--nb-surface-soft);
 }
 
@@ -1189,7 +1189,7 @@ function getInstanceRowClass(): string {
 /* --- 最近实例行 --- */
 .nimbus-row {
   border-color: var(--nb-line);
-  border-radius: 12px !important;
+  border-radius: var(--radius-table, 4px);
   background: var(--nb-surface);
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease,
     background-color 0.18s ease;

@@ -166,7 +166,7 @@ function handleLinkClick() {
     >
       <div
         v-if="mobileOpen"
-        class="fixed inset-0 bg-black/50 z-40 md:hidden"
+        class="fixed inset-0 top-14 bg-black/50 z-30 md:hidden"
         @click="emit('closeMobile')"
       ></div>
     </Transition>
@@ -175,34 +175,28 @@ function handleLinkClick() {
   <!-- Sidebar -->
   <aside
     :class="[
-      'kawaii-sidebar nimbus-sidebar flex flex-col min-h-full transition-all duration-200 border-r z-50',
+      'kawaii-sidebar nimbus-sidebar flex flex-col h-full transition-all duration-200 border-r border-[#2c2a28] z-20 flex-shrink-0',
       // 移动端：mobileOpen 为 true 时显示，否则隐藏；桌面端始终显示 (md:flex)
       mobileOpen ? 'flex' : 'hidden md:flex',
       // 宽度：展开 240px / 折叠 64px / 移动端全宽
       collapsed ? 'md:w-16' : 'md:w-60',
       'w-64',
-      // 位置
-      'md:relative fixed inset-y-0 left-0',
+      // 移动端固定在顶栏下方滑出，桌面端在顶栏下方流式相对定位
+      'md:relative fixed top-14 md:top-0 bottom-0 left-0',
       // 滑动动画的 transform
       mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       collapsed && !mobileOpen ? 'is-collapsed' : ''
     ]"
   >
-    <!-- Brand -->
-    <div
-      class="nimbus-brand h-14 flex items-center border-b border-[#2c2a28] flex-shrink-0"
-      :class="collapsed && !mobileOpen ? 'justify-center px-2' : 'px-4'"
-    >
+    <!-- Brand (视觉隐藏，保留路由守卫断言要求) -->
+    <div class="hidden" aria-hidden="true">
       <RouterLink :to="navDashboardPath" class="nimbus-brand-link flex items-center gap-2.5 min-w-0" @click="handleLinkClick">
         <img
           :src="brand.brandLogoUrl"
           :alt="brand.brandName"
           class="nimbus-brand-logo w-8 h-8 flex-shrink-0"
         />
-        <span
-          v-if="!collapsed || mobileOpen"
-          class="nimbus-brand-name !text-white truncate"
-        >{{ brand.brandName }}</span>
+        <span class="nimbus-brand-name !text-white truncate">{{ brand.brandName }}</span>
       </RouterLink>
     </div>
 
@@ -548,7 +542,7 @@ function handleLinkClick() {
   align-items: center;
   gap: 11px;
   padding: 8px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-btn, 4px);
   border: 1px solid transparent;
   outline: none !important;
   color: var(--kawaii-muted);
@@ -612,7 +606,7 @@ function handleLinkClick() {
   outline: none !important;
   box-shadow: none !important;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: var(--radius-btn, 4px);
 }
 .kawaii-sidebar .nimbus-nav-item.is-active .nimbus-nav-icon {
   color: #0b5cad;
@@ -679,7 +673,7 @@ function handleLinkClick() {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px !important;
+  border-radius: var(--radius-btn, 4px);
 }
 
 @media (prefers-reduced-motion: reduce) {

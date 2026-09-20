@@ -194,13 +194,24 @@ export default {
         '2xs': ['0.6875rem', { lineHeight: '1rem' }],
       },
       borderRadius: {
+        'none': '0px',
         DEFAULT: '4px',
         'sm': '2px',
         'md': '4px',
         'lg': '6px',
         'xl': '8px',
         '2xl': '10px',
-        '3xl': '12px'
+        '3xl': '12px',
+        // 语义化卡片与组件类型别名 (抽离集中维护，直接与 CSS 变量对齐)
+        'card': 'var(--radius-card, 6px)',
+        'card-sm': 'var(--radius-card-sm, 4px)',
+        'card-lg': 'var(--radius-card-lg, 8px)',
+        'modal': 'var(--radius-modal, 8px)',
+        'panel': 'var(--radius-panel, 6px)',
+        'btn': 'var(--radius-btn, 4px)',
+        'input': 'var(--radius-input, 4px)',
+        'table': 'var(--radius-table, 4px)',
+        'chip': 'var(--radius-chip, 4px)'
       },
       boxShadow: {
         'sm': 'none',

@@ -286,7 +286,7 @@
 
   .kawaii-sidebar a,
   .kawaii-sidebar button {
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     outline: none !important;
   }
 
@@ -296,7 +296,7 @@
     background: rgba(11, 92, 173, 0.08) !important;
     color: #0b5cad !important;
     border: none !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     box-shadow: none !important;
   }
 
@@ -306,7 +306,7 @@
     background: rgba(11, 92, 173, 0.2) !important;
     color: #4593de !important;
     border: none !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     box-shadow: none !important;
   }
 
@@ -361,7 +361,7 @@
   .kawaii-app-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea),
   .kawaii-public-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea) {
     border-color: var(--kawaii-line) !important;
-    border-radius: 12px;
+    border-radius: var(--radius-input);
     background-color: color-mix(in srgb, var(--kawaii-surface) 84%, transparent) !important;
     color: var(--kawaii-text) !important;
   }
@@ -419,7 +419,7 @@
 
   .kawaii-app-shell .page-header:not(.kawaii-dashboard-hero) {
     border: 1px solid var(--kawaii-line) !important;
-    border-radius: 16px;
+    border-radius: var(--radius-card);
     padding: 1.25rem;
     background:
       linear-gradient(135deg, color-mix(in srgb, var(--kawaii-surface) 92%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 82%, transparent));
@@ -437,7 +437,7 @@
 
   .kawaii-app-shell .card:not(.kawaii-card):not(.kawaii-prize-card) {
     border: 1px solid var(--kawaii-line) !important;
-    border-radius: 16px;
+    border-radius: var(--radius-card);
     background: color-mix(in srgb, var(--kawaii-surface) 90%, transparent) !important;
     box-shadow: 0 12px 34px rgb(17 17 26 / 0.08);
     backdrop-filter: blur(16px);
@@ -449,7 +449,7 @@
 
   .kawaii-auth-shell .card {
     border: 1px solid var(--kawaii-line) !important;
-    border-radius: 24px;
+    border-radius: var(--radius-card);
     background: color-mix(in srgb, var(--kawaii-surface) 88%, transparent) !important;
     box-shadow: var(--kawaii-shadow);
     backdrop-filter: blur(18px);
@@ -462,7 +462,7 @@
   .kawaii-app-shell .card-hover,
   .kawaii-app-shell .card-interactive {
     border-color: var(--kawaii-line) !important;
-    border-radius: 16px;
+    border-radius: var(--radius-card);
     background: color-mix(in srgb, var(--kawaii-surface) 90%, transparent) !important;
   }
 
@@ -477,7 +477,7 @@
   .kawaii-app-shell select.input,
   .kawaii-app-shell textarea.input {
     border-color: var(--kawaii-line) !important;
-    border-radius: 12px !important;
+    border-radius: var(--radius-input);
     background: color-mix(in srgb, var(--kawaii-surface) 84%, transparent) !important;
     color: var(--kawaii-text) !important;
   }
@@ -488,7 +488,7 @@
 
   .kawaii-auth-shell .input {
     border-color: var(--kawaii-line) !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-input);
     background: color-mix(in srgb, var(--kawaii-surface) 82%, transparent) !important;
     color: var(--kawaii-text) !important;
   }
@@ -513,7 +513,7 @@
 
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button) {
     border: 1px solid transparent !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     background: #0b5cad !important;
     color: #fff !important;
     box-shadow: none !important;
@@ -530,7 +530,7 @@
 
   .kawaii-auth-shell .btn-primary {
     border: 1px solid transparent !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     background: #0b5cad !important;
     color: #fff !important;
     box-shadow: none !important;
@@ -539,7 +539,7 @@
   .kawaii-app-shell .btn-secondary,
   .kawaii-app-shell .btn-ghost,
   .kawaii-app-shell .btn-outline {
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     border: 1px solid #393632 !important;
     background: #ffffff !important;
     color: #161513 !important;
@@ -576,7 +576,7 @@
 
   .modal-content {
     border: 1px solid var(--kawaii-line) !important;
-    border-radius: 24px !important;
+    border-radius: var(--radius-modal);
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--kawaii-surface) 94%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 64%, transparent)) !important;
     color: var(--kawaii-text) !important;
@@ -623,7 +623,7 @@
   .modal-content select.input,
   .modal-content textarea.input {
     border-color: var(--kawaii-line) !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-input);
     background: color-mix(in srgb, var(--kawaii-surface) 84%, transparent) !important;
     color: var(--kawaii-text) !important;
   }
@@ -668,7 +668,7 @@
 
   :where([class*='fixed'][class*='inset-0']) > :where([class*='bg-white'], [class*='bg-gray-900'], [class*='bg-gray-950']) {
     border: 1px solid var(--kawaii-line) !important;
-    border-radius: 24px !important;
+    border-radius: var(--radius-modal);
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--kawaii-surface) 94%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 64%, transparent)) !important;
     color: var(--kawaii-text) !important;
@@ -1398,7 +1398,7 @@
   }
 
   .kawaii-dashboard-instance-row {
-    border-radius: 18px !important;
+    border-radius: var(--radius-table);
   }
 
   .kawaii-instance-toolbar {
@@ -1469,7 +1469,7 @@
   }
 
   .kawaii-action-button {
-    border-radius: 12px !important;
+    border-radius: var(--radius-btn);
     background: color-mix(in srgb, var(--kawaii-surface) 74%, transparent) !important;
     color: var(--kawaii-text) !important;
     border: 1px solid transparent;
@@ -2320,7 +2320,7 @@
 
   .kawaii-wallet-page .card,
   .kawaii-wallet-page .rounded-\[28px\] {
-    border-radius: 24px !important;
+    border-radius: var(--radius-card);
   }
 
   .kawaii-wallet-page .rounded-3xl,
@@ -2607,7 +2607,7 @@
   .kawaii-stat-tile {
     position: relative;
     overflow: hidden;
-    border-radius: 1.125rem !important;
+    border-radius: var(--radius-card);
     background:
       radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--kawaii-primary) 13%, transparent), transparent 28%),
       linear-gradient(145deg, color-mix(in srgb, var(--kawaii-surface) 88%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 72%, transparent)) !important;
@@ -2630,7 +2630,7 @@
   .kawaii-panel,
   .kawaii-prize-card,
   .kawaii-page .card {
-    border-radius: 1.125rem !important;
+    border-radius: var(--radius-card);
   }
 
   .kawaii-instance-cloud-card {
@@ -2676,12 +2676,12 @@
   .kawaii-app-shell .btn-secondary,
   .kawaii-app-shell .btn-ghost,
   .kawaii-app-shell .btn-outline {
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
   }
 
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button),
   .kawaii-auth-shell .btn-primary {
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
   }
 
   .kawaii-app-companion {
@@ -2978,14 +2978,14 @@
   }
 
   .kawaii-app-shell :where(.badge, .tag, [class*='badge'], [class*='Badge']) {
-    border-radius: 4px !important;
+    border-radius: var(--radius-chip);
     letter-spacing: 0;
   }
 
   .kawaii-app-shell :where(.pagination, .pager) :where(button, a),
   .kawaii-app-shell :where(.page-size, .view-toggle) :where(button, select) {
     border-color: var(--kawaii-line) !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
     background: color-mix(in srgb, var(--kawaii-surface) 78%, transparent) !important;
     color: var(--kawaii-text) !important;
   }
@@ -2995,11 +2995,11 @@
     background: #0b5cad !important;
     color: #fff !important;
     box-shadow: none !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-btn);
   }
 
   .kawaii-app-shell :where(.alert, .notice, .callout) {
-    border-radius: 1rem !important;
+    border-radius: var(--radius-card);
     border-color: var(--kawaii-line) !important;
     background:
       radial-gradient(circle at 94% 18%, color-mix(in srgb, var(--kawaii-pink) 10%, transparent), transparent 24%),
@@ -3010,7 +3010,7 @@
     position: relative;
     overflow: hidden;
     border: 1px solid var(--kawaii-line) !important;
-    border-radius: 1.125rem !important;
+    border-radius: var(--radius-card);
     background:
       radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--kawaii-mint) 14%, transparent), transparent 28%),
       linear-gradient(145deg, color-mix(in srgb, var(--kawaii-surface) 88%, transparent), color-mix(in srgb, var(--kawaii-surface-soft) 72%, transparent)) !important;
@@ -3019,7 +3019,7 @@
 
   .kawaii-app-shell :where(.list-row, .record-row, .activity-row) {
     border-color: var(--kawaii-line) !important;
-    border-radius: 1rem;
+    border-radius: var(--radius-table);
     transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   }
 
@@ -3249,13 +3249,13 @@
 
 /* 收尾精修：与门面统一的圆角与链接强调 */
 .kawaii-auth-shell .card {
-  border-radius: 22px !important;
+  border-radius: var(--radius-card);
 }
 .kawaii-auth-shell .input {
-  border-radius: 12px !important;
+  border-radius: var(--radius-input);
 }
 .kawaii-auth-shell :where(.btn-primary, .btn-ghost, .btn-secondary) {
-  border-radius: 13px !important;
+  border-radius: var(--radius-btn);
 }
 .kawaii-auth-shell a {
   font-weight: 600 !important;
