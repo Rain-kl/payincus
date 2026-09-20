@@ -5071,7 +5071,7 @@ const zhTW = {
                 btrfsSourceHint: '實體碟路徑，如 /dev/sdb',
                 // DIR
                 dirPath: '目錄路徑',
-                dirPathHint: '指定一個存在的目錄，如 /mnt/data/incus-storage',
+                dirPathHint: '可選。留空自動使用預設目錄（/var/lib/incus/storage-pools/<名稱>），或填入已存在的自訂目錄（如 /mnt/data/incus-storage）',
                 // 儲存用途
                 purpose: '儲存用途',
                 forInstances: '用於實例系統碟',

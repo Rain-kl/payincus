@@ -3814,10 +3814,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           break
 
         case 'dir':
-          if (!storageSource) {
-            return reply.code(400).send({ error: 'DIR 需要指定 source（目录路径）' })
+          if (storageSource && storageSource !== `/var/lib/incus/storage-pools/${name}`) {
+            config['source'] = storageSource
           }
-          config['source'] = storageSource
           break
       }
 

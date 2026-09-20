@@ -4362,7 +4362,7 @@ export default {
                 btrfsSourceHint: '物理盘路径，如 /dev/sdb',
                 // DIR
                 dirPath: '目录路径',
-                dirPathHint: '指定一个存在的目录，如 /mnt/data/incus-storage',
+                dirPathHint: '可选。留空自动使用默认目录（/var/lib/incus/storage-pools/<名称>），或填入已存在的自定义目录（如 /mnt/data/incus-storage）',
                 // 存储用途
                 purpose: '存储用途',
                 forInstances: '用于实例系统盘',

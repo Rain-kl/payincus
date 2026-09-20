@@ -209,10 +209,7 @@ async function createPool() {
         return
       }
     } else if (form.value.driver === 'dir') {
-      if (!form.value.source) {
-        toast.error(t('admin.hosts.storage.pathRequired'))
-        return
-      }
+      // 目录路径为可选，留空将由 Incus 自动创建并管理默认路径
     }
 
     // 组合大小字符串
@@ -676,7 +673,7 @@ async function submitEdit() {
                 <template v-if="form.driver === 'dir'">
                   <div>
                     <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.storage.dirPath') }}</label>
-                    <input v-model="form.source" type="text" class="input" placeholder="/mnt/data/incus-storage" />
+                    <input v-model="form.source" type="text" class="input" placeholder="/mnt/data/incus-storage（留空使用默认目录）" />
                     <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.storage.dirPathHint') }}</p>
                   </div>
                 </template>

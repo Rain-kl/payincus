@@ -4179,7 +4179,7 @@ export default {
                 btrfsSourceHint: 'Physical disk path, e.g. /dev/sdb',
                 // DIR
                 dirPath: 'Directory Path',
-                dirPathHint: 'Specify an existing directory, e.g. /mnt/data/incus-storage',
+                dirPathHint: 'Optional. Leave blank to use default directory (/var/lib/incus/storage-pools/<name>), or specify an existing directory (e.g. /mnt/data/incus-storage)',
                 // Storage purpose
                 purpose: 'Storage Purpose',
                 forInstances: 'For instance system disk',
