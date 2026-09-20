@@ -5,11 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { useInboxStore } from '@/stores/inbox'
+import { useConfigStore } from '@/stores/config'
 import { supportedLocales, setLocale, type Locale } from '@/locales'
 import { useBrand } from '@/composables/useBrand'
 import SideNav from './SideNav.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
 import { instancesPath, loginPath, profilePath, terminalPath } from '@/utils/app-paths'
 import { dashboardPath } from '@/utils/app-paths'
 
@@ -24,7 +26,9 @@ const isSplitPane = computed(() => route.name === 'instance-create')
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const inboxStore = useInboxStore()
+const configStore = useConfigStore()
 const brand = useBrand()
+const showTermsModal = ref(false)
 const langMenuOpen = ref(false)
 const langMenuRef = ref<HTMLElement | null>(null)
 const sidebarCollapsed = ref<boolean>(false)
@@ -347,6 +351,58 @@ onUnmounted(() => {
         </main>
       </div>
     </div>
+
+    <!-- 下区：横向贯通页脚 (高度 32px / h-8) -->
+    <footer class="kawaii-app-footer h-8 w-full shrink-0 border-t border-[#e5e4e0] bg-[#F5F4F2] text-[#66615e] text-xs px-4 flex items-center justify-between select-none z-20">
+      <!-- 左侧：条款与隐私弹窗 + 联系方式 -->
+      <div class="flex items-center gap-3 shrink-0 text-[11px] sm:text-xs">
+        <button
+          type="button"
+          class="hover:text-[#161513] transition-colors cursor-pointer text-[#66615e]"
+          @click="showTermsModal = true"
+        >
+          {{ $t('auth.tos.title') || '使用条款和隐私声明' }}
+        </button>
+        <span class="text-black/20">|</span>
+        <div class="flex items-center gap-2.5">
+          <a
+            v-if="configStore.footerContactEmail"
+            :href="`mailto:${configStore.footerContactEmail}`"
+            class="hover:text-[#161513] transition-colors flex items-center gap-1 text-[#66615e]"
+            :title="configStore.footerContactEmail"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span class="hidden sm:inline">{{ configStore.footerContactEmail }}</span>
+          </a>
+          <a
+            v-if="configStore.footerTelegramLink"
+            :href="configStore.footerTelegramLink"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-[#161513] transition-colors flex items-center gap-1 text-[#66615e]"
+            title="Telegram"
+          >
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+            <span class="hidden md:inline">Telegram</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 右侧：版权所有 -->
+      <div class="flex items-center gap-2 truncate pl-4 text-[11px] sm:text-xs">
+        <span class="truncate">{{ brand.brandCopyright }}</span>
+      </div>
+    </footer>
+
+    <!-- 服务条款与隐私声明弹窗 -->
+    <TermsOfServiceModal
+      :show="showTermsModal"
+      @close="showTermsModal = false"
+    />
   </div>
 </template>
 
@@ -417,5 +473,29 @@ onUnmounted(() => {
   .kawaii-topbar :deep(.nimbus-userpill) {
     transition: none;
   }
+}
+
+/* Bottom Footer — compact 32px bar across full screen width */
+.kawaii-app-footer {
+  background-color: #F5F4F2 !important;
+  border-top: 1px solid #e5e4e0 !important;
+  color: #66615e !important;
+}
+
+:global(.light) .kawaii-app-footer,
+:global(.dark) .kawaii-app-footer {
+  background-color: #F5F4F2 !important;
+  border-top: 1px solid #e5e4e0 !important;
+  color: #66615e !important;
+}
+
+.kawaii-app-footer a,
+.kawaii-app-footer button {
+  color: #66615e !important;
+}
+
+.kawaii-app-footer a:hover,
+.kawaii-app-footer button:hover {
+  color: #161513 !important;
 }
 </style>
