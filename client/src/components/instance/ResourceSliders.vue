@@ -48,10 +48,20 @@ function allowanceToCores(allowance: number): number {
   return Math.ceil(allowance / 100)
 }
 
-// 格式化 CPU 显示
+// 格式化 CPU 显示（以 C 为单位，1C = 1 核；100% → 1C、150% → 1.5C）
 function formatCpu(value: number): string {
-  return `${value}%`
+  const cores = value / 100
+  return cores % 1 === 0 ? `${cores}C` : `${cores.toFixed(1)}C`
 }
+
+// CPU 快捷刻度：取 25%/50%/75% 位置的实际值，标签由 formatCpu 渲染为 C 单位
+const cpuPresets = computed(() => {
+  const range = cpuMax.value - cpuMin
+  return [0.25, 0.5, 0.75].map(ratio => {
+    const raw = cpuMin + range * ratio
+    return Math.min(cpuMax.value, Math.max(cpuMin, Math.round(raw / cpuStep) * cpuStep))
+  })
+})
 
 // 格式化内存显示
 function formatMemory(mb: number): string {
@@ -126,7 +136,7 @@ const diskIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
             class="font-medium"
             :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-800'"
           >
-            {{ `${selectedPackage.quotaInfo.remainingCpu}%` }}
+            {{ formatCpu(selectedPackage.quotaInfo.remainingCpu) }}
           </span>
         </span>
         <span v-if="selectedPackage.quotaInfo.remainingMemory !== null" class="text-gray-400">|</span>
@@ -153,6 +163,7 @@ const diskIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
         :label="t('instance.selector.cpu')"
         :subtitle="`~${allowanceToCores(cpu)} ${t('instance.selector.cores')}`"
         :format-value="formatCpu"
+        :presets="cpuPresets"
         :icon="cpuIcon"
         @update:model-value="emit('update:cpu', $event)"
       />

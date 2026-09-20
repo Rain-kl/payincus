@@ -357,6 +357,12 @@ function formatMemory(mb: number): string {
   return mb + ' MB'
 }
 
+// CPU 格式化（以 C 为单位，1C = 1 核；100% → 1C、150% → 1.5C）
+function formatCpu(value: number): string {
+  const cores = value / 100
+  return cores % 1 === 0 ? `${cores}C` : `${cores.toFixed(1)}C`
+}
+
 // 硬盘格式化（MB -> GB，使用1024进制）
 function formatDisk(mb: number): string {
   if (mb >= 1024) {
@@ -1523,7 +1529,7 @@ async function handleSubmit(): Promise<void> {
                     </span>
                   </div>
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                    <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ selectedPlan.cpu }}%</div><div class="text-xs text-themed-muted">CPU</div></div>
+                    <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatCpu(selectedPlan.cpu) }}</div><div class="text-xs text-themed-muted">CPU</div></div>
                     <div>
                       <div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatMemory(selectedPlan.memory) }}</div>
                       <div class="text-xs text-themed-muted leading-tight">
