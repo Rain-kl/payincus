@@ -125,7 +125,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
     fastify.get('/public', {
         config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
     }, async (_request: FastifyRequest, _reply: FastifyReply) => {
-        const [registrationEnabled, requireInviteCode, ticketCreationEnabled, freeSiteMode, mailAvailable, turnstileEnabled, turnstileSiteKey, avatarApiBase, smtpEnabled, emailDomainWhitelistEnabled, emailAllowedDomains, transferFee, footerContactEmail, footerTelegramLink, hostingMarketEntryEnabled, hostingNotice, brandName, brandSubtitle, brandLogoUrl, popupAnnouncementConfig, popupPromoImageUrlConfig, popupPromoPackageIdConfig] = await Promise.all([
+        const [registrationEnabled, requireInviteCode, ticketCreationEnabled, freeSiteMode, mailAvailable, turnstileEnabled, turnstileSiteKey, avatarApiBase, smtpEnabled, emailDomainWhitelistEnabled, emailAllowedDomains, transferFee, footerContactEmail, footerTelegramLink, hostingMarketEntryEnabled, hostingNotice, brandName, brandSubtitle, brandLogoUrl, brandCopyright, popupAnnouncementConfig, popupPromoImageUrlConfig, popupPromoPackageIdConfig] = await Promise.all([
             db.isRegistrationEnabled(),
             db.isInviteCodeRequired(),
             db.getSystemConfigBoolean('ticket_enabled', true),
@@ -145,6 +145,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             db.getSystemConfig('brand_name'),
             db.getSystemConfig('brand_subtitle'),
             db.getSystemConfig('brand_logo_url'),
+            db.getSystemConfig('brand_copyright'),
             db.getSystemConfigValueWithUpdatedAt('popup_announcement'),
             db.getSystemConfigValueWithUpdatedAt('popup_promo_image_url'),
             db.getSystemConfigValueWithUpdatedAt('popup_promo_package_id')
@@ -251,6 +252,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             brandName: brandName || 'Incudal',
             brandSubtitle: brandSubtitle || '基于 Incus 的低价 NAT VPS',
             brandLogoUrl: brandLogoUrl || '/incudal_logo.webp',
+            brandCopyright: brandCopyright?.trim() || '版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。',
             popupAnnouncement: popupAnnouncement ? popupAnnouncementConfig.value : null,
             popupAnnouncementUpdatedAt: popupAnnouncement ? popupAnnouncementConfig.updatedAt : null,
             popupPromoImageUrl: popupPromoPackage ? popupPromoImageUrl : null,
@@ -416,6 +418,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             'brand_name',
             'brand_subtitle',
             'brand_logo_url',
+            'brand_copyright',
             'popup_announcement',
             'popup_promo_image_url',
             'popup_promo_package_id',
@@ -479,6 +482,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             'brand_name',
             'brand_subtitle',
             'brand_logo_url',
+            'brand_copyright',
             'telegram_bot_username',
             'telegram_bot_token',
             'telegram_webhook_secret',
@@ -551,6 +555,12 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
                         return reply.code(400).send(apiError(ErrorCode.CONFIG_INVALID_VALUE, config.key))
                     }
                     if (config.value && !isHttpImageUrl(config.value) && !config.value.startsWith('/')) {
+                        return reply.code(400).send(apiError(ErrorCode.CONFIG_INVALID_VALUE, config.key))
+                    }
+                }
+                if (config.key === 'brand_copyright') {
+                    config.value = config.value.trim()
+                    if (config.value && config.value.length > 500) {
                         return reply.code(400).send(apiError(ErrorCode.CONFIG_INVALID_VALUE, config.key))
                     }
                 }
