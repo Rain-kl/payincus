@@ -51,6 +51,7 @@
 8. `RUN_DB_CHECKS=0 bash scripts/apply-online-update.sh <ver>` 会**跳过 DB/支付就绪校验**，仅在 owner 明确批准时使用。
 9. **禁止硬编码十六进制颜色**：前端所有颜色**必须使用主题系统提供的 token**（`var(--xxx)` / 语义 class / 集中色板常量）。组件、全局样式、scoped style 中**一律不得出现 `#hex` 色值**（如 `#F6F4F3`、`bg-[#295BA7]`、`color: #161513`、SVG `fill="#xxx"`）。唯一允许 hex 的位置是主题唯一来源 `client/src/styles/theme.css` 与守卫白名单文件（详见 `server/scripts/test-frontend-color-tokens.ts`）。`test:frontend-color-tokens` 守卫会全局扫描拦截，**违反即未完成**。
 10. **禁止在组件里指定主题色值**：背景 / 文字 / 边框 / 强调 / 选中态等颜色必须引用主题 token 层（`client/src/styles/theme.css` 是唯一事实来源，`tailwind.config.js` 的 token 映射与 `kawaii-cloud.css` 的 `--kawaii-*` 均为对它的引用）。改主题色**只改 theme.css 一处**，组件不得复制色值。
+11. **禁止任何透明 / 半透明元素**：全局样式、组件、scoped style、SVG、图标中一律不得出现透明 / 半透明写法 —— 包括 `rgba()`、`opacity`、`bg-*`/`text-*` 的透明度后缀（如 `bg-*/50`、`text-*/70`）、`/40`、`/50` 这类 Tailwind 透明度简写、`bg-transparent`、`transparent` 关键字等。所有背景 / 文字 / 边框 / 描边必须使用**不透明的纯色**（主题 token 或语义 class）。`test:frontend-color-tokens` 守卫会全局扫描拦截，**违反即未完成**。
 
 ---
 

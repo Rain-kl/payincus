@@ -356,171 +356,194 @@ async function saveConfig() {
 </script>
 
 <template>
-  <div class="card p-6">
-    <form class="space-y-6" @submit.prevent="saveConfig">
-      <!-- 基本信息 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.hostName') }}</label>
-          <!-- 管理员输入完整节点名称 -->
-          <template v-if="isAdmin">
-            <input 
-              v-model="form.name" 
-              type="text" 
-              class="input" 
-              placeholder="node-01" 
-              required 
-              pattern="^[a-zA-Z0-9_-]+$" 
-              @input="form.name = form.name.replace(/[^a-zA-Z0-9_-]/g, '')" 
-            />
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.hostNameHint') }}</p>
-          </template>
-          <!-- 普通用户输入节点名称后缀 -->
-          <template v-else>
-            <div class="flex">
-              <span class="inline-flex items-center px-3 text-sm border border-r-0 rounded-l-lg" :class="themeStore.isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-500'">{{ hostNamePrefix }}</span>
-              <input 
-                v-model="form.nameSuffix" 
-                type="text" 
-                class="input rounded-l-none flex-1" 
-                placeholder="myhost" 
-                required 
-                pattern="^[a-zA-Z0-9_-]+$" 
-                @input="form.nameSuffix = form.nameSuffix.replace(/[^a-zA-Z0-9_-]/g, '')" 
-              />
-            </div>
-            <p class="text-xs text-themed-muted mt-1">{{ t('resources.hosts.nameHint') }}</p>
-          </template>
-        </div>
-        <div>
-          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.hostDesc') }}</label>
-          <input v-model="form.location" type="text" class="input" placeholder="Hong Kong DC1" />
-        </div>
+  <form class="space-y-6" @submit.prevent="saveConfig">
+    <!-- ① 基础信息 -->
+    <section class="card">
+      <div class="border-b border-themed px-5 py-4 sm:px-6">
+        <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.basicInfo') }}</h2>
+        <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.basicInfoHint') }}</p>
       </div>
 
-      <!-- 连接方式选择 -->
-      <div>
-        <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.connectionMode') }}</label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label
-            class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
-            :class="!form.tunnelEnabled ? 'border-primary bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
-          >
-            <input type="radio" :value="false" v-model="form.tunnelEnabled" class="radio text-primary" />
-            <div>
-              <div class="text-sm">{{ t('admin.hosts.directMode') }}</div>
-            </div>
-          </label>
-          <label
-            class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
-            :class="form.tunnelEnabled ? 'border-primary bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
-          >
-            <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
-            <div>
-              <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- 直连模式输入框 -->
-      <div v-if="!form.tunnelEnabled" class="grid grid-cols-1 md:grid-cols-[1fr_120px] gap-4">
-        <div>
-          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ipAddress') }}</label>
-          <div class="flex gap-2">
-            <input v-model="form.hostAddress" type="text" class="input flex-1" placeholder="10.0.0.1 / 2001:db8::1 / node.example.com" :required="!form.tunnelEnabled" />
-          </div>
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ipAddressHint') }}</p>
-        </div>
-        <div>
-          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.apiPort') }}</label>
-          <input v-model.number="form.apiPort" type="number" min="1" max="65535" class="input" placeholder="8443" :required="!form.tunnelEnabled" />
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.apiPortHint') }}</p>
-        </div>
-      </div>
-
-      <!-- 穿透模式输入框与提示 -->
-      <div v-else class="space-y-4">
-        <div class="rounded-lg border border-themed bg-themed-secondary p-3 text-xs text-themed-secondary">
-          {{ t('admin.hosts.tunnelNotice') }}
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-4">
+      <div class="space-y-5 px-5 py-5 sm:px-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.targetPort') }}</label>
-            <input v-model.number="form.targetPort" type="number" min="1" max="65535" class="input" placeholder="8443" required />
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.targetPortHint') }}</p>
-          </div>
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.targetHost') }}</label>
-            <input v-model="form.targetHost" type="text" class="input" placeholder="127.0.0.1" />
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.targetHostHint') }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- 国家选择 -->
-        <div ref="countryDropdownRef" class="relative">
-          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.country') }}</label>
-          <button type="button" class="input w-full flex items-center justify-between" @click="toggleCountryDropdown">
-            <span class="flex items-center gap-2"><FlagIcon :code="form.countryCode" size="sm" />{{ selectedCountry?.name }}</span>
-            <svg class="w-4 h-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-          </button>
-          <div v-if="showCountryDropdown" class="absolute z-50 w-full mt-1 overflow-hidden rounded-lg border shadow-xl" :class="themeStore.isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'">
-            <div class="p-2 border-b" :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-100'">
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.hostName') }}</label>
+            <!-- 管理员输入完整节点名称 -->
+            <template v-if="isAdmin">
               <input
-                v-model="countrySearch"
-                type="search"
-                class="input h-9 text-sm"
-                :placeholder="t('common.searchPlaceholder')"
-                autocomplete="off"
-                autofocus
-                @keydown.enter.prevent.stop
-                @keydown.stop
+                v-model="form.name"
+                type="text"
+                class="input"
+                placeholder="node-01"
+                required
+                pattern="^[a-zA-Z0-9_-]+$"
+                @input="form.name = form.name.replace(/[^a-zA-Z0-9_-]/g, '')"
               />
-            </div>
-            <div class="max-h-60 overflow-auto py-1">
-              <button
-                v-for="c in filteredCountries"
-                :key="c.code"
-                type="button"
-                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors"
-                :class="[
-                  themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100',
-                  form.countryCode === c.code ? (themeStore.isDark ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900') : ''
-                ]"
-                @click="selectCountry(c.code)"
-              >
-                <FlagIcon :code="c.code" size="sm" />{{ c.name }}
-              </button>
-              <div v-if="filteredCountries.length === 0" class="px-3 py-6 text-center text-sm text-themed-muted">
-                {{ t('common.noSearchResults') }}
+              <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.hostNameHint') }}</p>
+            </template>
+            <!-- 普通用户输入节点名称后缀 -->
+            <template v-else>
+              <div class="flex">
+                <span class="inline-flex items-center px-3 text-sm border border-r-0 rounded-l-lg" :class="themeStore.isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-500'">{{ hostNamePrefix }}</span>
+                <input
+                  v-model="form.nameSuffix"
+                  type="text"
+                  class="input rounded-l-none flex-1"
+                  placeholder="myhost"
+                  required
+                  pattern="^[a-zA-Z0-9_-]+$"
+                  @input="form.nameSuffix = form.nameSuffix.replace(/[^a-zA-Z0-9_-]/g, '')"
+                />
+              </div>
+              <p class="text-xs text-themed-muted mt-1">{{ t('resources.hosts.nameHint') }}</p>
+            </template>
+          </div>
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.hostDesc') }}</label>
+            <input v-model="form.location" type="text" class="input" placeholder="Hong Kong DC1" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- 国家选择 -->
+          <div ref="countryDropdownRef" class="relative">
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.country') }}</label>
+            <button type="button" class="input w-full flex items-center justify-between" @click="toggleCountryDropdown">
+              <span class="flex items-center gap-2"><FlagIcon :code="form.countryCode" size="sm" />{{ selectedCountry?.name }}</span>
+              <svg class="w-4 h-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <div v-if="showCountryDropdown" class="absolute z-50 w-full mt-1 overflow-hidden rounded-lg border shadow-xl" :class="themeStore.isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'">
+              <div class="p-2 border-b" :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-100'">
+                <input
+                  v-model="countrySearch"
+                  type="search"
+                  class="input h-9 text-sm"
+                  :placeholder="t('common.searchPlaceholder')"
+                  autocomplete="off"
+                  autofocus
+                  @keydown.enter.prevent.stop
+                  @keydown.stop
+                />
+              </div>
+              <div class="max-h-60 overflow-auto py-1">
+                <button
+                  v-for="c in filteredCountries"
+                  :key="c.code"
+                  type="button"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors"
+                  :class="[
+                    themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100',
+                    form.countryCode === c.code ? (themeStore.isDark ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900') : ''
+                  ]"
+                  @click="selectCountry(c.code)"
+                >
+                  <FlagIcon :code="c.code" size="sm" />{{ c.name }}
+                </button>
+                <div v-if="filteredCountries.length === 0" class="px-3 py-6 text-center text-sm text-themed-muted">
+                  {{ t('common.noSearchResults') }}
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- IPv6 父接口 -->
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">
+              {{ t('admin.hosts.ipv6ParentInterface') }}
+              <span v-if="requiresIpv6ParentInterface" class="text-error">*</span>
+            </label>
+            <input v-model="form.ipv6ParentInterface" type="text" class="input" placeholder="eth0" />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ipv6ParentInterfaceHint') }}</p>
+          </div>
         </div>
-        
-        <!-- IPv6 父接口 -->
+
+        <!-- IPv6 子网 -->
         <div>
-          <label class="block text-xs text-themed-muted mb-1.5">
-            {{ t('admin.hosts.ipv6ParentInterface') }}
-            <span v-if="requiresIpv6ParentInterface" class="text-red-500">*</span>
-          </label>
-          <input v-model="form.ipv6ParentInterface" type="text" class="input" placeholder="eth0" />
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ipv6ParentInterfaceHint') }}</p>
+          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ipv6Subnet') }}</label>
+          <input v-model="form.ipv6Subnet" type="text" class="input" placeholder="2001:db8::/48" />
+          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ipv6SubnetHint') }}</p>
         </div>
       </div>
+    </section>
 
-      <!-- IPv6 子网 -->
-      <div>
-        <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ipv6Subnet') }}</label>
-        <input v-model="form.ipv6Subnet" type="text" class="input" placeholder="2001:db8::/48" />
-        <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ipv6SubnetHint') }}</p>
+    <!-- ② 网络连接 -->
+    <section class="card">
+      <div class="border-b border-themed px-5 py-4 sm:px-6">
+        <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.connectionConfig') }}</h2>
+        <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.connectionConfigHint') }}</p>
       </div>
 
-      <!-- 资源限制 -->
-      <div class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-4">{{ t('admin.hosts.resourceLimits') }}</h3>
+      <div class="space-y-5 px-5 py-5 sm:px-6">
+        <!-- 连接方式选择 -->
+        <div>
+          <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.connectionMode') }}</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label
+              class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+              :class="!form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
+            >
+              <input type="radio" :value="false" v-model="form.tunnelEnabled" class="radio text-primary" />
+              <div>
+                <div class="text-sm">{{ t('admin.hosts.directMode') }}</div>
+              </div>
+            </label>
+            <label
+              class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+              :class="form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
+            >
+              <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
+              <div>
+                <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 直连模式输入框 -->
+        <div v-if="!form.tunnelEnabled" class="grid grid-cols-1 md:grid-cols-[1fr_120px] gap-4">
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ipAddress') }}</label>
+            <div class="flex gap-2">
+              <input v-model="form.hostAddress" type="text" class="input flex-1" placeholder="10.0.0.1 / 2001:db8::1 / node.example.com" :required="!form.tunnelEnabled" />
+            </div>
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ipAddressHint') }}</p>
+          </div>
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.apiPort') }}</label>
+            <input v-model.number="form.apiPort" type="number" min="1" max="65535" class="input" placeholder="8443" :required="!form.tunnelEnabled" />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.apiPortHint') }}</p>
+          </div>
+        </div>
+
+        <!-- 穿透模式输入框与提示 -->
+        <div v-else class="space-y-4">
+          <div class="rounded-lg border border-themed bg-themed-secondary p-3 text-xs text-themed-secondary">
+            {{ t('admin.hosts.tunnelNotice') }}
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-[120px_1fr] gap-4">
+            <div>
+              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.targetPort') }}</label>
+              <input v-model.number="form.targetPort" type="number" min="1" max="65535" class="input" placeholder="8443" required />
+              <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.targetPortHint') }}</p>
+            </div>
+            <div>
+              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.targetHost') }}</label>
+              <input v-model="form.targetHost" type="text" class="input" placeholder="127.0.0.1" />
+              <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.targetHostHint') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 资源与配额 -->
+    <section class="card">
+      <div class="border-b border-themed px-5 py-4 sm:px-6">
+        <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.resourceTitle') }}</h2>
+        <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.resourceTitleHint') }}</p>
+      </div>
+
+      <div class="space-y-5 px-5 py-5 sm:px-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.cpuAllowanceMax') }}</label>
@@ -539,11 +562,39 @@ async function saveConfig() {
             </select>
           </div>
         </div>
+
+        <div class="rounded-lg border border-themed bg-themed-secondary px-4 py-3">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-sm text-themed">{{ t('admin.hosts.transferEnabled') }}</p>
+              <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.transferEnabledHint') }}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="form.transferEnabled"
+              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-themed transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+              :class="form.transferEnabled ? 'bg-primary-500' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
+              @click="form.transferEnabled = !form.transferEnabled"
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="form.transferEnabled ? 'translate-x-5' : 'translate-x-0'"
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ④ NAT 端口映射 -->
+    <section class="card">
+      <div class="border-b border-themed px-5 py-4 sm:px-6">
+        <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.natConfig') }}</h2>
+        <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.natConfigHint') }}</p>
       </div>
 
-      <!-- NAT 配置 -->
-      <div class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-4">{{ t('admin.hosts.natConfig') }}</h3>
+      <div class="space-y-5 px-5 py-5 sm:px-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.natPublicIpv4') }}</label>
@@ -556,7 +607,7 @@ async function saveConfig() {
             <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.natPublicIpv6Desc') }}</p>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.natBindIpv4') }}</label>
             <input v-model="form.natConfig.bindIp" type="text" class="input" :placeholder="t('admin.hosts.natBindIpv4Placeholder')" />
@@ -568,7 +619,7 @@ async function saveConfig() {
             <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.natBindIpv6Desc') }}</p>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.portRangeStart') }}</label>
             <input v-model.number="form.natConfig.portRangeStart" type="number" class="input" placeholder="10000" />
@@ -579,107 +630,97 @@ async function saveConfig() {
           </div>
         </div>
       </div>
+    </section>
 
-      <!-- 转移控制 -->
-      <div class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-4">{{ t('admin.hosts.transferControl') }}</h3>
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-themed">{{ t('admin.hosts.transferEnabled') }}</p>
-            <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.transferEnabledHint') }}</p>
-          </div>
-          <button
-            type="button"
-            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="form.transferEnabled ? 'bg-blue-600' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
-            @click="form.transferEnabled = !form.transferEnabled"
-          >
-            <span
-              class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-              :class="form.transferEnabled ? 'translate-x-5' : 'translate-x-0'"
-            />
-          </button>
-        </div>
+    <!-- ⑤ 交付与展示 -->
+    <section class="card">
+      <div class="border-b border-themed px-5 py-4 sm:px-6">
+        <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.deliveryTitle') }}</h2>
+        <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.deliveryTitleHint') }}</p>
       </div>
 
-      <!-- 节点通知 -->
-      <div v-if="!isAdmin" class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-2">{{ t('admin.hosts.notificationSettings') }}</h3>
-        <p class="text-xs text-themed-muted mb-4">{{ t('admin.hosts.notificationSettingsHint') }}</p>
-        <div class="space-y-4">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-sm text-themed">{{ t('admin.hosts.notifyPurchase') }}</p>
-              <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notifyPurchaseHint') }}</p>
-            </div>
-            <button
-              type="button"
-              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              :class="form.notifyPurchase ? 'bg-blue-600' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
-              @click="form.notifyPurchase = !form.notifyPurchase"
-            >
-              <span
-                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="form.notifyPurchase ? 'translate-x-5' : 'translate-x-0'"
-              />
-            </button>
+      <div class="space-y-5 px-5 py-5 sm:px-6">
+        <!-- 通知设置（仅普通用户可见） -->
+        <template v-if="!isAdmin">
+          <div class="rounded-lg border border-themed bg-themed-secondary px-4 py-3">
+            <p class="text-sm text-themed">{{ t('admin.hosts.notificationSettings') }}</p>
+            <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notificationSettingsHint') }}</p>
           </div>
 
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-sm text-themed">{{ t('admin.hosts.notifyRenew') }}</p>
-              <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notifyRenewHint') }}</p>
-            </div>
-            <button
-              type="button"
-              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              :class="form.notifyRenew ? 'bg-blue-600' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
-              @click="form.notifyRenew = !form.notifyRenew"
-            >
-              <span
-                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="form.notifyRenew ? 'translate-x-5' : 'translate-x-0'"
-              />
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="text-sm text-themed">{{ t('admin.hosts.notifyDestroy') }}</p>
-              <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notifyDestroyHint') }}</p>
-            </div>
-            <button
-              type="button"
-              class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              :class="form.notifyDestroy ? 'bg-blue-600' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
-              @click="form.notifyDestroy = !form.notifyDestroy"
-            >
-              <span
-                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="form.notifyDestroy ? 'translate-x-5' : 'translate-x-0'"
-              />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 额外配置 -->
-      <div class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-4">{{ t('admin.hosts.extraConfig') }}</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.trafficResetDay') }}</label>
-            <input v-model.number="form.trafficResetDay" type="number" class="input" :min="1" :max="28" placeholder="1" />
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.trafficResetDayHint') }}</p>
-          </div>
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.enableResourcePool') }}</label>
-            <div class="flex items-center justify-between mt-2">
-              <p class="text-xs text-themed-muted">{{ t('admin.hosts.enableResourcePoolHint') }}</p>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm text-themed">{{ t('admin.hosts.notifyPurchase') }}</p>
+                <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notifyPurchaseHint') }}</p>
+              </div>
               <button
                 type="button"
-                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                :class="form.enableResourcePool ? 'bg-blue-600' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
+                role="switch"
+                :aria-checked="form.notifyPurchase"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-themed transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+                :class="form.notifyPurchase ? 'bg-primary-500' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
+                @click="form.notifyPurchase = !form.notifyPurchase"
+              >
+                <span
+                  class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  :class="form.notifyPurchase ? 'translate-x-5' : 'translate-x-0'"
+                />
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm text-themed">{{ t('admin.hosts.notifyRenew') }}</p>
+                <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notifyRenewHint') }}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.notifyRenew"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-themed transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+                :class="form.notifyRenew ? 'bg-primary-500' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
+                @click="form.notifyRenew = !form.notifyRenew"
+              >
+                <span
+                  class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  :class="form.notifyRenew ? 'translate-x-5' : 'translate-x-0'"
+                />
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm text-themed">{{ t('admin.hosts.notifyDestroy') }}</p>
+                <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.notifyDestroyHint') }}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.notifyDestroy"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-themed transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+                :class="form.notifyDestroy ? 'bg-primary-500' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
+                @click="form.notifyDestroy = !form.notifyDestroy"
+              >
+                <span
+                  class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  :class="form.notifyDestroy ? 'translate-x-5' : 'translate-x-0'"
+                />
+              </button>
+            </div>
+          </div>
+
+          <div class="border-t border-themed pt-5">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm text-themed">{{ t('admin.hosts.enableResourcePool') }}</p>
+                <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.enableResourcePoolHint') }}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.enableResourcePool"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-themed transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+                :class="form.enableResourcePool ? 'bg-primary-500' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
                 @click="form.enableResourcePool = !form.enableResourcePool"
               >
                 <span
@@ -689,46 +730,73 @@ async function saveConfig() {
               </button>
             </div>
           </div>
+        </template>
+
+        <!-- 管理员：额外设置置顶 -->
+        <template v-else>
+          <div class="max-w-md">
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.trafficResetDay') }}</label>
+            <input v-model.number="form.trafficResetDay" type="number" class="input" :min="1" :max="28" placeholder="1" />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.trafficResetDayHint') }}</p>
+          </div>
+
+          <div class="rounded-lg border border-themed bg-themed-secondary px-4 py-3">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm text-themed">{{ t('admin.hosts.enableResourcePool') }}</p>
+                <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.enableResourcePoolHint') }}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.enableResourcePool"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-themed transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500"
+                :class="form.enableResourcePool ? 'bg-primary-500' : (themeStore.isDark ? 'bg-gray-600' : 'bg-gray-300')"
+                @click="form.enableResourcePool = !form.enableResourcePool"
+              >
+                <span
+                  class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  :class="form.enableResourcePool ? 'translate-x-5' : 'translate-x-0'"
+                />
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 节点公告 & 探针地址 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 border-t border-themed pt-5">
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.announcement') }}</label>
+            <textarea
+              v-model="form.announcement"
+              class="input min-h-[100px] resize-y"
+              :placeholder="t('admin.hosts.announcementPlaceholder')"
+              rows="3"
+              maxlength="1000"
+            />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.announcementHint') }}</p>
+          </div>
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.probeUrl') }}</label>
+            <input
+              v-model="form.probeUrl"
+              type="url"
+              class="input"
+              :placeholder="t('admin.hosts.probeUrlPlaceholder')"
+              maxlength="500"
+            />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.probeUrlHint') }}</p>
+          </div>
         </div>
       </div>
+    </section>
 
-      <!-- 节点公告 -->
-      <div class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-4">{{ t('admin.hosts.announcement') }}</h3>
-        <div>
-          <textarea 
-            v-model="form.announcement" 
-            class="input min-h-[100px] resize-y" 
-            :placeholder="t('admin.hosts.announcementPlaceholder')"
-            rows="3"
-            maxlength="1000"
-          />
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.announcementHint') }}</p>
-        </div>
-      </div>
-
-      <!-- 探针地址 -->
-      <div class="border-t border-themed pt-6">
-        <h3 class="text-sm font-medium text-themed mb-4">{{ t('admin.hosts.probeUrl') }}</h3>
-        <div>
-          <input 
-            v-model="form.probeUrl" 
-            type="url" 
-            class="input" 
-            :placeholder="t('admin.hosts.probeUrlPlaceholder')"
-            maxlength="500"
-          />
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.probeUrlHint') }}</p>
-        </div>
-      </div>
-
-      <!-- 按钮 -->
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-themed">
-        <button type="submit" class="btn-primary" :disabled="saving || !form.name || !form.hostAddress">
-          <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-          {{ t('common.save') }}
-        </button>
-      </div>
-    </form>
-  </div>
+    <!-- 吸底保存条 -->
+    <div class="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t border-themed bg-themed-surface px-5 py-3.5 sm:px-6">
+      <button type="submit" class="btn-primary" :disabled="saving || !form.name || !form.hostAddress">
+        <span v-if="saving" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 " :class="themeStore.isDark ? 'border-white border-t-gray-500' : 'border-white border-t-gray-300'"></span>
+        {{ saving ? t('common.saving') : t('common.save') }}
+      </button>
+    </div>
+  </form>
 </template>
