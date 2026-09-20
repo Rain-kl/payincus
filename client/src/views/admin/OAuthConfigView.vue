@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
@@ -64,6 +65,55 @@ const oauthAppForm = ref<{
   scopes: ['profile:read'],
   enabled: true
 })
+
+const isScopeDropdownOpen = ref(false)
+const scopeDropdownRef = ref<HTMLElement | null>(null)
+const scopeSearchQuery = ref('')
+
+onClickOutside(scopeDropdownRef, () => {
+  isScopeDropdownOpen.value = false
+})
+
+const filteredOAuthScopes = computed(() => {
+  const query = scopeSearchQuery.value.trim().toLowerCase()
+  if (!query) return availableOAuthScopes.value
+  return availableOAuthScopes.value.filter(scope => {
+    return (
+      scope.scope.toLowerCase().includes(query) ||
+      scope.title.toLowerCase().includes(query) ||
+      scope.description.toLowerCase().includes(query) ||
+      scope.resources.some(r => r.toLowerCase().includes(query))
+    )
+  })
+})
+
+function toggleScopeDropdown(): void {
+  isScopeDropdownOpen.value = !isScopeDropdownOpen.value
+}
+
+function toggleScope(scopeKey: PublicApiScope): void {
+  const index = oauthAppForm.value.scopes.indexOf(scopeKey)
+  if (index > -1) {
+    oauthAppForm.value.scopes.splice(index, 1)
+  } else {
+    oauthAppForm.value.scopes.push(scopeKey)
+  }
+}
+
+function removeScope(scopeKey: PublicApiScope): void {
+  const index = oauthAppForm.value.scopes.indexOf(scopeKey)
+  if (index > -1) {
+    oauthAppForm.value.scopes.splice(index, 1)
+  }
+}
+
+function selectAllScopes(): void {
+  oauthAppForm.value.scopes = availableOAuthScopes.value.map(s => s.scope)
+}
+
+function clearAllScopes(): void {
+  oauthAppForm.value.scopes = []
+}
 
 onMounted(async (): Promise<void> => {
   await Promise.all([loadConfigs(), loadOAuthScopes(), loadOAuthApps(), loadOAuthAuthorizations()])
@@ -176,6 +226,8 @@ function resetOAuthAppForm(): void {
     scopes: ['profile:read'],
     enabled: true
   }
+  isScopeDropdownOpen.value = false
+  scopeSearchQuery.value = ''
 }
 
 function editOAuthApp(app: OAuthClientApp): void {
@@ -187,6 +239,8 @@ function editOAuthApp(app: OAuthClientApp): void {
     enabled: app.enabled
   }
   oauthAppSecret.value = ''
+  isScopeDropdownOpen.value = false
+  scopeSearchQuery.value = ''
 }
 
 function parseRedirectUrisInput(value: string): string[] {
@@ -489,7 +543,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
       </div>
     </div>
 
-    <div class="nimbus-card overflow-hidden rounded-xl border border-themed bg-themed-surface">
+    <div class="nimbus-card rounded-xl border border-themed bg-themed-surface">
       <div class="flex flex-col gap-3 border-b border-themed px-6 py-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h3 class="font-semibold text-themed">PayIncus OAuth 服务端</h3>
@@ -513,7 +567,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
         </div>
       </div>
 
-      <form class="grid min-w-0 gap-4 p-6 xl:grid-cols-[minmax(360px,1fr)_minmax(360px,480px)]" @submit.prevent="saveOAuthApp">
+      <form class="space-y-4 p-6" @submit.prevent="saveOAuthApp">
         <div class="grid min-w-0 gap-4 md:grid-cols-2">
           <div>
             <label class="mb-1.5 block text-sm text-themed-secondary">应用名称</label>
@@ -526,36 +580,166 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
               启用此 OAuth App
             </label>
           </div>
-          <div class="md:col-span-2">
-            <label class="mb-1.5 block text-sm text-themed-secondary">Redirect URI，每行一个</label>
-            <textarea v-model="oauthAppForm.redirectUris" class="input min-h-[86px]" placeholder="https://example.com/oauth/callback"></textarea>
+        </div>
+
+        <!-- 授权 Scope 多选下拉框 -->
+        <div ref="scopeDropdownRef" class="relative" @keydown.esc="isScopeDropdownOpen = false">
+          <div class="mb-1.5 flex items-center justify-between">
+            <label class="text-sm text-themed-secondary">授权 Scope</label>
+            <div class="flex items-center gap-2">
+              <span class="text-2xs text-themed-muted">已选 {{ oauthAppForm.scopes.length }} / {{ availableOAuthScopes.length }} 项</span>
+              <button
+                v-if="oauthAppForm.scopes.length > 0"
+                type="button"
+                class="text-2xs text-themed-muted hover:text-error transition-colors"
+                @click="clearAllScopes"
+              >
+                清空所选
+              </button>
+            </div>
+          </div>
+
+          <!-- 下拉框触发条（展示已选 Tag） -->
+          <div
+            class="input min-h-[42px] h-auto cursor-pointer py-1.5 pr-9 relative flex flex-wrap items-center gap-1.5 transition-colors"
+            :class="isScopeDropdownOpen ? 'ring-2 ring-accent/30 border-accent' : ''"
+            @click="toggleScopeDropdown"
+          >
+            <span v-if="oauthAppForm.scopes.length === 0" class="text-themed-muted text-sm select-none">
+              请选择授权 Scope（至少选择一项）...
+            </span>
+            <template v-else>
+              <span
+                v-for="scopeKey in oauthAppForm.scopes"
+                :key="scopeKey"
+                class="inline-flex items-center gap-1 rounded bg-themed-secondary px-2 py-0.5 text-xs font-mono text-themed transition-colors hover:bg-themed-tertiary"
+              >
+                <span>{{ scopeKey }}</span>
+                <button
+                  type="button"
+                  class="ml-0.5 text-themed-muted hover:text-error transition-colors"
+                  title="移除此 Scope"
+                  @click.stop="removeScope(scopeKey)"
+                >
+                  ✕
+                </button>
+              </span>
+            </template>
+
+            <!-- 右侧展开箭头图标 -->
+            <div class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-themed-muted">
+              <svg
+                class="h-4 w-4 transition-transform duration-200"
+                :class="isScopeDropdownOpen ? 'rotate-180 text-accent' : ''"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- 下拉浮层面板 -->
+          <div
+            v-if="isScopeDropdownOpen"
+            class="absolute left-0 right-0 z-50 mt-1.5 rounded-xl border border-themed bg-themed-surface shadow-2xl overflow-hidden animate-fade-in"
+          >
+            <!-- 搜索与快捷操作 -->
+            <div class="p-2.5 border-b border-themed bg-themed-secondary/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-between">
+              <div class="relative flex-1">
+                <input
+                  v-model="scopeSearchQuery"
+                  type="text"
+                  class="input input-sm w-full pl-8 py-1 text-xs"
+                  placeholder="搜索 Scope 标识、名称或描述..."
+                  @click.stop
+                />
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-themed-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <button
+                  v-if="scopeSearchQuery"
+                  type="button"
+                  class="absolute right-2 top-1/2 -translate-y-1/2 text-themed-muted hover:text-themed text-xs p-1"
+                  @click.stop="scopeSearchQuery = ''"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 justify-end">
+                <button
+                  type="button"
+                  class="btn-ghost btn-xs text-xs"
+                  @click.stop="selectAllScopes"
+                >
+                  全选 ({{ availableOAuthScopes.length }})
+                </button>
+                <button
+                  type="button"
+                  class="btn-ghost btn-xs text-xs text-themed-muted hover:text-error"
+                  @click.stop="clearAllScopes"
+                >
+                  清空
+                </button>
+              </div>
+            </div>
+
+            <!-- 选项列表 -->
+            <div class="max-h-72 overflow-y-auto p-2 space-y-1.5 text-sm">
+              <div
+                v-for="scope in filteredOAuthScopes"
+                :key="scope.scope"
+                class="flex items-start gap-2.5 rounded-lg border border-transparent p-2.5 transition-colors cursor-pointer hover:bg-themed-hover"
+                :class="oauthAppForm.scopes.includes(scope.scope) ? 'bg-themed-secondary/70 border-themed' : ''"
+                @click.stop="toggleScope(scope.scope)"
+              >
+                <input
+                  type="checkbox"
+                  class="mt-1 h-4 w-4 rounded text-accent cursor-pointer"
+                  :checked="oauthAppForm.scopes.includes(scope.scope)"
+                  @click.stop="toggleScope(scope.scope)"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="rounded bg-themed-tertiary px-1.5 py-0.5 font-mono text-xs font-medium text-themed">
+                      {{ scope.scope }}
+                    </span>
+                    <span class="rounded-full bg-themed-secondary px-1.5 py-0.5 text-2xs text-themed-muted">
+                      {{ formatScopeRisk(scope.risk) }}
+                    </span>
+                    <span class="rounded-full bg-themed-secondary px-1.5 py-0.5 text-2xs text-themed-muted">
+                      {{ formatScopeAccess(scope.access) }}
+                    </span>
+                    <span class="text-xs font-medium text-themed ml-1">{{ scope.title }}</span>
+                  </div>
+                  <div class="mt-1 text-xs text-themed-muted break-words leading-relaxed">
+                    {{ scope.description }}
+                  </div>
+                  <div class="mt-1 font-mono text-2xs text-themed-faint break-all">
+                    {{ scope.resources.join(', ') }}
+                  </div>
+                </div>
+              </div>
+              <div v-if="filteredOAuthScopes.length === 0" class="py-6 text-center text-xs text-themed-muted">
+                未找到匹配的 Scope
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="min-w-0 rounded-xl border border-themed p-4">
-          <div class="text-sm font-medium text-themed">授权 Scope</div>
-          <div class="mt-3 grid gap-2 text-sm text-themed">
-            <label v-for="scope in availableOAuthScopes" :key="scope.scope" class="flex min-w-0 items-start gap-2 rounded-lg border border-themed px-3 py-2 transition-colors hover:bg-themed-hover">
-              <input v-model="oauthAppForm.scopes" type="checkbox" :value="scope.scope" class="mt-1 h-4 w-4 rounded text-accent" />
-              <span class="min-w-0 flex-1">
-                <span class="flex flex-wrap items-center gap-2">
-                  <span class="rounded bg-themed-tertiary px-1.5 py-0.5 font-mono text-xs text-themed">{{ scope.scope }}</span>
-                  <span class="rounded-full bg-themed-secondary px-1.5 py-0.5 text-2xs text-themed-muted">{{ formatScopeRisk(scope.risk) }}</span>
-                  <span class="rounded-full bg-themed-secondary px-1.5 py-0.5 text-2xs text-themed-muted">{{ formatScopeAccess(scope.access) }}</span>
-                </span>
-                <span class="mt-1 block text-xs font-medium text-themed">{{ scope.title }}</span>
-                <span class="mt-1 block break-words text-xs text-themed-muted">{{ scope.description }}</span>
-                <span class="mt-1 block break-all font-mono text-2xs text-themed-muted">{{ scope.resources.join(', ') }}</span>
-              </span>
-            </label>
-          </div>
-          <div class="mt-4 flex gap-2">
-            <button type="submit" class="btn-primary" :disabled="oauthAppSaving">
-              <span v-if="oauthAppSaving" class="loading-spinner h-4 w-4"></span>
-              {{ oauthAppSaving ? '保存中...' : (oauthAppForm.id ? '更新应用' : '创建应用') }}
-            </button>
-            <button type="button" class="btn-secondary" @click="resetOAuthAppForm">清空</button>
-          </div>
+        <div>
+          <label class="mb-1.5 block text-sm text-themed-secondary">Redirect URI，每行一个</label>
+          <textarea v-model="oauthAppForm.redirectUris" class="input min-h-[86px]" placeholder="https://example.com/oauth/callback"></textarea>
+        </div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="submit" class="btn-primary" :disabled="oauthAppSaving">
+            <span v-if="oauthAppSaving" class="loading-spinner h-4 w-4"></span>
+            {{ oauthAppSaving ? '保存中...' : (oauthAppForm.id ? '更新应用' : '创建应用') }}
+          </button>
+          <button type="button" class="btn-secondary" @click="resetOAuthAppForm">清空</button>
         </div>
       </form>
 
