@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -33,11 +33,18 @@ const showChangeEmailModal = ref(false)
 
 // 获取风格的国际化名称
 function getStyleLabel(style: string): string {
+  if (!style) return t('profile.avatar.defaultStyle')
   return t(`profile.avatar.styles.${style}`)
 }
 
 const hasAvatarChanged = computed(() => {
-  return selectedAvatarStyle.value !== authStore.user?.avatarStyle
+  return (selectedAvatarStyle.value || '') !== (authStore.user?.avatarStyle || '')
+})
+
+watch(() => authStore.user?.avatarStyle, (val?: string) => {
+  if (!hasAvatarChanged.value) {
+    selectedAvatarStyle.value = val || ''
+  }
 })
 
 async function saveAvatarStyle(): Promise<void> {
@@ -172,10 +179,31 @@ defineExpose({ loadUserDetails })
             <!-- 风格选择 -->
             <div class="flex-1 w-full">
               <div class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                <!-- 默认风格（背景+首字母） -->
+                <button
+                  type="button"
+                  class="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all cursor-pointer"
+                  :class="[
+                    !selectedAvatarStyle
+                      ? 'border-primary-500 bg-primary-500/10'
+                      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                  ]"
+                  :title="$t('profile.avatar.defaultStyle')"
+                  @click="selectedAvatarStyle = ''"
+                >
+                  <UserAvatar 
+                    :username="authStore.user?.username || ''"
+                    :email="authStore.user?.email" 
+                    avatar-style=""
+                    :prefer-badge="false"
+                    :size="32"
+                  />
+                </button>
                 <button
                   v-for="style in avatarStyles"
                   :key="style"
-                  class="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all"
+                  type="button"
+                  class="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all cursor-pointer"
                   :class="[
                     selectedAvatarStyle === style
                       ? 'border-primary-500 bg-primary-500/10'

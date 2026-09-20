@@ -2265,6 +2265,7 @@ export default {
         // Avatar
         avatar: {
             title: 'Avatar Style',
+            defaultStyle: 'Default',
             saveSuccess: 'Avatar style updated',
             saveFailed: 'Failed to update avatar style',
             styles: {

@@ -377,7 +377,7 @@ function getNetworkModeText(mode: string | null | undefined) {
             <UserAvatar
               :username="activeTab === 'sent' ? (transfer.toUser?.username || '') : (transfer.fromUser?.username || '')"
               :email="activeTab === 'sent' ? (transfer.toUser?.email || null) : (transfer.fromUser?.email || null)"
-              :avatar-style="activeTab === 'sent' ? (transfer.toUser?.avatarStyle || 'bigSmile') : (transfer.fromUser?.avatarStyle || 'bigSmile')"
+              :avatar-style="activeTab === 'sent' ? (transfer.toUser?.avatarStyle || '') : (transfer.fromUser?.avatarStyle || '')"
               :badge-id="activeTab === 'sent' ? (transfer.toUser?.avatarBadgeId || null) : (transfer.fromUser?.avatarBadgeId || null)"
               :size="28"
             />
@@ -568,7 +568,7 @@ function getNetworkModeText(mode: string | null | undefined) {
                   <UserAvatar 
                     :username="activeTab === 'sent' ? (transfer.toUser?.username || '') : (transfer.fromUser?.username || '')" 
                     :email="activeTab === 'sent' ? (transfer.toUser?.email || null) : (transfer.fromUser?.email || null)"
-                    :avatar-style="activeTab === 'sent' ? (transfer.toUser?.avatarStyle || 'bigSmile') : (transfer.fromUser?.avatarStyle || 'bigSmile')"
+                    :avatar-style="activeTab === 'sent' ? (transfer.toUser?.avatarStyle || '') : (transfer.fromUser?.avatarStyle || '')"
                     :badge-id="activeTab === 'sent' ? (transfer.toUser?.avatarBadgeId || null) : (transfer.fromUser?.avatarBadgeId || null)"
                     :size="28"
                   />

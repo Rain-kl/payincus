@@ -652,7 +652,7 @@ onMounted(async () => {
                   <UserAvatar
                     :username="authStore.user?.username || ''"
                     :email="authStore.user?.email"
-                    :avatar-style="authStore.user?.avatarStyle || 'adventurer'"
+                    :avatar-style="authStore.user?.avatarStyle || ''"
                     :size="54"
                   />
                 </div>

@@ -522,7 +522,7 @@ export default async function hostingRoutes(fastify: FastifyInstance) {
               id: 0,
               username: log.snapshotBuyerName || '',
               email: log.snapshotBuyerEmail || null,
-              avatarStyle: log.snapshotBuyerAvatar || 'bigSmile',
+              avatarStyle: log.snapshotBuyerAvatar || '',
               avatarBadgeId: null
             },
             host: {

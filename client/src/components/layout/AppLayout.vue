@@ -276,7 +276,7 @@ onUnmounted(() => {
             <UserAvatar 
               :username="authStore.user?.username || ''" 
               :email="authStore.user?.email"
-              :avatar-style="authStore.user?.avatarStyle || 'bigSmile'"
+              :avatar-style="authStore.user?.avatarStyle || ''"
               :size="28"
             />
             <span class="hidden sm:block text-sm text-white">{{ authStore.user?.username }}</span>

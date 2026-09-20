@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import BadgeImage from '@/components/BadgeImage.vue'
@@ -61,30 +61,58 @@ const styleNameMap: Record<string, string> = {
   thumbs: 'thumbs'
 }
 
-const styleKeys = Object.keys(styleNameMap)
+// 预设高辨识度与优雅质感背景色盘
+const AVATAR_BG_PALETTE = [
+  'bg-blue-600 text-white',
+  'bg-indigo-600 text-white',
+  'bg-emerald-600 text-white',
+  'bg-amber-600 text-white',
+  'bg-rose-600 text-white',
+  'bg-cyan-600 text-white',
+  'bg-violet-600 text-white',
+  'bg-teal-600 text-white',
+  'bg-slate-700 text-white'
+]
 
-// 根据用户名生成一个稳定的随机索引
-function getStableRandomIndex(seed: string): number {
+function getAvatarBgClass(name: string): string {
+  if (!name) return 'bg-zinc-700 text-white'
   let hash = 0
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i)
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i)
     hash |= 0
   }
-  return Math.abs(hash) % styleKeys.length
+  const index = Math.abs(hash) % AVATAR_BG_PALETTE.length
+  return AVATAR_BG_PALETTE[index]
+}
+
+const avatarBgClass = computed(() => getAvatarBgClass(props.username))
+
+const displayInitial = computed(() => {
+  const name = (props.username || '').trim()
+  if (!name) return '?'
+  return name.charAt(0).toUpperCase()
+})
+
+const imgFailed = ref(false)
+
+watch(() => [props.avatarStyle, props.username, props.email], () => {
+  imgFailed.value = false
+})
+
+function onImgError() {
+  imgFailed.value = true
 }
 
 const avatarUrl = computed(() => {
   if (!props.username) return ''
   
-  // 如果没有指定风格或风格无效，根据用户名随机选择
-  let styleKey = props.avatarStyle
+  // 未设置头像风格或风格无效时，返回空字符串（触发默认背景+首字母大写展示）
+  const styleKey = props.avatarStyle?.trim()
   if (!styleKey || !styleNameMap[styleKey]) {
-    const idx = getStableRandomIndex(props.username)
-    styleKey = styleKeys[idx]
+    return ''
   }
   
   const styleName = styleNameMap[styleKey]
-  // 优先使用邮箱作为 seed，没有邮箱时降级使用用户名
   const seed = encodeURIComponent(props.email || props.username)
   const apiBase = configStore.avatarApiBase
   return `${apiBase}/${styleName}/svg?seed=${seed}&size=${props.size}`
@@ -99,10 +127,14 @@ const effectiveBadgeId = computed(() => {
   return null
 })
 
-const sizeStyle = computed(() => ({
-  width: `${props.size}px`,
-  height: `${props.size}px`
-}))
+const sizeStyle = computed(() => {
+  const s = props.size || 32
+  return {
+    width: `${s}px`,
+    height: `${s}px`,
+    fontSize: `${Math.max(11, Math.round(s * 0.44))}px`
+  }
+})
 </script>
 
 <template>
@@ -114,18 +146,20 @@ const sizeStyle = computed(() => ({
     variant="avatar"
   />
   <img 
-    v-else-if="avatarUrl"
+    v-else-if="avatarUrl && !imgFailed"
     :src="avatarUrl" 
     :alt="username"
-    class="rounded-full"
+    class="rounded-full object-cover shrink-0 select-none"
     :style="sizeStyle"
     loading="lazy"
+    @error="onImgError"
   />
   <div 
     v-else
-    class="rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-medium"
+    class="rounded-full flex items-center justify-center font-semibold shrink-0 select-none leading-none shadow-sm"
+    :class="avatarBgClass"
     :style="sizeStyle"
   >
-    {{ username?.charAt(0).toUpperCase() }}
+    {{ displayInitial }}
   </div>
 </template>

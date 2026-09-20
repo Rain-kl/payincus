@@ -2995,6 +2995,7 @@ const zhTW = {
         // 頭像
         avatar: {
             title: '頭像風格',
+            defaultStyle: '預設',
             saveSuccess: '頭像風格已更新',
             saveFailed: '更新頭像風格失敗',
             styles: {

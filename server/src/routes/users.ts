@@ -533,6 +533,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
           avatarStyle: {
             type: 'string',
             enum: [
+              '',
               'adventurer', 'adventurerNeutral', 'avataaars', 'avataaarsNeutral',
               'bigEars', 'bigEarsNeutral', 'bigSmile', 'bottts', 'botttsNeutral',
               'croodles', 'croodlesNeutral', 'dylan', 'funEmoji', 'glass', 'icons',
@@ -644,7 +645,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       updates.passwordHash = await bcrypt.hash(password, 12)
     }
 
-    if (avatarStyle) {
+    if (avatarStyle !== undefined) {
       updates.avatarStyle = avatarStyle
     }
 
@@ -682,7 +683,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
       const updateActions: string[] = []
       if (email !== undefined) updateActions.push('email')
       if (password) updateActions.push('password')
-      if (avatarStyle) updateActions.push('avatarStyle')
+      if (avatarStyle !== undefined) updateActions.push('avatarStyle')
 
       await createLog(
         request.user.id,

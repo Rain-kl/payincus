@@ -31,7 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
       username: rawUser.username,
       email: rawUser.email || '',
       role: rawUser.role,
-      avatarStyle: rawUser.avatarStyle || 'bigSmile',
+      avatarStyle: rawUser.avatarStyle || '',
       avatarBadgeId: rawUser.avatarBadgeId || null,
       hasCreatedHostBefore: rawUser.hasCreatedHostBefore || false,
       canAccessHostingFeature: rawUser.canAccessHostingFeature ?? true

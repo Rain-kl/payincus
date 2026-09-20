@@ -1756,7 +1756,7 @@ function copyToClipboard(text: string) {
               <div>
                 <div class="text-xs text-themed-muted">{{ $t('admin.billing.user') }}</div>
                 <div class="mt-1 flex min-w-0 items-center gap-2">
-                  <UserAvatar :username="inst.user?.username || ''" :avatar-style="inst.user?.avatarStyle || 'bottts'" :badge-id="inst.user?.avatarBadgeId || null" :size="24" />
+                  <UserAvatar :username="inst.user?.username || ''" :avatar-style="inst.user?.avatarStyle || ''" :badge-id="inst.user?.avatarBadgeId || null" :size="24" />
                   <div class="min-w-0">
                     <div class="truncate text-themed">{{ inst.user?.username || '-' }}</div>
                     <div class="truncate text-xs text-themed-muted">#{{ inst.user?.id }} {{ inst.user?.email || '' }}</div>
@@ -1939,7 +1939,7 @@ function copyToClipboard(text: string) {
                 <!-- 用户 -->
                 <td class="p-3 whitespace-nowrap">
                   <div class="flex items-center gap-2">
-                    <UserAvatar :username="inst.user?.username || ''" :avatar-style="inst.user?.avatarStyle || 'bottts'" :badge-id="inst.user?.avatarBadgeId || null" :size="28" />
+                    <UserAvatar :username="inst.user?.username || ''" :avatar-style="inst.user?.avatarStyle || ''" :badge-id="inst.user?.avatarBadgeId || null" :size="28" />
                     <div class="flex flex-col">
                       <span class="truncate text-themed font-medium">{{ inst.user?.username || '-' }}</span>
                       <div class="flex items-center gap-1 text-xs text-themed-muted">

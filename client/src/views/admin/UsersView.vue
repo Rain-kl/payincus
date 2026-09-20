@@ -1134,7 +1134,7 @@ function _getQuotaPercent(used, limit) {
                 <UserAvatar
                   :username="user.username"
                   :email="user.email"
-                  :avatar-style="user.avatarStyle || 'bigSmile'"
+                  :avatar-style="user.avatarStyle || ''"
                   :badge-id="user.avatarBadgeId || null"
                   :size="40"
                 />
@@ -1329,7 +1329,7 @@ function _getQuotaPercent(used, limit) {
                     <UserAvatar 
                       :username="user.username" 
                       :email="user.email"
-                      :avatar-style="user.avatarStyle || 'bigSmile'"
+                      :avatar-style="user.avatarStyle || ''"
                       :badge-id="user.avatarBadgeId || null"
                       :size="36"
                     />

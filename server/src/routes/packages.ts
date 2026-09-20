@@ -1174,7 +1174,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
               id: p.user_id,
               username: p.owner_username,
               email: p.owner_email,
-              avatarStyle: p.owner_avatar_style || 'bigSmile',
+              avatarStyle: p.owner_avatar_style || '',
               avatarBadgeId: (p as any).owner_avatar_badge_id || null
             }
           })),

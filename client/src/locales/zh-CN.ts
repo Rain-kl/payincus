@@ -2448,6 +2448,7 @@ export default {
         // 头像
         avatar: {
             title: '头像风格',
+            defaultStyle: '默认',
             saveSuccess: '头像风格已更新',
             saveFailed: '更新头像风格失败',
             styles: {

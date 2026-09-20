@@ -174,7 +174,7 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 }
 
 // 可用的头像风格
-const AVATAR_STYLES = [
+export const AVATAR_STYLES = [
   'adventurer', 'adventurerNeutral', 'avataaars', 'avataaarsNeutral',
   'bigEars', 'bigEarsNeutral', 'bigSmile', 'bottts', 'botttsNeutral',
   'croodles', 'croodlesNeutral', 'dylan', 'funEmoji', 'glass', 'icons',
@@ -196,8 +196,8 @@ export async function createUser(
   const { getDefaultQuotaConfig } = await import('./system-config.js')
   const defaultQuota = await getDefaultQuotaConfig()
 
-  // 随机选择头像风格
-  const avatarStyle = AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)]
+  // 默认头像风格为空（使用背景+首字母展示）
+  const avatarStyle = ''
 
   const user = await prisma.user.create({
     data: {
@@ -400,7 +400,7 @@ export async function createRegisteredUser(
     getDefaultQuotaConfig(),
     getFreeSiteRegisterGiftConfig()
   ])
-  const avatarStyle = AVATAR_STYLES[Math.floor(Math.random() * AVATAR_STYLES.length)]
+  const avatarStyle = ''
   const normalizedEmail = input.email?.toLowerCase().trim() || null
 
   try {
