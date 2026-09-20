@@ -52,7 +52,7 @@
 
   /* 亮色主题变量 · OCI Console 对标参考截图 */
   .light {
-    --bg-primary: #ffffff;
+    --bg-primary: #F6F4F3;
     --bg-secondary: #ffffff;
     --bg-tertiary: #f9f9f8;
     --bg-elevated: #ffffff;
@@ -1554,17 +1554,40 @@ textarea.input,
   @apply bg-gray-100;
 }
 
-/* ============ 弹窗/下拉菜单主题 ============ */
+/* ============ 弹窗/下拉菜单主题（纯实色不透明规范） ============ */
+.dropdown-menu,
+.kawaii-menu-panel,
+[role='menu'],
+.popover,
+.oci-user-dropdown {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 .dropdown-menu {
   @apply rounded-lg shadow-lg overflow-hidden;
 }
 
-.dark .dropdown-menu {
-  @apply bg-gray-900 border border-gray-800;
+.dark .dropdown-menu,
+:global(.dark) .dropdown-menu,
+:global(.dark) .kawaii-menu-panel,
+:global(.dark) [role='menu'],
+:global(.dark) .popover,
+:global(.dark) .oci-user-dropdown {
+  background-color: #1f1d1b !important;
+  border-color: #312e2b !important;
+  color: #f4f4f3 !important;
 }
 
-.light .dropdown-menu {
-  @apply bg-white border border-gray-200;
+.light .dropdown-menu,
+:global(.light) .dropdown-menu,
+:global(.light) .kawaii-menu-panel,
+:global(.light) [role='menu'],
+:global(.light) .popover,
+:global(.light) .oci-user-dropdown {
+  background-color: #ffffff !important;
+  border-color: #e0dfdd !important;
+  color: #161513 !important;
 }
 
 .dropdown-item {

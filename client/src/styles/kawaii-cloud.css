@@ -7,7 +7,7 @@
      - 阴影清零（Flat Design），保持平整企业云控制台质感。
      ============================================================ */
   .light {
-    --kawaii-bg: #ffffff;
+    --kawaii-bg: #F6F4F3;
     --kawaii-surface: #ffffff;
     --kawaii-surface-soft: #f9f9f8;
     --kawaii-line: #e0dfdd;
@@ -113,8 +113,9 @@
   .kawaii-menu-panel {
     border-color: var(--kawaii-line) !important;
     background: var(--kawaii-surface) !important;
-    box-shadow: 0 18px 46px rgb(17 17 26 / 0.18);
-    backdrop-filter: blur(18px) saturate(1.05);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     overflow: hidden;
   }
 
@@ -558,10 +559,11 @@
   .kawaii-app-shell .dropdown-menu,
   .kawaii-app-shell .popover {
     border-color: var(--kawaii-line) !important;
-    background: color-mix(in srgb, var(--kawaii-surface) 90%, transparent) !important;
+    background: var(--kawaii-surface) !important;
     color: var(--kawaii-text) !important;
-    box-shadow: var(--kawaii-shadow);
-    backdrop-filter: blur(18px);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.12) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   /* OCI 弹窗：实色不透明背景，去掉半透明渐变 */
@@ -805,16 +807,17 @@
     color: revert;
   }
 
-  .kawaii-page :where([class*='absolute'][class*='z-50'][class*='shadow-xl'], [class*='absolute'][class*='z-40'][class*='shadow-xl'], [class*='absolute'][class*='z-50'][class*='shadow-lg']) {
+  .kawaii-page :where([class*='absolute'][class*='z-50'][class*='shadow-xl'], [class*='absolute'][class*='z-40'][class*='shadow-xl'], [class*='absolute'][class*='z-50'][class*='shadow-lg'], [class*='absolute'][class*='z-40'][class*='shadow-lg']) {
     border-color: var(--kawaii-line) !important;
-    background: color-mix(in srgb, var(--kawaii-surface) 90%, transparent) !important;
+    background: var(--kawaii-surface) !important;
     color: var(--kawaii-text) !important;
-    box-shadow: var(--kawaii-shadow) !important;
-    backdrop-filter: blur(18px);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.12) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
-  .kawaii-page :where([class*='absolute'][class*='z-50'][class*='shadow-xl'], [class*='absolute'][class*='z-40'][class*='shadow-xl'], [class*='absolute'][class*='z-50'][class*='shadow-lg']) :where([class*='hover:bg-gray-50'], [class*='hover:bg-gray-100'], [class*='dark:hover:bg-gray-800']):hover {
-    background-color: color-mix(in srgb, var(--kawaii-surface-soft) 88%, transparent) !important;
+  .kawaii-page :where([class*='absolute'][class*='z-50'][class*='shadow-xl'], [class*='absolute'][class*='z-40'][class*='shadow-xl'], [class*='absolute'][class*='z-50'][class*='shadow-lg'], [class*='absolute'][class*='z-40'][class*='shadow-lg']) :where([class*='hover:bg-gray-50'], [class*='hover:bg-gray-100'], [class*='dark:hover:bg-gray-800']):hover {
+    background-color: var(--kawaii-surface-soft) !important;
   }
 
   .kawaii-page .kawaii-theme-exempt,

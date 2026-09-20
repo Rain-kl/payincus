@@ -1058,6 +1058,7 @@ export default {
             clone: 'Clone',
             suspend: 'Suspend',
             unsuspend: 'Unsuspend',
+            more: 'More',
         },
         renameModal: {
             title: 'Rename Instance',

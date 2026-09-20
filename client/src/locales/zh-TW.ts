@@ -1208,6 +1208,7 @@ const zhTW = {
             clone: '複製',
             suspend: '封停',
             unsuspend: '解封',
+            more: '更多操作',
         },
         renameModal: {
             title: '重新命名實例',

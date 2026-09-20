@@ -1241,6 +1241,7 @@ export default {
             clone: '复制',
             suspend: '封停',
             unsuspend: '解封',
+            more: '更多操作',
         },
         renameModal: {
             title: '重命名实例',
