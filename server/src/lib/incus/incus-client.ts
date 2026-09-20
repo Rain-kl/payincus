@@ -6,6 +6,7 @@
 import { Agent, request } from 'undici'
 import { readFileSync } from 'fs'
 import tls from 'node:tls'
+import net from 'node:net'
 import type {
   IncusClientOptions,
   IncusApiResponse
@@ -88,13 +89,28 @@ export class IncusClient {
                 this.options.targetHost || '127.0.0.1',
                 this.options.targetPort || 8443
               )
+              const rawHost = _opts?.servername || _opts?.hostname
+              const servername = rawHost && !net.isIP(rawHost) ? rawHost : undefined
               const tlsSocket = tls.connect({
                 socket: duplex,
                 cert,
                 key,
-                rejectUnauthorized: false
+                rejectUnauthorized: false,
+                servername
               })
-              cb(null, tlsSocket)
+              let cbCalled = false
+              tlsSocket.once('secureConnect', () => {
+                if (!cbCalled) {
+                  cbCalled = true
+                  cb(null, tlsSocket)
+                }
+              })
+              tlsSocket.once('error', (err) => {
+                if (!cbCalled) {
+                  cbCalled = true
+                  cb(err, null as any)
+                }
+              })
             } catch (err: any) {
               cb(err, null as any)
             }

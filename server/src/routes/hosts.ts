@@ -8,6 +8,8 @@ import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
+import tls from 'tls'
+import net from 'node:net'
 import { Agent, request as undiciRequest } from 'undici'
 import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
@@ -155,6 +157,18 @@ function formatStoragePoolCreateError(error: unknown): string {
     return [
       '宿主机缺少 LVM 管理工具，当前系统无法创建 LVM 存储池。',
       '请先在宿主机执行 apt-get update && apt-get install -y lvm2，并确认 which lvm / lvm version 正常后再重试。原始错误:',
+      message
+    ].join(' ')
+  }
+
+  if (
+    lowerMessage.includes('dm-thin-pool') ||
+    (lowerMessage.includes('thin-pool') && lowerMessage.includes('device-mapper')) ||
+    lowerMessage.includes('module dm-thin-pool not found')
+  ) {
+    return [
+      '宿主机内核缺少 dm-thin-pool 模块，当前系统无法创建 LVM Thinpool（精简卷）。',
+      '请在创建 LVM 存储池时取消勾选“启用 Thinpool（精简配置）”，或改用 DIR 存储池。原始错误:',
       message
     ].join(' ')
   }
@@ -1658,13 +1672,60 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
 
     // 创建 undici Agent（携带面板的 Client 证书）
-    const panelAgent = new Agent({
-      connect: {
-        cert,
-        key,
-        rejectUnauthorized: false  // 首次连接必须忽略宿主机的自签名证书错误
+    const isTunnel = (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false
+    let panelAgent: Agent
+    if (isTunnel) {
+      if (!hostTunnelManager.isTunnelOnline(host.id)) {
+        return reply.code(400).send({ error: '宿主机内网穿透通道未连接（Agent 离线），请确保 Agent 正常运行后再点击验证' })
       }
-    })
+      panelAgent = new Agent({
+        connect: (_opts: any, cb: (err: Error | null, socket: any) => void) => {
+          try {
+            const duplex = hostTunnelManager.createDuplexStream(
+              host.id,
+              (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
+              (host as any).targetPort ?? (host as any).target_port ?? 8443
+            )
+            const rawHost = _opts?.servername || _opts?.hostname
+            const servername = rawHost && !net.isIP(rawHost) ? rawHost : undefined
+            const tlsSocket = tls.connect({
+              socket: duplex,
+              cert,
+              key,
+              rejectUnauthorized: false,
+              servername
+            })
+            let cbCalled = false
+            tlsSocket.once('secureConnect', () => {
+              if (!cbCalled) {
+                cbCalled = true
+                cb(null, tlsSocket)
+              }
+            })
+            tlsSocket.once('error', (err) => {
+              if (!cbCalled) {
+                cbCalled = true
+                cb(err, null as any)
+              }
+            })
+          } catch (err: any) {
+            cb(err, null as any)
+          }
+        },
+        headersTimeout: 120000,
+        bodyTimeout: 300000
+      })
+    } else {
+      panelAgent = new Agent({
+        connect: {
+          cert,
+          key,
+          rejectUnauthorized: false  // 首次连接必须忽略宿主机的自签名证书错误
+        },
+        headersTimeout: 120000,
+        bodyTimeout: 300000
+      })
+    }
 
     try {
       // 证书模式：证书已在安装脚本中导入，直接测试连接

@@ -87,6 +87,9 @@ export async function getAllHosts(): Promise<Host[]> {
     cpu_allowance_max: host.cpuAllowanceMax,
     memory_max: host.memoryMax,
     storage_size: host.storageSize,
+    tunnel_enabled: host.tunnelEnabled,
+    target_host: host.targetHost,
+    target_port: host.targetPort,
     created_at: host.createdAt.toISOString(),
     updated_at: host.updatedAt.toISOString()
   }))
@@ -169,6 +172,9 @@ export async function getHostById(id: number): Promise<Host | null> {
     announcement: host.announcement,
     // 探针地址
     probe_url: host.probeUrl,
+    tunnel_enabled: host.tunnelEnabled,
+    target_host: host.targetHost,
+    target_port: host.targetPort,
     created_at: host.createdAt.toISOString(),
     updated_at: host.updatedAt.toISOString()
   }
@@ -204,6 +210,9 @@ export async function getHostByUserAndName(userId: number, name: string): Promis
     cpu_used: host.cpuUsed,
     memory_used: host.memoryUsed,
     disk_used: host.diskUsed,
+    tunnel_enabled: host.tunnelEnabled,
+    target_host: host.targetHost,
+    target_port: host.targetPort,
     created_at: host.createdAt.toISOString(),
     updated_at: host.updatedAt.toISOString()
   }
@@ -978,7 +987,10 @@ export async function selectAvailableHost(options: {
       ipv6_subnet: host.ipv6Subnet,
       ipv6_gateway: host.ipv6Gateway,
       ipv6_parent_interface: host.ipv6ParentInterface,
-      instance_type: host.instanceType  // 添加实例类型字段
+      instance_type: host.instanceType,  // 添加实例类型字段
+      tunnel_enabled: host.tunnelEnabled,
+      target_host: host.targetHost,
+      target_port: host.targetPort
     }
   }
 

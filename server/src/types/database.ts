@@ -98,6 +98,9 @@ export interface Host {
   instance_type?: 'container' | 'vm' | 'both'
   nat_ports_used_count?: number
   tags?: string[]
+  tunnel_enabled?: boolean
+  target_host?: string
+  target_port?: number
   // Caddy 反代配置
   caddy_enabled?: boolean
   caddy_username?: string | null

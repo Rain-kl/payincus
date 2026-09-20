@@ -137,6 +137,25 @@ func (w *Worker) runLoop(ctx context.Context) {
 	}
 }
 
+type streamEntry struct {
+	writeChan chan []byte
+	closeOnce sync.Once
+	closed    chan struct{}
+}
+
+func newStreamEntry() *streamEntry {
+	return &streamEntry{
+		writeChan: make(chan []byte, 128),
+		closed:    make(chan struct{}),
+	}
+}
+
+func (s *streamEntry) close() {
+	s.closeOnce.Do(func() {
+		close(s.closed)
+	})
+}
+
 func (w *Worker) connectAndServe(ctx context.Context) error {
 	panelURL := strings.TrimRight(w.cfg.PanelURL, "/")
 	var wsURL string
@@ -183,13 +202,13 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 	writeErrChan := make(chan error, 1)
 
 	var streamsMu sync.Mutex
-	streams := make(map[uint32]net.Conn)
+	streams := make(map[uint32]*streamEntry)
 	defer func() {
 		streamsMu.Lock()
-		for _, c := range streams {
-			c.Close()
+		for _, s := range streams {
+			s.close()
 		}
-		streams = make(map[uint32]net.Conn)
+		streams = make(map[uint32]*streamEntry)
 		streamsMu.Unlock()
 	}()
 
@@ -220,6 +239,11 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 			}
 		}
 	}()
+
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(70 * time.Second))
+		return nil
+	})
 
 	// Read pump
 	for {
@@ -261,22 +285,58 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 				tPort = openCfg.TargetPort
 			}
 
-			go func(sID uint32, host string, port int) {
+			s := newStreamEntry()
+			streamsMu.Lock()
+			if old, exists := streams[streamID]; exists {
+				old.close()
+			}
+			streams[streamID] = s
+			streamsMu.Unlock()
+
+			go func(sID uint32, host string, port int, entry *streamEntry) {
+				defer entry.close()
+
 				addr := net.JoinHostPort(host, fmt.Sprint(port))
 				targetConn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 				if err != nil {
 					log.Printf("[tunnel] stream %d: dial local target %s failed: %v", sID, addr, err)
+					streamsMu.Lock()
+					if streams[sID] == entry {
+						delete(streams, sID)
+					}
+					streamsMu.Unlock()
 					select {
 					case writeChan <- EncodeFrame(FrameTypeReset, sID, nil):
 					case <-ctx.Done():
 					}
 					return
 				}
+				defer targetConn.Close()
 
-				streamsMu.Lock()
-				streams[sID] = targetConn
-				streamsMu.Unlock()
+				// Goroutine to drain incoming data from server and write to targetConn
+				go func() {
+					for {
+						select {
+						case data, ok := <-entry.writeChan:
+							if !ok {
+								if tcpConn, isTCP := targetConn.(*net.TCPConn); isTCP {
+									_ = tcpConn.CloseWrite()
+								}
+								return
+							}
+							if _, wErr := targetConn.Write(data); wErr != nil {
+								entry.close()
+								return
+							}
+						case <-entry.closed:
+							return
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
 
+				// Main stream goroutine reads from targetConn and sends data back to server
 				buf := make([]byte, 32*1024)
 				for {
 					n, readErr := targetConn.Read(buf)
@@ -284,16 +344,18 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 						dataFrame := EncodeFrame(FrameTypeData, sID, buf[:n])
 						select {
 						case writeChan <- dataFrame:
+						case <-entry.closed:
+							return
 						case <-ctx.Done():
-							targetConn.Close()
 							return
 						}
 					}
 					if readErr != nil {
 						streamsMu.Lock()
-						delete(streams, sID)
+						if streams[sID] == entry {
+							delete(streams, sID)
+						}
 						streamsMu.Unlock()
-						targetConn.Close()
 
 						if readErr == io.EOF {
 							select {
@@ -309,36 +371,40 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 						return
 					}
 				}
-			}(streamID, tHost, tPort)
+			}(streamID, tHost, tPort, s)
 
 		case FrameTypeData:
 			streamsMu.Lock()
-			targetConn, ok := streams[streamID]
+			entry, ok := streams[streamID]
 			streamsMu.Unlock()
-			if ok && targetConn != nil {
-				_, _ = targetConn.Write(payload)
+			if ok && entry != nil {
+				select {
+				case entry.writeChan <- payload:
+				case <-entry.closed:
+				case <-ctx.Done():
+				}
 			}
 
 		case FrameTypeClose:
 			streamsMu.Lock()
-			targetConn, ok := streams[streamID]
-			delete(streams, streamID)
+			entry, ok := streams[streamID]
+			if streams[streamID] == entry {
+				delete(streams, streamID)
+			}
 			streamsMu.Unlock()
-			if ok && targetConn != nil {
-				if tcpConn, isTCP := targetConn.(*net.TCPConn); isTCP {
-					_ = tcpConn.CloseWrite()
-				} else {
-					_ = targetConn.Close()
-				}
+			if ok && entry != nil {
+				close(entry.writeChan)
 			}
 
 		case FrameTypeReset:
 			streamsMu.Lock()
-			targetConn, ok := streams[streamID]
-			delete(streams, streamID)
+			entry, ok := streams[streamID]
+			if streams[streamID] == entry {
+				delete(streams, streamID)
+			}
 			streamsMu.Unlock()
-			if ok && targetConn != nil {
-				_ = targetConn.Close()
+			if ok && entry != nil {
+				entry.close()
 			}
 
 		case FrameTypeConfig:

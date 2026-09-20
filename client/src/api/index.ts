@@ -1160,15 +1160,15 @@ const api = {
       useExisting?: boolean  // 使用/导入已有存储池模式
       existingSource?: string  // 底层已存在的存储源名称（如 ZFS 池名、LVM VG 名）
     }): Promise<{ success: boolean; message: string; imported?: boolean }> =>
-      http.post(`/hosts/${id}/storage-pools`, data),
+      http.post(`/hosts/${id}/storage-pools`, data, { timeout: TIMEOUT.LONG }),
     deleteStoragePool: (id: number, poolName: string): Promise<{ success: boolean; message: string }> =>
-      http.delete(`/hosts/${id}/storage-pools/${poolName}`),
+      http.delete(`/hosts/${id}/storage-pools/${poolName}`, { timeout: TIMEOUT.LONG }),
     updateStoragePool: (id: number, poolName: string, data: {
       size?: string
       description?: string
       purpose?: 'instance_data' | 'instance_storage'
     }): Promise<{ success: boolean; message: string }> =>
-      http.patch(`/hosts/${id}/storage-pools/${poolName}`, data),
+      http.patch(`/hosts/${id}/storage-pools/${poolName}`, data, { timeout: TIMEOUT.LONG }),
     getPublicIpv4Pools: (id: number): Promise<{ pools: Array<{
       id: number
       name: string

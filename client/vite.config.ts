@@ -487,7 +487,7 @@ export default defineConfig(({ mode }) => {
           target: devProxyTarget,
           changeOrigin: true,
           ws: true,
-          timeout: 10000,
+          timeout: 120000,
           configure: (proxy, _options) => {
             proxy.on('error', (err, _req, res) => {
               // Handle proxy errors gracefully

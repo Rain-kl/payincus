@@ -236,7 +236,9 @@ async function createPool() {
     showCreateModal.value = false
     await loadPools()
   } catch (err: any) {
-    toast.error(t('admin.hosts.storage.createFailed') + ': ' + (err?.message || String(err)))
+    const errMsg = err?.message || String(err)
+    const prefix = t('admin.hosts.storage.createFailed')
+    toast.error(errMsg.startsWith(prefix) ? errMsg : `${prefix}: ${errMsg}`)
   } finally {
     creating.value = false
   }
@@ -253,7 +255,9 @@ async function deletePool(poolName: string) {
     toast.success(t('admin.hosts.storage.deleteSuccess'))
     await loadPools()
   } catch (err: any) {
-    toast.error(t('admin.hosts.storage.deleteFailed') + ': ' + (err?.message || String(err)))
+    const errMsg = err?.message || String(err)
+    const prefix = t('admin.hosts.storage.deleteFailed')
+    toast.error(errMsg.startsWith(prefix) ? errMsg : `${prefix}: ${errMsg}`)
   } finally {
     deleting.value = null
   }
