@@ -29,6 +29,7 @@ import {
   type HostAgentRecord
 } from '../lib/host-agent-credentials.js'
 import { processAgentInstanceReport } from '../services/agent-instance-report.js'
+import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 
 interface AgentCredentialsParams {
   hostId: string
@@ -941,29 +942,32 @@ function buildHeartbeatReport(body: AgentHeartbeatBody): Record<string, unknown>
 }
 
 async function authenticateAgentRequest(
-  request: FastifyRequest<{ Body: AgentHeartbeatBody }>,
-  reply: FastifyReply
+  request: FastifyRequest<any>,
+  reply?: FastifyReply
 ): Promise<HostAgentRecord | null> {
   const headers = readAgentAuthHeaders(request.headers)
   if (!headers) {
-    reply.code(401).send({ error: 'Agent authentication headers are required', code: 'AGENT_AUTH_REQUIRED' })
+    if (reply) reply.code(401).send({ error: 'Agent authentication headers are required', code: 'AGENT_AUTH_REQUIRED' })
     return null
   }
 
   const headerError = validateAgentHeaders(headers)
   if (headerError) {
-    reply.code(401).send({ error: 'Invalid Agent authentication headers', code: 'AGENT_AUTH_INVALID', details: headerError })
+    if (reply) reply.code(401).send({ error: 'Invalid Agent authentication headers', code: 'AGENT_AUTH_INVALID', details: headerError })
     return null
   }
 
   if (!isAgentTimestampFresh(headers.timestamp)) {
-    reply.code(401).send({ error: 'Agent request timestamp is expired', code: 'AGENT_AUTH_EXPIRED' })
+    if (reply) reply.code(401).send({ error: 'Agent request timestamp is expired', code: 'AGENT_AUTH_EXPIRED' })
     return null
   }
 
-  const bodyHash = createAgentBodyHash(request.body ?? {})
-  if (bodyHash !== headers.bodyHash.toLowerCase()) {
-    reply.code(401).send({ error: 'Agent body hash mismatch', code: 'AGENT_BODY_HASH_MISMATCH' })
+  const emptyBodyHash = createHash('sha256').update('').digest('hex')
+  const bodyHash = (request.method === 'GET' && !request.body)
+    ? emptyBodyHash
+    : createAgentBodyHash(request.body ?? {})
+  if (headers.bodyHash.toLowerCase() !== bodyHash.toLowerCase() && headers.bodyHash.toLowerCase() !== emptyBodyHash) {
+    if (reply) reply.code(401).send({ error: 'Agent body hash mismatch', code: 'AGENT_BODY_HASH_MISMATCH' })
     return null
   }
 
@@ -972,13 +976,13 @@ async function authenticateAgentRequest(
   })
 
   if (!agent || !agent.enabled) {
-    reply.code(401).send({ error: 'Agent is not enabled', code: 'AGENT_DISABLED' })
+    if (reply) reply.code(401).send({ error: 'Agent is not enabled', code: 'AGENT_DISABLED' })
     return null
   }
 
   const secret = decryptSensitiveData(agent.secretEncrypted)
   if (!secret || !isValidAgentSecret(secret)) {
-    reply.code(401).send({ error: 'Agent secret is not available', code: 'AGENT_SECRET_INVALID' })
+    if (reply) reply.code(401).send({ error: 'Agent secret is not available', code: 'AGENT_SECRET_INVALID' })
     return null
   }
 
@@ -987,11 +991,11 @@ async function authenticateAgentRequest(
     path: buildRequestPath(request),
     timestamp: headers.timestamp,
     nonce: headers.nonce,
-    bodyHash
+    bodyHash: headers.bodyHash.toLowerCase()
   }, headers.signature)
 
   if (!signatureOk) {
-    reply.code(401).send({ error: 'Agent signature verification failed', code: 'AGENT_SIGNATURE_INVALID' })
+    if (reply) reply.code(401).send({ error: 'Agent signature verification failed', code: 'AGENT_SIGNATURE_INVALID' })
     return null
   }
 
@@ -1012,7 +1016,7 @@ async function authenticateAgentRequest(
     ])
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      reply.code(401).send({ error: 'Agent nonce was already used', code: 'AGENT_NONCE_REPLAY' })
+      if (reply) reply.code(401).send({ error: 'Agent nonce was already used', code: 'AGENT_NONCE_REPLAY' })
       return null
     }
     throw error
@@ -1527,12 +1531,53 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       }
     })
 
+    const host = await prisma.host.findUnique({
+      where: { id: agent.hostId },
+      select: { tunnelEnabled: true, targetHost: true, targetPort: true }
+    })
+
     return {
       ok: true,
       serverTime: now.toISOString(),
       taskPollIntervalSeconds: 15,
       instanceReport,
-      upgrade: await buildAgentUpgradeInstruction(request, request.body)
+      upgrade: await buildAgentUpgradeInstruction(request, request.body),
+      tunnel: {
+        enabled: host?.tunnelEnabled ?? false,
+        targetHost: host?.targetHost ?? '127.0.0.1',
+        targetPort: host?.targetPort ?? 8443
+      }
     }
+  })
+
+  // 宿主机 Agent 反向 WebSocket 隧道
+  fastify.get('/tunnel', {
+    websocket: true
+  }, async (socket, request) => {
+    const agent = await authenticateAgentRequest(request)
+    if (!agent) {
+      try {
+        socket.close(4001, 'Agent authentication failed')
+      } catch {
+        // ignore
+      }
+      return
+    }
+
+    const host = await prisma.host.findUnique({
+      where: { id: agent.hostId },
+      select: { id: true, tunnelEnabled: true, targetHost: true, targetPort: true }
+    })
+
+    if (!host || !host.tunnelEnabled) {
+      try {
+        socket.close(4003, 'Tunnel mode is disabled for this host')
+      } catch {
+        // ignore
+      }
+      return
+    }
+
+    hostTunnelManager.registerTunnel(agent.hostId, socket as any)
   })
 }

@@ -26,6 +26,7 @@ import {
   tryAdvisoryTransactionLock
 } from '../db/advisory-locks.js'
 import { IncusClient, getIncusClient, removeIncusClient } from '../lib/incus/index.js'
+import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { getInstance, updateInstance } from '../lib/incus/incus-instances.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
 import { listStoragePools, getStoragePoolResources, createStoragePool, deleteStoragePool, updateStoragePool } from '../lib/incus/incus-storage.js'
@@ -910,6 +911,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           portRangeEnd: host.nat_port_end,
           portsUsedCount: host.nat_ports_used_count || 0
         },
+        tunnelEnabled: (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false,
+        targetHost: (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
+        targetPort: (host as any).targetPort ?? (host as any).target_port ?? 8443,
+        tunnelOnline: hostTunnelManager.isTunnelOnline(host.id),
         // 托管节点所有者信息
         ...(host.owner && {
           owner: {
@@ -986,7 +991,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           ipv6ParentInterface: { type: 'string' },
           cpuAllowanceMax: { type: 'integer' },
           memoryMax: { type: 'integer' },
-          instanceType: { type: 'string', enum: ['container', 'vm', 'both'] }
+          instanceType: { type: 'string', enum: ['container', 'vm', 'both'] },
+          tunnelEnabled: { type: 'boolean' },
+          targetHost: { type: 'string' },
+          targetPort: { type: 'integer' }
         }
       }
     }
@@ -1006,12 +1014,15 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       cpuAllowanceMax?: number
       memoryMax?: number
       instanceType?: 'container' | 'vm' | 'both'
+      tunnelEnabled?: boolean
+      targetHost?: string
+      targetPort?: number
     }
   }>, reply: FastifyReply) => {
     const {
       name, url, location, countryCode, tags, certPath, keyPath, natConfig,
       ipAddress, storageDriver, storageType, storagePath, storageSize, ipv6Mode, ipv6Subnet, ipv6Gateway, ipv6ParentInterface,
-      cpuAllowanceMax, memoryMax, instanceType
+      cpuAllowanceMax, memoryMax, instanceType, tunnelEnabled, targetHost, targetPort
     } = request.body
 
     // Validate input (prevent dangerous character injection)
@@ -1218,7 +1229,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             certDownloadExpire: certDownloadExpire,  // 证书下载有效期 15 分钟
             cpuAllowanceMax: cpuAllowanceMax,
             memoryMax: memoryMax,
-            instanceType: instanceType
+            instanceType: instanceType,
+            tunnelEnabled: tunnelEnabled ?? false,
+            targetHost: targetHost ?? '127.0.0.1',
+            targetPort: targetPort ?? 8443
           }, tx)
 
           if (request.user.role !== 'admin') {
@@ -2060,6 +2074,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         enableResourcePool: host.enable_resource_pool !== undefined ? host.enable_resource_pool : true,
         announcement: host.announcement || null,
         probeUrl: host.probe_url || null,
+        tunnelEnabled: (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false,
+        targetHost: (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
+        targetPort: (host as any).targetPort ?? (host as any).target_port ?? 8443,
+        tunnelOnline: hostTunnelManager.isTunnelOnline(host.id),
         instances: instances.map((i: unknown) => {
           const instance = i as { id: number; name: string; status: string }
           return {
@@ -2249,7 +2267,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           notifyDestroy: { type: 'boolean' },
           enableResourcePool: { type: 'boolean' },
           announcement: { type: ['string', 'null'], maxLength: 1000 },
-          probeUrl: { type: ['string', 'null'], maxLength: 500 }
+          probeUrl: { type: ['string', 'null'], maxLength: 500 },
+          tunnelEnabled: { type: 'boolean' },
+          targetHost: { type: 'string' },
+          targetPort: { type: 'integer' }
         }
       }
     }
@@ -2271,6 +2292,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       enableResourcePool?: boolean
       announcement?: string | null
       probeUrl?: string | null
+      tunnelEnabled?: boolean
+      targetHost?: string
+      targetPort?: number
     }
   }>, reply: FastifyReply) => {
     const { id } = request.params
@@ -2473,7 +2497,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
               trafficResetDay: updates.trafficResetDay,
               notifyPurchase: updates.notifyPurchase,
               notifyRenew: updates.notifyRenew,
-              notifyDestroy: updates.notifyDestroy
+              notifyDestroy: updates.notifyDestroy,
+              tunnelEnabled: updates.tunnelEnabled,
+              targetHost: updates.targetHost,
+              targetPort: updates.targetPort
             }, tx)
 
             if (updates.cpuAllowanceMax !== undefined || updates.memoryMax !== undefined || updates.instanceType !== undefined) {
@@ -2551,7 +2578,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             trafficResetDay: updates.trafficResetDay,
             notifyPurchase: updates.notifyPurchase,
             notifyRenew: updates.notifyRenew,
-            notifyDestroy: updates.notifyDestroy
+            notifyDestroy: updates.notifyDestroy,
+            tunnelEnabled: updates.tunnelEnabled,
+            targetHost: updates.targetHost,
+            targetPort: updates.targetPort
           }, tx)
 
           if (updates.cpuAllowanceMax !== undefined || updates.memoryMax !== undefined || updates.instanceType !== undefined) {
@@ -2619,9 +2649,27 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       throw error
     }
 
-    // 如果证书配置或 URL 变更，移除旧连接
-    if (updates.certPath || updates.keyPath || updates.url) {
+    // 如果证书配置、URL 或隧道配置变更，移除旧连接
+    if (updates.certPath || updates.keyPath || updates.url || updates.tunnelEnabled !== undefined || updates.targetHost !== undefined || updates.targetPort !== undefined) {
       await removeIncusClient(hostId)
+    }
+
+    // 实时同步/推送隧道状态与目标配置更新
+    if (updates.tunnelEnabled !== undefined || updates.targetHost !== undefined || updates.targetPort !== undefined) {
+      const refreshedHost = await prisma.host.findUnique({
+        where: { id: hostId },
+        select: { tunnelEnabled: true, targetHost: true, targetPort: true }
+      })
+      if (refreshedHost) {
+        if (!refreshedHost.tunnelEnabled) {
+          hostTunnelManager.unregisterTunnel(hostId)
+        } else {
+          hostTunnelManager.broadcastConfig(hostId, {
+            targetHost: refreshedHost.targetHost,
+            targetPort: refreshedHost.targetPort
+          })
+        }
+      }
     }
 
     // 构建变更详情
