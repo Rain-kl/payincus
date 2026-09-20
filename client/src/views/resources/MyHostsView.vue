@@ -477,8 +477,11 @@ onActivated(() => {
                 <div class="truncate text-sm font-semibold text-themed">
                   {{ host.name?.toUpperCase() || host.name }}
                 </div>
-                <div class="mt-0.5 truncate font-mono text-xs text-themed-muted">
-                  {{ host.location || host.url }}
+                <div class="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-themed-muted">
+                  <span v-if="host.tunnelEnabled" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-themed-secondary text-themed border border-themed shrink-0">
+                    {{ t('admin.hosts.tunnelMode') }}
+                  </span>
+                  <span class="truncate">{{ host.location || host.url }}</span>
                 </div>
               </div>
             </div>
@@ -562,8 +565,11 @@ onActivated(() => {
                     <div class="truncate font-medium text-themed">
                       {{ host.name?.toUpperCase() || host.name }}
                     </div>
-                    <div class="truncate font-mono text-xs text-themed-muted">
-                      {{ host.location || host.url }}
+                    <div class="flex items-center gap-1.5 truncate font-mono text-xs text-themed-muted">
+                      <span v-if="host.tunnelEnabled" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-themed-secondary text-themed border border-themed shrink-0">
+                        {{ t('admin.hosts.tunnelMode') }}
+                      </span>
+                      <span class="truncate">{{ host.location || host.url }}</span>
                     </div>
                   </div>
                 </div>

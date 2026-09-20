@@ -39,6 +39,10 @@ interface Host {
     portRangeEnd: number | null
     portsUsedCount?: number
   }
+  tunnelEnabled?: boolean
+  targetHost?: string
+  targetPort?: number
+  tunnelOnline?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -510,6 +514,25 @@ const xAxisLabels = computed(() => {
           <dt class="text-gray-500">{{ t('admin.hosts.apiUrl') }}</dt>
           <dd class="font-mono text-xs truncate max-w-[200px]" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'" :title="host.url">
             {{ host.url }}
+          </dd>
+        </div>
+        <div class="flex justify-between items-center">
+          <dt class="text-gray-500">{{ t('admin.hosts.connectionMode') }}</dt>
+          <dd class="flex items-center gap-1.5" :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
+            <span class="text-xs">{{ host.tunnelEnabled ? t('admin.hosts.tunnelMode') : t('admin.hosts.directMode') }}</span>
+            <span
+              v-if="host.tunnelEnabled"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium"
+              :class="host.tunnelOnline ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'"
+            >
+              {{ host.tunnelOnline ? t('admin.hosts.tunnelConnected') : t('admin.hosts.tunnelDisconnected') }}
+            </span>
+          </dd>
+        </div>
+        <div v-if="host.tunnelEnabled" class="flex justify-between items-center">
+          <dt class="text-gray-500">{{ t('admin.hosts.targetPort') }}</dt>
+          <dd class="font-mono text-xs" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
+            {{ host.targetPort || 8443 }}
           </dd>
         </div>
         <div v-if="host.createdAt" class="flex justify-between items-center">

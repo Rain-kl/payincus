@@ -35,8 +35,11 @@ const verifyError = ref('')
 const form = ref({
   name: '',
   nameSuffix: '',
+  tunnelEnabled: false,
   hostAddress: '',
   apiPort: 8443,
+  targetHost: '127.0.0.1',
+  targetPort: 8443,
   location: '',
   countryCode: 'us',
   cpuAllowanceMax: 0,
@@ -144,9 +147,14 @@ async function createHost() {
   if (!nameValidation.valid) { toast.error(nameValidation.message || t('admin.hosts.hostNameHint')); return }
   
   // 验证服务器地址
-  if (!form.value.hostAddress) { toast.error(t('admin.hosts.ipAddressRequired')); return }
-  const ipValidation = validateHostAddress(form.value.hostAddress, t('admin.hosts.ipAddress'))
-  if (!ipValidation.valid) { toast.error(ipValidation.message || ''); return }
+  if (!form.value.tunnelEnabled) {
+    if (!form.value.hostAddress) { toast.error(t('admin.hosts.ipAddressRequired')); return }
+    const ipValidation = validateHostAddress(form.value.hostAddress, t('admin.hosts.ipAddress'))
+    if (!ipValidation.valid) { toast.error(ipValidation.message || ''); return }
+  } else if (form.value.targetHost) {
+    const targetHostValidation = validateHostAddress(form.value.targetHost, t('admin.hosts.targetHost'))
+    if (!targetHostValidation.valid) { toast.error(targetHostValidation.message || ''); return }
+  }
   
   // 验证描述（如果提供）
   if (form.value.location) {
@@ -222,11 +230,16 @@ async function createHost() {
 
   saving.value = true
   try {
-    const url = buildHostApiUrl(form.value.hostAddress, form.value.apiPort || 8443)
+    const address = form.value.tunnelEnabled ? (form.value.targetHost?.trim() || '127.0.0.1') : form.value.hostAddress
+    const port = form.value.tunnelEnabled ? (form.value.targetPort || 8443) : (form.value.apiPort || 8443)
+    const url = buildHostApiUrl(address, port)
     
     const formData: any = {
       name: fullName,
       url: url,
+      tunnelEnabled: form.value.tunnelEnabled,
+      targetHost: form.value.tunnelEnabled ? (form.value.targetHost?.trim() || '127.0.0.1') : undefined,
+      targetPort: form.value.tunnelEnabled ? (form.value.targetPort || 8443) : undefined,
       location: form.value.location || undefined,
       countryCode: form.value.countryCode,
       cpuAllowanceMax: form.value.cpuAllowanceMax || undefined,
@@ -339,16 +352,61 @@ function closeAndGoBack() {
 
           <!-- 连接与网络 -->
           <section class="nimbus-card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_140px]">
+            <!-- 连接方式选择 -->
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.connectionMode') }}</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label
+                  class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+                  :class="!form.tunnelEnabled ? 'border-primary bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
+                >
+                  <input type="radio" :value="false" v-model="form.tunnelEnabled" class="radio text-primary" />
+                  <div>
+                    <div class="text-sm">{{ t('admin.hosts.directMode') }}</div>
+                  </div>
+                </label>
+                <label
+                  class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+                  :class="form.tunnelEnabled ? 'border-primary bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
+                >
+                  <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
+                  <div>
+                    <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 直连模式输入框 -->
+            <div v-if="!form.tunnelEnabled" class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_140px]">
               <div class="space-y-1.5">
                 <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.ipAddress') }}</label>
-                <input v-model="form.hostAddress" type="text" class="input font-mono" placeholder="10.0.0.1 / 2001:db8::1 / node.example.com" required />
+                <input v-model="form.hostAddress" type="text" class="input font-mono" placeholder="10.0.0.1 / 2001:db8::1 / node.example.com" :required="!form.tunnelEnabled" />
                 <p class="text-xs text-themed-muted">{{ t('admin.hosts.ipAddressHint') }}</p>
               </div>
               <div class="space-y-1.5">
                 <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.apiPort') }}</label>
-                <input v-model.number="form.apiPort" type="number" min="1" max="65535" class="input font-mono tabular-nums" placeholder="8443" required />
+                <input v-model.number="form.apiPort" type="number" min="1" max="65535" class="input font-mono tabular-nums" placeholder="8443" :required="!form.tunnelEnabled" />
                 <p class="text-xs text-themed-muted">{{ t('admin.hosts.apiPortHint') }}</p>
+              </div>
+            </div>
+
+            <!-- 穿透模式输入框与提示 -->
+            <div v-else class="space-y-4">
+              <div class="rounded-lg border border-themed bg-themed-secondary p-3 text-xs text-themed-secondary">
+                {{ t('admin.hosts.tunnelNotice') }}
+              </div>
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-[140px_1fr]">
+                <div class="space-y-1.5">
+                  <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.targetPort') }}</label>
+                  <input v-model.number="form.targetPort" type="number" min="1" max="65535" class="input font-mono tabular-nums" placeholder="8443" required />
+                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.targetPortHint') }}</p>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.targetHost') }}</label>
+                  <input v-model="form.targetHost" type="text" class="input font-mono" placeholder="127.0.0.1" />
+                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.targetHostHint') }}</p>
+                </div>
               </div>
             </div>
 
