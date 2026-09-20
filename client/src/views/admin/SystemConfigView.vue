@@ -129,6 +129,7 @@ const form = ref({
   brand_name: 'Incudal',
   brand_subtitle: '基于 Incus 的低价 NAT VPS',
   brand_logo_url: '/incudal_logo.webp',
+  brand_copyright: '',
   // 邮箱域名白名单配置
   email_domain_whitelist_enabled: false,
   email_allowed_domains: '',
@@ -183,7 +184,7 @@ const floatConfigKeys = ['transfer_fee', 'free_site_register_gift_balance', 'aff
 const booleanConfigKeys = ['registration_enabled', 'require_invite_code', 'hosting_feature_enabled', 'hosting_market_entry_enabled', 'ticket_enabled', 'ticket_auto_close_enabled', 'free_site_mode', 'free_site_register_gift_enabled', 'turnstile_enabled', 'smtp_enabled', 'smtp_secure', 'email_domain_whitelist_enabled']
 
 // 字符串类型的配置键
-const stringConfigKeys = ['turnstile_site_key', 'turnstile_secret_key', 'avatar_api_base', 'smtp_host', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name', 'email_allowed_domains', 'footer_contact_email', 'brand_name', 'brand_subtitle', 'brand_logo_url', 'hosting_notice']
+const stringConfigKeys = ['turnstile_site_key', 'turnstile_secret_key', 'avatar_api_base', 'smtp_host', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name', 'email_allowed_domains', 'footer_contact_email', 'brand_name', 'brand_subtitle', 'brand_logo_url', 'brand_copyright', 'hosting_notice']
 stringConfigKeys.push('popup_announcement', 'popup_promo_image_url', 'popup_promo_package_id', 'ticket_image_lsky_base_url', 'ticket_image_lsky_token', 'ticket_image_lsky_api_version', 'ticket_image_lsky_target_id')
 stringConfigKeys.push('system_update_allowed_admin_ids', 'payincus_gift_card_admin_ids')
 
@@ -516,7 +517,7 @@ const hasFooterLinkChanges = computed(() => {
   })
 })
 
-const brandKeys = ['brand_name', 'brand_subtitle', 'brand_logo_url']
+const brandKeys = ['brand_name', 'brand_subtitle', 'brand_logo_url', 'brand_copyright']
 async function saveBrand() {
   await saveConfigGroup(brandKeys, savingBrand)
   await configStore.loadPublicConfig(true)
@@ -1382,6 +1383,18 @@ async function sendTestEmail() {
                 placeholder="/incudal_logo.webp"
               />
               <p class="text-xs text-themed-muted">{{ t('admin.system.brand.logoDesc') || '支持 http(s) 图片地址或站点内绝对路径。' }}</p>
+            </div>
+            <div class="space-y-2 md:col-span-2">
+              <label class="block text-sm text-themed-secondary">
+                {{ t('admin.system.brand.copyright') || '版权所有' }}
+              </label>
+              <input
+                v-model="form.brand_copyright"
+                type="text"
+                class="input"
+                placeholder="版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。"
+              />
+              <p class="text-xs text-themed-muted">{{ t('admin.system.brand.copyrightDesc') || '显示在页面底部的版权所有文案，留空则使用默认值。' }}</p>
             </div>
           </div>
         </div>

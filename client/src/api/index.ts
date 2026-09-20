@@ -1986,6 +1986,7 @@ const api = {
       brandName?: string | null
       brandSubtitle?: string | null
       brandLogoUrl?: string | null
+      brandCopyright?: string | null
       popupAnnouncement?: string | null
       popupAnnouncementUpdatedAt?: string | null
       popupPromoImageUrl?: string | null
