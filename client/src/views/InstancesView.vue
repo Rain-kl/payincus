@@ -1464,7 +1464,7 @@ async function confirmBatchDestroy(): Promise<void> {
       <div class="flex items-center gap-2.5">
         <RouterLink
           :to="instanceCreatePath()"
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 transition-colors shadow-sm"
+          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white transition-colors shadow-sm"
         >
           {{ configStore.freeSiteMode ? freeSiteCopy.instanceCreate : $t('instance.create') }}
         </RouterLink>
@@ -1637,22 +1637,22 @@ async function confirmBatchDestroy(): Promise<void> {
         {{ search ? $t('instance.noMatchingInstances') : $t('instance.noInstances') }}
       </h3>
       <p class="text-themed-muted mb-4">{{ search ? $t('instance.tryOtherKeywords') : $t('instance.createFirstInstance') }}</p>
-      <RouterLink v-if="!search" :to="instanceCreatePath()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white dark:bg-white dark:hover:bg-gray-100 dark:text-gray-900 transition-colors shadow-sm">{{ configStore.freeSiteMode ? freeSiteCopy.instanceCreateFirst : $t('instance.create') }}</RouterLink>
+      <RouterLink v-if="!search" :to="instanceCreatePath()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white transition-colors shadow-sm">{{ configStore.freeSiteMode ? freeSiteCopy.instanceCreateFirst : $t('instance.create') }}</RouterLink>
     </div>
 
     <!-- 实例列表 -->
     <template v-else>
       <!-- 列表布局 (OCI 风格) -->
-      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: #ffffff; box-shadow: none; border: 1px solid #e5e5e4;">
-        <div class="overflow-x-auto oci-table-scroll bg-white dark:bg-[#161513]">
+      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: var(--bg-surface); box-shadow: none; border: 1px solid var(--border-color);">
+        <div class="overflow-x-auto oci-table-scroll bg-[var(--bg-surface)]">
           <table class="w-full table-fixed" style="table-layout: auto;">
-            <thead class="border-b border-[#e5e5e4] dark:border-[#2f2b28] bg-white dark:bg-[#161513]">
+            <thead class="border-b border-[var(--border-color)] dark:border-[var(--border-color)] bg-[var(--bg-surface)]">
               <tr>
                 <th class="w-12 px-3 py-3 text-center">
                   <div class="flex items-center justify-center">
                     <button
                       type="button"
-                      class="relative flex h-4 w-4 items-center justify-center rounded border border-[#d0cfcd] dark:border-[#444] bg-white dark:bg-[#1f1d1b] text-primary-600 transition-colors"
+                      class="relative flex h-4 w-4 items-center justify-center rounded border border-[var(--border-strong)] bg-[var(--bg-surface)] text-primary-600 transition-colors"
                       @click="toggleSelectAll"
                     >
                       <span v-if="isAllSelected" class="h-2 w-2 rounded-sm bg-current"></span>
@@ -1660,17 +1660,17 @@ async function confirmBatchDestroy(): Promise<void> {
                     </button>
                   </div>
                 </th>
-                <th class="max-w-64 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
-                <th class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
-                <th class="max-w-40 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
-                <th class="max-w-36 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.privateIp') }}</th>
-                <th class="max-w-48 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.config') }}</th>
-                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.ocpuCount') }}</th>
-                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.memoryGb') }}</th>
-                <th class="max-w-44 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.createdAt') }}</th>
-                <th v-if="isAdmin" class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.user') }}</th>
+                <th class="max-w-64 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
+                <th class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
+                <th class="max-w-40 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
+                <th class="max-w-36 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.privateIp') }}</th>
+                <th class="max-w-48 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.config') }}</th>
+                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.ocpuCount') }}</th>
+                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.memoryGb') }}</th>
+                <th class="max-w-44 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.createdAt') }}</th>
+                <th v-if="isAdmin" class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.user') }}</th>
                 <th class="w-full"></th>
-                <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-white dark:bg-[#161513] border-l border-[#e5e5e4] dark:border-[#2a2826]">
+                <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-[var(--bg-surface)] border-l border-[var(--border-color)]">
                   <span class="sr-only">{{ $t('common.actions') }}</span>
                 </th>
               </tr>
@@ -1678,14 +1678,14 @@ async function confirmBatchDestroy(): Promise<void> {
             <TransitionGroup
               tag="tbody"
               name="instance-table-order"
-              class="divide-y divide-[#e5e5e4] dark:divide-[#282624]"
+              class="divide-y divide-[var(--border-color)]"
             >
               <tr
                 v-for="instance in instances"
                 :key="instance.id"
-                class="group cursor-pointer transition-colors bg-white hover:bg-[#f7f7f6] dark:bg-[#161513] dark:hover:bg-[#1e1c1a]"
+                class="group cursor-pointer transition-colors bg-white hover:bg-[var(--bg-tertiary)] dark:bg-[var(--bg-surface)] dark:hover:bg-[var(--bg-tertiary)]"
                 :class="[
-                  selectedIds.has(instance.id) ? 'bg-[#edf2f7] dark:bg-[#1c2228]' : '',
+                  selectedIds.has(instance.id) ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))]' : '',
                   recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
                   instance.status?.toLowerCase() === 'creating' ? 'creating-row' : ''
                 ]"
@@ -1708,19 +1708,19 @@ async function confirmBatchDestroy(): Promise<void> {
                   <div class="flex flex-col min-w-0 max-w-64">
                     <div class="flex items-center gap-2 min-w-0">
                       <span
-                        class="font-medium text-sm text-[#0563c1] dark:text-[#4da3ff] hover:underline truncate"
+                        class="font-medium text-sm text-[var(--accent)] hover:underline truncate"
                         :title="instance.name"
                       >
                         {{ instance.name }}
                       </span>
                       <span
                         v-if="!instance.packagePlanId"
-                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#ebe9e7] text-[#444] dark:bg-[#2c2a27] dark:text-[#bbb] border border-[#dcdad7] dark:border-[#3d3a36] shrink-0"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] dark:bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0"
                       >
                         {{ $t('instance.alwaysFree') }}
                       </span>
                     </div>
-                    <div class="text-[11px] text-[#716c67] dark:text-[#9e9892] truncate mt-0.5" :title="formatImageName(instance.image, (instance as any).imageName)">
+                    <div class="text-[11px] text-[var(--text-tertiary)] truncate mt-0.5" :title="formatImageName(instance.image, (instance as any).imageName)">
                       {{ formatImageName(instance.image, (instance as any).imageName) }}
                     </div>
                   </div>
@@ -1737,7 +1737,7 @@ async function confirmBatchDestroy(): Promise<void> {
                   </span>
                   <span
                     v-else-if="instance.status?.toLowerCase() === 'stopped'"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#e8e6e4] text-stone-600 border border-[#d8d6d4] dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--bg-tertiary)] text-stone-600 border border-[var(--border-color)] dark:bg-[var(--bg-tertiary)] dark:text-[var(--text-secondary)] dark:border-[var(--border-color)]"
                   >
                     <span class="w-1.5 h-1.5 rounded-full bg-stone-400 shrink-0"></span>
                     {{ $t('instance.status.stopped') }}
@@ -1791,11 +1791,11 @@ async function confirmBatchDestroy(): Promise<void> {
 
                 <!-- Actions: Fixed/Sticky to right -->
                 <td
-                  class="sticky right-0 z-10 w-14 px-2 py-3.5 text-center border-l border-[#e5e5e4] dark:border-[#2a2826] transition-colors"
+                  class="sticky right-0 z-10 w-14 px-2 py-3.5 text-center border-l border-[var(--border-color)] transition-colors"
                   :class="[
                     selectedIds.has(instance.id)
-                      ? 'bg-[#edf2f7] dark:bg-[#1c2228]'
-                      : 'bg-white group-hover:bg-[#f7f7f6] dark:bg-[#161513] dark:group-hover:bg-[#1e1c1a]'
+                      ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))]'
+                      : 'bg-white group-hover:bg-[var(--bg-tertiary)] dark:bg-[var(--bg-surface)] dark:group-hover:bg-[var(--bg-tertiary)]'
                   ]"
                   @click.stop
                 >
@@ -1819,7 +1819,7 @@ async function confirmBatchDestroy(): Promise<void> {
                       ></div>
                       <div
                         v-if="activeRowMenuId === instance.id"
-                        class="dropdown-menu kawaii-menu-panel fixed z-50 w-44 rounded border border-themed bg-white dark:bg-[#1f1d1b] shadow-2xl py-1.5 text-left text-xs select-none"
+                        class="dropdown-menu kawaii-menu-panel fixed z-50 w-44 rounded border border-themed bg-[var(--bg-surface)] shadow-2xl py-1.5 text-left text-xs select-none"
                         :style="{ top: `${rowMenuPosition.top}px`, right: `${rowMenuPosition.right}px` }"
                         @click.stop
                       >
@@ -1908,7 +1908,7 @@ async function confirmBatchDestroy(): Promise<void> {
           <div
             v-for="instance in instances"
             :key="instance.id"
-            class="nimbus-card-lift card overflow-hidden transition-all rounded-xl border border-black/[0.08] dark:border-white/[0.08] bg-white dark:bg-[#121212]"
+            class="nimbus-card-lift card overflow-hidden transition-all rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)]"
             :class="[
               instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
               recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
@@ -2178,8 +2178,8 @@ async function confirmBatchDestroy(): Promise<void> {
             :class="[
               instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
               recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
-              selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : 'border-black/[0.08] dark:border-white/[0.08]',
-              'bg-white dark:bg-[#121212] hover:border-black/20 dark:hover:border-white/20'
+              selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : 'border-[var(--border-color)]',
+              'bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)]'
             ]"
           >
             <div>
@@ -2476,12 +2476,12 @@ async function confirmBatchDestroy(): Promise<void> {
       </div>
     </template>
 
-    <div v-if="!loading && instances.length > 0" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-[#57534e] dark:text-[#a8a29e] py-3 px-1">
+    <div v-if="!loading && instances.length > 0" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-[var(--text-secondary)] py-3 px-1">
       <div class="flex items-center gap-2">
         <button
           :disabled="page <= 1"
           type="button"
-          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[#d0cfcd] dark:border-[#444] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[var(--border-strong)] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
           @click="goToPage(page - 1)"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
@@ -2489,7 +2489,7 @@ async function confirmBatchDestroy(): Promise<void> {
         <button
           :disabled="page >= totalPages"
           type="button"
-          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[#d0cfcd] dark:border-[#444] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[var(--border-strong)] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
           @click="goToPage(page + 1)"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>

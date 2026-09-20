@@ -1314,7 +1314,7 @@ function handleVisibilityChange() {
           <!-- 空状态 -->
           <div
             v-if="tabs.length === 0"
-            class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]"
+            class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]"
           >
             <div class="text-center px-6">
               <div class="w-16 h-16 mx-auto mb-4 rounded-2xl border border-neutral-700 bg-neutral-800/80 flex items-center justify-center">
@@ -1374,7 +1374,7 @@ function handleVisibilityChange() {
             v-for="tab in tabs"
             :key="tab.id"
             :ref="(el) => setContainerRef(tab.id, el as HTMLElement)"
-            class="terminal-container bg-[#0a0a0a]"
+            class="terminal-container bg-[var(--terminal-bg)]"
             :class="activeTabId === tab.id ? 'visible' : 'invisible absolute'"
             @contextmenu="handleContextMenu"
             @touchstart="handleTouchStart"
@@ -1386,7 +1386,7 @@ function handleVisibilityChange() {
           <Transition name="fade">
             <div
               v-if="activeTab && (activeTab.status === 'connecting' || activeTab.status === 'reconnecting')"
-              class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+              class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
             >
               <div class="flex flex-col items-center gap-4">
                 <div class="w-8 h-8 border-2 border-neutral-600 border-t-white rounded-full animate-spin" />
@@ -1399,7 +1399,7 @@ function handleVisibilityChange() {
           <Transition name="fade">
             <div
               v-if="activeTab && cloudInitStatus.get(activeTab.id) === 'checking'"
-              class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+              class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
             >
               <div class="flex flex-col items-center gap-4">
                 <div class="w-8 h-8 border-2 border-neutral-600 border-t-white rounded-full animate-spin" />
@@ -1412,7 +1412,7 @@ function handleVisibilityChange() {
           <Transition name="fade">
             <div
               v-if="activeTab && cloudInitStatus.get(activeTab.id) === 'not_ready'"
-              class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+              class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
             >
               <div class="flex flex-col items-center gap-4 text-center px-6 max-w-md">
                 <div class="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
@@ -1451,7 +1451,7 @@ function handleVisibilityChange() {
           <Transition name="fade">
             <div
               v-if="activeTab && activeTab.status === 'error'"
-              class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+              class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
             >
               <div class="flex flex-col items-center gap-4 text-center px-6">
                 <div class="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
@@ -1636,7 +1636,7 @@ function handleVisibilityChange() {
                         </div>
                         <span
                           class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 bg-green-500 sm:h-3 sm:w-3"
-                          :class="themeStore.isDark ? 'border-[#171717]' : 'border-white'"
+                          :class="themeStore.isDark ? 'border-[var(--border-color)]' : 'border-white'"
                         />
                       </div>
 
@@ -2011,7 +2011,7 @@ function handleVisibilityChange() {
 }
 
 .terminal-area {
-  background-color: #0a0a0a;
+  background-color: var(--terminal-bg);
   /* 移动端使用较小的高度，避免超出可视区域 */
   height: calc(100vh - 200px);
   height: calc(100dvh - 200px);
@@ -2048,7 +2048,7 @@ function handleVisibilityChange() {
 
 :deep(.xterm-viewport) {
   overflow-y: auto !important;
-  background-color: #0a0a0a !important;
+  background-color: var(--terminal-bg) !important;
 }
 
 :deep(.xterm-screen) {

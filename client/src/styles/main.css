@@ -2,6 +2,7 @@
    在 main.ts / admin/main.ts 中 import（对 CN 受众更快，且无 Google CDN 依赖）。 */
 @import './theme.css';
 @import './kawaii-cloud.css';
+@import './markdown-theme.css';
 
 @tailwind base;
 @tailwind components;

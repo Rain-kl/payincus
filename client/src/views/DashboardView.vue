@@ -1095,7 +1095,7 @@ function getInstanceRowClass(): string {
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, #ffffff 55%, transparent),
+    color-mix(in srgb, var(--topbar-text) 55%, transparent),
     transparent
   );
   transform: translateX(-100%);
@@ -1247,7 +1247,7 @@ function getInstanceRowClass(): string {
   background: var(--nb-amber);
 }
 .nimbus-load-fill--danger {
-  background: #dc2626;
+  background: var(--error);
 }
 
 /* --- 空状态图标 --- */

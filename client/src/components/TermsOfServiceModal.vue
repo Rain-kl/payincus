@@ -73,7 +73,7 @@ onMounted(() => {
         <!-- Modal -->
         <div
           class="modal-content relative w-full max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[85vh] rounded-xl shadow-2xl overflow-hidden flex flex-col"
-          :class="themeStore.isDark ? 'bg-[#141414] border border-gray-800' : 'bg-white'"
+          :class="themeStore.isDark ? 'bg-[var(--bg-surface)] border border-[var(--border-color)]' : 'bg-[var(--bg-surface)]'"
         >
           <!-- Header -->
           <div 
@@ -193,7 +193,7 @@ onMounted(() => {
 .dark .markdown-body h4,
 .dark .markdown-body h5,
 .dark .markdown-body h6 {
-  color: #ededed;
+  color: var(--text-primary);
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: 600;
@@ -207,7 +207,7 @@ onMounted(() => {
 .light .markdown-body h4,
 .light .markdown-body h5,
 .light .markdown-body h6 {
-  color: #18181b;
+  color: var(--text-primary);
   margin-top: 1.5em;
   margin-bottom: 0.5em;
   font-weight: 600;
@@ -221,18 +221,18 @@ onMounted(() => {
 .markdown-body h5 { font-size: 1em; }
 .markdown-body h6 { font-size: 0.9em; }
 
-.dark .markdown-body h2 { border-bottom: 1px solid #262626; }
-.light .markdown-body h2 { border-bottom: 1px solid #e4e4e7; }
-.dark .markdown-body h6 { color: #a1a1a1; }
-.light .markdown-body h6 { color: #52525b; }
+.dark .markdown-body h2 { border-bottom: 1px solid var(--border-color); }
+.light .markdown-body h2 { border-bottom: 1px solid var(--border-color); }
+.dark .markdown-body h6 { color: var(--text-secondary); }
+.light .markdown-body h6 { color: var(--text-secondary); }
 
 /* 段落 */
 .markdown-body p {
   margin: 1em 0;
 }
 
-.dark .markdown-body p { color: #d4d4d4; }
-.light .markdown-body p { color: #3f3f46; }
+.dark .markdown-body p { color: var(--text-secondary); }
+.light .markdown-body p { color: var(--text-secondary); }
 
 /* 列表 */
 .markdown-body ul,
@@ -253,24 +253,24 @@ onMounted(() => {
   margin: 0.5em 0;
 }
 
-.dark .markdown-body li { color: #d4d4d4; }
-.light .markdown-body li { color: #3f3f46; }
+.dark .markdown-body li { color: var(--text-secondary); }
+.light .markdown-body li { color: var(--text-secondary); }
 
 /* 强调 */
 .markdown-body strong {
   font-weight: 600;
 }
 
-.dark .markdown-body strong { color: #ededed; }
-.light .markdown-body strong { color: #18181b; }
+.dark .markdown-body strong { color: var(--text-primary); }
+.light .markdown-body strong { color: var(--text-primary); }
 
 .markdown-body em {
   font-style: italic;
 }
 
 /* 链接 */
-.dark .markdown-body a { color: #3b82f6; }
-.light .markdown-body a { color: #2563eb; }
+.dark .markdown-body a { color: var(--accent); }
+.light .markdown-body a { color: var(--accent); }
 
 .markdown-body a {
   text-decoration: none;

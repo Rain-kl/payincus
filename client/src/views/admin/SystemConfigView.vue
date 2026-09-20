@@ -2150,12 +2150,12 @@ async function sendTestEmail() {
 }
 
 .light .card:hover {
-  border-color: #d4d8e2;
+  border-color: var(--border-color);
   box-shadow: 0 6px 20px -14px rgb(15 23 42 / 0.18);
 }
 
 .dark .card:hover {
-  border-color: #2a303b;
+  border-color: var(--border-color);
 }
 
 @media (prefers-reduced-motion: reduce) {

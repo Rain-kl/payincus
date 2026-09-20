@@ -64,8 +64,8 @@ useReveal(revealRoot)
   inset: 0;
   background-image: radial-gradient(color-mix(in srgb, var(--kawaii-text) 9%, transparent) 1px, transparent 1px);
   background-size: 26px 26px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 0%, transparent 72%);
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black 0%, transparent 72%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black 0%, transparent 72%);
   opacity: 0.45;
 }
 

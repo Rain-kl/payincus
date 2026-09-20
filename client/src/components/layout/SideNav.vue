@@ -369,7 +369,7 @@ function handleLinkClick() {
 
 /* Shell: override the legacy gradient/blur/shadow with a clean surface + hairline */
 .kawaii-sidebar.nimbus-sidebar {
-  background: var(--kawaii-surface) !important;
+  background: var(--sidebar-bg) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   border-color: var(--kawaii-line) !important;
@@ -502,7 +502,7 @@ function handleLinkClick() {
   outline: none !important;
   color: var(--kawaii-muted);
   font-size: 0.84375rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.2;
   transition: color 160ms ease, background-color 160ms ease;
 }

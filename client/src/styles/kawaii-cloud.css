@@ -269,14 +269,14 @@
 
   .kawaii-sidebar {
     border-color: var(--kawaii-line) !important;
-    background: var(--kawaii-surface) !important;
+    background: var(--sidebar-bg) !important;
     color: var(--kawaii-text);
     box-shadow: none !important;
     transition: width 180ms ease, background-color 180ms ease, border-color 180ms ease;
   }
 
   .dark .kawaii-sidebar {
-    background: var(--bg-elevated) !important;
+    background: var(--sidebar-bg) !important;
     border-color: var(--border-color) !important;
     box-shadow: none !important;
   }

@@ -111,7 +111,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const itemShell = (selected: boolean, expanded: boolean) => [
-  props.isDark ? 'border-gray-800 bg-[#0d0d0f] hover:border-gray-700' : 'border-gray-200 bg-white hover:border-gray-300',
+  props.isDark ? 'border-[var(--border-color)] bg-[var(--bg-elevated)] hover:border-gray-700' : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-gray-300',
   selected ? (props.isDark ? 'ring-1 ring-blue-500/40' : 'ring-1 ring-blue-500/30') : '',
   expanded ? (props.isDark ? 'shadow-[0_0_0_1px_rgba(255,255,255,0.02)]' : 'shadow-sm') : ''
 ]

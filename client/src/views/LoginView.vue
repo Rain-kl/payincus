@@ -623,7 +623,7 @@ function getProviderInfo(provider: string): ProviderInfo {
   border-radius: 8px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--topbar-text);
   background: var(--kawaii-primary);
   transition: background-color 0.15s ease, transform 0.1s ease;
 }

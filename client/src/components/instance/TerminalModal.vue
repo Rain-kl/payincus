@@ -1168,11 +1168,11 @@ function handleVisibilityChange() {
         class="terminal-window group/terminal-workspace relative flex flex-col overflow-hidden"
         :class="[
           isFullscreen ? 'w-full h-full' : 'w-full max-w-7xl h-[85vh] rounded-lg',
-          'bg-[#0a0a0a] border border-neutral-800 shadow-2xl'
+          'bg-[var(--terminal-bg)] border border-neutral-800 shadow-2xl'
         ]"
       >
         <!-- 标题栏 -->
-        <div class="flex items-center justify-between h-10 px-3 bg-[#0a0a0a] border-b border-neutral-800">
+        <div class="flex items-center justify-between h-10 px-3 bg-[var(--terminal-bg)] border-b border-neutral-800">
           <!-- 标签栏 -->
           <div class="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
             <button
@@ -1387,7 +1387,7 @@ function handleVisibilityChange() {
             <Transition name="fade">
               <div
                 v-if="activeTab && (activeTab.status === 'connecting' || activeTab.status === 'reconnecting')"
-                class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+                class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
               >
                 <div class="flex flex-col items-center gap-4">
                   <div class="w-8 h-8 border-2 border-neutral-600 border-t-white rounded-full animate-spin" />
@@ -1400,7 +1400,7 @@ function handleVisibilityChange() {
             <Transition name="fade">
               <div
                 v-if="cloudInitStatus === 'checking'"
-                class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+                class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
               >
                 <div class="flex flex-col items-center gap-4">
                   <div class="w-8 h-8 border-2 border-neutral-600 border-t-white rounded-full animate-spin" />
@@ -1413,7 +1413,7 @@ function handleVisibilityChange() {
             <Transition name="fade">
               <div
                 v-if="cloudInitStatus === 'not_ready'"
-                class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+                class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
               >
                 <div class="flex flex-col items-center gap-4 text-center px-6 max-w-md">
                   <div class="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
@@ -1465,7 +1465,7 @@ function handleVisibilityChange() {
             <Transition name="fade">
               <div
                 v-if="activeTab && activeTab.status === 'error'"
-                class="absolute inset-0 flex items-center justify-center bg-[#0a0a0a]/95"
+                class="absolute inset-0 flex items-center justify-center bg-[var(--terminal-bg)]/95"
               >
                 <div class="flex flex-col items-center gap-4 text-center px-6">
                   <div class="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
@@ -1763,7 +1763,7 @@ function handleVisibilityChange() {
 
 :deep(.xterm-viewport) {
   overflow-y: auto !important;
-  background-color: #0a0a0a !important;
+  background-color: var(--terminal-bg) !important;
 }
 
 :deep(.xterm-screen) {

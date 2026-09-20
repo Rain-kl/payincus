@@ -22,6 +22,7 @@
     --bg-elevated: #24211e;       /* 浮层背景（菜单/弹窗内部）*/
     --bg-surface: #1f1d1b;        /* 表面白底（卡片/弹窗）→ 浅色 = #FFFFFF */
     --bg-surface-soft: #282522;   /* 次级表面 → 浅色 = #FBF9F8 */
+    --sidebar-bg: #1a1816;        /* 侧边栏背景 → 浅色 = #F6F4F3（owner 指定）*/
     --success-soft: #1e3a2f;      /* 成功/在线标签浅底 → 浅色 = #C5D8AD */
 
     /* ---- 边框 ---- */
@@ -43,10 +44,36 @@
     --topbar-border: #2C2A29;     /* 标题栏分隔线 */
     --footer-bg: #1f1d1b;         /* 页脚背景 → 浅色 = #F5F4F2（近似 surface）*/
 
+    /* ---- 终端（xterm 模拟器专用深黑，明暗主题共用） ---- */
+    --terminal-bg: #0a0a0a;
+
+    /* ---- 图表系列色（统计/柱状图，暗色用浅调） ---- */
+    --chart-1: #60a5fa;
+    --chart-2: #34d399;
+    --chart-3: #fbbf24;
+    --chart-4: #fb7185;
+
     /* ---- 状态色（绿/琥珀/红 三态保留） ---- */
     --success: #5cd887;
     --warning: #f5c842;
     --error: #f27568;
+
+    /* ---- 帮助文档 Alert 状态色（内容渲染专用，跟随明暗主题） ---- */
+    --alert-info: #60a5fa;
+    --alert-success: #4ade80;
+    --alert-warning: #facc15;
+    --alert-danger: #f87171;
+    --alert-note: #9ca3af;
+    --alert-info-bg: rgba(59, 130, 246, 0.15);
+    --alert-success-bg: rgba(34, 197, 94, 0.15);
+    --alert-warning-bg: rgba(234, 179, 8, 0.15);
+    --alert-danger-bg: rgba(239, 68, 68, 0.15);
+    --alert-note-bg: rgba(107, 114, 128, 0.15);
+    --alert-border: rgba(59, 130, 246, 0.3);
+    --alert-border-success: rgba(34, 197, 94, 0.3);
+    --alert-border-warning: rgba(234, 179, 8, 0.3);
+    --alert-border-danger: rgba(239, 68, 68, 0.3);
+    --alert-border-note: rgba(107, 114, 128, 0.3);
 
     /* =========================================================
      * 统一圆角规格阶梯 (集中抽离维护)
@@ -82,6 +109,7 @@
     --bg-elevated: #ffffff;       /* 浮层背景 */
     --bg-surface: #FFFFFF;        /* 表面白底（owner 指定 #FFFFFF）*/
     --bg-surface-soft: #FBF9F8;   /* 次级表面（owner 指定 #FBF9F8）*/
+    --sidebar-bg: #E4E3E0;        /* 侧边栏背景（owner 指定 #E4E3E0）*/
     --success-soft: #C5D8AD;      /* 成功/在线标签浅底（owner 指定 #C5D8AD）*/
 
     /* ---- 边框 ---- */
@@ -103,10 +131,36 @@
     --topbar-border: #2C2A29;     /* 标题栏分隔线（owner 指定 #2C2A29）*/
     --footer-bg: #F5F4F2;         /* 页脚背景 */
 
+    /* ---- 终端（xterm 模拟器专用深黑，明暗主题共用） ---- */
+    --terminal-bg: #0a0a0a;
+
+    /* ---- 图表系列色（统计/柱状图，浅色用深调） ---- */
+    --chart-1: #2563eb;
+    --chart-2: #059669;
+    --chart-3: #d97706;
+    --chart-4: #e11d48;
+
     /* ---- 状态色（绿/琥珀/红 三态保留） ---- */
     --success: #1e7e34;
     --warning: #8f5b00;
     --error: #c74634;
+
+    /* ---- 帮助文档 Alert 状态色（内容渲染专用，跟随明暗主题） ---- */
+    --alert-info: #2563eb;
+    --alert-success: #16a34a;
+    --alert-warning: #ca8a04;
+    --alert-danger: #dc2626;
+    --alert-note: #4b5563;
+    --alert-info-bg: #eff6ff;
+    --alert-success-bg: #f0fdf4;
+    --alert-warning-bg: #fefce8;
+    --alert-danger-bg: #fef2f2;
+    --alert-note-bg: #f9fafb;
+    --alert-border: rgba(59, 130, 246, 0.3);
+    --alert-border-success: rgba(34, 197, 94, 0.3);
+    --alert-border-warning: rgba(234, 179, 8, 0.3);
+    --alert-border-danger: rgba(239, 68, 68, 0.3);
+    --alert-border-note: rgba(107, 114, 128, 0.3);
 
     /* =========================================================
      * 统一圆角规格阶梯 (集中抽离维护)

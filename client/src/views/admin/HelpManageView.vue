@@ -1015,166 +1015,96 @@ function formatDate(dateStr: string | null | undefined): string {
 
 /* Alert 颜色变体 - 暗色主题 */
 .dark .md-alert-info {
-  background-color: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.3);
+  background-color: var(--alert-info-bg);
+  border-color: var(--alert-border);
 }
 .dark .md-alert-info svg,
 .dark .md-alert-info > div {
-  color: #60a5fa;
+  color: var(--alert-info);
 }
 
 .dark .md-alert-success {
-  background-color: rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.3);
+  background-color: var(--alert-success-bg);
+  border-color: var(--alert-border-success);
 }
 .dark .md-alert-success svg,
 .dark .md-alert-success > div {
-  color: #4ade80;
+  color: var(--alert-success);
 }
 
 .dark .md-alert-warning {
-  background-color: rgba(234, 179, 8, 0.15);
-  border-color: rgba(234, 179, 8, 0.3);
+  background-color: var(--alert-warning-bg);
+  border-color: var(--alert-border-warning);
 }
 .dark .md-alert-warning svg,
 .dark .md-alert-warning > div {
-  color: #facc15;
+  color: var(--alert-warning);
 }
 
 .dark .md-alert-danger {
-  background-color: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
+  background-color: var(--alert-danger-bg);
+  border-color: var(--alert-border-danger);
 }
 .dark .md-alert-danger svg,
 .dark .md-alert-danger > div {
-  color: #f87171;
+  color: var(--alert-danger);
 }
 
 .dark .md-alert-note {
-  background-color: rgba(107, 114, 128, 0.15);
-  border-color: rgba(107, 114, 128, 0.3);
+  background-color: var(--alert-note-bg);
+  border-color: var(--alert-border-note);
 }
 .dark .md-alert-note svg,
 .dark .md-alert-note > div {
-  color: #9ca3af;
+  color: var(--alert-note);
 }
 
 /* Alert 颜色变体 - 亮色主题 */
 .light .md-alert-info {
-  background-color: #eff6ff;
-  border-color: rgba(59, 130, 246, 0.3);
+  background-color: var(--alert-info-bg);
+  border-color: var(--alert-border);
 }
 .light .md-alert-info svg,
 .light .md-alert-info > div {
-  color: #2563eb;
+  color: var(--alert-info);
 }
 
 .light .md-alert-success {
-  background-color: #f0fdf4;
-  border-color: rgba(34, 197, 94, 0.3);
+  background-color: var(--alert-success-bg);
+  border-color: var(--alert-border-success);
 }
 .light .md-alert-success svg,
 .light .md-alert-success > div {
-  color: #16a34a;
+  color: var(--alert-success);
 }
 
 .light .md-alert-warning {
-  background-color: #fefce8;
-  border-color: rgba(234, 179, 8, 0.3);
+  background-color: var(--alert-warning-bg);
+  border-color: var(--alert-border-warning);
 }
 .light .md-alert-warning svg,
 .light .md-alert-warning > div {
-  color: #ca8a04;
+  color: var(--alert-warning);
 }
 
 .light .md-alert-danger {
-  background-color: #fef2f2;
-  border-color: rgba(239, 68, 68, 0.3);
+  background-color: var(--alert-danger-bg);
+  border-color: var(--alert-border-danger);
 }
 .light .md-alert-danger svg,
 .light .md-alert-danger > div {
-  color: #dc2626;
+  color: var(--alert-danger);
 }
 
 .light .md-alert-note {
-  background-color: #f9fafb;
-  border-color: rgba(107, 114, 128, 0.3);
+  background-color: var(--alert-note-bg);
+  border-color: var(--alert-border-note);
 }
 .light .md-alert-note svg,
 .light .md-alert-note > div {
-  color: #4b5563;
+  color: var(--alert-note);
 }
 
 /* ============ 代码高亮主题适配 ============ */
-/* 暗色主题代码高亮 */
-.dark .markdown-body pre {
-  background: #0d1117;
-  border-color: #30363d;
-}
-
-.dark .markdown-body .hljs {
-  color: #c9d1d9;
-  background: transparent;
-}
-
-.dark .markdown-body .hljs-keyword,
-.dark .markdown-body .hljs-selector-tag,
-.dark .markdown-body .hljs-title {
-  color: #ff7b72;
-}
-
-.dark .markdown-body .hljs-string,
-.dark .markdown-body .hljs-attr {
-  color: #a5d6ff;
-}
-
-.dark .markdown-body .hljs-comment {
-  color: #8b949e;
-}
-
-.dark .markdown-body .hljs-number,
-.dark .markdown-body .hljs-literal {
-  color: #79c0ff;
-}
-
-.dark .markdown-body .hljs-function,
-.dark .markdown-body .hljs-built_in {
-  color: #d2a8ff;
-}
-
-/* 亮色主题代码高亮 */
-.light .markdown-body pre {
-  background: #f6f8fa;
-  border-color: #d0d7de;
-}
-
-.light .markdown-body .hljs {
-  color: #24292f;
-  background: transparent;
-}
-
-.light .markdown-body .hljs-keyword,
-.light .markdown-body .hljs-selector-tag,
-.light .markdown-body .hljs-title {
-  color: #cf222e;
-}
-
-.light .markdown-body .hljs-string,
-.light .markdown-body .hljs-attr {
-  color: #0a3069;
-}
-
-.light .markdown-body .hljs-comment {
-  color: #6e7781;
-}
-
-.light .markdown-body .hljs-number,
-.light .markdown-body .hljs-literal {
-  color: #0550ae;
-}
-
-.light .markdown-body .hljs-function,
-.light .markdown-body .hljs-built_in {
-  color: #8250df;
-}
+/* 已抽为全局共享样式 client/src/styles/markdown-theme.css（GitHub 官方配色） */
 </style>

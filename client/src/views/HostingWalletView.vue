@@ -1492,11 +1492,11 @@ onMounted(async () => {
 }
 
 .light .wallet-withdraw-btn {
-  --tw-ring-offset-color: #ffffff;
+  --tw-ring-offset-color: var(--bg-surface);
 }
 
 .dark .wallet-withdraw-btn {
-  --tw-ring-offset-color: #0a0a0a;
+  --tw-ring-offset-color: var(--bg-primary);
 }
 
 .light .wallet-withdraw-btn:disabled {

@@ -253,8 +253,8 @@ onMounted(() => {
   inset: 0;
   background-image: radial-gradient(color-mix(in srgb, var(--kawaii-text) 9%, transparent) 1px, transparent 1px);
   background-size: 26px 26px;
-  -webkit-mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, #000 0%, transparent 70%);
-  mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, #000 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, black 0%, transparent 70%);
+  mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, black 0%, transparent 70%);
   opacity: 0.45;
 }
 

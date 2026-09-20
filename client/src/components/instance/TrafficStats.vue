@@ -373,11 +373,11 @@ const dailyAvgText = computed(() => {
       <!-- Thin progress bar with indicator dot -->
       <div class="relative w-full h-[3px] bg-gray-100 dark:bg-gray-800 rounded-full my-3">
         <div
-          class="absolute left-0 top-0 h-full bg-[#2563eb] rounded-full transition-all duration-300"
+          class="absolute left-0 top-0 h-full bg-[var(--accent)] rounded-full transition-all duration-300"
           :style="{ width: `${progressPercent}%` }"
         ></div>
         <div
-          class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#2563eb] transition-all duration-300 pointer-events-none"
+          class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[var(--accent)] transition-all duration-300 pointer-events-none"
           :style="{ left: `${progressPercent}%` }"
         ></div>
       </div>
@@ -428,8 +428,8 @@ const dailyAvgText = computed(() => {
         >
           <defs>
             <linearGradient id="trafficAreaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#2563eb" stop-opacity="0.18" />
-              <stop offset="100%" stop-color="#2563eb" stop-opacity="0.01" />
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.01" />
             </linearGradient>
           </defs>
 
@@ -445,7 +445,7 @@ const dailyAvgText = computed(() => {
             v-if="linePath"
             :d="linePath"
             fill="none"
-            stroke="#2563eb"
+            stroke="var(--accent)"
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -458,7 +458,7 @@ const dailyAvgText = computed(() => {
             :y1="0"
             :x2="hoverPoint.x"
             :y2="200"
-            stroke="#94a3b8"
+            stroke="var(--border-strong)"
             stroke-width="1.2"
             stroke-dasharray="3 3"
           />
@@ -469,8 +469,8 @@ const dailyAvgText = computed(() => {
             :cx="hoverPoint.x"
             :cy="hoverPoint.y"
             r="4.5"
-            fill="#2563eb"
-            stroke="#ffffff"
+            fill="var(--accent)"
+            stroke="var(--topbar-text)"
             stroke-width="2"
           />
         </svg>
@@ -491,7 +491,7 @@ const dailyAvgText = computed(() => {
             <span>{{ t('traffic.upload') }}: {{ hoverItem.txFormatted }}</span>
           </div>
           <div class="flex items-center gap-2 mt-1 pt-1 border-t border-gray-700 font-bold text-white">
-            <span class="w-2 h-2 rounded-full bg-[#2563eb]"></span>
+            <span class="w-2 h-2 rounded-full bg-[var(--accent)]"></span>
             <span>{{ t('traffic.total') }}: {{ hoverItem.totalFormatted }}</span>
           </div>
         </div>
@@ -519,7 +519,7 @@ const dailyAvgText = computed(() => {
     <!-- Bottom Footer Metrics -->
     <div class="flex flex-wrap items-center gap-6 sm:gap-8 pt-4 mt-2 border-t border-gray-100 dark:border-gray-800 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
       <div class="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200">
-        <span class="w-2.5 h-2.5 rounded-full bg-[#2563eb]"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-[var(--accent)]"></span>
         <span>{{ t('traffic.dailyTotal') }}</span>
       </div>
       <div>

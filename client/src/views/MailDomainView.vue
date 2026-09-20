@@ -490,7 +490,7 @@ function switchTab(tab: 'accounts' | 'dns' | 'settings') {
   height: 1.5rem;
   border-radius: 9999px;
   background: var(--kawaii-primary);
-  color: #fff;
+  color: var(--topbar-text);
   font-size: 0.75rem;
   font-weight: 600;
   flex: none;

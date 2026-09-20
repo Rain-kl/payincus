@@ -454,7 +454,7 @@ function getProviderInfo(provider: string): ProviderInfo {
   border-radius: 0.6rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--topbar-text);
   background: var(--kawaii-primary);
   box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--kawaii-primary) 75%, transparent);
   transition: filter 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
@@ -482,13 +482,13 @@ function getProviderInfo(provider: string): ProviderInfo {
   border-radius: 0.55rem;
   font-size: 0.8125rem;
   line-height: 1.35;
-  color: #dc2626;
-  background: color-mix(in srgb, #dc2626 9%, transparent);
-  border: 1px solid color-mix(in srgb, #dc2626 24%, transparent);
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error) 24%, transparent);
 }
 
 :global(.dark) .admin-auth-error {
-  color: #f87171;
+  color: color-mix(in srgb, var(--error) 78%, var(--bg-surface));
 }
 
 .admin-auth-divider {
@@ -520,8 +520,8 @@ function getProviderInfo(provider: string): ProviderInfo {
   width: 0.9rem;
   height: 0.9rem;
   border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, var(--topbar-text) 40%, transparent);
+  border-top-color: var(--topbar-text);
   animation: adminAuthSpin 0.7s linear infinite;
 }
 

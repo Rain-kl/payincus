@@ -852,7 +852,7 @@ async function handleSubmit(): Promise<void> {
             {{ error }}
           </div>
 
-          <button type="submit" :disabled="!canSubmit" class="btn btn-primary w-full">
+          <button type="submit" :disabled="!canSubmit" class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md font-medium text-sm bg-black hover:bg-neutral-900 text-white border border-neutral-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
             {{ submitting ? $t('instance.createPage.creating') : $t('admin.instanceCreate.submit') }}
           </button>
         </div>

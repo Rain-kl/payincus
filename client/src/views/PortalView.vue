@@ -510,7 +510,7 @@ onMounted(() => {
 /* ── 状态色中和：源/实例徽章在首页统一为 墨/靛，不出现绿/琥珀 ── */
 .kawaii-source-chip.market {
   background: var(--kawaii-primary) !important;
-  color: #fff !important;
+  color: var(--topbar-text) !important;
 }
 .kawaii-price-text.market {
   color: var(--kawaii-text) !important;
@@ -578,8 +578,8 @@ onMounted(() => {
     linear-gradient(90deg, var(--kawaii-line) 1px, transparent 1px);
   background-size: 100% 100%, 48px 48px, 48px 48px;
   opacity: 0.55;
-  -webkit-mask-image: radial-gradient(75% 62% at 50% 0%, #000 30%, transparent 82%);
-  mask-image: radial-gradient(75% 62% at 50% 0%, #000 30%, transparent 82%);
+  -webkit-mask-image: radial-gradient(75% 62% at 50% 0%, black 30%, transparent 82%);
+  mask-image: radial-gradient(75% 62% at 50% 0%, black 30%, transparent 82%);
 }
 .nimbus-eyebrow {
   display: inline-flex;
@@ -814,7 +814,7 @@ onMounted(() => {
   padding: 0.55rem 1.1rem;
   border-radius: 10px;
   background: var(--kawaii-primary);
-  color: #fff;
+  color: var(--topbar-text);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -975,8 +975,8 @@ onMounted(() => {
   border-radius: 24px;
   padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1.5rem, 5vw, 4rem);
   /* 固定深靛蓝，双主题下白字对比稳定 */
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 52%, #3730a3 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 82%, var(--bg-primary)) 52%, color-mix(in srgb, var(--accent) 68%, var(--bg-primary)) 100%);
+  color: var(--topbar-text);
   text-align: center;
 }
 .nimbus-cta-grid {
@@ -987,8 +987,8 @@ onMounted(() => {
     linear-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
   background-size: 46px 46px;
-  -webkit-mask-image: radial-gradient(circle at 50% 38%, #000, transparent 78%);
-  mask-image: radial-gradient(circle at 50% 38%, #000, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at 50% 38%, black, transparent 78%);
+  mask-image: radial-gradient(circle at 50% 38%, black, transparent 78%);
 }
 .nimbus-cta-inner {
   position: relative;
@@ -998,11 +998,11 @@ onMounted(() => {
   font-size: clamp(1.75rem, 4vw, 2.75rem);
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--topbar-text);
   text-wrap: balance;
 }
 .nimbus-cta-title span {
-  color: #c7c8fb;
+  color: color-mix(in srgb, var(--accent) 55%, var(--topbar-text));
 }
 .nimbus-cta-sub {
   margin: 1rem auto 0;
@@ -1019,8 +1019,8 @@ onMounted(() => {
   gap: 0.75rem;
 }
 .nimbus-cta-primary {
-  background: #fff;
-  color: #3730a3;
+  background: var(--topbar-text);
+  color: var(--accent-strong);
 }
 .nimbus-cta-primary:hover {
   transform: translateY(-1px);
@@ -1028,7 +1028,7 @@ onMounted(() => {
 }
 .nimbus-cta-ghost {
   background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  color: var(--topbar-text);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 .nimbus-cta-ghost:hover {
@@ -1036,7 +1036,7 @@ onMounted(() => {
 }
 .nimbus-cta-primary:focus-visible,
 .nimbus-cta-ghost:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--topbar-text);
   outline-offset: 2px;
 }
 

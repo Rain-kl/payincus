@@ -810,35 +810,35 @@ function riskToneClass(severity: string): string {
 }
 
 .chart-bar-blue {
-  background-color: #2563eb;
+  background-color: var(--chart-1);
 }
 
 .chart-bar-emerald {
-  background-color: #059669;
+  background-color: var(--chart-2);
 }
 
 .chart-bar-amber {
-  background-color: #d97706;
+  background-color: var(--chart-3);
 }
 
 .chart-bar-rose {
-  background-color: #e11d48;
+  background-color: var(--chart-4);
 }
 
 :global(.dark) .chart-bar-blue {
-  background-color: #60a5fa;
+  background-color: var(--chart-1);
 }
 
 :global(.dark) .chart-bar-emerald {
-  background-color: #34d399;
+  background-color: var(--chart-2);
 }
 
 :global(.dark) .chart-bar-amber {
-  background-color: #fbbf24;
+  background-color: var(--chart-3);
 }
 
 :global(.dark) .chart-bar-rose {
-  background-color: #fb7185;
+  background-color: var(--chart-4);
 }
 
 .chart-tooltip {

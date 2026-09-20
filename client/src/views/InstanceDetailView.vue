@@ -3848,45 +3848,45 @@ function formatShortDate(dateStr: string | null | undefined): string {
    （覆盖 kawaii-cloud.css 全局 .kawaii-menu-panel/.kawaii-menu-item 半透明样式）
    ============================================================ */
 .action-menu-container :deep(.kawaii-menu-panel) {
-  background: #fff !important;
-  border-color: #e5e5e5 !important;
+  background: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.10) !important;
 }
 .action-menu-container :deep(.kawaii-menu-item) {
-  color: #000 !important;
+  color: var(--text-primary) !important;
 }
 .action-menu-container :deep(.kawaii-menu-item:hover) {
-  background: #f5f5f5 !important;
-  color: #000 !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
 }
 .action-menu-container :deep(.kawaii-menu-item .text-themed-muted) {
-  color: #000 !important;
+  color: var(--text-primary) !important;
 }
 .action-menu-container :deep(.kawaii-menu-item.text-danger),
 .action-menu-container :deep(.kawaii-menu-item.text-danger:hover) {
-  color: #dc2626 !important;
+  color: var(--error) !important;
 }
 .action-menu-container :deep(.kawaii-menu-item.text-warning) {
-  color: #d97706 !important;
+  color: var(--warning) !important;
 }
 .action-menu-container :deep(.kawaii-menu-item.text-success) {
-  color: #16a34a !important;
+  color: var(--success) !important;
 }
 .dark .action-menu-container :deep(.kawaii-menu-panel) {
-  background: #000 !important;
-  border-color: #262626 !important;
+  background: var(--bg-elevated) !important;
+  border-color: var(--border-color) !important;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.6) !important;
 }
 .dark .action-menu-container :deep(.kawaii-menu-item) {
-  color: #fff !important;
+  color: var(--text-primary) !important;
 }
 .dark .action-menu-container :deep(.kawaii-menu-item:hover) {
-  background: #1a1a1a !important;
-  color: #fff !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
 }
 .dark .action-menu-container :deep(.kawaii-menu-item .text-themed-muted) {
-  color: #fff !important;
+  color: var(--text-primary) !important;
 }
 </style>

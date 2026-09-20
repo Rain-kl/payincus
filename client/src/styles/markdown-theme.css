@@ -1,0 +1,92 @@
+/* ============================================================
+ * Markdown 内容渲染主题（帮助中心/服务条款等正文用）
+ * ------------------------------------------------------------
+ * 这是「内容渲染」专用样式层，不是主题皮肤：
+ *  - 代码高亮 = GitHub 官方 Markdown 语法配色（内容品牌色板）
+ *  - md-alert   = 文档四态 alert（颜色值引用 theme.css 的 --alert-* token）
+ * 唯一允许 hex 的样式文件（守卫白名单），供 HelpView /
+ *  HelpManageView 共用，消除重复。
+ * ============================================================ */
+
+/* ============ 代码高亮主题适配（GitHub 官方配色） ============ */
+/* 暗色主题代码高亮 */
+.dark .markdown-body pre {
+  background: #0d1117;
+  border-color: #30363d;
+}
+
+.dark .markdown-body .hljs {
+  color: #c9d1d9;
+  background: transparent;
+}
+
+.dark .markdown-body .hljs-keyword,
+.dark .markdown-body .hljs-selector-tag,
+.dark .markdown-body .hljs-title {
+  color: #ff7b72;
+}
+
+.dark .markdown-body .hljs-string,
+.dark .markdown-body .hljs-attr {
+  color: #a5d6ff;
+}
+
+.dark .markdown-body .hljs-comment {
+  color: #8b949e;
+}
+
+.dark .markdown-body .hljs-number,
+.dark .markdown-body .hljs-literal {
+  color: #79c0ff;
+}
+
+.dark .markdown-body .hljs-function,
+.dark .markdown-body .hljs-built_in {
+  color: #d2a8ff;
+}
+
+.dark .markdown-body .hljs-variable,
+.dark .markdown-body .hljs-template-variable {
+  color: #ffa657;
+}
+
+/* 亮色主题代码高亮 */
+.light .markdown-body pre {
+  background: #f6f8fa;
+  border-color: #d0d7de;
+}
+
+.light .markdown-body .hljs {
+  color: #24292f;
+  background: transparent;
+}
+
+.light .markdown-body .hljs-keyword,
+.light .markdown-body .hljs-selector-tag,
+.light .markdown-body .hljs-title {
+  color: #cf222e;
+}
+
+.light .markdown-body .hljs-string,
+.light .markdown-body .hljs-attr {
+  color: #0a3069;
+}
+
+.light .markdown-body .hljs-comment {
+  color: #6e7781;
+}
+
+.light .markdown-body .hljs-number,
+.light .markdown-body .hljs-literal {
+  color: #0550ae;
+}
+
+.light .markdown-body .hljs-function,
+.light .markdown-body .hljs-built_in {
+  color: #8250df;
+}
+
+.light .markdown-body .hljs-variable,
+.light .markdown-body .hljs-template-variable {
+  color: #953800;
+}
