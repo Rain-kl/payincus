@@ -211,6 +211,7 @@ export default async function trafficRoutes(fastify: FastifyInstance): Promise<v
         const { periodStart, periodEnd } = getTrafficPeriod(trafficResetDay)
         const vipExtraTrafficQuota = await getVipExtraTrafficQuota(instance.userId, instance.monthlyTrafficLimit)
         const effectiveInstanceLimit = getEffectiveLimit(instance.monthlyTrafficLimit, vipExtraTrafficQuota)
+        const trafficResetPrice = resolveTrafficResetPriceYuan(instance)
 
         return {
             monthlyUsed: serializeBigInt(instance.monthlyTrafficUsed),
@@ -223,6 +224,7 @@ export default async function trafficRoutes(fastify: FastifyInstance): Promise<v
             trafficStatus: instance.trafficStatus,
             percentage: calculatePercentage(instance.monthlyTrafficUsed, effectiveInstanceLimit),
             trafficResetDay,
+            trafficResetPrice,
             periodStart: formatLocalDate(periodStart),
             periodEnd: formatLocalDate(periodEnd)
         }
@@ -276,8 +278,11 @@ export default async function trafficRoutes(fastify: FastifyInstance): Promise<v
         const trafficResetDay = host?.traffic_reset_day ?? 1
         const { periodStart, periodEnd } = getTrafficPeriod(trafficResetDay)
 
-        // 按周期获取历史数据
-        const history = await trafficDb.getDailyTrafficByPeriod(instanceId, periodStart)
+        // 按周期或天数获取历史数据
+        const days = request.query.days ? parsePositiveId(request.query.days) : null
+        const history = (days !== null)
+            ? await trafficDb.getDailyTraffic(instanceId, days)
+            : await trafficDb.getDailyTrafficByPeriod(instanceId, periodStart)
 
         return {
             trafficResetDay,

@@ -2214,6 +2214,7 @@ const api = {
       trafficStatus: 'NORMAL' | 'WARNING' | 'LIMITED'
       percentage: number
       trafficResetDay: number
+      trafficResetPrice?: number | null
       periodStart: string
       periodEnd: string
     }> => http.get(`/instances/${instanceId}/traffic`),

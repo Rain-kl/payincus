@@ -1005,7 +1005,9 @@ export async function getInstanceTrafficInfo(instanceId: number) {
             hostId: true,
             monthlyTrafficLimit: true,
             monthlyTrafficUsed: true,
-            trafficStatus: true
+            trafficStatus: true,
+            package: { select: { trafficResetPrice: true } },
+            packagePlan: { select: { trafficResetPrice: true } }
         }
     })
 }

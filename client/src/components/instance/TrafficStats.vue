@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useThemeStore } from '@/stores/theme'
 import api from '@/api'
 
 const props = defineProps<{
@@ -9,7 +8,6 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
 
 // 流量数据
 interface TrafficData {
@@ -20,6 +18,7 @@ interface TrafficData {
   trafficStatus: 'NORMAL' | 'WARNING' | 'LIMITED'
   percentage: number
   trafficResetDay: number
+  trafficResetPrice?: number | null
   periodStart: string
   periodEnd: string
 }
@@ -36,12 +35,15 @@ interface TrafficHistoryItem {
 
 const trafficData = ref<TrafficData | null>(null)
 const trafficHistory = ref<TrafficHistoryItem[]>([])
-const periodInfo = ref<{ periodStart: string; periodEnd: string } | null>(null)
 const loading = ref(true)
 const historyLoading = ref(true)
+const selectedDays = ref<number>(30)
+
+// 悬浮点索引
+const hoverIndex = ref<number | null>(null)
 
 onMounted(async () => {
-  await Promise.all([loadTrafficData(), loadTrafficHistory()])
+  await Promise.all([loadTrafficData(), loadTrafficHistory(selectedDays.value)])
 })
 
 async function loadTrafficData() {
@@ -56,15 +58,45 @@ async function loadTrafficData() {
   }
 }
 
-async function loadTrafficHistory() {
+// 补齐并格式化连续天数
+function fillContinuousDays(rawItems: TrafficHistoryItem[], days: number): TrafficHistoryItem[] {
+  const itemMap = new Map<string, TrafficHistoryItem>()
+  for (const item of rawItems) {
+    itemMap.set(item.date, item)
+  }
+
+  const result: TrafficHistoryItem[] = []
+  const now = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
+    const existing = itemMap.get(dateStr)
+    if (existing) {
+      result.push(existing)
+    } else {
+      result.push({
+        date: dateStr,
+        rxTotal: '0',
+        txTotal: '0',
+        rxFormatted: '0 B',
+        txFormatted: '0 B',
+        total: '0',
+        totalFormatted: '0 B'
+      })
+    }
+  }
+  return result
+}
+
+async function loadTrafficHistory(days: number) {
   historyLoading.value = true
   try {
-    const response = await api.traffic.getInstanceTrafficHistory(props.instanceId)
-    trafficHistory.value = response.data
-    periodInfo.value = {
-      periodStart: response.periodStart,
-      periodEnd: response.periodEnd
-    }
+    const response = await api.traffic.getInstanceTrafficHistory(props.instanceId, days)
+    trafficHistory.value = fillContinuousDays(response.data, days)
   } catch (error) {
     console.error('Failed to load traffic history:', error)
   } finally {
@@ -72,285 +104,429 @@ async function loadTrafficHistory() {
   }
 }
 
-// 格式化周期日期显示 (MM-DD ~ MM-DD)
-const periodDateRange = computed(() => {
-  if (!trafficData.value) return ''
-  const start = trafficData.value.periodStart.slice(5) // MM-DD
-  const end = trafficData.value.periodEnd.slice(5)
-  return `${start} ~ ${end}`
-})
+async function handleDaysChange(days: number) {
+  if (selectedDays.value === days) return
+  selectedDays.value = days
+  hoverIndex.value = null
+  await loadTrafficHistory(days)
+}
 
-// 状态标签样式
-const statusBadgeClass = computed(() => {
+// 格式化字节数
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB'
+  return (bytes / 1073741824).toFixed(1) + ' GB'
+}
+
+// 用量显示文案，如 "7.6 / 512 GB"
+const usageDisplayText = computed(() => {
   if (!trafficData.value) return ''
-  switch (trafficData.value.trafficStatus) {
-    case 'LIMITED':
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-    case 'WARNING':
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-    default:
-      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+  const used = trafficData.value.monthlyUsedFormatted
+  const limit = trafficData.value.monthlyLimitFormatted
+  if (!limit) return `${used} / ${t('traffic.unlimited')}`
+  const usedParts = used.split(' ')
+  const limitParts = limit.split(' ')
+  if (usedParts.length === 2 && limitParts.length === 2 && usedParts[1] === limitParts[1]) {
+    return `${usedParts[0]} / ${limitParts[0]} ${limitParts[1]}`
   }
+  return `${used} / ${limit}`
 })
 
-const statusLabel = computed(() => {
+// 进度条百分比 (0 - 100)
+const progressPercent = computed(() => {
+  if (!trafficData.value) return 0
+  const p = trafficData.value.percentage ?? 0
+  return Math.max(0, Math.min(100, p))
+})
+
+// 重置提示信息
+const resetHintText = computed(() => {
   if (!trafficData.value) return ''
-  switch (trafficData.value.trafficStatus) {
-    case 'LIMITED':
-      return t('traffic.status.limited')
-    case 'WARNING':
-      return t('traffic.status.warning')
-    default:
-      return t('traffic.status.normal')
+  const nextDate = trafficData.value.periodEnd?.slice(5) || ''
+  const price = trafficData.value.trafficResetPrice
+  if (price !== undefined && price !== null && Number(price) > 0) {
+    return t('traffic.paidResetHint', {
+      date: nextDate,
+      price: Number(price).toFixed(2)
+    })
   }
+  return `${t('traffic.nextFreeReset')} ${nextDate} · ${t('traffic.periodResetHint', { date: trafficData.value.trafficResetDay })}`
 })
 
-// 进度条颜色
-const progressBarClass = computed(() => {
-  if (!trafficData.value) return 'bg-blue-500'
-  if (trafficData.value.percentage >= 100) return 'bg-red-500'
-  if (trafficData.value.percentage >= 80) return 'bg-yellow-500'
-  return 'bg-blue-500'
-})
-
-// 计算图表最大值
+// 计算峰值数值（用于标尺上限）
 const chartMaxValue = computed(() => {
-  if (trafficHistory.value.length === 0) return 1
-  const max = Math.max(...trafficHistory.value.map(h => Number(h.total)))
-  return max || 1
+  if (trafficHistory.value.length === 0) return 0
+  return Math.max(...trafficHistory.value.map(h => Number(h.total) || 0))
 })
 
-// 格式化字节数为可读字符串
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return '0'
-  if (bytes < 1024) return bytes + 'B'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'K'
-  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + 'M'
-  return (bytes / 1073741824).toFixed(1) + 'G'
-}
-
-// Y 轴刻度标签
-const yAxisLabels = computed(() => {
-  const max = chartMaxValue.value
-  return {
-    top: formatBytes(max),
-    mid: formatBytes(max / 2),
-    bottom: '0'
+// 计算 Y 轴整倍数上限 (GB)
+const ceilingGb = computed(() => {
+  const peakGb = chartMaxValue.value / (1024 * 1024 * 1024)
+  if (peakGb <= 0) return 1
+  const niceCeilings = [
+    0.5, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 300, 500, 1000
+  ]
+  for (const c of niceCeilings) {
+    if (c >= peakGb * 1.08) {
+      return c
+    }
   }
+  const factor = Math.pow(10, Math.floor(Math.log10(peakGb)))
+  return Math.ceil((peakGb * 1.1) / factor) * factor
 })
 
-// 格式化日期显示 (MM-DD)
-const formatDate = (dateStr: string) => {
-  return dateStr.slice(5) // 去掉年份，只保留 MM-DD
-}
+// Y 轴 5 档刻度 (100%, 75%, 50%, 25%, 0%)
+const yAxisTicks = computed(() => {
+  const c = ceilingGb.value
+  const steps = 4
+  const ticks = []
+  for (let i = steps; i >= 0; i--) {
+    const val = (c / steps) * i
+    const label = val === 0 ? '0 GB' : `${Number(val.toFixed(2))} GB`
+    ticks.push({
+      label,
+      valGb: val,
+      yPercent: ((steps - i) / steps) * 100
+    })
+  }
+  return ticks
+})
 
-// X 轴标签（显示 5-7 个日期点）
-const xAxisLabels = computed(() => {
+// 归一化计算每个点的坐标
+const chartPoints = computed(() => {
   const len = trafficHistory.value.length
   if (len === 0) return []
-  if (len <= 7) return trafficHistory.value.map(h => ({ date: formatDate(h.date), index: trafficHistory.value.indexOf(h) }))
-  
-  // 显示首、尾和中间均匀分布的点
-  const step = Math.floor(len / 5)
-  const labels = []
-  for (let i = 0; i < len; i += step) {
-    labels.push({ date: formatDate(trafficHistory.value[i].date), index: i })
+  const cGb = ceilingGb.value
+
+  return trafficHistory.value.map((item, idx) => {
+    const x = len <= 1 ? 500 : (idx / (len - 1)) * 1000
+    const bytes = Number(item.total) || 0
+    const valGb = bytes / (1024 * 1024 * 1024)
+    const ratio = Math.max(0, Math.min(1, valGb / cGb))
+    const y = 200 - ratio * 200
+    return {
+      x,
+      y,
+      item,
+      labelDate: item.date?.slice(5) || ''
+    }
+  })
+})
+
+// SVG 折线路径
+const linePath = computed(() => {
+  const pts = chartPoints.value
+  if (pts.length === 0) return ''
+  return pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')
+})
+
+// SVG 面积渐变填充路径
+const areaPath = computed(() => {
+  const pts = chartPoints.value
+  if (pts.length === 0) return ''
+  const first = pts[0]
+  const last = pts[pts.length - 1]
+  const linePart = pts.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')
+  return `${linePart} L ${last.x.toFixed(2)} 200 L ${first.x.toFixed(2)} 200 Z`
+})
+
+// X 轴日期刻度（4 个均匀点）
+const xAxisLabels = computed(() => {
+  const len = chartPoints.value.length
+  if (len === 0) return []
+  if (len <= 4) {
+    return chartPoints.value.map((p, idx) => ({ date: p.labelDate, index: idx }))
   }
-  // 确保最后一个日期显示
-  if (labels[labels.length - 1].index !== len - 1) {
-    labels.push({ date: formatDate(trafficHistory.value[len - 1].date), index: len - 1 })
+  const idx1 = 0
+  const idx2 = Math.round((len - 1) / 3)
+  const idx3 = Math.round(((len - 1) * 2) / 3)
+  const idx4 = len - 1
+  return [
+    { date: chartPoints.value[idx1].labelDate, index: idx1 },
+    { date: chartPoints.value[idx2].labelDate, index: idx2 },
+    { date: chartPoints.value[idx3].labelDate, index: idx3 },
+    { date: chartPoints.value[idx4].labelDate, index: idx4 }
+  ]
+})
+
+// 悬浮点与对应数据
+const hoverPoint = computed(() => {
+  if (hoverIndex.value === null) return null
+  return chartPoints.value[hoverIndex.value] || null
+})
+
+const hoverItem = computed(() => {
+  if (hoverIndex.value === null) return null
+  return trafficHistory.value[hoverIndex.value] || null
+})
+
+function handleMouseMove(e: MouseEvent) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const ratio = Math.max(0, Math.min(1, x / rect.width))
+  const count = chartPoints.value.length
+  if (count > 0) {
+    hoverIndex.value = Math.min(count - 1, Math.max(0, Math.round(ratio * (count - 1))))
   }
-  return labels
+}
+
+function handleMouseLeave() {
+  hoverIndex.value = null
+}
+
+const tooltipStyle = computed(() => {
+  if (!hoverPoint.value) return {}
+  const leftPercent = hoverPoint.value.x / 10
+  const topPercent = Math.max(12, Math.min(78, (hoverPoint.value.y / 200) * 100))
+  if (leftPercent > 68) {
+    return {
+      right: `${Math.max(2, 100 - leftPercent + 2)}%`,
+      top: `${topPercent}%`,
+      transform: 'translateY(-50%)'
+    }
+  }
+  return {
+    left: `${Math.max(2, leftPercent + 2)}%`,
+    top: `${topPercent}%`,
+    transform: 'translateY(-50%)'
+  }
+})
+
+// 峰值数据与文案
+const peakInfo = computed(() => {
+  if (trafficHistory.value.length === 0) return { formatted: '0 GB', date: '' }
+  let max = trafficHistory.value[0]
+  for (const item of trafficHistory.value) {
+    if (Number(item.total) > Number(max.total)) {
+      max = item
+    }
+  }
+  const bytes = Number(max.total)
+  const gb = bytes / (1024 * 1024 * 1024)
+  const formatted = bytes === 0 ? '0 GB' : (gb >= 0.1 ? `${gb.toFixed(1)} GB` : formatBytes(bytes))
+  const date = max.date?.slice(5) || ''
+  return { formatted, date }
+})
+
+const peakText = computed(() => {
+  if (!peakInfo.value.date) return peakInfo.value.formatted
+  return `${peakInfo.value.formatted}(${peakInfo.value.date})`
+})
+
+// 日均用量
+const dailyAvgText = computed(() => {
+  if (trafficHistory.value.length === 0) return '0 GB'
+  const sumBytes = trafficHistory.value.reduce((acc, cur) => acc + (Number(cur.total) || 0), 0)
+  const avgBytes = sumBytes / trafficHistory.value.length
+  const gb = avgBytes / (1024 * 1024 * 1024)
+  if (gb >= 0.05) {
+    return `${gb.toFixed(1)} GB`
+  }
+  return formatBytes(avgBytes)
 })
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Current Month Usage -->
-    <div class="card p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 
-          class="text-lg font-medium"
-          :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'"
-        >
-          {{ $t('traffic.monthlyUsage') }}
-          <span v-if="trafficData" class="text-sm font-normal ml-2" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-            ({{ periodDateRange }})
-          </span>
+  <div class="card p-6">
+    <!-- Top Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h3 class="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
+          {{ t('traffic.thisPeriod') }}
         </h3>
-        <span 
-          v-if="trafficData"
-          :class="['px-2.5 py-0.5 rounded-full text-xs font-medium', statusBadgeClass]"
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {{ t('traffic.historySubtitle') }}
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          v-for="d in [30, 60, 90]"
+          :key="d"
+          type="button"
+          class="rounded-full px-3.5 py-1 text-xs sm:text-sm font-medium transition-all"
+          :class="selectedDays === d
+            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
+            : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'"
+          @click="handleDaysChange(d)"
         >
-          {{ statusLabel }}
-        </span>
-      </div>
-
-      <div v-if="loading" class="animate-pulse space-y-4">
-        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-        <div class="h-2 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-      </div>
-
-      <template v-else-if="trafficData">
-        <div class="space-y-3">
-          <div class="flex justify-between text-sm">
-            <span :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-              {{ $t('traffic.used') }}
-            </span>
-            <span :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'" class="font-medium">
-              {{ trafficData.monthlyUsedFormatted }}
-              <template v-if="trafficData.monthlyLimitFormatted">
-                / {{ trafficData.monthlyLimitFormatted }}
-              </template>
-              <template v-else>
-                / {{ $t('traffic.unlimited') }}
-              </template>
-            </span>
-          </div>
-
-          <!-- Progress Bar -->
-          <div 
-            class="h-2 rounded-full overflow-hidden"
-            :class="themeStore.isDark ? 'bg-gray-700' : 'bg-gray-200'"
-          >
-            <div 
-              :class="['h-full rounded-full transition-all duration-300', progressBarClass]"
-              :style="{ width: `${Math.min(trafficData.percentage, 100)}%` }"
-            ></div>
-          </div>
-
-          <div class="flex justify-between text-xs">
-            <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
-              {{ trafficData.percentage.toFixed(1) }}%
-            </span>
-            <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-              <span 
-                v-if="trafficData.trafficStatus === 'LIMITED'"
-                class="text-red-500"
-              >
-                {{ $t('traffic.throttledHint') }}
-                <span class="mx-1">·</span>
-              </span>
-              {{ $t('traffic.periodResetHint', { date: trafficData.trafficResetDay }) }}
-            </span>
-          </div>
-        </div>
-      </template>
-
-      <div v-else class="text-center py-4">
-        <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-          {{ $t('traffic.noData') }}
-        </span>
+          {{ t(`traffic.days${d}`) }}
+        </button>
       </div>
     </div>
 
-    <!-- Traffic History Chart -->
-    <div class="card p-6">
-      <h3 
-        class="text-lg font-medium mb-4"
-        :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'"
-      >
-        {{ $t('traffic.historyPeriod') }}
-        <span v-if="periodInfo" class="text-sm font-normal ml-2" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-          ({{ periodInfo.periodStart.slice(5) }} ~ {{ periodInfo.periodEnd.slice(5) }})
+    <!-- Usage & Progress -->
+    <div v-if="loading && !trafficData" class="animate-pulse space-y-3 mb-6">
+      <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+      <div class="h-1 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+    </div>
+    <div v-else-if="trafficData" class="space-y-2 mb-6">
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ t('traffic.used') }}</span>
+        <span class="text-base font-bold text-gray-900 dark:text-gray-100">
+          {{ usageDisplayText }}
         </span>
-      </h3>
+      </div>
 
-      <div v-if="historyLoading" class="animate-pulse">
-        <div class="flex items-end gap-1 h-32">
-          <div 
-            v-for="i in 30" 
-            :key="i" 
-            class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-t"
-            :style="{ height: `${Math.random() * 100}%` }"
-          ></div>
+      <!-- Thin progress bar with indicator dot -->
+      <div class="relative w-full h-[3px] bg-gray-100 dark:bg-gray-800 rounded-full my-3">
+        <div
+          class="absolute left-0 top-0 h-full bg-[#2563eb] rounded-full transition-all duration-300"
+          :style="{ width: `${progressPercent}%` }"
+        ></div>
+        <div
+          class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#2563eb] transition-all duration-300 pointer-events-none"
+          :style="{ left: `${progressPercent}%` }"
+        ></div>
+      </div>
+
+      <!-- Reset note -->
+      <div class="text-xs text-gray-500 dark:text-gray-400">
+        <span v-if="trafficData.trafficStatus === 'LIMITED'" class="text-red-500 mr-2">
+          {{ t('traffic.throttledHint') }} ·
+        </span>
+        {{ resetHintText }}
+      </div>
+    </div>
+
+    <!-- Area Chart -->
+    <div class="flex">
+      <!-- Y-axis ticks -->
+      <div class="relative w-14 h-48 text-xs text-gray-400 dark:text-gray-500 pr-3 select-none text-right flex-shrink-0">
+        <div
+          v-for="tick in yAxisTicks"
+          :key="tick.valGb"
+          class="absolute right-3 transform -translate-y-1/2 leading-none whitespace-nowrap"
+          :style="{ top: `${tick.yPercent}%` }"
+        >
+          {{ tick.label }}
         </div>
       </div>
 
-      <template v-else-if="trafficHistory.length > 0">
-        <!-- Bar Chart with Y-axis -->
-        <div class="flex">
-          <!-- Y 轴刻度 -->
-          <div class="flex flex-col justify-between h-40 pr-2 text-xs w-10" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-            <span class="text-right">{{ yAxisLabels.top }}</span>
-            <span class="text-right">{{ yAxisLabels.mid }}</span>
-            <span class="text-right">{{ yAxisLabels.bottom }}</span>
-          </div>
-          
-          <!-- 图表区域 -->
-          <div class="flex-1">
-            <!-- 背景网格线 -->
-            <div class="relative h-40">
-              <div 
-                class="absolute inset-0 flex flex-col justify-between pointer-events-none"
-              >
-                <div class="border-b" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"></div>
-                <div class="border-b" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"></div>
-                <div class="border-b" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"></div>
-              </div>
-              
-              <!-- 柱状图 -->
-              <div class="absolute inset-0 flex items-end gap-0.5 px-1">
-                <div 
-                  v-for="(item, index) in trafficHistory" 
-                  :key="item.date"
-                  class="flex-1 min-w-1 rounded-t transition-all duration-200 cursor-pointer group relative"
-                  :class="[
-                    themeStore.isDark 
-                      ? 'bg-gradient-to-t from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300' 
-                      : 'bg-gradient-to-t from-blue-500 to-blue-400 hover:from-blue-400 hover:to-blue-300'
-                  ]"
-                  :style="{ height: `${Math.max((Number(item.total) / chartMaxValue) * 100, 1)}%` }"
-                >
-                  <!-- Tooltip -->
-                  <div 
-                    class="absolute bottom-full mb-2 px-2.5 py-1.5 text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10"
-                    :class="[
-                      themeStore.isDark ? 'bg-gray-800 text-gray-200 border border-gray-700' : 'bg-white text-gray-900 border border-gray-200 shadow-md',
-                      index < 5 ? 'left-0' : index > trafficHistory.length - 5 ? 'right-0' : 'left-1/2 -translate-x-1/2'
-                    ]"
-                  >
-                    <div class="font-medium mb-1">{{ item.date }}</div>
-                    <div class="flex items-center gap-1.5">
-                      <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                      <span>{{ $t('traffic.download') }}: {{ item.rxFormatted }}</span>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                      <span class="w-2 h-2 rounded-full bg-orange-500"></span>
-                      <span>{{ $t('traffic.upload') }}: {{ item.txFormatted }}</span>
-                    </div>
-                    <div 
-                      class="mt-1 pt-1 font-medium"
-                      :class="themeStore.isDark ? 'border-t border-gray-700' : 'border-t border-gray-200'"
-                    >
-                      {{ $t('traffic.total') }}: {{ item.totalFormatted }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <!-- Chart area -->
+      <div
+        class="relative flex-1 h-48 cursor-crosshair select-none"
+        @mousemove="handleMouseMove"
+        @mouseleave="handleMouseLeave"
+      >
+        <!-- Horizontal grid lines -->
+        <div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+          <div
+            v-for="tick in yAxisTicks"
+            :key="tick.valGb"
+            class="border-b border-gray-100 dark:border-gray-800/80 w-full"
+          ></div>
+        </div>
 
-            <!-- X-axis labels -->
-            <div class="relative h-5 mt-1">
-              <div 
-                v-for="label in xAxisLabels" 
-                :key="label.index"
-                class="absolute text-xs transform -translate-x-1/2"
-                :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-                :style="{ left: `${trafficHistory.length === 1 ? 50 : (label.index / (trafficHistory.length - 1)) * 100}%` }"
-              >
-                {{ label.date }}
-              </div>
-            </div>
+        <!-- SVG Line and Area Chart -->
+        <svg
+          class="w-full h-full overflow-visible"
+          viewBox="0 0 1000 200"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="trafficAreaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2563eb" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="#2563eb" stop-opacity="0.01" />
+            </linearGradient>
+          </defs>
+
+          <!-- Gradient Area -->
+          <path
+            v-if="areaPath"
+            :d="areaPath"
+            fill="url(#trafficAreaGradient)"
+          />
+
+          <!-- Line -->
+          <path
+            v-if="linePath"
+            :d="linePath"
+            fill="none"
+            stroke="#2563eb"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+
+          <!-- Hover Guideline -->
+          <line
+            v-if="hoverPoint"
+            :x1="hoverPoint.x"
+            :y1="0"
+            :x2="hoverPoint.x"
+            :y2="200"
+            stroke="#94a3b8"
+            stroke-width="1.2"
+            stroke-dasharray="3 3"
+          />
+
+          <!-- Hover Dot -->
+          <circle
+            v-if="hoverPoint"
+            :cx="hoverPoint.x"
+            :cy="hoverPoint.y"
+            r="4.5"
+            fill="#2563eb"
+            stroke="#ffffff"
+            stroke-width="2"
+          />
+        </svg>
+
+        <!-- Hover Tooltip -->
+        <div
+          v-if="hoverItem"
+          class="absolute z-20 pointer-events-none px-3 py-2 text-xs rounded-lg shadow-xl bg-gray-900 text-white dark:bg-gray-800 dark:text-gray-100 border border-gray-700 whitespace-nowrap transition-all duration-75"
+          :style="tooltipStyle"
+        >
+          <div class="font-semibold text-gray-300 mb-1">{{ hoverItem.date }}</div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>{{ t('traffic.download') }}: {{ hoverItem.rxFormatted }}</span>
+          </div>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span>{{ t('traffic.upload') }}: {{ hoverItem.txFormatted }}</span>
+          </div>
+          <div class="flex items-center gap-2 mt-1 pt-1 border-t border-gray-700 font-bold text-white">
+            <span class="w-2 h-2 rounded-full bg-[#2563eb]"></span>
+            <span>{{ t('traffic.total') }}: {{ hoverItem.totalFormatted }}</span>
           </div>
         </div>
-      </template>
+      </div>
+    </div>
 
-      <div v-else class="text-center py-8">
-        <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-          {{ $t('traffic.noHistoryData') }}
-        </span>
+    <!-- X-axis date labels -->
+    <div class="flex">
+      <div class="w-14 flex-shrink-0"></div>
+      <div class="relative flex-1 h-5 mt-2 select-none">
+        <div
+          v-for="label in xAxisLabels"
+          :key="label.index"
+          class="absolute text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap"
+          :class="[
+            label.index === 0 ? 'translate-x-0' : label.index === trafficHistory.length - 1 ? '-translate-x-full' : '-translate-x-1/2'
+          ]"
+          :style="{ left: `${trafficHistory.length === 1 ? 50 : (label.index / (trafficHistory.length - 1)) * 100}%` }"
+        >
+          {{ label.date }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Footer Metrics -->
+    <div class="flex flex-wrap items-center gap-6 sm:gap-8 pt-4 mt-2 border-t border-gray-100 dark:border-gray-800 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+      <div class="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#2563eb]"></span>
+        <span>{{ t('traffic.dailyTotal') }}</span>
+      </div>
+      <div>
+        <span>{{ t('traffic.peak') }} {{ peakText }}</span>
+      </div>
+      <div>
+        <span>{{ t('traffic.dailyAverage') }} {{ dailyAvgText }}</span>
       </div>
     </div>
   </div>
