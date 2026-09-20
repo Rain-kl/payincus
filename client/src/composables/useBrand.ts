@@ -5,7 +5,8 @@ export function useBrand() {
 
   return {
     get brandName() {
-      return configStore.brandName?.trim() || 'Incudal'
+      const name = configStore.brandName?.trim()
+      return (!name || name === 'Incudal') ? 'Cloud' : name
     },
     get brandSubtitle() {
       return configStore.brandSubtitle?.trim() || '基于 Incus 的低价 NAT VPS'

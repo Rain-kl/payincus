@@ -28,6 +28,10 @@ const themeStore = useThemeStore()
 const inboxStore = useInboxStore()
 const configStore = useConfigStore()
 const brand = useBrand()
+const titleBrandName = computed(() => {
+  const name = brand.brandName?.trim()
+  return (!name || name === 'Incudal') ? 'Cloud' : name
+})
 const showTermsModal = ref(false)
 const langMenuOpen = ref(false)
 const langMenuRef = ref<HTMLElement | null>(null)
@@ -153,12 +157,12 @@ onUnmounted(() => {
         <RouterLink :to="navDashboardPath" class="flex items-center gap-2.5 min-w-0 flex-shrink-0">
           <img
             :src="brand.brandLogoUrl"
-            :alt="brand.brandName"
+            :alt="titleBrandName"
             class="w-7 h-7 rounded flex-shrink-0 object-cover"
           />
           <span
             class="font-semibold text-base text-white truncate tracking-tight"
-          >{{ brand.brandName }}</span>
+          >{{ titleBrandName }}</span>
         </RouterLink>
       </div>
 
