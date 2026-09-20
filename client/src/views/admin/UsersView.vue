@@ -1237,12 +1237,13 @@ function _getQuotaPercent(used, limit) {
                   <span>{{ user.instanceCount || 0 }} {{ t('admin.users.instances') }}</span>
                   <button
                     v-if="user.instanceCount > 0"
-                    class="btn-ghost btn-xs p-1 text-themed-muted hover:text-themed"
+                    type="button"
+                    class="text-themed-muted hover:text-themed transition-colors cursor-pointer inline-flex items-center justify-center p-0.5"
                     :title="t('admin.users.viewInstances')"
                     @click="viewUserInstances(user)"
                   >
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
                 </div>
@@ -1514,12 +1515,13 @@ function _getQuotaPercent(used, limit) {
                     <span class="text-sm text-themed-secondary">{{ user.instanceCount || 0 }} {{ t('admin.users.instances') }}</span>
                     <button 
                       v-if="user.instanceCount > 0"
-                      class="btn-ghost btn-xs p-1 text-themed-muted hover:text-themed"
+                      type="button"
+                      class="text-themed-muted hover:text-themed transition-colors cursor-pointer inline-flex items-center justify-center p-0.5"
                       :title="t('admin.users.viewInstances')"
                       @click="viewUserInstances(user)"
                     >
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                   </div>
