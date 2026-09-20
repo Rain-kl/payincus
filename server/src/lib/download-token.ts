@@ -32,7 +32,7 @@ setInterval(() => {
             downloadTokens.delete(token)
         }
     }
-}, 5 * 60 * 1000)
+}, 5 * 60 * 1000).unref()
 
 /**
  * 生成一次性下载 Token

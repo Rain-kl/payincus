@@ -38,7 +38,7 @@ setInterval(() => {
       actionTickets.delete(token)
     }
   }
-}, 60 * 1000)
+}, 60 * 1000).unref()
 
 function createTicket<T extends ActionTicket>(ticket: T): string {
   const token = nanoid(32)

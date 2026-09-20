@@ -586,7 +586,7 @@ setInterval(() => {
             exportTaskStore.delete(id)
         }
     }
-}, 5 * 60 * 1000)
+}, 5 * 60 * 1000).unref()
 
 /**
  * 清理过期的 Refresh Token（定期任务）
@@ -1336,7 +1336,7 @@ setInterval(() => {
             usedNonces.delete(nonce)
         }
     }
-}, 10 * 60 * 1000)
+}, 10 * 60 * 1000).unref()
 
 /**
  * 验证并消费 OAuth State
@@ -1585,7 +1585,7 @@ setInterval(() => {
             usedLoginCodeNonces.delete(nonce)
         }
     }
-}, 2 * 60 * 1000)
+}, 2 * 60 * 1000).unref()
 
 /**
  * 生成 OAuth 一次性登录码

@@ -195,6 +195,15 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma
 }
 
+// 确保 prisma.$disconnect() 同时关闭底层的 pg.Pool，避免 CLI 脚本和单次任务挂死
+const originalDisconnect = prisma.$disconnect.bind(prisma)
+prisma.$disconnect = async () => {
+  await originalDisconnect()
+  if (!pool.ended) {
+    await pool.end()
+  }
+}
+
 export function getDbPoolStats(): {
   totalCount: number
   idleCount: number
@@ -209,7 +218,9 @@ export function getDbPoolStats(): {
 
 export async function closePrismaDatabase(): Promise<void> {
   await prisma.$disconnect()
-  await pool.end()
+  if (!pool.ended) {
+    await pool.end()
+  }
 }
 
 export default prisma
