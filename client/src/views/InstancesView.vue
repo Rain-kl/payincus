@@ -315,6 +315,7 @@ onMounted(async (): Promise<void> => {
   loadInstanceLayoutPreference()
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', updateViewportState)
+    window.addEventListener('scroll', closeRowMenu, { passive: true })
   }
 
   // 从 URL 获取 userId 参数（首次加载）
@@ -343,6 +344,7 @@ onMounted(async (): Promise<void> => {
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateViewportState)
+    window.removeEventListener('scroll', closeRowMenu)
   }
   if (refreshInterval) clearInterval(refreshInterval)
   if (searchTimer) {
@@ -632,10 +634,34 @@ function closeActionsDropdown(): void {
 }
 
 const activeRowMenuId = ref<number | null>(null)
+const rowMenuPosition = ref<{ top: number; right: number }>({ top: 0, right: 0 })
+
 function toggleRowMenu(id: number, e: Event): void {
   e.stopPropagation()
-  activeRowMenuId.value = activeRowMenuId.value === id ? null : id
+  if (activeRowMenuId.value === id) {
+    closeRowMenu()
+    return
+  }
+  const btn = e.currentTarget as HTMLElement | null
+  if (btn) {
+    const rect = btn.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const menuHeight = 240
+    if (spaceBelow < menuHeight && rect.top > menuHeight) {
+      rowMenuPosition.value = {
+        top: Math.max(8, rect.top - menuHeight - 4),
+        right: Math.max(12, window.innerWidth - rect.right)
+      }
+    } else {
+      rowMenuPosition.value = {
+        top: rect.bottom + 4,
+        right: Math.max(12, window.innerWidth - rect.right)
+      }
+    }
+  }
+  activeRowMenuId.value = id
 }
+
 function closeRowMenu(): void {
   activeRowMenuId.value = null
 }
@@ -1617,11 +1643,10 @@ async function confirmBatchDestroy(): Promise<void> {
     <!-- 实例列表 -->
     <template v-else>
       <!-- 列表布局 (OCI 风格) -->
-      <!-- 列表布局 (OCI 风格) -->
-      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: #F6F4F3; box-shadow: none; border: 1px solid #e5e5e4;">
-        <div class="overflow-x-auto oci-table-scroll">
+      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: #ffffff; box-shadow: none; border: 1px solid #e5e5e4;">
+        <div class="overflow-x-auto oci-table-scroll bg-white dark:bg-[#161513]">
           <table class="w-full table-fixed" style="min-width: 1200px;">
-            <thead class="border-b border-[#e5e5e4] dark:border-[#2f2b28] bg-[#F6F4F3] dark:bg-[#161513]">
+            <thead class="border-b border-[#e5e5e4] dark:border-[#2f2b28] bg-white dark:bg-[#161513]">
               <tr>
                 <th class="w-12 px-3 py-3 text-center">
                   <div class="flex items-center justify-center">
@@ -1644,7 +1669,7 @@ async function confirmBatchDestroy(): Promise<void> {
                 <th class="w-28 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.memoryGb') }}</th>
                 <th class="w-44 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.createdAt') }}</th>
                 <th v-if="isAdmin" class="w-32 px-3.5 py-3 text-left text-xs font-semibold text-[#57534e] dark:text-[#a8a29e] uppercase tracking-wider truncate">{{ $t('instance.user') }}</th>
-                <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-[#F6F4F3] dark:bg-[#161513] border-l border-[#e5e5e4] dark:border-[#2a2826]">
+                <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-white dark:bg-[#161513] border-l border-[#e5e5e4] dark:border-[#2a2826]">
                   <span class="sr-only">{{ $t('common.actions') }}</span>
                 </th>
               </tr>
@@ -1657,7 +1682,7 @@ async function confirmBatchDestroy(): Promise<void> {
               <tr
                 v-for="instance in instances"
                 :key="instance.id"
-                class="group cursor-pointer transition-colors bg-[#F6F4F3] hover:bg-[#eeecea] dark:bg-[#161513] dark:hover:bg-[#1f1d1b]"
+                class="group cursor-pointer transition-colors bg-white hover:bg-[#f7f7f6] dark:bg-[#161513] dark:hover:bg-[#1e1c1a]"
                 :class="[
                   selectedIds.has(instance.id) ? 'bg-[#edf2f7] dark:bg-[#1c2228]' : '',
                   recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
@@ -1764,11 +1789,11 @@ async function confirmBatchDestroy(): Promise<void> {
                   :class="[
                     selectedIds.has(instance.id)
                       ? 'bg-[#edf2f7] dark:bg-[#1c2228]'
-                      : 'bg-[#F6F4F3] group-hover:bg-[#eeecea] dark:bg-[#161513] dark:group-hover:bg-[#1f1d1b]'
+                      : 'bg-white group-hover:bg-[#f7f7f6] dark:bg-[#161513] dark:group-hover:bg-[#1e1c1a]'
                   ]"
                   @click.stop
                 >
-                  <div class="relative inline-flex items-center justify-center">
+                  <div class="inline-flex items-center justify-center">
                     <button
                       type="button"
                       class="p-1.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-themed-muted transition-colors cursor-pointer"
@@ -1780,86 +1805,89 @@ async function confirmBatchDestroy(): Promise<void> {
                       </svg>
                     </button>
 
-                    <div
-                      v-if="activeRowMenuId === instance.id"
-                      class="fixed inset-0 z-20"
-                      @click.stop="closeRowMenu"
-                    ></div>
-                    <div
-                      v-if="activeRowMenuId === instance.id"
-                      class="absolute right-0 top-full mt-1 w-44 rounded-md bg-white dark:bg-[#1f1d1b] shadow-xl border border-gray-200 dark:border-gray-700 py-1.5 z-30 text-left text-xs"
-                      @click.stop
-                    >
-                      <button
-                        type="button"
-                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-themed"
-                        @click.stop="closeRowMenu(); openInstanceDetail(instance.id)"
+                    <Teleport to="body">
+                      <div
+                        v-if="activeRowMenuId === instance.id"
+                        class="fixed inset-0 z-40"
+                        @click.stop="closeRowMenu"
+                      ></div>
+                      <div
+                        v-if="activeRowMenuId === instance.id"
+                        class="dropdown-menu kawaii-menu-panel fixed z-50 w-44 rounded border border-themed bg-white dark:bg-[#1f1d1b] shadow-2xl py-1.5 text-left text-xs select-none"
+                        :style="{ top: `${rowMenuPosition.top}px`, right: `${rowMenuPosition.right}px` }"
+                        @click.stop
                       >
-                        {{ $t('instance.details') }}
-                      </button>
+                        <button
+                          type="button"
+                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-themed transition-colors hover:bg-themed-hover"
+                          @click.stop="closeRowMenu(); openInstanceDetail(instance.id)"
+                        >
+                          {{ $t('instance.details') }}
+                        </button>
 
-                      <div class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
+                        <div class="border-t border-themed my-1"></div>
 
-                      <button
-                        v-if="canStartInstance(instance)"
-                        type="button"
-                        :disabled="!!actionLoading[instance.id]"
-                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
-                        @click.stop="closeRowMenu(); handleAction(instance, 'start')"
-                      >
-                        {{ $t('instance.actions.start') }}
-                      </button>
-                      <button
-                        v-if="instance.status?.toLowerCase() === 'running'"
-                        type="button"
-                        :disabled="!!actionLoading[instance.id]"
-                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-amber-600 dark:text-amber-400 disabled:opacity-50"
-                        @click.stop="closeRowMenu(); handleAction(instance, 'stop')"
-                      >
-                        {{ $t('instance.actions.stop') }}
-                      </button>
-                      <button
-                        v-if="instance.status?.toLowerCase() === 'running'"
-                        type="button"
-                        :disabled="!!actionLoading[instance.id]"
-                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-primary-600 dark:text-primary-400 disabled:opacity-50"
-                        @click.stop="closeRowMenu(); handleAction(instance, 'restart')"
-                      >
-                        {{ $t('instance.actions.restart') }}
-                      </button>
+                        <button
+                          v-if="canStartInstance(instance)"
+                          type="button"
+                          :disabled="!!actionLoading[instance.id]"
+                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-success transition-colors hover:bg-themed-hover disabled:opacity-50"
+                          @click.stop="closeRowMenu(); handleAction(instance, 'start')"
+                        >
+                          {{ $t('instance.actions.start') }}
+                        </button>
+                        <button
+                          v-if="instance.status?.toLowerCase() === 'running'"
+                          type="button"
+                          :disabled="!!actionLoading[instance.id]"
+                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-warning transition-colors hover:bg-themed-hover disabled:opacity-50"
+                          @click.stop="closeRowMenu(); handleAction(instance, 'stop')"
+                        >
+                          {{ $t('instance.actions.stop') }}
+                        </button>
+                        <button
+                          v-if="instance.status?.toLowerCase() === 'running'"
+                          type="button"
+                          :disabled="!!actionLoading[instance.id]"
+                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-accent transition-colors hover:bg-themed-hover disabled:opacity-50"
+                          @click.stop="closeRowMenu(); handleAction(instance, 'restart')"
+                        >
+                          {{ $t('instance.actions.restart') }}
+                        </button>
 
-                      <button
-                        v-if="canResetInstanceTraffic(instance)"
-                        type="button"
-                        class="w-full text-left px-3.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-themed"
-                        @click.stop="closeRowMenu(); openResetTrafficModal(instance)"
-                      >
-                        {{ $t('admin.hosts.resetTraffic') }}
-                      </button>
+                        <button
+                          v-if="canResetInstanceTraffic(instance)"
+                          type="button"
+                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-themed transition-colors hover:bg-themed-hover"
+                          @click.stop="closeRowMenu(); openResetTrafficModal(instance)"
+                        >
+                          {{ $t('admin.hosts.resetTraffic') }}
+                        </button>
 
-                      <div v-if="canReorderInstances" class="px-3.5 py-1">
-                        <InstanceOrderMenu
-                          :actions="INSTANCE_ORDER_ACTIONS"
-                          :labels="instanceOrderLabels"
-                          :label="$t('instance.order.label')"
-                          :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
-                          :loading="orderLoading"
-                          :dark="themeStore.isDark"
-                          align="left"
-                          @reorder="reorderInstance(instance, $event)"
-                        />
+                        <div v-if="canReorderInstances" class="px-3.5 py-1">
+                          <InstanceOrderMenu
+                            :actions="INSTANCE_ORDER_ACTIONS"
+                            :labels="instanceOrderLabels"
+                            :label="$t('instance.order.label')"
+                            :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
+                            :loading="orderLoading"
+                            :dark="themeStore.isDark"
+                            align="left"
+                            @reorder="reorderInstance(instance, $event)"
+                          />
+                        </div>
+
+                        <div v-if="canDeleteInstance(instance)" class="border-t border-themed my-1"></div>
+                        <button
+                          v-if="canDeleteInstance(instance)"
+                          type="button"
+                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-danger transition-colors hover:bg-themed-hover"
+                          @click.stop="closeRowMenu(); handleAction(instance, 'delete')"
+                        >
+                          {{ $t('instance.actions.delete') }}
+                        </button>
                       </div>
-
-                      <div v-if="canDeleteInstance(instance)" class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
-                      <button
-                        v-if="canDeleteInstance(instance)"
-                        type="button"
-                        class="w-full text-left px-3.5 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 transition-colors"
-                        @click.stop="closeRowMenu(); handleAction(instance, 'delete')"
-                      >
-                        {{ $t('instance.actions.delete') }}
-                      </button>
-                    </div>
+                    </Teleport>
                   </div>
                 </td>
               </tr>
