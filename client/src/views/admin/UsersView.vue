@@ -1161,7 +1161,8 @@ function _getQuotaPercent(used, limit) {
           <div
             v-for="(user, index) in users"
             :key="user.id"
-            class="card p-4"
+            class="card p-4 relative"
+            :class="{ 'z-20': activeActionMenuUserId === user.id }"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3">
