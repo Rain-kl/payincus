@@ -182,9 +182,9 @@ function handleLinkClick() {
     <div class="hidden" aria-hidden="true">
       <RouterLink :to="navDashboardPath" class="nimbus-brand-link flex items-center gap-2.5 min-w-0" @click="handleLinkClick">
         <img
-          :src="brand.brandLogoUrl"
+          :src="brand.topBarLogoUrl"
           :alt="brand.brandName"
-          class="nimbus-brand-logo w-8 h-8 flex-shrink-0"
+          class="nimbus-brand-logo w-8 h-8 flex-shrink-0 object-contain"
         />
         <span class="nimbus-brand-name !text-white truncate">{{ brand.brandName }}</span>
       </RouterLink>

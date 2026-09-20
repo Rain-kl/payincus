@@ -50,7 +50,7 @@ let transporterCache: Transporter | null = null
 let configCacheTime: number = 0
 const CONFIG_CACHE_TTL = 60000 // 缓存时间：1 分钟
 const DEFAULT_BRAND_NAME = 'Incudal'
-const DEFAULT_BRAND_LOGO_URL = '/incudal_logo.webp'
+const DEFAULT_BRAND_LOGO_URL = '/logo.svg'
 
 async function getMailBrandName(): Promise<string> {
     const configuredName = await getSystemConfig('brand_name')
@@ -61,7 +61,7 @@ async function getMailBrandName(): Promise<string> {
 async function getMailBrandLogoUrl(): Promise<string> {
     const configuredLogoUrl = await getSystemConfig('brand_logo_url')
     const logoUrl = configuredLogoUrl?.trim()
-    return logoUrl || DEFAULT_BRAND_LOGO_URL
+    return (logoUrl && logoUrl !== '/incudal_logo.webp') ? logoUrl : DEFAULT_BRAND_LOGO_URL
 }
 
 function formatBrandSubject(brandName: string, subject: string): string {

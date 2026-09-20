@@ -25,7 +25,7 @@ export const useConfigStore = defineStore('config', () => {
     const avatarApiBase = ref('https://api.dicebear.com/9.x')
     const brandName = ref('Incudal')
     const brandSubtitle = ref('基于 Incus 的低价 NAT VPS')
-    const brandLogoUrl = ref('/incudal_logo.webp')
+    const brandLogoUrl = ref('/logo.svg')
     const brandCopyright = ref('版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。')
     const registrationEnabled = ref(true)
     const requireInviteCode = ref(true)
@@ -35,7 +35,7 @@ export const useConfigStore = defineStore('config', () => {
     const turnstileEnabled = ref(false)
     const turnstileSiteKey = ref<string | null>(null)
     const transferFee = ref(0)
-    const footerContactEmail = ref<string | null>('incudal@sent.com')
+    const footerContactEmail = ref<string | null>('ryan@io0.cc')
     const footerTelegramLink = ref<string | null>(null)
     const hostingMarketEntryEnabled = ref(true)
     const hostingNotice = ref<string | null>(null)
@@ -65,7 +65,7 @@ export const useConfigStore = defineStore('config', () => {
                 avatarApiBase.value = config.avatarApiBase || 'https://api.dicebear.com/9.x'
                 brandName.value = config.brandName?.trim() || 'Incudal'
                 brandSubtitle.value = config.brandSubtitle?.trim() || '基于 Incus 的低价 NAT VPS'
-                brandLogoUrl.value = config.brandLogoUrl?.trim() || '/incudal_logo.webp'
+                brandLogoUrl.value = (config.brandLogoUrl?.trim() && config.brandLogoUrl !== '/incudal_logo.webp') ? config.brandLogoUrl.trim() : '/logo.svg'
                 brandCopyright.value = config.brandCopyright?.trim() || '版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。'
                 transferFee.value = config.transferFee || 0
                 footerContactEmail.value = config.footerContactEmail ?? null

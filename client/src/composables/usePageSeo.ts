@@ -68,7 +68,9 @@ function upsertCanonical(href: string): void {
 function applySeo(options: SeoOptions): void {
   const configStore = useConfigStore()
   const brandName = configStore.brandName?.trim() || 'Incudal'
-  const image = toAbsoluteUrl(options.image || configStore.brandLogoUrl?.trim() || '/incudal_logo.webp')
+  const configuredLogo = configStore.brandLogoUrl?.trim()
+  const defaultLogo = (configuredLogo && configuredLogo !== '/incudal_logo.webp') ? configuredLogo : '/logo.svg'
+  const image = toAbsoluteUrl(options.image || defaultLogo)
   const canonical = options.canonical || window.location.href
   const robots = options.robots || defaultRobots
 
@@ -100,7 +102,9 @@ function restoreDefaults(): void {
   const configStore = useConfigStore()
   const brandName = configStore.brandName?.trim() || 'Incudal'
   const brandSubtitle = configStore.brandSubtitle?.trim() || '基于 Incus 的低价 NAT VPS'
-  const brandLogoUrl = toAbsoluteUrl(configStore.brandLogoUrl?.trim() || '/incudal_logo.webp')
+  const configuredLogo = configStore.brandLogoUrl?.trim()
+  const defaultLogo = (configuredLogo && configuredLogo !== '/incudal_logo.webp') ? configuredLogo : '/logo.svg'
+  const brandLogoUrl = toAbsoluteUrl(defaultLogo)
   const title = defaultTitle.replace(/Incudal/g, brandName)
   const description = defaultDescription || brandSubtitle
 

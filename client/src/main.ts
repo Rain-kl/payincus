@@ -44,11 +44,15 @@ themeStore.init()
 import { useConfigStore } from './stores/config'
 const configStore = useConfigStore()
 configStore.loadPublicConfig().then(() => {
-  const logoUrl = configStore.brandLogoUrl?.trim() || '/incudal_logo.webp'
+  const configuredLogo = configStore.brandLogoUrl?.trim()
+  const logoUrl = (configuredLogo && configuredLogo !== '/incudal_logo.webp') ? configuredLogo : '/logo.svg'
   const icon = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null
   const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]') as HTMLLinkElement | null
   if (icon) {
     icon.href = logoUrl
+    if (logoUrl.endsWith('.svg')) {
+      icon.type = 'image/svg+xml'
+    }
   }
   if (appleTouchIcon) {
     appleTouchIcon.href = logoUrl

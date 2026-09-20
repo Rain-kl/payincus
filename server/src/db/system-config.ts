@@ -77,7 +77,7 @@ export async function initSystemConfig(): Promise<void> {
         { key: 'free_site_register_gift_points', value: '0', type: 'number', label: '注册赠送积分', description: '白嫖站注册自动赠送的积分数量' },
         { key: 'brand_name', value: 'Incudal', type: 'string', label: '系统名称', description: '站点顶部、登录页、SEO 等位置展示的系统名称，留空则使用默认值' },
         { key: 'brand_subtitle', value: '基于 Incus 的低价 NAT VPS', type: 'string', label: '网站副标题', description: '站点顶部、公共页、SEO 默认描述等位置展示的品牌副标题，留空则使用默认值' },
-        { key: 'brand_logo_url', value: '/incudal_logo.webp', type: 'string', label: '系统 Logo 地址', description: '站点顶部、登录页、SEO 等位置展示的 Logo 图片地址，留空则使用默认值' },
+        { key: 'brand_logo_url', value: '/logo.svg', type: 'string', label: '系统 Logo 地址', description: '站点顶部、登录页、SEO 等位置展示的 Logo 图片地址，留空则使用默认值' },
         { key: 'brand_copyright', value: '版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。', type: 'string', label: '版权所有', description: '站点页脚展示的版权所有文案，留空则使用默认值' },
         { key: 'popup_announcement', value: '', type: 'string', label: '弹窗公告', description: '用户访问网站时弹出的公告内容，留空则不广播' },
         { key: 'popup_promo_image_url', value: '', type: 'string', label: '图片推广弹窗图片', description: '用户访问网站时弹出的套餐推广图片 URL，留空则不显示图片推广弹窗' },
@@ -89,7 +89,7 @@ export async function initSystemConfig(): Promise<void> {
         // 头像 API 配置
         { key: 'avatar_api_base', value: 'https://api.dicebear.com/9.x', type: 'string', label: '头像 API 地址', description: 'DiceBear 头像 API 基础地址，可自建服务' },
         // 侧边栏底部联系方式
-        { key: 'footer_contact_email', value: 'incudal@sent.com', type: 'string', label: '底部联系邮箱', description: '侧边栏底部邮箱按钮显示的邮箱地址或 mailto 链接' },
+        { key: 'footer_contact_email', value: 'ryan@io0.cc', type: 'string', label: '底部联系邮箱', description: '侧边栏底部邮箱按钮显示的邮箱地址或 mailto 链接' },
         { key: 'footer_telegram_link', value: '', type: 'string', label: '底部 Telegram 群链接', description: '侧边栏底部 Telegram 按钮跳转地址' },
         // Telegram 专用机器人配置
         { key: 'telegram_bot_enabled', value: 'false', type: 'boolean', label: 'Telegram 专用机器人', description: '是否启用 Telegram 账号绑定机器人' },

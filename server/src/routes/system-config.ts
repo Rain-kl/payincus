@@ -251,7 +251,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             hostingNotice,
             brandName: brandName || 'Incudal',
             brandSubtitle: brandSubtitle || '基于 Incus 的低价 NAT VPS',
-            brandLogoUrl: brandLogoUrl || '/incudal_logo.webp',
+            brandLogoUrl: (brandLogoUrl && brandLogoUrl !== '/incudal_logo.webp') ? brandLogoUrl : '/logo.svg',
             brandCopyright: brandCopyright?.trim() || '版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。',
             popupAnnouncement: popupAnnouncement ? popupAnnouncementConfig.value : null,
             popupAnnouncementUpdatedAt: popupAnnouncement ? popupAnnouncementConfig.updatedAt : null,

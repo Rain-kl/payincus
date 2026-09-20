@@ -156,9 +156,9 @@ onUnmounted(() => {
         <!-- Brand: Logo + Name (桌面端与移动端统一位于标题栏最左侧) -->
         <RouterLink :to="navDashboardPath" class="flex items-center gap-2.5 min-w-0 flex-shrink-0">
           <img
-            :src="brand.brandLogoUrl"
+            :src="brand.topBarLogoUrl"
             :alt="titleBrandName"
-            class="w-7 h-7 rounded flex-shrink-0 object-cover"
+            class="w-7 h-7 rounded flex-shrink-0 object-contain"
           />
           <span
             class="font-semibold text-base text-white truncate tracking-tight"
