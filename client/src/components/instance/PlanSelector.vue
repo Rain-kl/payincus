@@ -62,6 +62,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const themeStore = useThemeStore()
 
+// CPU 格式化（以 C 为单位，1C = 1 核；100% → 1C、150% → 1.5C）
+function formatCpu(value: number): string {
+  const cores = value / 100
+  return cores % 1 === 0 ? `${cores}C` : `${cores.toFixed(1)}C`
+}
+
 function formatMemory(mb: number): string {
   if (mb >= 1024) return (mb / 1024).toFixed(mb >= 10240 ? 0 : 1) + ' GB'
   return mb + ' MB'
@@ -290,7 +296,7 @@ function handleSelect(plan: PackagePlan): void {
               class="font-semibold"
               :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-800'"
             >
-              {{ plan.cpu }}%
+              {{ formatCpu(plan.cpu) }}
             </div>
           </div>
           <!-- 内存 -->
