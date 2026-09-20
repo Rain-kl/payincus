@@ -35,11 +35,6 @@ const primaryActionLabel = computed(() => {
   return t('publicSite.actions.signIn')
 })
 
-const secondaryAction = computed(() => (
-  route.name === 'market'
-    ? { to: '/', label: t('publicSite.nav.overview') }
-    : { to: marketPath(), label: t('publicSite.actions.browseProducts') }
-))
 
 const accountLinks = computed(() => {
   if (authStore.isAuthenticated) {
@@ -102,12 +97,6 @@ void configStore.loadPublicConfig()
           </div>
 
           <div class="flex flex-col gap-3 sm:flex-row">
-            <RouterLink
-              class="kawaii-secondary-button inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-semibold transition-colors"
-              :to="secondaryAction.to"
-            >
-              {{ secondaryAction.label }}
-            </RouterLink>
             <button
               class="kawaii-primary-button inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition-colors"
               @click="handlePrimaryAction"
@@ -150,9 +139,6 @@ void configStore.loadPublicConfig()
               {{ link.label }}
             </RouterLink>
           </div>
-          <p class="text-xs leading-6 text-themed-muted">
-            {{ t('publicSite.footer.purchaseHint') }}
-          </p>
         </div>
       </div>
     </div>

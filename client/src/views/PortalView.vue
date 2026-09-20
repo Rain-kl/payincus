@@ -250,11 +250,6 @@ onMounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.5 4.5l6 6m0 0l-6 6m6-6h-15" />
               </svg>
             </button>
-
-            <button class="kawaii-secondary-button nimbus-btn nimbus-btn-ghost" @click="goToConsole">
-              <span class="sm:hidden">{{ consoleActionCompactLabel }}</span>
-              <span class="hidden sm:inline">{{ consoleActionLabel }}</span>
-            </button>
           </div>
 
           <div class="nimbus-hero-trust">
