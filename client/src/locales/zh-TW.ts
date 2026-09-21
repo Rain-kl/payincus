@@ -577,7 +577,7 @@ const zhTW = {
 
     giftCardsAdmin: {
         title: '禮品卡管理',
-        description: '產生和管理可兌換到帳戶餘額的禮品卡。生產環境需要配置 PAYINCUS_GIFT_CARD_ADMIN_IDS 後才能操作。',
+        description: '產生和管理可兌換到帳戶餘額的禮品卡。可透過配置 PAYINCUS_GIFT_CARD_ADMIN_IDS 設定管理員白名單。',
         stats: {
             active: '可用禮品卡',
             used: '已兌換',

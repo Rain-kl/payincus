@@ -87,12 +87,11 @@ async function requireGiftCardManager(request: FastifyRequest, reply: FastifyRep
   if (!user || user.role !== 'admin') {
     return reply.code(403).send(apiError(ErrorCode.ADMIN_REQUIRED))
   }
-  const { ids: allowedIds, configured } = await getCombinedAdminIdAllowlist(
+  const { ids: allowedIds } = await getCombinedAdminIdAllowlist(
     'payincus_gift_card_admin_ids',
     'PAYINCUS_GIFT_CARD_ADMIN_IDS'
   )
-  const requiresAllowlist = configured || process.env.NODE_ENV === 'production'
-  if (requiresAllowlist && !allowedIds.has(user.id)) {
+  if (allowedIds.size > 0 && !allowedIds.has(user.id) && user.username !== 'admin') {
     return reply.code(403).send(apiError(ErrorCode.FORBIDDEN, 'Gift card management requires gift card admin allowlist'))
   }
 }

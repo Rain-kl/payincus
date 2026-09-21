@@ -129,7 +129,7 @@ export async function initSystemConfig(): Promise<void> {
         { key: 'ticket_image_lsky_target_id', value: '', type: 'string', label: '策略/存储 ID', description: 'v1 填 strategy_id，v2 填 storage_id，可留空使用默认策略' },
         // 平台运营配置
         { key: 'system_update_allowed_admin_ids', value: '', type: 'string', label: 'OTA 管理员白名单', description: '允许执行系统 OTA 更新的管理员 UID，多个用英文逗号分隔；留空时仅 admin 用户名可操作' },
-        { key: 'payincus_gift_card_admin_ids', value: '', type: 'string', label: '礼品卡管理员白名单', description: '允许管理礼品卡的管理员 UID，多个用英文逗号分隔；生产环境建议必须配置' },
+        { key: 'payincus_gift_card_admin_ids', value: '', type: 'string', label: '礼品卡管理员白名单', description: '允许管理礼品卡的管理员 UID，多个用英文逗号分隔；留空时所有管理员可操作' },
     ]
 
     for (const config of configs) {

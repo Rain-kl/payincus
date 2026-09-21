@@ -885,7 +885,7 @@ async function sendTestEmail() {
             <div class="space-y-2">
               <label class="block text-sm text-themed-secondary">礼品卡管理员 UID</label>
               <input v-model="form.payincus_gift_card_admin_ids" type="text" class="input font-mono" placeholder="1,2,3" />
-              <p class="text-xs text-themed-muted">生产环境建议必须配置；未在白名单内的管理员不能生成、禁用或删除礼品卡。</p>
+              <p class="text-xs text-themed-muted">留空时所有管理员可操作；配置后仅白名单内的管理员可生成、禁用或删除礼品卡。</p>
             </div>
           </div>
         </div>

@@ -118,10 +118,13 @@ assert(
   route.includes('function requireGiftCardManager') &&
     route.includes('PAYINCUS_GIFT_CARD_ADMIN_IDS') &&
     route.includes('requireGiftCardManager]') &&
+    route.includes('allowedIds.size > 0') &&
+    !route.includes('requiresAllowlist') &&
+    !route.includes("process.env.NODE_ENV === 'production'") &&
     route.includes('normalizeIdList') &&
     db.includes('maskGiftCardCode(code)') &&
     db.includes('revealCode: options.revealCode === true'),
-  'admin gift card routes must require an explicit production allowlist, normalize batch IDs, and mask list codes by default'
+  'admin gift card routes must check configured allowlist, fallback safely when unconfigured, normalize batch IDs, and mask list codes by default'
 )
 
 const adminGenerateSection = route.slice(

@@ -757,7 +757,7 @@ export default {
 
     giftCardsAdmin: {
         title: '礼品卡管理',
-        description: '生成和管理可兑换到账户余额的礼品卡。生产环境需要配置 PAYINCUS_GIFT_CARD_ADMIN_IDS 后才能操作。',
+        description: '生成和管理可兑换到账户余额的礼品卡。可通过配置 PAYINCUS_GIFT_CARD_ADMIN_IDS 设置管理员白名单。',
         stats: {
             active: '可用礼品卡',
             used: '已兑换',

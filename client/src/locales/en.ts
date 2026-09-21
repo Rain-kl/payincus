@@ -573,7 +573,7 @@ export default {
 
     giftCardsAdmin: {
         title: 'Gift Card Management',
-        description: 'Create and manage gift cards that can be redeemed into account balance. Production operations require PAYINCUS_GIFT_CARD_ADMIN_IDS to be configured.',
+        description: 'Create and manage gift cards that can be redeemed into account balance. You can configure PAYINCUS_GIFT_CARD_ADMIN_IDS to restrict administrator access.',
         stats: {
             active: 'Available Gift Cards',
             used: 'Redeemed',
