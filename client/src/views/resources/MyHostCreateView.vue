@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -9,11 +8,23 @@ import { onClickOutside } from '@vueuse/core'
 import { availableFlagCountryCodes, getLocalizedCountryName } from '@/utils/countryDisplay'
 import { buildHostApiUrl, validateIdentifier, validateName, validateHostAddress, validateIpAddress } from '@/utils/validation'
 import FlagIcon from '@/components/FlagIcon.vue'
-import { hostsPath } from '@/utils/app-paths'
-import MyHostsView from './MyHostsView.vue'
+
+const props = withDefaults(
+  defineProps<{
+    show?: boolean
+  }>(),
+  {
+    show: false
+  }
+)
+
+const emit = defineEmits<{
+  (e: 'update:show', value: boolean): void
+  (e: 'close'): void
+  (e: 'created', host?: any): void
+}>()
 
 const { t, locale } = useI18n()
-const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
 
@@ -262,12 +273,13 @@ async function createHost() {
 
     hostId.value = (response as any).host?.id
     toast.success(t('admin.hosts.hostAdded'))
+    emit('created', (response as any).host)
     if (command) {
       installCommand.value = command
       showInstallScript.value = true
       installStatus.value = 'waiting'
     } else {
-      goBack()
+      closeAndGoBack()
     }
   } catch (err: any) {
     const errorCode = err?.code
@@ -284,34 +296,20 @@ function copyCommand() {
   toast.success(t('common.copied'))
 }
 
-const showDrawer = ref(true)
-
-function goBack(): void {
-  if (!showDrawer.value) return
-  showDrawer.value = false
-  setTimeout(() => {
-    router.push(hostsPath())
-  }, 250)
-}
-
 function closeAndGoBack() {
   showInstallScript.value = false
-  goBack()
+  emit('update:show', false)
+  emit('close')
 }
 </script>
 
 <template>
-  <div class="host-create-page">
-    <!-- Background view: Hosts list -->
-    <MyHostsView />
-
-    <!-- Drawer Modal -->
-    <DrawerModal
-      :show="showDrawer"
-      max-width="max-w-3xl lg:!max-w-4xl"
-      raw
-      @close="closeAndGoBack"
-    >
+  <DrawerModal
+    :show="props.show"
+    max-width="max-w-3xl lg:!max-w-4xl"
+    raw
+    @close="closeAndGoBack"
+  >
       <!-- Header -->
       <div class="modal-header">
         <div class="flex items-center gap-2 min-w-0">
@@ -659,7 +657,6 @@ function closeAndGoBack() {
         </template>
       </div>
     </DrawerModal>
-  </div>
 </template>
 
 <style scoped>

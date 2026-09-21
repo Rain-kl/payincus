@@ -52,6 +52,7 @@
 9. **禁止硬编码十六进制颜色**：前端所有颜色**必须使用主题系统提供的 token**（`var(--xxx)` / 语义 class / 集中色板常量）。组件、全局样式、scoped style 中**一律不得出现 `#hex` 色值**（如 `#F6F4F3`、`bg-[#295BA7]`、`color: #161513`、SVG `fill="#xxx"`）。唯一允许 hex 的位置是主题唯一来源 `client/src/styles/theme.css` 与守卫白名单文件（详见 `server/scripts/test-frontend-color-tokens.ts`）。`test:frontend-color-tokens` 守卫会全局扫描拦截，**违反即未完成**。
 10. **禁止在组件里指定主题色值**：背景 / 文字 / 边框 / 强调 / 选中态等颜色必须引用主题 token 层（`client/src/styles/theme.css` 是唯一事实来源，`tailwind.config.js` 的 token 映射与 `kawaii-cloud.css` 的 `--kawaii-*` 均为对它的引用）。改主题色**只改 theme.css 一处**，组件不得复制色值。
 11. **禁止任何透明 / 半透明元素**：全局样式、组件、scoped style、SVG、图标中一律不得出现透明 / 半透明写法 —— 包括 `rgba()`、`opacity`、`bg-*`/`text-*` 的透明度后缀（如 `bg-*/50`、`text-*/70`）、`/40`、`/50` 这类 Tailwind 透明度简写、`bg-transparent`、`transparent` 关键字等。所有背景 / 文字 / 边框 / 描边必须使用**不透明的纯色**（主题 token 或语义 class）。`test:frontend-color-tokens` 守卫会全局扫描拦截，**违反即未完成**。
+12. **所有弹窗必须使用抽屉（Drawer）**：前端所有弹窗、表单浮层、操作模态框（Modal / Dialog / Popup）一律统一使用 `<DrawerModal>` 或右侧滑出抽屉样式（`.modal-overlay` + `.modal-backdrop` + `.modal-content` 侧边抽屉布局），严禁使用居中弹窗、原生 alert/confirm（除必要的高危二次确认外）或非抽屉样式的全屏浮层。抽屉层级、遮罩背景及内构（`.modal-header` / `.modal-body` / `.modal-footer`）必须保持全系统一致，取消按钮白底黑字（`btn-secondary`），确认/提交按钮黑底白字（`btn-primary`）。
 
 ---
 

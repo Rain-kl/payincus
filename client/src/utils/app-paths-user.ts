@@ -85,7 +85,7 @@ export function hostsPath(): string {
 }
 
 export function hostCreatePath(): string {
-  return '/resources/hosts/create'
+  return '/resources/hosts'
 }
 
 export function hostDetailPath(id: number | string): string {
@@ -97,9 +97,9 @@ export function packagesPath(): string {
 }
 
 export function packageCreatePath(): string {
-  return '/resources/packages/create'
+  return '/resources/packages'
 }
 
-export function packageEditPath(id: number | string): string {
-  return `/resources/packages/${encodeURIComponent(String(id))}/edit`
+export function packageEditPath(_id?: number | string): string {
+  return '/resources/packages'
 }

@@ -673,89 +673,89 @@ onMounted(() => {
       </template>
     </template>
 
-    <!-- Modal -->
-    <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-        <div class="modal-backdrop" @click="showModal = false"></div>
-        <div class="modal-content max-w-lg">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ modalTitle }}</h3>
-            <button class="p-1 rounded hover:bg-gray-500/20" @click="showModal = false">
-              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <form class="flex-1 flex flex-col min-h-0" @submit.prevent="saveImage">
-            <div class="modal-body space-y-4">
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.name') }} *</label>
-                <input v-model="form.name" type="text" class="input" :placeholder="t('admin.images.placeholder.name')" />
-              </div>
-              
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.remoteAlias') }} *</label>
-                <input v-model="form.remoteAlias" type="text" class="input font-mono" :placeholder="t('admin.images.placeholder.remoteAlias')" />
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.remoteAlias') }}</p>
-              </div>
-              
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.osType') }}</label>
-                  <input v-model="form.osType" type="text" class="input" />
-                </div>
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.architecture') }}</label>
-                  <select v-model="form.architecture" class="input">
-                    <option v-for="option in architectureOptions" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
-              </div>
-              
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.instanceType') }}</label>
-                <select v-model="form.instanceType" class="input">
-                  <option value="both">{{ t('admin.images.typeBoth') }}</option>
-                  <option value="container">{{ t('admin.images.typeContainer') }}</option>
-                  <option value="vm">{{ t('admin.images.typeVm') }}</option>
-                </select>
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.instanceType') }}</p>
-              </div>
-              
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.icon') }} *</label>
-                <select v-model="form.icon" class="input">
-                  <option value="">{{ t('admin.images.placeholder.icon') }}</option>
-                  <option v-for="icon in iconOptions" :key="icon" :value="icon">{{ icon }}</option>
-                </select>
-              </div>
-              
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.sortOrder') }}</label>
-                <input v-model.number="form.sortOrder" type="number" class="input" min="0" />
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.sortOrder') }}</p>
-              </div>
-              
-              <div class="flex items-center gap-2">
-                <input :id="'hidden'" v-model="form.hidden" type="checkbox" class="w-4 h-4 rounded" />
-                <label :for="'hidden'" class="text-sm text-themed-secondary cursor-pointer">{{ t('admin.images.fields.hidden') }}</label>
-              </div>
-            </div>
-            
-            <div class="modal-footer">
-              <button type="button" class="btn-secondary" @click="showModal = false">{{ t('common.cancel') }}</button>
-              <button type="submit" class="btn-primary" :disabled="saving">
-                <span v-if="saving" class="loading-spinner w-4 h-4 mr-2"></span>
-                {{ isEditMode ? t('common.save') : t('common.create') }}
-              </button>
-            </div>
-          </form>
-        </div>
+    <!-- Drawer Modal -->
+    <DrawerModal
+      :show="showModal"
+      max-width="max-w-lg"
+      raw
+      @close="showModal = false"
+    >
+      <div class="modal-header">
+        <h3 class="modal-title">{{ modalTitle }}</h3>
+        <button type="button" class="btn btn-ghost btn-sm p-1.5 -mr-1" aria-label="close" @click="showModal = false">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
-    </Teleport>
+
+      <form class="flex-1 flex flex-col min-h-0" @submit.prevent="saveImage">
+        <div class="modal-body space-y-4">
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.name') }} *</label>
+            <input v-model="form.name" type="text" class="input" :placeholder="t('admin.images.placeholder.name')" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.remoteAlias') }} *</label>
+            <input v-model="form.remoteAlias" type="text" class="input font-mono" :placeholder="t('admin.images.placeholder.remoteAlias')" />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.remoteAlias') }}</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.osType') }}</label>
+              <input v-model="form.osType" type="text" class="input" />
+            </div>
+            <div>
+              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.architecture') }}</label>
+              <select v-model="form.architecture" class="input">
+                <option v-for="option in architectureOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.instanceType') }}</label>
+            <select v-model="form.instanceType" class="input">
+              <option value="both">{{ t('admin.images.typeBoth') }}</option>
+              <option value="container">{{ t('admin.images.typeContainer') }}</option>
+              <option value="vm">{{ t('admin.images.typeVm') }}</option>
+            </select>
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.instanceType') }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.icon') }} *</label>
+            <select v-model="form.icon" class="input">
+              <option value="">{{ t('admin.images.placeholder.icon') }}</option>
+              <option v-for="icon in iconOptions" :key="icon" :value="icon">{{ icon }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.sortOrder') }}</label>
+            <input v-model.number="form.sortOrder" type="number" class="input" min="0" />
+            <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.sortOrder') }}</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input :id="'hidden'" v-model="form.hidden" type="checkbox" class="w-4 h-4 rounded" />
+            <label :for="'hidden'" class="text-sm text-themed-secondary cursor-pointer">{{ t('admin.images.fields.hidden') }}</label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" @click="showModal = false">{{ t('common.cancel') }}</button>
+          <button type="submit" class="btn-primary" :disabled="saving">
+            <span v-if="saving" class="loading-spinner w-4 h-4 mr-2"></span>
+            {{ isEditMode ? t('common.save') : t('common.create') }}
+          </button>
+        </div>
+      </form>
+    </DrawerModal>
   </div>
 </template>
 

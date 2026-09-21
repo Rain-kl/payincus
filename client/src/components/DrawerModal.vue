@@ -83,7 +83,7 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <Transition name="modal">
+    <Transition name="modal" appear>
       <div
         v-if="isOpen"
         class="modal-overlay"

@@ -207,9 +207,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/resources/hosts/create',
-    name: 'my-host-create',
-    component: () => import('@/views/resources/MyHostCreateView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.myHostCreate', title: '创建节点' }
+    redirect: '/resources/hosts'
   },
   {
     path: '/resources/hosts/:id',
@@ -225,15 +223,11 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/resources/packages/create',
-    name: 'my-package-create',
-    component: () => import('@/views/resources/PackageFormView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.myPackageCreate', title: '创建套餐' }
+    redirect: '/resources/packages'
   },
   {
     path: '/resources/packages/:id/edit',
-    name: 'my-package-edit',
-    component: () => import('@/views/resources/PackageFormView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.myPackageEdit', title: '编辑套餐' }
+    redirect: '/resources/packages'
   },
   // 托管余额页面
   {

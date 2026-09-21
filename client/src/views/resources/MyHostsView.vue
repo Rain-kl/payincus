@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { translateError } from '@/utils/errorHandler'
 import { hostCreatePath, hostDetailPath, isAdminEntry } from '@/utils/app-paths'
+import MyHostCreateView from './MyHostCreateView.vue'
 
 // 为 KeepAlive include 匹配定义组件名称（必须在所有 import 之后）
 defineOptions({ name: 'MyHostsView' })
@@ -172,25 +173,27 @@ watch(search, () => {
   }, 300)
 })
 
-// 跳转到创建页面（需检查托管准入条件）
+const showCreateDrawer = ref(false)
+
+// 打开创建抽屉（需检查托管准入条件）
 async function goToCreate() {
   // 管理员直接放行
   if (isAdminEntry || authStore.user?.role === 'admin') {
-    router.push(hostCreatePath())
+    showCreateDrawer.value = true
     return
   }
 
   try {
     const res = await api.hosting.checkAccess()
     if (res.allowed) {
-      router.push(hostCreatePath())
+      showCreateDrawer.value = true
     } else {
       accessDeniedDetails.value = res.details || null
       showAccessDeniedModal.value = true
     }
   } catch {
-    // 检查失败时也允许跳转，让后端再次校验
-    router.push(hostCreatePath())
+    // 检查失败时也允许打开，让后端再次校验
+    showCreateDrawer.value = true
   }
 }
 
@@ -677,64 +680,68 @@ onActivated(() => {
     </div>
   </div>
 
-  <!-- 托管准入条件不满足弹窗 -->
-  <div
-    v-if="showAccessDeniedModal"
-    class="modal-overlay"
-    @click.self="showAccessDeniedModal = false"
+  <!-- 托管准入条件不满足抽屉 -->
+  <DrawerModal
+    v-model:show="showAccessDeniedModal"
+    max-width="max-w-md"
+    raw
+    @close="showAccessDeniedModal = false"
   >
-    <div class="modal-backdrop" @click="showAccessDeniedModal = false"></div>
-    <div class="modal-content max-w-md">
-      <div class="modal-header">
-        <div class="flex items-center gap-3">
-          <div
-            class="flex h-10 w-10 items-center justify-center rounded-full"
-            :class="themeStore.isDark ? 'bg-amber-500/15' : 'bg-amber-100'"
-          >
-            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h3 class="modal-title">{{ t('hosting.accessDenied.title') }}</h3>
-        </div>
-        <button class="p-1 rounded hover:bg-gray-500/20" @click="showAccessDeniedModal = false">
-          <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="modal-body space-y-4">
-        <p class="text-sm text-themed-muted">{{ t('hosting.accessDenied.description') }}</p>
-
-        <div class="space-y-3">
-          <!-- 条件：至少拥有过1台实例 -->
-          <div class="flex items-center gap-3 rounded-lg border border-themed bg-themed-secondary p-3">
-            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-themed-hover text-themed-muted">
-              <span class="text-xs font-medium">!</span>
-            </div>
-            <div class="flex-1">
-              <div class="text-sm font-medium text-themed">{{ accessDeniedConditionText }}</div>
-              <div class="text-xs text-themed-muted">
-                {{ accessDeniedStatusText }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <p class="text-xs text-themed-muted">{{ accessDeniedHintText }}</p>
-      </div>
-
-      <div class="modal-footer">
-        <button
-          class="btn-primary w-full"
-          @click="showAccessDeniedModal = false"
+    <div class="modal-header">
+      <div class="flex items-center gap-3">
+        <div
+          class="flex h-10 w-10 items-center justify-center rounded-full"
+          :class="themeStore.isDark ? 'bg-amber-500/15' : 'bg-amber-100'"
         >
-          {{ t('common.confirm') }}
-        </button>
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 class="modal-title">{{ t('hosting.accessDenied.title') }}</h3>
       </div>
+      <button type="button" class="btn btn-ghost btn-sm p-1.5 -mr-1" aria-label="close" @click="showAccessDeniedModal = false">
+        <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
-  </div>
+
+    <div class="modal-body space-y-4">
+      <p class="text-sm text-themed-muted">{{ t('hosting.accessDenied.description') }}</p>
+
+      <div class="space-y-3">
+        <!-- 条件：至少拥有过1台实例 -->
+        <div class="flex items-center gap-3 rounded-lg border border-themed bg-themed-secondary p-3">
+          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-themed-hover text-themed-muted">
+            <span class="text-xs font-medium">!</span>
+          </div>
+          <div class="flex-1">
+            <div class="text-sm font-medium text-themed">{{ accessDeniedConditionText }}</div>
+            <div class="text-xs text-themed-muted">
+              {{ accessDeniedStatusText }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-themed-muted">{{ accessDeniedHintText }}</p>
+    </div>
+
+    <div class="modal-footer">
+      <button
+        class="btn-primary w-full"
+        @click="showAccessDeniedModal = false"
+      >
+        {{ t('common.confirm') }}
+      </button>
+    </div>
+  </DrawerModal>
+
+  <!-- 创建节点抽屉 -->
+  <MyHostCreateView
+    v-model:show="showCreateDrawer"
+    @created="loadHosts"
+  />
 </template>
 
 <style scoped>

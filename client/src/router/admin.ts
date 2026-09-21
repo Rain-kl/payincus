@@ -289,9 +289,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin/resources/hosts/create',
-    name: 'admin-my-host-create',
-    component: () => import('@/views/resources/MyHostCreateView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.myHostCreate', title: '创建节点' }
+    redirect: '/admin/resources/hosts'
   },
   {
     path: '/admin/resources/hosts/:id',
@@ -307,15 +305,11 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin/resources/packages/create',
-    name: 'admin-my-package-create',
-    component: () => import('@/views/resources/PackageFormView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.myPackageCreate', title: '创建套餐' }
+    redirect: '/admin/resources/packages'
   },
   {
     path: '/admin/resources/packages/:id/edit',
-    name: 'admin-my-package-edit',
-    component: () => import('@/views/resources/PackageFormView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.myPackageEdit', title: '编辑套餐' }
+    redirect: '/admin/resources/packages'
   },
   {
     path: '/:pathMatch(.*)*',

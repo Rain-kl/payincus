@@ -760,7 +760,7 @@ assert.ok(
     hostInstancesTabSource.includes('instanceDetailPath(id)') &&
     hostCreateInstanceTabSource.includes('instanceDetailPath(result.instance.id)') &&
     ticketInstanceOwnerCardSource.includes('instanceDetailPath(props.instanceSummary.id)') &&
-    myPackagesViewSource.includes("import { instanceCreatePath, isAdminEntry, packageCreatePath, packageEditPath } from '@/utils/app-paths'") &&
+    myPackagesViewSource.includes("import { instanceCreatePath, isAdminEntry } from '@/utils/app-paths'") &&
     myPackagesViewSource.includes('if (isAdminEntry) return') &&
     myPackagesViewSource.includes('${window.location.origin}${instanceCreatePath()}?source=${source}&package=${pkg.id}') &&
     myPackagesViewSource.includes('v-if="!isAdminEntry"') &&
@@ -1026,7 +1026,6 @@ assert.ok(
     instancesViewSource.includes('@click="toggleSelectAll"') &&
     instancesViewSource.includes('@change="toggleSelect(instance.id)"') &&
     instancesViewSource.includes('@click="openInstanceDetail(instance.id)"') &&
-    instancesViewSource.includes('@reorder="reorderInstance(instance, $event)"') &&
     instancesViewSource.includes("@click.stop=\"handleAction(instance, 'start')\"") &&
     instancesViewSource.includes("@click.stop=\"handleAction(instance, 'stop')\"") &&
     instancesViewSource.includes("@click.stop=\"handleAction(instance, 'restart')\"") &&

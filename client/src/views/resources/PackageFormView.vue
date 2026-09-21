@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import api from '@/api'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { useToast } from '@/stores/toast'
@@ -10,24 +10,38 @@ import { useAuthStore } from '@/stores/auth'
 import type { Host, HostWithDetails, Package, CreatePackageRequest, UpdatePackageRequest } from '@/types/api'
 import { validateName, validateText } from '@/utils/validation'
 import { translateError } from '@/utils/errorHandler'
-import { packagesPath } from '@/utils/app-paths'
-import MyPackagesView from './MyPackagesView.vue'
 
 // 为 KeepAlive exclude 匹配定义组件名称
 defineOptions({
   name: 'PackageFormView'
 })
 
+const props = withDefaults(
+  defineProps<{
+    show?: boolean
+    packageId?: number | null
+  }>(),
+  {
+    show: false,
+    packageId: null
+  }
+)
+
+const emit = defineEmits<{
+  (e: 'update:show', value: boolean): void
+  (e: 'close'): void
+  (e: 'saved', pkg?: any): void
+}>()
+
 const { t } = useI18n()
-const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const themeStore = useThemeStore()
 const authStore = useAuthStore()
 
 // Mode: create or edit
-const isEditMode = computed(() => !!route.params.id)
-const packageId = computed(() => route.params.id ? Number(route.params.id) : null)
+const packageId = computed(() => props.packageId ?? (route.params.id ? Number(route.params.id) : null))
+const isEditMode = computed(() => !!packageId.value)
 type PackageCreationMode = 'free' | 'paid'
 const packageCreationMode = ref<PackageCreationMode>('free')
 const showPackageLevelInstanceDefaults = computed(() => packageCreationMode.value === 'free')
@@ -499,34 +513,45 @@ async function syncHostStoragePoolSelections(hostIds: number[]): Promise<void> {
   form.value.hostTrafficMultipliers = nextMultipliers
 }
 
-onMounted(async () => {
+async function initForm(): Promise<void> {
+  formError.value = ''
+  saving.value = false
   await Promise.all([
     loadHosts(),
     loadPrerequisitePackages()
   ])
-  if (isEditMode.value && packageId.value) {
+  if (packageId.value) {
+    loading.value = true
+    form.value = getDefaultForm()
     await loadPackage(packageId.value)
+  } else {
+    form.value = getDefaultForm()
+    packageCreationMode.value = 'free'
+    currentPackageOwnerId.value = authStore.user?.id ?? null
+  }
+}
+
+onMounted(async () => {
+  if (props.show || route.params.id) {
+    await initForm()
   }
 })
 
-// 监听路由参数变化，重新加载套餐数据
+watch(() => props.show, async (shown) => {
+  if (shown) {
+    await initForm()
+  }
+})
+
+watch(() => props.packageId, async () => {
+  if (props.show) {
+    await initForm()
+  }
+})
+
 watch(() => route.params.id, async (newId, oldId) => {
   if (newId !== oldId) {
-    // 重置状态
-    formError.value = ''
-    saving.value = false
-    if (newId) {
-      loading.value = true
-      form.value = getDefaultForm()
-      await loadPrerequisitePackages()
-      await loadPackage(Number(newId))
-    } else {
-      // 切换到创建模式
-      form.value = getDefaultForm()
-      packageCreationMode.value = 'free'
-      currentPackageOwnerId.value = authStore.user?.id ?? null
-      await loadPrerequisitePackages()
-    }
+    await initForm()
   }
 })
 
@@ -647,7 +672,7 @@ async function loadPackage(id: number): Promise<void> {
     }
   } catch (_err: any) {
     toast.error(t('admin.packages.loadFailed') || 'Failed to load package')
-    router.push(packagesPath())
+    closeDrawer()
   } finally {
     loading.value = false
   }
@@ -806,10 +831,9 @@ async function savePackage(): Promise<void> {
       toast.success(t('admin.packages.packageCreated'))
     }
 
-    showDrawer.value = false
-    setTimeout(() => {
-      router.push(packagesPath())
-    }, 250)
+    emit('saved')
+    emit('update:show', false)
+    emit('close')
   } catch (err: any) {
     formError.value = translateError(err) || t('admin.packages.saveFailed')
   } finally {
@@ -817,29 +841,21 @@ async function savePackage(): Promise<void> {
   }
 }
 
-const showDrawer = ref(true)
-
-function goBack(): void {
-  if (!showDrawer.value) return
-  showDrawer.value = false
-  setTimeout(() => {
-    router.push(packagesPath())
-  }, 250)
+function closeDrawer(): void {
+  emit('update:show', false)
+  emit('close')
 }
+
+const goBack = closeDrawer
 </script>
 
 <template>
-  <div class="package-form-page">
-    <!-- Background view: Packages list -->
-    <MyPackagesView />
-
-    <!-- Drawer Modal -->
-    <DrawerModal
-      :show="showDrawer"
-      max-width="max-w-3xl lg:!max-w-4xl"
-      raw
-      @close="goBack"
-    >
+  <DrawerModal
+    :show="props.show"
+    max-width="max-w-3xl lg:!max-w-4xl"
+    raw
+    @close="closeDrawer"
+  >
       <!-- Header -->
       <div class="modal-header">
         <div class="flex items-center gap-2 min-w-0">
@@ -1624,7 +1640,6 @@ function goBack(): void {
         </button>
       </div>
     </DrawerModal>
-  </div>
 </template>
 
 <style scoped>

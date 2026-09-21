@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import api from '@/api'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -11,13 +10,13 @@ import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import { translateError } from '@/utils/errorHandler'
 import type { Package, Host } from '@/types/api'
-import { instanceCreatePath, isAdminEntry, packageCreatePath, packageEditPath } from '@/utils/app-paths'
+import { instanceCreatePath, isAdminEntry } from '@/utils/app-paths'
+import PackageFormView from './PackageFormView.vue'
 
 // 为 KeepAlive include 匹配定义组件名称（必须在所有 import 之后）
 defineOptions({ name: 'MyPackagesView' })
 
 const { t } = useI18n()
-const router = useRouter()
 const toast = useToast()
 const themeStore = useThemeStore()
 const authStore = useAuthStore()
@@ -313,13 +312,18 @@ function copyShareLink(pkg: Package): void {
   })
 }
 
-// 跳转到创建页面
+const showPackageDrawer = ref(false)
+const editingPackageId = ref<number | null>(null)
+
+// 打开创建套餐抽屉
 async function openCreate(): Promise<void> {
-  router.push(packageCreatePath())
+  editingPackageId.value = null
+  showPackageDrawer.value = true
 }
 
 function openEdit(pkg: Package): void {
-  router.push(packageEditPath(pkg.id))
+  editingPackageId.value = pkg.id
+  showPackageDrawer.value = true
 }
 
 async function deletePackage(pkg: Package): Promise<void> {
@@ -1408,6 +1412,13 @@ function getBillingCycleLabel(months: number): string {
         </div>
       </Transition>
     </Teleport>
+
+    <!-- 套餐创建/编辑抽屉 -->
+    <PackageFormView
+      v-model:show="showPackageDrawer"
+      :package-id="editingPackageId"
+      @saved="loadPackages"
+    />
   </div>
 </template>
 

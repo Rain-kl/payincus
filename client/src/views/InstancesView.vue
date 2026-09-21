@@ -15,7 +15,6 @@ import type { Instance, UserBalance } from '@/types/api'
 import FlagIcon from '@/components/FlagIcon.vue'
 import DistroIcon from '@/components/icons/DistroIcon.vue'
 import InstanceDisplayIcon from '@/components/InstanceDisplayIcon.vue'
-import InstanceOrderMenu from '@/components/instance/InstanceOrderMenu.vue'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 import { instanceCreatePath, instanceDetailPath, isAdminEntry, transfersPath, walletPath } from '@/utils/app-paths'
 
@@ -66,8 +65,6 @@ const instances = ref<Instance[]>([])
 const loading = ref<boolean>(true)
 const listError = ref<string>('')
 const actionLoading = ref<Record<number, string>>({})
-const orderLoading = ref<boolean>(false)
-const recentlyOrderedInstanceId = ref<number | null>(null)
 const batchActionLoading = ref<string>('')
 
 // 搜索和分页
@@ -212,17 +209,7 @@ const batchDestroyIneligibleItems = computed(() => batchDestroyPreview.value.fil
 const batchDestroyTotalRefund = computed(() => batchDestroyEligibleItems.value.reduce((sum, item) => sum + item.refund.refundAmount, 0))
 const batchDestroyTotalFee = computed(() => batchDestroyEligibleItems.value.reduce((sum, item) => sum + item.refund.feeAmount, 0))
 const batchDestroyCanSubmit = computed(() => batchDestroyEligibleItems.value.length > 0 && batchDestroyConfirm.value === 'DESTROY' && !batchDestroySubmitting.value)
-const isInstanceOrderView = computed(() => search.value.trim() === '' && countryFilter.value === null)
-const canReorderInstances = computed(() => (
-  isInstanceOrderView.value &&
-  (
-    !isAdmin.value ||
-    filterUserId.value === (authStore.user?.id || null)
-  )
-))
-
 let refreshInterval: ReturnType<typeof setInterval> | null = null
-let orderFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
 // 监听搜索变化（防抖）
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -351,7 +338,6 @@ onUnmounted(() => {
     clearTimeout(searchTimer)
     searchTimer = null
   }
-  clearInstanceOrderFeedback()
 })
 
 // 当组件被 KeepAlive 停用时，暂停定时器
@@ -364,7 +350,6 @@ onDeactivated(() => {
     clearTimeout(searchTimer)
     searchTimer = null
   }
-  clearInstanceOrderFeedback()
 })
 
 // 当组件从 KeepAlive 缓存中激活时，重新加载数据
@@ -408,7 +393,6 @@ async function loadInstances(force = false): Promise<void> {
     loading.value === false &&
     (
       Object.keys(actionLoading.value).length > 0 ||
-      orderLoading.value ||
       batchActionLoading.value ||
       batchRenewSubmitting.value ||
       batchDestroySubmitting.value
@@ -973,103 +957,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
 
 type InstanceAction = 'start' | 'stop' | 'restart' | 'delete'
 type BatchSimpleAction = 'start' | 'stop' | 'restart' | 'sync'
-type InstanceOrderAction = 'top' | 'up' | 'down' | 'bottom'
 const SIMPLE_BATCH_CONCURRENCY = 5
-const INSTANCE_ORDER_ACTIONS: InstanceOrderAction[] = ['top', 'up', 'down', 'bottom']
-
-const instanceOrderLabels = computed<Record<InstanceOrderAction, string>>(() => ({
-  top: t('instance.order.top'),
-  up: t('instance.order.up'),
-  down: t('instance.order.down'),
-  bottom: t('instance.order.bottom')
-}))
-
-function getInstanceIndex(instanceId: number): number {
-  return instances.value.findIndex(instance => instance.id === instanceId)
-}
-
-function canMoveInstance(instanceId: number, action: InstanceOrderAction): boolean {
-  if (orderLoading.value || !canReorderInstances.value || total.value <= 1) return false
-  const index = getInstanceIndex(instanceId)
-  if (index < 0) return false
-  const globalIndex = (page.value - 1) * pageSize.value + index
-  if (action === 'top' || action === 'up') return globalIndex > 0
-  return globalIndex < total.value - 1
-}
-
-function getInstanceOrderDisabledActions(instanceId: number): Record<InstanceOrderAction, boolean> {
-  return {
-    top: !canMoveInstance(instanceId, 'top'),
-    up: !canMoveInstance(instanceId, 'up'),
-    down: !canMoveInstance(instanceId, 'down'),
-    bottom: !canMoveInstance(instanceId, 'bottom')
-  }
-}
-
-function clearInstanceOrderFeedback(): void {
-  if (orderFeedbackTimer) {
-    clearTimeout(orderFeedbackTimer)
-    orderFeedbackTimer = null
-  }
-  recentlyOrderedInstanceId.value = null
-}
-
-function markInstanceOrderFeedback(instanceId: number): void {
-  clearInstanceOrderFeedback()
-  recentlyOrderedInstanceId.value = instanceId
-  orderFeedbackTimer = setTimeout(() => {
-    recentlyOrderedInstanceId.value = null
-    orderFeedbackTimer = null
-  }, 1100)
-}
-
-function getVisibleReorderTargetIndex(currentIndex: number, action: InstanceOrderAction): number | null {
-  const pageStartIndex = (page.value - 1) * pageSize.value
-  const globalIndex = pageStartIndex + currentIndex
-  let targetGlobalIndex = globalIndex
-  if (action === 'top') targetGlobalIndex = 0
-  else if (action === 'up') targetGlobalIndex = globalIndex - 1
-  else if (action === 'down') targetGlobalIndex = globalIndex + 1
-  else targetGlobalIndex = total.value - 1
-
-  const targetIndex = targetGlobalIndex - pageStartIndex
-  if (targetIndex < 0 || targetIndex >= instances.value.length) {
-    return null
-  }
-  return targetIndex
-}
-
-async function reorderInstance(instance: Instance, action: InstanceOrderAction): Promise<void> {
-  if (!canMoveInstance(instance.id, action)) return
-
-  const currentIndex = getInstanceIndex(instance.id)
-  if (currentIndex < 0) return
-
-  const nextInstances = [...instances.value]
-  const targetIndex = getVisibleReorderTargetIndex(currentIndex, action)
-  if (targetIndex !== null) {
-    const [moved] = nextInstances.splice(currentIndex, 1)
-    if (!moved) return
-    nextInstances.splice(targetIndex, 0, moved)
-  }
-
-  try {
-    orderLoading.value = true
-    if (targetIndex !== null) {
-      instances.value = nextInstances
-      markInstanceOrderFeedback(instance.id)
-    }
-    await api.instances.updateOrder(instance.id, action)
-    await loadInstances(true)
-    toast.success(t('instance.order.updateSuccess'))
-  } catch (error: any) {
-    clearInstanceOrderFeedback()
-    toast.error(t('instance.order.updateFailed') + ': ' + translateError(error))
-    await loadInstances(true)
-  } finally {
-    orderLoading.value = false
-  }
-}
 
 async function handleAction(instance: Instance, action: InstanceAction): Promise<void> {
   actionLoading.value[instance.id] = action
@@ -1686,7 +1574,6 @@ async function confirmBatchDestroy(): Promise<void> {
                 class="group cursor-pointer transition-colors bg-white hover:bg-[var(--bg-tertiary)] dark:bg-[var(--bg-surface)] dark:hover:bg-[var(--bg-tertiary)]"
                 :class="[
                   selectedIds.has(instance.id) ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))]' : '',
-                  recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
                   instance.status?.toLowerCase() === 'creating' ? 'creating-row' : ''
                 ]"
                 @click="openInstanceDetail(instance.id)"
@@ -1870,18 +1757,6 @@ async function confirmBatchDestroy(): Promise<void> {
                           {{ $t('admin.hosts.resetTraffic') }}
                         </button>
 
-                        <div v-if="canReorderInstances" class="px-3.5 py-1">
-                          <InstanceOrderMenu
-                            :actions="INSTANCE_ORDER_ACTIONS"
-                            :labels="instanceOrderLabels"
-                            :label="$t('instance.order.label')"
-                            :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
-                            :loading="orderLoading"
-                            :dark="themeStore.isDark"
-                            align="left"
-                            @reorder="reorderInstance(instance, $event)"
-                          />
-                        </div>
 
                         <div v-if="canDeleteInstance(instance)" class="border-t border-themed my-1"></div>
                         <button
@@ -1911,7 +1786,6 @@ async function confirmBatchDestroy(): Promise<void> {
             class="nimbus-card-lift card overflow-hidden transition-all rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)]"
             :class="[
               instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
-              recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
               selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : ''
             ]"
           >
@@ -2072,17 +1946,6 @@ async function confirmBatchDestroy(): Promise<void> {
               class="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.01] dark:bg-white/[0.01]"
             >
               <div class="flex items-center gap-1">
-                <InstanceOrderMenu
-                  v-if="canReorderInstances"
-                  :actions="INSTANCE_ORDER_ACTIONS"
-                  :labels="instanceOrderLabels"
-                  :label="$t('instance.order.label')"
-                  :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
-                  :loading="orderLoading"
-                  :dark="themeStore.isDark"
-                  align="left"
-                  @reorder="reorderInstance(instance, $event)"
-                />
                 <button
                   v-if="canStartInstance(instance)"
                   type="button"
@@ -2177,7 +2040,6 @@ async function confirmBatchDestroy(): Promise<void> {
             class="nimbus-instance-card group relative flex flex-col justify-between rounded-xl border p-4 sm:p-5 transition-all duration-200"
             :class="[
               instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
-              recentlyOrderedInstanceId === instance.id ? (themeStore.isDark ? 'is-order-feedback-dark' : 'is-order-feedback-light') : '',
               selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : 'border-[var(--border-color)]',
               'bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)]'
             ]"
@@ -2367,18 +2229,6 @@ async function confirmBatchDestroy(): Promise<void> {
             <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] dark:border-white/[0.06] pt-3">
               <!-- Left side: Order & Power -->
               <div class="flex items-center gap-1.5">
-                <InstanceOrderMenu
-                  v-if="canReorderInstances"
-                  :actions="INSTANCE_ORDER_ACTIONS"
-                  :labels="instanceOrderLabels"
-                  :label="$t('instance.order.label')"
-                  :disabled-actions="getInstanceOrderDisabledActions(instance.id)"
-                  :loading="orderLoading"
-                  :dark="themeStore.isDark"
-                  align="left"
-                  @reorder="reorderInstance(instance, $event)"
-                />
-
                 <button
                   v-if="canStartInstance(instance)"
                   type="button"
@@ -2943,15 +2793,6 @@ async function confirmBatchDestroy(): Promise<void> {
     border-color 520ms ease;
 }
 
-.is-order-feedback-light {
-  background-color: rgb(249 250 251);
-  box-shadow: 0 10px 28px rgb(15 23 42 / 0.08);
-}
-
-.is-order-feedback-dark {
-  background-color: rgb(17 24 39 / 0.82);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 0.22);
-}
 
 @media (prefers-reduced-motion: reduce) {
   .instance-table-order-move,
