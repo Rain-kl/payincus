@@ -593,31 +593,13 @@ function getPackageSourceLabel(source: 'official' | 'market'): string {
 }
 
 const sourceTabs = computed<SourceTab[]>(() => {
-  const tabs: SourceTab[] = [
+  return [
     {
       key: 'official',
       type: 'official',
       label: getPackageSourceLabel('official')
     }
   ]
-
-  if (configStore.hostingMarketEntryEnabled) {
-    tabs.push(
-      ...hostingZones.value.map(zone => ({
-        key: `zone:${zone.id}` as PackageSource,
-        type: 'zone' as const,
-        label: zone.name,
-        logoUrl: zone.logoUrl
-      })),
-      {
-        key: 'market',
-        type: 'market',
-        label: getPackageSourceLabel('market')
-      }
-    )
-  }
-
-  return tabs
 })
 
 function isPackageSourceSelectable(source: PackageSource): boolean {
@@ -650,12 +632,11 @@ onMounted(async (): Promise<void> => {
   const initialSource = normalizePackageSourceQuery(route.query.source, route.query.zoneId)
   
   try {
-    const [zonesRes, userRes, keysRes] = await Promise.all([
-      configStore.hostingMarketEntryEnabled ? api.packages.getHostingZones() : Promise.resolve({ zones: [] as HostingZoneTab[] }),
+    const [userRes, keysRes] = await Promise.all([
       api.users.get(authStore.user!.id),
       api.sshKeys.list()
     ])
-    hostingZones.value = configStore.hostingMarketEntryEnabled ? (zonesRes.zones || []) : []
+    hostingZones.value = []
 
     const effectiveInitialSource = getSelectablePackageSource(initialSource)
     const initialSourceRequest = toPackageSourceRequest(effectiveInitialSource)
@@ -1207,7 +1188,7 @@ async function handleSubmit(): Promise<void> {
         <!-- LEFT: 选择区（独立滚动）-->
         <div class="nimbus-pane space-y-4 mb-4 lg:mb-0 lg:flex-[3] lg:overflow-y-auto lg:pr-1 lg:pb-4 scrollbar-hide">
           <!-- 套餐来源切换器（随内容滚动） -->
-          <div class="flex justify-center">
+          <div v-if="sourceTabs.length > 1" class="flex justify-center">
             <div
               class="nimbus-segmented inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-themed bg-themed-surface p-1 shadow-sm scrollbar-hide"
             >

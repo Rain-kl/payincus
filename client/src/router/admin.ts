@@ -138,12 +138,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/admin/SystemConfigView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'admin.system.sections.access.title', title: '访问与注册' }
   },
-  {
-    path: '/admin/settings/hosting',
-    name: 'admin-settings-hosting',
-    component: () => import('@/views/admin/SystemConfigView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'admin.system.sections.hosting.title', title: '托管与站点' }
-  },
+
   {
     path: '/admin/settings/brand',
     name: 'admin-settings-brand',
@@ -187,8 +182,8 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.telegramSettings', title: 'Telegram 设置' }
   },
   {
-    path: '/admin/system-update',
-    name: 'admin-system-update',
+    path: '/admin/settings/update',
+    name: 'admin-settings-update',
     component: () => import('@/views/admin/SystemUpdateView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.systemUpdate', title: '版本更新' }
   },

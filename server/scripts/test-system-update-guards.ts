@@ -16,7 +16,7 @@ const migration = read('server/prisma/migrations/20260623093000_add_system_updat
 const adminApi = read('client/src/api/admin.ts')
 const userApi = read('client/src/api/index.ts')
 const adminRouter = read('client/src/router/admin.ts')
-const adminNav = read('client/src/config/side-nav-items-admin.ts')
+const adminSettings = read('client/src/constants/adminSettings.ts')
 const releaseWorkflow = read('.github/workflows/release.yml')
 const onlineScript = read('scripts/apply-online-update.sh')
 const atomicMigrationScript = read('scripts/migrate-ota-atomic-layout.sh')
@@ -104,8 +104,8 @@ assert.ok(
 assert.ok(
   adminApi.includes('/admin/system-update/version') &&
     adminApi.includes('/admin/system-update/start') &&
-    adminRouter.includes("path: '/admin/system-update'") &&
-    adminNav.includes("path: '/admin/system-update'"),
+    adminRouter.includes("path: '/admin/settings/update'") &&
+    adminSettings.includes("path: '/admin/settings/update'"),
   'admin frontend must expose the version update page and API client'
 )
 

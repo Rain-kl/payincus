@@ -1,7 +1,7 @@
-export type SystemSettingsSectionKey = 'access' | 'hosting' | 'brand' | 'security' | 'mail' | 'tickets' | 'popup' | 'operations'
+export type SystemSettingsSectionKey = 'access' | 'brand' | 'security' | 'mail' | 'tickets' | 'popup' | 'operations'
 
 export interface SystemSettingsNavigationItem {
-  key: SystemSettingsSectionKey | 'telegram'
+  key: SystemSettingsSectionKey | 'telegram' | 'update'
   path: string
   labelKey: string
   descriptionKey?: string
@@ -13,12 +13,6 @@ export const systemSettingsSections: Array<SystemSettingsNavigationItem & { key:
     path: '/admin/settings/access',
     labelKey: 'admin.system.sections.access.title',
     descriptionKey: 'admin.system.sections.access.description'
-  },
-  {
-    key: 'hosting',
-    path: '/admin/settings/hosting',
-    labelKey: 'admin.system.sections.hosting.title',
-    descriptionKey: 'admin.system.sections.hosting.description'
   },
   {
     key: 'brand',
@@ -64,5 +58,10 @@ export const systemSettingsNavigationItems: SystemSettingsNavigationItem[] = [
     key: 'telegram',
     path: '/admin/settings/telegram',
     labelKey: 'admin.system.tabs.telegram'
+  },
+  {
+    key: 'update',
+    path: '/admin/settings/update',
+    labelKey: 'nav.systemUpdate'
   }
 ]

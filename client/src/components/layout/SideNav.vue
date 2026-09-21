@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useBrand } from '@/composables/useBrand'
 import { isAdminEntry, navMenuItems, type MenuItem } from '@/config/side-nav-items'
@@ -22,7 +21,6 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
-const authStore = useAuthStore()
 const configStore = useConfigStore()
 const brand = useBrand()
 void configStore.loadPublicConfig()
@@ -48,10 +46,6 @@ const hiddenWhenMailUnavailableMenuNames = new Set(['mail'])
 const collapsibleGroupLabels = new Set(['nav.operations', 'nav.billing', 'nav.resources', 'nav.system'])
 const collapsedGroupLabels = ref(new Set<string>())
 const navDashboardPath = dashboardPath()
-const shouldHideHostingFeature = computed(() =>
-  !authStore.isAdmin && authStore.user?.canAccessHostingFeature === false
-)
-
 const menuItems = computed<MenuItem[]>(() => {
   let baseItems = [...navMenuItems]
 
@@ -63,17 +57,17 @@ const menuItems = computed<MenuItem[]>(() => {
     baseItems = baseItems.filter(item => !item.name || !hiddenWhenMailUnavailableMenuNames.has(item.name))
   }
 
-  if (!shouldHideHostingFeature.value) {
-    return baseItems
+  if (!isAdminEntry) {
+    baseItems = baseItems.filter(item => {
+      if (item.divider && (item.label === 'nav.expand' || item.label === 'nav.resources')) {
+        return false
+      }
+
+      return !item.name || !hiddenExpandMenuNames.has(item.name)
+    })
   }
 
-  return baseItems.filter(item => {
-    if (item.divider && (item.label === 'nav.expand' || item.label === 'nav.resources')) {
-      return false
-    }
-
-    return !item.name || !hiddenExpandMenuNames.has(item.name)
-  })
+  return baseItems
 })
 
 const activeGroupLabels = computed(() => {

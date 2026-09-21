@@ -3,13 +3,11 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
-import { useAuthStore } from '@/stores/auth'
 import { isAdminEntry, navMenuItems, type MenuItem } from '@/config/side-nav-items'
 
 const { t } = useI18n()
 const router = useRouter()
 const configStore = useConfigStore()
-const authStore = useAuthStore()
 
 const query = ref('')
 const isOpen = ref(false)
@@ -56,16 +54,12 @@ const menuKeywords: Record<string, string[]> = {
   tickets: ['工单', '客服', '帮助', '支持', 'ticket', 'tickets', 'support'],
   help: ['帮助', '文档', '指南', 'faq', 'doc', 'docs', 'manual', 'help'],
   logs: ['日志', '操作记录', '审计', 'logs', 'audit', 'history'],
-  'my-hosts': ['我的节点', '宿主机', '服务器', 'host', 'hosts', 'node', 'nodes'],
-  'my-packages': ['我的套餐', '套餐', '规格', 'package', 'packages', 'plan', 'plans'],
-  'hosting-wallet': ['托管收益', '收益', '提现', 'earnings', 'revenue', 'hosting'],
   extensions: ['扩展', '插件', '应用', 'extension', 'extensions', 'plugin', 'addon'],
   entertainment: ['福利', '签到', '抽奖', '活动', 'welfare', 'checkin', 'lottery', 'bonus'],
   profile: ['个人设置', '账号', '修改密码', '2fa', 'settings', 'account', 'password', 'security', 'profile'],
   // 管理端菜单关键词
   'admin-users': ['用户', '用户管理', '封禁', '解封', 'users', 'accounts', 'ban', 'admin'],
   'admin-instances': ['实例', '实例管理', '所有实例', 'instances', 'vps', 'servers'],
-  'admin-hosting': ['托管', '节点托管', '资源', 'hosting'],
   'admin-settings': ['系统设置', '参数配置', '系统参数', 'settings', 'system', 'config'],
   'admin-my-hosts': ['节点管理', '宿主机', 'hosts', 'nodes'],
   'admin-my-packages': ['套餐管理', '套餐配置', 'packages', 'plans'],
@@ -75,7 +69,7 @@ const menuKeywords: Record<string, string[]> = {
   'admin-billing': ['计费管理', '网关', '支付通道', 'billing', 'gateway', 'payment'],
   'admin-gift-cards': ['礼品卡管理', '生成卡密', 'gift', 'cards'],
   'admin-orders': ['订单管理', '所有订单', 'orders'],
-  'admin-system-update': ['系统更新', '在线升级', 'ota', 'update', 'upgrade'],
+  'admin-settings-update': ['系统更新', '在线升级', 'ota', 'update', 'upgrade'],
   'admin-tickets': ['工单管理', '所有工单', 'tickets'],
   'admin-broadcast': ['系统公告', '发布公告', 'broadcast', 'announcement'],
   'admin-logs': ['系统日志', '操作日志', 'audit', 'logs'],
@@ -95,7 +89,6 @@ interface SearchableItem {
   keywords: string[]
 }
 
-const hiddenExpandMenuNames = new Set(['my-hosts', 'my-packages', 'hosting-wallet'])
 const hiddenWhenTicketDisabledMenuNames = new Set(['tickets'])
 const hiddenWhenMailUnavailableMenuNames = new Set(['mail'])
 
@@ -119,9 +112,6 @@ const searchableList = computed<SearchableItem[]>(() => {
     if (!isAdminEntry && !configStore.mailAvailable && hiddenWhenMailUnavailableMenuNames.has(item.name)) {
       continue
     }
-    if (!isAdminEntry && !authStore.isAdmin && authStore.user?.canAccessHostingFeature === false && hiddenExpandMenuNames.has(item.name)) {
-      continue
-    }
 
     const title = getNavLabel(item)
     const keywords = menuKeywords[item.name] || []
@@ -133,6 +123,17 @@ const searchableList = computed<SearchableItem[]>(() => {
       title,
       groupName: currentGroup || (isAdminEntry ? '管理' : '常用'),
       keywords
+    })
+  }
+
+  if (isAdminEntry) {
+    result.push({
+      name: 'admin-settings-update',
+      path: '/admin/settings/update',
+      icon: 'refresh',
+      title: t('nav.systemUpdate') || '系统更新',
+      groupName: '系统',
+      keywords: menuKeywords['admin-settings-update'] || ['系统更新', '在线升级', 'ota', 'update', 'upgrade']
     })
   }
 

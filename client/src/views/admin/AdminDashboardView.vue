@@ -221,7 +221,7 @@ const activeRisks = computed<ActionableRiskItem[]>(() => {
     } else if (r.key === 'host_offline' || r.key === 'agent_stale') {
       targetPath = '/admin/resources/hosts'
     } else if (r.key === 'ota_failed' || r.key === 'disk_update_error') {
-      targetPath = '/admin/system-update'
+      targetPath = '/admin/settings/update'
     }
 
     const title = t(`admin.statistics.operations.risks.${r.key}.title`, { count: r.count })

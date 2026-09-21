@@ -199,7 +199,7 @@ const currentSection = computed(() =>
 )
 
 const isAccessSection = computed(() => currentSectionKey.value === 'access')
-const isHostingSection = computed(() => currentSectionKey.value === 'hosting')
+const isHostingSection = computed(() => false)
 const isBrandSection = computed(() => currentSectionKey.value === 'brand')
 const isSecuritySection = computed(() => currentSectionKey.value === 'security')
 const isMailSection = computed(() => currentSectionKey.value === 'mail')

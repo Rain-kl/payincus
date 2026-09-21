@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
+import { systemSettingsNavigationItems } from '@/constants/adminSettings'
 import type {
   AvailableSystemUpdate,
   SystemUpdateCheckResult,
@@ -10,6 +13,8 @@ import type {
 } from '@/types/api'
 
 const toast = useToast()
+const route = useRoute()
+const { t } = useI18n()
 
 const loading = ref(true)
 const checking = ref(false)
@@ -291,10 +296,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="kawaii-page p-6 space-y-6 animate-fade-in">
+  <div class="kawaii-page space-y-6 animate-fade-in">
     <div class="page-header">
       <div>
-        <h1 class="page-title">版本更新</h1>
+        <h1 class="page-title">{{ t('admin.system.title') || '系统设置' }}</h1>
         <p class="page-description">通过 Git release tag 进行受控在线更新，更新前会自动备份并执行验证。</p>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -315,6 +320,20 @@ onUnmounted(() => {
           {{ checking ? '检查中...' : '检查更新' }}
         </button>
       </div>
+    </div>
+
+    <div class="flex gap-1 overflow-x-auto border-b border-themed-border">
+      <router-link
+        v-for="item in systemSettingsNavigationItems"
+        :key="item.path"
+        :to="item.path"
+        class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors duration-150"
+        :class="route.path === item.path
+          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+          : 'border-transparent text-themed-muted hover:text-themed'"
+      >
+        {{ t(item.labelKey) }}
+      </router-link>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center gap-2 py-16 text-sm text-themed-muted">
