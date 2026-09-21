@@ -2741,6 +2741,17 @@ const api = {
         host: { id: number; name: string; countryCode?: string | null }
         packagePlan: { name: string; cpu: number; memory: number; disk: number } | null
       }>
+      pendingTickets?: Array<{
+        id: number
+        subject: string
+        category: string
+        priority: string
+        status: string
+        createdAt: string
+        user: { id: number; username: string }
+        host: { id: number; name: string } | null
+        instance: { id: number; name: string } | null
+      }>
     }> => http.get('/admin/statistics/overview'),
 
     // ==================== VIP 等级规则 ====================

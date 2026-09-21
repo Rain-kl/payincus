@@ -323,6 +323,36 @@ function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk
   const cores = Math.max(1, Math.round(plan.cpu / 100))
   return `${cores}C ${ramGb} · ${plan.name}`
 }
+
+// 待处理工单概览
+const pendingTickets = computed(() => stats.value?.pendingTickets || [])
+const pendingTicketsCount = computed(() => stats.value?.operations.support.openTickets ?? pendingTickets.value.length)
+
+function getTicketPriorityBadgeClass(priority: string): string {
+  switch (priority) {
+    case 'urgent':
+      return 'border-rose-600 text-rose-700 dark:text-rose-300'
+    case 'high':
+      return 'border-amber-600 text-amber-700 dark:text-amber-300'
+    default:
+      return 'border-themed text-themed-secondary'
+  }
+}
+
+function getTicketPriorityText(priority: string): string {
+  switch (priority) {
+    case 'urgent':
+      return t('admin.dashboard.ticketPriorityUrgent')
+    case 'high':
+      return t('admin.dashboard.ticketPriorityHigh')
+    case 'normal':
+      return t('admin.dashboard.ticketPriorityNormal')
+    case 'low':
+      return t('admin.dashboard.ticketPriorityLow')
+    default:
+      return priority
+  }
+}
 </script>
 
 <template>
@@ -570,87 +600,156 @@ function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk
         </div>
       </section>
 
-      <!-- Level 2: 运维待办与风险雷达 (Action Hub) -->
-      <section aria-label="Operations Radar" class="card p-5">
-        <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+      <!-- Level 2: 重点待办与营销 (Campaigns & Pending Tickets) -->
+      <section aria-label="Campaigns and Pending Tickets" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <!-- 1. 进行中的活动 (营销卡片) -->
+        <div class="card p-5 flex flex-col justify-between">
           <div>
-            <h2 class="text-base font-semibold tracking-tight text-themed flex items-center gap-2">
-              <span
-                class="w-2.5 h-2.5 rounded-full"
-                :class="activeRisks.length > 0 ? 'bg-amber-600' : 'bg-emerald-600'"
-              ></span>
-              {{ t('admin.dashboard.actionHubTitle') }}
-            </h2>
-            <p class="text-xs text-themed-muted mt-0.5">
-              {{ activeRisks.length > 0
-                ? t('admin.dashboard.actionRequired') + ' - ' + t('admin.dashboard.actionCount', { count: activeRisks.length })
-                : t('admin.dashboard.allClearDescription') }}
-            </p>
-          </div>
-
-          <span
-            class="px-2.5 py-1 rounded text-xs font-mono font-medium border"
-            :class="activeRisks.length > 0
-              ? 'border-amber-600 text-amber-700 dark:text-amber-300 bg-themed-secondary'
-              : 'border-emerald-600 text-emerald-700 dark:text-emerald-300 bg-themed-secondary'"
-          >
-            {{ activeRisks.length > 0 ? `${activeRisks.length} 待办` : '正常' }}
-          </span>
-        </div>
-
-        <!-- 风险项列表 -->
-        <div v-if="activeRisks.length > 0" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div
-            v-for="risk in activeRisks"
-            :key="risk.key"
-            class="p-3.5 rounded-lg border bg-themed-secondary flex items-start justify-between gap-3"
-            :class="risk.severity === 'critical' ? 'border-rose-600' : 'border-amber-600'"
-          >
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span
-                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide border"
-                  :class="risk.severity === 'critical'
-                    ? 'border-rose-600 text-rose-700 dark:text-rose-300'
-                    : 'border-amber-600 text-amber-700 dark:text-amber-300'"
-                >
-                  {{ risk.severity === 'critical' ? '紧急' : '预警' }}
-                </span>
-                <p class="text-sm font-semibold text-themed truncate">
-                  {{ risk.title }}
+            <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+              <div>
+                <h2 class="text-base font-semibold tracking-tight text-themed">
+                  {{ t('admin.dashboard.marketingTitle') }}
+                </h2>
+                <p class="text-xs text-themed-muted mt-0.5">
+                  {{ t('admin.dashboard.marketingDescription') }}
                 </p>
               </div>
-              <p class="text-xs text-themed-muted mt-1 leading-relaxed">
-                {{ risk.description }}
-              </p>
+              <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
+                {{ t('admin.dashboard.activeCampaignsBadge', { count: totalActiveLotteries }) }}
+              </span>
             </div>
 
+            <!-- 签到活动状态条 -->
+            <div class="mt-4 p-3 rounded-lg border border-themed bg-themed-surface flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span
+                  class="w-2.5 h-2.5 rounded-full"
+                  :class="checkinInfo.enabled ? 'bg-emerald-600' : 'bg-rose-600'"
+                ></span>
+                <div>
+                  <span class="text-xs font-semibold text-themed">{{ t('admin.dashboard.dailyCheckin') }}</span>
+                  <span class="text-[11px] text-themed-muted ml-2">
+                    {{ checkinInfo.enabled ? t('admin.dashboard.checkinRule', { min: checkinInfo.minPoints, max: checkinInfo.maxPoints }) : t('admin.dashboard.checkinDisabled') }}
+                  </span>
+                </div>
+              </div>
+              <span class="text-xs font-mono tabular-nums text-themed-secondary">
+                {{ t('admin.dashboard.todayCheckinsCount', { count: checkinInfo.todayCheckins }) }}
+              </span>
+            </div>
+
+            <!-- 生效中的抽奖活动列表 -->
+            <div class="mt-4">
+              <div v-if="activeLotteries.length > 0" class="divide-y divide-themed border border-themed rounded-lg overflow-hidden bg-themed-surface">
+                <div
+                  v-for="lottery in activeLotteries"
+                  :key="lottery.id"
+                  class="p-3 flex items-center justify-between hover:bg-themed-hover transition-colors"
+                >
+                  <div class="min-w-0 pr-3">
+                    <p class="text-xs font-medium text-themed truncate">
+                      {{ lottery.name }}
+                    </p>
+                    <p class="text-[11px] text-themed-muted mt-0.5">
+                      {{ t('admin.dashboard.costPointsPerDraw', { points: lottery.costPoints }) }}
+                      <span class="mx-1 text-themed-faint">·</span>
+                      {{ t('admin.dashboard.drawsCount', { count: lottery.totalDraws }) }}
+                    </p>
+                  </div>
+                  <span class="text-[11px] font-mono px-2 py-0.5 rounded border border-themed bg-themed-tertiary text-themed-secondary shrink-0">
+                    {{ lottery.endAt ? lottery.endAt.slice(0, 10) : t('admin.dashboard.longTermActive') }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-else class="p-6 text-center border border-themed rounded-lg bg-themed-surface">
+                <p class="text-xs text-themed-muted">{{ t('admin.dashboard.noActiveLotteries') }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+            <span>{{ t('admin.dashboard.dailyCheckin') }}与抽奖活动</span>
             <button
               type="button"
-              class="btn btn-secondary btn-sm shrink-0 self-center text-xs"
-              @click="jumpTo(risk.targetPath)"
+              class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+              @click="jumpTo('/admin/entertainment')"
             >
-              {{ t('admin.dashboard.viewDetails') }}
+              {{ t('admin.dashboard.manageMarketing') }}
             </button>
           </div>
         </div>
 
-        <!-- 全健康状态 -->
-        <div v-else class="mt-4 p-4 rounded-lg border border-themed bg-themed-tertiary flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full border border-emerald-600 bg-themed-secondary flex items-center justify-center text-emerald-600">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
+        <!-- 2. 待处理工单 (新增卡片) -->
+        <div class="card p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+              <div>
+                <h2 class="text-base font-semibold tracking-tight text-themed">
+                  {{ t('admin.dashboard.pendingTicketsTitle') }}
+                </h2>
+                <p class="text-xs text-themed-muted mt-0.5">
+                  {{ t('admin.dashboard.pendingTicketsDescription') }}
+                </p>
+              </div>
+              <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
+                {{ t('admin.dashboard.pendingTicketsBadge', { count: pendingTicketsCount }) }}
+              </span>
             </div>
-            <div>
-              <p class="text-sm font-medium text-themed">{{ t('admin.dashboard.allClearTitle') }}</p>
-              <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.dashboard.allClearDescription') }}</p>
+
+            <!-- 工单列表 -->
+            <div class="mt-4">
+              <div v-if="pendingTickets.length > 0" class="divide-y divide-themed border border-themed rounded-lg overflow-hidden bg-themed-surface">
+                <div
+                  v-for="ticket in pendingTickets"
+                  :key="ticket.id"
+                  class="p-3 flex items-center justify-between hover:bg-themed-hover transition-colors cursor-pointer"
+                  @click="jumpTo(`/admin/tickets?ticket=${ticket.id}`)"
+                >
+                  <div class="min-w-0 pr-3">
+                    <div class="flex items-center gap-1.5">
+                      <span
+                        class="text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+                        :class="getTicketPriorityBadgeClass(ticket.priority)"
+                      >
+                        {{ getTicketPriorityText(ticket.priority) }}
+                      </span>
+                      <p class="text-xs font-medium text-themed truncate">
+                        {{ ticket.subject }}
+                      </p>
+                    </div>
+                    <p class="text-[11px] text-themed-muted mt-0.5 truncate">
+                      {{ ticket.user.username }}
+                      <span v-if="ticket.instance || ticket.host" class="mx-1 text-themed-faint">·</span>
+                      <span v-if="ticket.instance">{{ ticket.instance.name }}</span>
+                      <span v-else-if="ticket.host">{{ ticket.host.name }}</span>
+                      <span class="mx-1 text-themed-faint">·</span>
+                      <span class="capitalize">{{ ticket.category }}</span>
+                    </p>
+                  </div>
+
+                  <span class="text-[11px] font-mono text-themed-muted shrink-0">
+                    {{ formatRelativeTime(ticket.createdAt) }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-else class="p-6 text-center border border-themed rounded-lg bg-themed-surface">
+                <p class="text-xs text-themed-muted">{{ t('admin.dashboard.noPendingTickets') }}</p>
+              </div>
             </div>
           </div>
-          <span class="text-xs font-mono text-themed-faint hidden sm:inline-block">
-            {{ t('admin.dashboard.agentFreshnessNote') }}
-          </span>
+
+          <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+            <span>需管理员跟进与回复</span>
+            <button
+              type="button"
+              class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+              @click="jumpTo('/admin/tickets')"
+            >
+              {{ t('admin.dashboard.manageTickets') }}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -839,80 +938,73 @@ function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk
             </div>
           </div>
 
-          <!-- 2. 进行中的活动 (营销卡片) -->
+          <!-- 2. 实例构成与到期分布 -->
           <div class="card p-5 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
                 <div>
                   <h2 class="text-base font-semibold tracking-tight text-themed">
-                    {{ t('admin.dashboard.marketingTitle') }}
+                    {{ t('admin.dashboard.instanceStructureTitle') }}
                   </h2>
                   <p class="text-xs text-themed-muted mt-0.5">
-                    {{ t('admin.dashboard.marketingDescription') }}
+                    全平台 {{ totalInstances }} 台未删除实例的订购模式与健康状态
                   </p>
                 </div>
-                <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
-                  {{ t('admin.dashboard.activeCampaignsBadge', { count: totalActiveLotteries }) }}
+                <span class="text-xs font-mono text-themed-secondary">
+                  总量: {{ totalInstances }}
                 </span>
               </div>
 
-              <!-- 签到活动状态条 -->
-              <div class="mt-4 p-3 rounded-lg border border-themed bg-themed-surface flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                  <span
-                    class="w-2.5 h-2.5 rounded-full"
-                    :class="checkinInfo.enabled ? 'bg-emerald-600' : 'bg-rose-600'"
-                  ></span>
-                  <div>
-                    <span class="text-xs font-semibold text-themed">{{ t('admin.dashboard.dailyCheckin') }}</span>
-                    <span class="text-[11px] text-themed-muted ml-2">
-                      {{ checkinInfo.enabled ? t('admin.dashboard.checkinRule', { min: checkinInfo.minPoints, max: checkinInfo.maxPoints }) : t('admin.dashboard.checkinDisabled') }}
+              <div class="mt-6 space-y-4">
+                <!-- 付费与免费占比条 -->
+                <div>
+                  <div class="flex justify-between text-xs text-themed-secondary mb-1.5">
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                      {{ t('admin.statistics.labels.paidInstances') }} ({{ paidInstances }}台)
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      {{ t('admin.statistics.labels.freeInstances') }} ({{ freeInstances }}台)
                     </span>
                   </div>
-                </div>
-                <span class="text-xs font-mono tabular-nums text-themed-secondary">
-                  {{ t('admin.dashboard.todayCheckinsCount', { count: checkinInfo.todayCheckins }) }}
-                </span>
-              </div>
-
-              <!-- 生效中的抽奖活动列表 -->
-              <div class="mt-4">
-                <div v-if="activeLotteries.length > 0" class="divide-y divide-themed border border-themed rounded-lg overflow-hidden bg-themed-surface">
-                  <div
-                    v-for="lottery in activeLotteries"
-                    :key="lottery.id"
-                    class="p-3 flex items-center justify-between hover:bg-themed-hover transition-colors"
-                  >
-                    <div class="min-w-0 pr-3">
-                      <p class="text-xs font-medium text-themed truncate">
-                        {{ lottery.name }}
-                      </p>
-                      <p class="text-[11px] text-themed-muted mt-0.5">
-                        {{ t('admin.dashboard.costPointsPerDraw', { points: lottery.costPoints }) }}
-                        <span class="mx-1 text-themed-faint">·</span>
-                        {{ t('admin.dashboard.drawsCount', { count: lottery.totalDraws }) }}
-                      </p>
-                    </div>
-                    <span class="text-[11px] font-mono px-2 py-0.5 rounded border border-themed bg-themed-tertiary text-themed-secondary shrink-0">
-                      {{ lottery.endAt ? lottery.endAt.slice(0, 10) : t('admin.dashboard.longTermActive') }}
-                    </span>
+                  <div class="h-3 rounded-full overflow-hidden bg-themed-tertiary flex border border-themed">
+                    <div class="bg-blue-600" :style="{ width: `${paidInstancesPct}%` }"></div>
+                    <div class="bg-emerald-600" :style="{ width: `${freeInstancesPct}%` }"></div>
                   </div>
                 </div>
 
-                <div v-else class="p-6 text-center border border-themed rounded-lg bg-themed-surface">
-                  <p class="text-xs text-themed-muted">{{ t('admin.dashboard.noActiveLotteries') }}</p>
+                <!-- 临期与健康概览 -->
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                  <div class="p-3 rounded-lg border border-themed bg-themed-surface">
+                    <p class="text-xs text-themed-muted">{{ t('admin.dashboard.expiringNotice') }}</p>
+                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
+                      {{ expiringSoonInstances }}
+                      <span class="text-xs text-themed-faint font-normal">台</span>
+                    </p>
+                    <p class="text-[11px] text-themed-faint mt-1">需关注续费留存</p>
+                  </div>
+
+                  <div class="p-3 rounded-lg border border-themed bg-themed-surface">
+                    <p class="text-xs text-themed-muted">今日新交付实例</p>
+                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
+                      +{{ stats.operations.instances.newToday }}
+                      <span class="text-xs text-themed-faint font-normal">台</span>
+                    </p>
+                    <p class="text-[11px] text-themed-faint mt-1">生产环境在线增长</p>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-              <span>{{ t('admin.dashboard.dailyCheckin') }}与抽奖活动</span>
+              <span>托管 / 自营实例全部在线统计</span>
               <button
                 type="button"
                 class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-                @click="jumpTo('/admin/entertainment')"
+                @click="jumpTo('/admin/hosting')"
               >
-                {{ t('admin.dashboard.manageMarketing') }}
+                管理托管实例 ➔
               </button>
             </div>
           </div>
@@ -994,78 +1086,9 @@ function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk
             </div>
           </div>
 
-          <!-- 4. 实例构成与到期分布 -->
-          <div class="card p-5 flex flex-col justify-between">
-            <div>
-              <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
-                <div>
-                  <h2 class="text-base font-semibold tracking-tight text-themed">
-                    {{ t('admin.dashboard.instanceStructureTitle') }}
-                  </h2>
-                  <p class="text-xs text-themed-muted mt-0.5">
-                    全平台 {{ totalInstances }} 台未删除实例的订购模式与健康状态
-                  </p>
-                </div>
-                <span class="text-xs font-mono text-themed-secondary">
-                  总量: {{ totalInstances }}
-                </span>
-              </div>
 
-              <div class="mt-6 space-y-4">
-                <!-- 付费与免费占比条 -->
-                <div>
-                  <div class="flex justify-between text-xs text-themed-secondary mb-1.5">
-                    <span class="inline-flex items-center gap-1.5">
-                      <span class="w-2 h-2 rounded-full bg-blue-600"></span>
-                      {{ t('admin.statistics.labels.paidInstances') }} ({{ paidInstances }}台)
-                    </span>
-                    <span class="inline-flex items-center gap-1.5">
-                      <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                      {{ t('admin.statistics.labels.freeInstances') }} ({{ freeInstances }}台)
-                    </span>
-                  </div>
-                  <div class="h-3 rounded-full overflow-hidden bg-themed-tertiary flex border border-themed">
-                    <div class="bg-blue-600" :style="{ width: `${paidInstancesPct}%` }"></div>
-                    <div class="bg-emerald-600" :style="{ width: `${freeInstancesPct}%` }"></div>
-                  </div>
-                </div>
 
-                <!-- 临期与健康概览 -->
-                <div class="grid grid-cols-2 gap-3 mt-4">
-                  <div class="p-3 rounded-lg border border-themed bg-themed-surface">
-                    <p class="text-xs text-themed-muted">{{ t('admin.dashboard.expiringNotice') }}</p>
-                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
-                      {{ expiringSoonInstances }}
-                      <span class="text-xs text-themed-faint font-normal">台</span>
-                    </p>
-                    <p class="text-[11px] text-themed-faint mt-1">需关注续费留存</p>
-                  </div>
-
-                  <div class="p-3 rounded-lg border border-themed bg-themed-surface">
-                    <p class="text-xs text-themed-muted">今日新交付实例</p>
-                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
-                      +{{ stats.operations.instances.newToday }}
-                      <span class="text-xs text-themed-faint font-normal">台</span>
-                    </p>
-                    <p class="text-[11px] text-themed-faint mt-1">生产环境在线增长</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-              <span>托管 / 自营实例全部在线统计</span>
-              <button
-                type="button"
-                class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-                @click="jumpTo('/admin/hosting')"
-              >
-                管理托管实例 ➔
-              </button>
-            </div>
-          </div>
-
-          <!-- 5. 平台运行事实 (Platform Pulse) -->
+          <!-- 4. 平台运行事实 (Platform Pulse) -->
           <div class="card p-5 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
@@ -1160,6 +1183,90 @@ function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk
           </div>
         </div>
       </section>
+
+      <!-- Level 5: 运维待办与风险雷达 (Action Hub) -->
+      <section aria-label="Operations Radar" class="card p-5">
+        <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+          <div>
+            <h2 class="text-base font-semibold tracking-tight text-themed flex items-center gap-2">
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                :class="activeRisks.length > 0 ? 'bg-amber-600' : 'bg-emerald-600'"
+              ></span>
+              {{ t('admin.dashboard.actionHubTitle') }}
+            </h2>
+            <p class="text-xs text-themed-muted mt-0.5">
+              {{ activeRisks.length > 0
+                ? t('admin.dashboard.actionRequired') + ' - ' + t('admin.dashboard.actionCount', { count: activeRisks.length })
+                : t('admin.dashboard.allClearDescription') }}
+            </p>
+          </div>
+
+          <span
+            class="px-2.5 py-1 rounded text-xs font-mono font-medium border"
+            :class="activeRisks.length > 0
+              ? 'border-amber-600 text-amber-700 dark:text-amber-300 bg-themed-secondary'
+              : 'border-emerald-600 text-emerald-700 dark:text-emerald-300 bg-themed-secondary'"
+          >
+            {{ activeRisks.length > 0 ? `${activeRisks.length} 待办` : '正常' }}
+          </span>
+        </div>
+
+        <!-- 风险项列表 -->
+        <div v-if="activeRisks.length > 0" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            v-for="risk in activeRisks"
+            :key="risk.key"
+            class="p-3.5 rounded-lg border bg-themed-secondary flex items-start justify-between gap-3"
+            :class="risk.severity === 'critical' ? 'border-rose-600' : 'border-amber-600'"
+          >
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide border"
+                  :class="risk.severity === 'critical'
+                    ? 'border-rose-600 text-rose-700 dark:text-rose-300'
+                    : 'border-amber-600 text-amber-700 dark:text-amber-300'"
+                >
+                  {{ risk.severity === 'critical' ? '紧急' : '预警' }}
+                </span>
+                <p class="text-sm font-semibold text-themed truncate">
+                  {{ risk.title }}
+                </p>
+              </div>
+              <p class="text-xs text-themed-muted mt-1 leading-relaxed">
+                {{ risk.description }}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm shrink-0 self-center text-xs"
+              @click="jumpTo(risk.targetPath)"
+            >
+              {{ t('admin.dashboard.viewDetails') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 全健康状态 -->
+        <div v-else class="mt-4 p-4 rounded-lg border border-themed bg-themed-tertiary flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full border border-emerald-600 bg-themed-secondary flex items-center justify-center text-emerald-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-themed">{{ t('admin.dashboard.allClearTitle') }}</p>
+              <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.dashboard.allClearDescription') }}</p>
+            </div>
+          </div>
+          <span class="text-xs font-mono text-themed-faint hidden sm:inline-block">
+            {{ t('admin.dashboard.agentFreshnessNote') }}
+          </span>
+        </div>
+      </section>
     </div>
 
     <!-- 空状态 -->
@@ -1180,8 +1287,10 @@ function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk
   align-items: end;
   gap: 0.35rem;
   min-height: 14rem;
+  height: auto;
   overflow-x: auto;
-  padding: 2rem 0.25rem 0.75rem;
+  overflow-y: hidden;
+  padding: 2.25rem 0.25rem 0.5rem;
   scrollbar-gutter: stable;
 }
 

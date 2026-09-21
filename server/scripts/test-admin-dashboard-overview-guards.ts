@@ -43,5 +43,17 @@ assert.ok(
   'admin-statistics.ts response must include recentInstances'
 )
 
+assert.ok(
+  statsRouteSource.includes('prisma.ticket.findMany') &&
+    statsRouteSource.includes("status: { in: ['open', 'in_progress'] }"),
+  'admin-statistics.ts must query pending tickets'
+)
+
+assert.ok(
+  statsRouteSource.includes('pendingTickets:'),
+  'admin-statistics.ts response must include pendingTickets'
+)
+
 console.log('admin dashboard overview guards passed')
 process.exit(0)
+

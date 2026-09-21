@@ -215,7 +215,8 @@ export default async function adminStatisticsRoutes(app: FastifyInstance): Promi
         totalActiveLotteries,
         todayCheckins,
         checkinSettings,
-        recentInstances
+        recentInstances,
+        pendingTickets
       ] = await Promise.all([
         prisma.user.count(),
         prisma.instance.count({ where: { status: { not: 'deleted' } } }),
@@ -515,6 +516,37 @@ export default async function adminStatisticsRoutes(app: FastifyInstance): Promi
           },
           orderBy: { createdAt: 'desc' },
           take: 5
+        }),
+        prisma.ticket.findMany({
+          where: { status: { in: ['open', 'in_progress'] } },
+          select: {
+            id: true,
+            subject: true,
+            category: true,
+            priority: true,
+            status: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                username: true
+              }
+            },
+            host: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            instance: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
         })
       ])
 
@@ -633,6 +665,17 @@ export default async function adminStatisticsRoutes(app: FastifyInstance): Promi
           user: inst.user,
           host: inst.host,
           packagePlan: inst.packagePlan
+        })),
+        pendingTickets: pendingTickets.map(ticket => ({
+          id: ticket.id,
+          subject: ticket.subject,
+          category: ticket.category,
+          priority: ticket.priority,
+          status: ticket.status,
+          createdAt: ticket.createdAt.toISOString(),
+          user: ticket.user,
+          host: ticket.host,
+          instance: ticket.instance
         }))
       }
     } catch (error) {
