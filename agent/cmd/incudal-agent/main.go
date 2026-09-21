@@ -51,7 +51,7 @@ func main() {
 	log.Printf("incudal-agent started: panel=%s interval=%s", cfg.PanelURL, cfg.HeartbeatInterval)
 	upgradeRunner := upgrade.DefaultRunner(cfg)
 	var upgradeInProgress atomic.Bool
-	var caddyInstallInProgress atomic.Bool
+	var caddyOpInProgress atomic.Bool
 	heartbeatLogState := newHeartbeatLogState()
 	if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds); err != nil {
 		heartbeatLogState.logFailure(err)
@@ -60,7 +60,7 @@ func main() {
 		if result.Tunnel != nil {
 			tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
 		}
-		scheduleCaddyInstall(ctx, result, &caddyInstallInProgress)
+		handleCaddyInstruction(ctx, result, &caddyOpInProgress)
 		scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 	}
 
@@ -79,44 +79,64 @@ func main() {
 				if result.Tunnel != nil {
 					tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
 				}
-				scheduleCaddyInstall(ctx, result, &caddyInstallInProgress)
+				handleCaddyInstruction(ctx, result, &caddyOpInProgress)
 				scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 			}
 		}
 	}
 }
 
-// scheduleCaddyInstall 收到面板 caddy.command=install 时，在节点本地部署 Caddy。
-// 幂等：安装进行中或已可用时跳过；成功后下个心跳自然上报 available=true。
-func scheduleCaddyInstall(ctx context.Context, result panel.HeartbeatResult, inProgress *atomic.Bool) {
+// handleCaddyInstruction 处理面板下发的 Caddy 指令（install / uninstall）。
+// 幂等：对应操作进行中跳过；操作系统为原子互斥（安装/卸载不会并发）。
+func handleCaddyInstruction(ctx context.Context, result panel.HeartbeatResult, inProgress *atomic.Bool) {
 	if result.Caddy == nil {
-		log.Printf("[caddy] no instruction in heartbeat response")
 		return
 	}
 	log.Printf("[caddy] instruction: command=%q port=%d", result.Caddy.Command, result.Caddy.Port)
 	if inProgress.Load() {
 		return
 	}
-	if result.Caddy.Command != "install" {
-		return
-	}
-	if caddy.Detect().Available {
+	if result.Caddy.Command != "install" && result.Caddy.Command != "uninstall" {
 		return
 	}
 	if !inProgress.CompareAndSwap(false, true) {
 		return
 	}
-	log.Printf("[caddy] install command received; deploying Caddy on loopback")
-	go func() {
-		defer inProgress.Store(false)
-		installCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-		defer cancel()
-		if err := caddy.Install(installCtx); err != nil {
-			log.Printf("[caddy] install failed: %v", err)
+	switch result.Caddy.Command {
+	case "install":
+		if caddy.Detect().Available {
+			inProgress.Store(false)
 			return
 		}
-		log.Printf("[caddy] install complete")
-	}()
+		log.Printf("[caddy] install command received; deploying Caddy on loopback")
+		go func() {
+			defer inProgress.Store(false)
+			installCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+			if err := caddy.Install(installCtx); err != nil {
+				log.Printf("[caddy] install failed: %v", err)
+				return
+			}
+			log.Printf("[caddy] install complete")
+		}()
+
+	case "uninstall":
+		if !caddy.Detect().Available {
+			inProgress.Store(false)
+			return
+		}
+		log.Printf("[caddy] uninstall command received; removing Caddy from host")
+		go func() {
+			defer inProgress.Store(false)
+			uninstallCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			if err := caddy.Uninstall(uninstallCtx); err != nil {
+				log.Printf("[caddy] uninstall failed: %v", err)
+				return
+			}
+			log.Printf("[caddy] uninstall complete")
+		}()
+	}
 }
 
 func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalSeconds int) (panel.HeartbeatResult, error) {

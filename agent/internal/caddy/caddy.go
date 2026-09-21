@@ -74,6 +74,36 @@ func Install(ctx context.Context) error {
 	return nil
 }
 
+// Uninstall 从宿主机彻底移除 Caddy：
+// 停止并禁用服务、删除 systemd unit、Caddyfile、二进制与 apt 源。
+// 卸载后下个心跳自然上报 available=false，面板据此把 caddy_enabled 置回 false。
+func Uninstall(ctx context.Context) error {
+	// 1. 停止并禁用服务（unit 不存在时 systemctl 会失败，忽略）。
+	_ = exec.CommandContext(ctx, "systemctl", "stop", "caddy").Run()
+	_ = exec.CommandContext(ctx, "systemctl", "disable", "caddy").Run()
+
+	// 2. 删除 systemd unit 与 socket（若有）并 reload。
+	_ = os.Remove("/etc/systemd/system/caddy.service")
+	_ = os.Remove("/etc/systemd/system/caddy.socket")
+	_ = exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
+
+	// 3. 删除配置与数据。
+	_ = os.RemoveAll(caddyConfigDir)
+	_ = os.RemoveAll("/var/lib/caddy")
+	_ = os.RemoveAll("/var/log/caddy")
+
+	// 4. 删除管理二进制。
+	_ = os.Remove("/usr/bin/caddy")
+	_ = os.Remove("/usr/local/bin/caddy")
+
+	// 5. 删除 APT 仓库源与 keyring（若 apt 安装过）。
+	_ = os.Remove("/etc/apt/sources.list.d/caddy-stable.list")
+	_ = os.Remove("/usr/share/keyrings/caddy-stable-archive-keyring.gpg")
+
+	log.Printf("[caddy] uninstalled: binary, unit, config and apt source removed")
+	return nil
+}
+
 func installPackage(ctx context.Context) error {
 	if _, err := exec.LookPath("caddy"); err == nil {
 		return nil // 已装
