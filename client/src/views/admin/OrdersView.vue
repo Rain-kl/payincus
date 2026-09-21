@@ -848,158 +848,201 @@ onMounted(() => {
       </div>
     </section>
 
-    <div v-if="selectedOrder" class="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" @click.self="selectedOrder = null">
-      <aside class="order-drawer-panel h-full w-full max-w-xl overflow-y-auto bg-themed-surface p-6 shadow-2xl">
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <h2 class="text-xl font-semibold text-themed">{{ selectedOrder.title }}</h2>
-            <p class="mt-1 break-all font-mono text-sm text-themed-muted">{{ selectedOrder.orderNo }}</p>
-          </div>
-          <button class="btn btn-ghost btn-sm shrink-0" @click="selectedOrder = null">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-          </button>
-        </div>
-
-        <div v-if="detailLoading" class="mt-6 text-sm text-themed-muted">正在加载详情...</div>
-        <dl v-else class="mt-6 grid gap-3 text-sm">
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">用户</dt><dd class="col-span-2 text-themed">{{ selectedOrder.user?.username || `#${selectedOrder.userId}` }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">状态</dt><dd class="col-span-2 text-themed">{{ statusLabel(selectedOrder) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">金额</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.amount) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">实际到账</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ selectedOrder.actualAmount === null ? '-' : formatMoney(selectedOrder.actualAmount) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">手续费</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.fee) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">支付渠道</dt><dd class="col-span-2 text-themed">{{ selectedOrder.provider?.name || selectedOrder.paymentMethod || '-' }}</dd></div>
-          <div v-if="selectedOrder.providerStatusSummary" class="grid grid-cols-3 gap-3">
-            <dt class="text-xs uppercase tracking-wider text-themed-faint">Provider 摘要</dt>
-            <dd class="col-span-2 text-themed">
-              <div>原始状态：{{ selectedOrder.providerStatusSummary.rawStatus }}</div>
-              <div>交易号：<span class="font-mono">{{ selectedOrder.providerStatusSummary.tradeNo || '-' }}</span></div>
-              <div>回调时间：<span class="font-mono tabular-nums">{{ formatTime(selectedOrder.providerStatusSummary.callbackAt) }}</span></div>
-            </dd>
-          </div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">交易号</dt><dd class="col-span-2 break-all font-mono text-themed">{{ selectedOrder.tradeNo || '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">关联实例</dt><dd class="col-span-2 text-themed">{{ instanceName(selectedOrder) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">账期</dt><dd class="col-span-2 text-themed">{{ selectedOrder.months ? `${selectedOrder.months} 个月` : '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">开始时间</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.periodStart) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">结束时间</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.periodEnd) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">创建时间</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.createdAt) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">完成时间</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.completedAt) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">失败原因</dt><dd class="col-span-2 text-themed">{{ selectedOrder.failReason || '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3"><dt class="text-xs uppercase tracking-wider text-themed-faint">备注</dt><dd class="col-span-2 text-themed">{{ selectedOrder.remark || '-' }}</dd></div>
-        </dl>
-
-        <div v-if="actionMessage" class="mt-5 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">{{ actionMessage }}</div>
-        <div v-if="actionError" class="mt-5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">{{ actionError }}</div>
-
-        <section class="mt-6 border-t border-themed pt-5">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h3 class="text-base font-semibold text-themed">订单运营处理</h3>
-              <p class="mt-1 text-sm text-themed-muted">登记争议状态和人工退款申请。退款登记只创建调账审批，不会直接修改余额。</p>
-            </div>
-            <span :class="['badge border shrink-0', operationStatusClass(selectedOrder.operationCase?.status)]">
-              {{ operationStatusLabel(selectedOrder.operationCase?.status) }}
-            </span>
-          </div>
-
-          <div v-if="selectedOrder.operationCase" class="mt-4 rounded-lg border border-themed bg-themed-secondary p-3 text-sm">
-            <div class="grid gap-2 text-themed-muted">
-              <div>最近处理：{{ selectedOrder.operationCase.updatedBy?.username || selectedOrder.operationCase.createdBy?.username || '-' }} · <span class="font-mono tabular-nums">{{ formatTime(selectedOrder.operationCase.updatedAt) }}</span></div>
-              <div>处理原因：<span class="text-themed">{{ selectedOrder.operationCase.reason }}</span></div>
-              <div v-if="selectedOrder.operationCase.result">处理结果：<span class="text-themed">{{ selectedOrder.operationCase.result }}</span></div>
-              <div v-if="selectedOrder.operationCase.balanceAdjustmentRequest">
-                关联审批：
-                <span class="text-themed"><span class="font-mono tabular-nums">#{{ selectedOrder.operationCase.balanceAdjustmentRequest.id }}</span> · {{ adjustmentTypeLabel(selectedOrder.operationCase.balanceAdjustmentRequest.requestType) }} · {{ adjustmentStatusLabel(selectedOrder.operationCase.balanceAdjustmentRequest.status) }}</span>
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="selectedOrder" class="modal-overlay" @click.self="selectedOrder = null">
+          <div class="modal-backdrop" @click="selectedOrder = null"></div>
+          <div class="modal-content max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="modal-header">
+              <div class="min-w-0">
+                <h3 class="modal-title">{{ selectedOrder.title }}</h3>
+                <p class="mt-0.5 break-all font-mono text-xs text-themed-muted">{{ selectedOrder.orderNo }}</p>
               </div>
+              <button class="btn btn-ghost btn-sm shrink-0" @click="selectedOrder = null">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </button>
+            </div>
+
+            <div class="modal-body flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+              <div v-if="detailLoading" class="text-sm text-themed-muted">正在加载详情...</div>
+              <dl v-else class="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-2">
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">用户</dt>
+                  <dd class="text-right text-themed font-medium">{{ selectedOrder.user?.username || `#${selectedOrder.userId}` }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">状态</dt>
+                  <dd class="text-right">
+                    <span :class="['badge border', statusClass(selectedOrder.status)]">{{ statusLabel(selectedOrder) }}</span>
+                  </dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">金额</dt>
+                  <dd class="text-right font-mono font-medium tabular-nums text-themed">{{ formatMoney(selectedOrder.amount) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">实际到账</dt>
+                  <dd class="text-right font-mono font-medium tabular-nums text-themed">{{ selectedOrder.actualAmount === null ? '-' : formatMoney(selectedOrder.actualAmount) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">手续费</dt>
+                  <dd class="text-right font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.fee) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">支付渠道</dt>
+                  <dd class="text-right text-themed">{{ selectedOrder.provider?.name || selectedOrder.paymentMethod || '-' }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">交易号</dt>
+                  <dd class="truncate pl-2 text-right font-mono text-themed" :title="selectedOrder.tradeNo || ''">{{ selectedOrder.tradeNo || '-' }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">关联实例</dt>
+                  <dd class="truncate pl-2 text-right text-themed">{{ instanceName(selectedOrder) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">账期</dt>
+                  <dd class="text-right text-themed">{{ selectedOrder.months ? `${selectedOrder.months} 个月` : '-' }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">创建时间</dt>
+                  <dd class="text-right font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.createdAt) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">开始时间</dt>
+                  <dd class="text-right font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.periodStart) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">结束时间</dt>
+                  <dd class="text-right font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.periodEnd) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">完成时间</dt>
+                  <dd class="text-right font-mono tabular-nums text-themed">{{ formatTime(selectedOrder.completedAt) }}</dd>
+                </div>
+                <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3 py-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">失败原因</dt>
+                  <dd class="truncate pl-2 text-right text-themed" :title="selectedOrder.failReason || ''">{{ selectedOrder.failReason || '-' }}</dd>
+                </div>
+                <div v-if="selectedOrder.providerStatusSummary" class="rounded-lg bg-themed-secondary p-3 sm:col-span-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">Provider 摘要</dt>
+                  <dd class="mt-1.5 space-y-1 text-xs text-themed">
+                    <div>原始状态：{{ selectedOrder.providerStatusSummary.rawStatus }}</div>
+                    <div>交易号：<span class="font-mono">{{ selectedOrder.providerStatusSummary.tradeNo || '-' }}</span></div>
+                    <div>回调时间：<span class="font-mono tabular-nums">{{ formatTime(selectedOrder.providerStatusSummary.callbackAt) }}</span></div>
+                  </dd>
+                </div>
+                <div v-if="selectedOrder.remark" class="rounded-lg bg-themed-secondary p-3 sm:col-span-2">
+                  <dt class="text-xs uppercase tracking-wider text-themed-faint">备注</dt>
+                  <dd class="mt-1 break-words text-sm text-themed">{{ selectedOrder.remark }}</dd>
+                </div>
+              </dl>
+
+              <div v-if="actionMessage" class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">{{ actionMessage }}</div>
+              <div v-if="actionError" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">{{ actionError }}</div>
+
+              <section class="border-t border-themed pt-5">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 class="text-base font-semibold text-themed">订单运营处理</h3>
+                    <p class="mt-1 text-sm text-themed-muted">登记争议状态和人工退款申请。退款登记只创建调账审批，不会直接修改余额。</p>
+                  </div>
+                  <span :class="['badge border shrink-0', operationStatusClass(selectedOrder.operationCase?.status)]">
+                    {{ operationStatusLabel(selectedOrder.operationCase?.status) }}
+                  </span>
+                </div>
+
+                <div v-if="selectedOrder.operationCase" class="mt-4 rounded-lg border border-themed bg-themed-secondary p-3 text-sm">
+                  <div class="grid gap-2 text-themed-muted">
+                    <div>最近处理：{{ selectedOrder.operationCase.updatedBy?.username || selectedOrder.operationCase.createdBy?.username || '-' }} · <span class="font-mono tabular-nums">{{ formatTime(selectedOrder.operationCase.updatedAt) }}</span></div>
+                    <div>处理原因：<span class="text-themed">{{ selectedOrder.operationCase.reason }}</span></div>
+                    <div v-if="selectedOrder.operationCase.result">处理结果：<span class="text-themed">{{ selectedOrder.operationCase.result }}</span></div>
+                    <div v-if="selectedOrder.operationCase.balanceAdjustmentRequest">
+                      关联审批：
+                      <span class="text-themed"><span class="font-mono tabular-nums">#{{ selectedOrder.operationCase.balanceAdjustmentRequest.id }}</span> · {{ adjustmentTypeLabel(selectedOrder.operationCase.balanceAdjustmentRequest.requestType) }} · {{ adjustmentStatusLabel(selectedOrder.operationCase.balanceAdjustmentRequest.status) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-4 grid gap-3">
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">争议状态</span>
+                    <select v-model="operationStatus" class="input" :disabled="actionLoading">
+                      <option v-for="item in operationStatusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                  </label>
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">处理原因</span>
+                    <textarea v-model="operationReason" class="input min-h-[84px]" placeholder="写明订单异常、核查依据或退款原因" :disabled="actionLoading" />
+                  </label>
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">处理结果</span>
+                    <textarea v-model="operationResult" class="input min-h-[72px]" placeholder="可选，例如已联系用户、等待 provider 对账、已补偿" :disabled="actionLoading" />
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-themed">
+                    <input v-model="operationCreateRefundRequest" type="checkbox" class="h-4 w-4 accent-primary-500" :disabled="actionLoading || hasPendingRefundRequest" />
+                    <span>同时登记退款审批</span>
+                  </label>
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">退款金额</span>
+                    <input v-model="operationRefundAmount" class="input font-mono tabular-nums" placeholder="勾选退款登记时必填，例如 10.00" :disabled="actionLoading || !operationCreateRefundRequest" />
+                  </label>
+                  <p v-if="hasPendingRefundRequest" class="text-sm text-amber-600 dark:text-amber-400">该订单已有待审核退款审批，需处理完成后才能再次登记。</p>
+                  <button class="btn btn-primary justify-self-start" :disabled="actionLoading" @click="saveOperationCase">保存运营处理</button>
+                </div>
+              </section>
+
+              <section v-if="selectedOrder.sourceType === 'recharge'" class="border-t border-themed pt-5">
+                <h3 class="text-base font-semibold text-themed">充值订单处理</h3>
+                <p class="mt-1 text-sm text-themed-muted">仅待支付或处理中订单允许人工完成或标记失败，入账仍走原有充值完成逻辑。</p>
+                <div class="mt-4 grid gap-3">
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">交易号</span>
+                    <input v-model="completeTradeNo" class="input font-mono" placeholder="可选，第三方交易号或线下凭证号" :disabled="!canCompleteRecharge || actionLoading" />
+                  </label>
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">实际入账金额</span>
+                    <input v-model="completeActualAmount" class="input font-mono tabular-nums" placeholder="留空则按订单金额入账" :disabled="!canCompleteRecharge || actionLoading" />
+                  </label>
+                  <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-primary" :disabled="!canCompleteRecharge || actionLoading" @click="completeRecharge">手动完成并入账</button>
+                  </div>
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">失败原因</span>
+                    <textarea v-model="failReason" class="input min-h-[84px]" placeholder="标记失败时必须填写原因" :disabled="!canFailRecharge || actionLoading" />
+                  </label>
+                  <button class="btn btn-danger justify-self-start" :disabled="!canFailRecharge || actionLoading" @click="failRecharge">标记失败</button>
+                </div>
+              </section>
+
+              <section class="border-t border-themed pt-5">
+                <h3 class="text-base font-semibold text-themed">人工调账 / 退款审批</h3>
+                <p class="mt-1 text-sm text-themed-muted">用于补款、退款或扣款。正数增加用户余额，负数扣减用户余额；提交后进入审批任务，通过后才会写入余额日志。</p>
+                <div class="mt-4 grid gap-3">
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">调账金额</span>
+                    <input v-model="adjustmentAmount" class="input font-mono tabular-nums" placeholder="例如 10.00 或 -5.00" :disabled="actionLoading" />
+                  </label>
+                  <label class="block text-sm">
+                    <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">调账原因</span>
+                    <textarea v-model="adjustmentRemark" class="input min-h-[84px]" placeholder="必须写明订单、原因和处理结论" :disabled="actionLoading" />
+                  </label>
+                  <button class="btn btn-primary justify-self-start" :disabled="actionLoading" @click="adjustBalance">提交调账审批</button>
+                </div>
+              </section>
+            </div>
+
+            <div class="modal-footer flex justify-end">
+              <button class="btn btn-secondary btn-sm" @click="selectedOrder = null">关闭</button>
             </div>
           </div>
-
-          <div class="mt-4 grid gap-3">
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">争议状态</span>
-              <select v-model="operationStatus" class="input" :disabled="actionLoading">
-                <option v-for="item in operationStatusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-              </select>
-            </label>
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">处理原因</span>
-              <textarea v-model="operationReason" class="input min-h-[84px]" placeholder="写明订单异常、核查依据或退款原因" :disabled="actionLoading" />
-            </label>
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">处理结果</span>
-              <textarea v-model="operationResult" class="input min-h-[72px]" placeholder="可选，例如已联系用户、等待 provider 对账、已补偿" :disabled="actionLoading" />
-            </label>
-            <label class="flex items-center gap-2 text-sm text-themed">
-              <input v-model="operationCreateRefundRequest" type="checkbox" class="h-4 w-4 accent-primary-500" :disabled="actionLoading || hasPendingRefundRequest" />
-              <span>同时登记退款审批</span>
-            </label>
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">退款金额</span>
-              <input v-model="operationRefundAmount" class="input font-mono tabular-nums" placeholder="勾选退款登记时必填，例如 10.00" :disabled="actionLoading || !operationCreateRefundRequest" />
-            </label>
-            <p v-if="hasPendingRefundRequest" class="text-sm text-amber-600 dark:text-amber-400">该订单已有待审核退款审批，需处理完成后才能再次登记。</p>
-            <button class="btn btn-primary justify-self-start" :disabled="actionLoading" @click="saveOperationCase">保存运营处理</button>
-          </div>
-        </section>
-
-        <section v-if="selectedOrder.sourceType === 'recharge'" class="mt-6 border-t border-themed pt-5">
-          <h3 class="text-base font-semibold text-themed">充值订单处理</h3>
-          <p class="mt-1 text-sm text-themed-muted">仅待支付或处理中订单允许人工完成或标记失败，入账仍走原有充值完成逻辑。</p>
-          <div class="mt-4 grid gap-3">
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">交易号</span>
-              <input v-model="completeTradeNo" class="input font-mono" placeholder="可选，第三方交易号或线下凭证号" :disabled="!canCompleteRecharge || actionLoading" />
-            </label>
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">实际入账金额</span>
-              <input v-model="completeActualAmount" class="input font-mono tabular-nums" placeholder="留空则按订单金额入账" :disabled="!canCompleteRecharge || actionLoading" />
-            </label>
-            <div class="flex flex-wrap gap-2">
-              <button class="btn btn-primary" :disabled="!canCompleteRecharge || actionLoading" @click="completeRecharge">手动完成并入账</button>
-            </div>
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">失败原因</span>
-              <textarea v-model="failReason" class="input min-h-[84px]" placeholder="标记失败时必须填写原因" :disabled="!canFailRecharge || actionLoading" />
-            </label>
-            <button class="btn btn-danger justify-self-start" :disabled="!canFailRecharge || actionLoading" @click="failRecharge">标记失败</button>
-          </div>
-        </section>
-
-        <section class="mt-6 border-t border-themed pt-5">
-          <h3 class="text-base font-semibold text-themed">人工调账 / 退款审批</h3>
-          <p class="mt-1 text-sm text-themed-muted">用于补款、退款或扣款。正数增加用户余额，负数扣减用户余额；提交后进入审批任务，通过后才会写入余额日志。</p>
-          <div class="mt-4 grid gap-3">
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">调账金额</span>
-              <input v-model="adjustmentAmount" class="input font-mono tabular-nums" placeholder="例如 10.00 或 -5.00" :disabled="actionLoading" />
-            </label>
-            <label class="block text-sm">
-              <span class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-themed-faint">调账原因</span>
-              <textarea v-model="adjustmentRemark" class="input min-h-[84px]" placeholder="必须写明订单、原因和处理结论" :disabled="actionLoading" />
-            </label>
-            <button class="btn btn-primary justify-self-start" :disabled="actionLoading" @click="adjustBalance">提交调账审批</button>
-          </div>
-        </section>
-      </aside>
-    </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-.order-drawer-panel {
-  animation: order-drawer-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes order-drawer-in {
-  from {
-    transform: translateX(24px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
