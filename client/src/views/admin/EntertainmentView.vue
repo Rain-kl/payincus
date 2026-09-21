@@ -1629,23 +1629,26 @@ function getSeriesTitle(seriesId: string): string {
 
     <!-- 创建/编辑抽奖弹窗 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-200"
-        leave-active-class="transition-opacity duration-200"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="modal">
         <div 
           v-if="showLotteryModal" 
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          class="modal-overlay"
           @click.self="showLotteryModal = false"
         >
-          <div class="card p-6 w-full max-w-md">
-            <h3 class="text-lg font-medium text-themed mb-4">
-              {{ editingLottery ? $t('entertainment.admin.editLottery') : $t('entertainment.admin.createLottery') }}
-            </h3>
+          <div class="modal-backdrop" @click="showLotteryModal = false"></div>
+          <div class="modal-content max-w-xl">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                {{ editingLottery ? $t('entertainment.admin.editLottery') : $t('entertainment.admin.createLottery') }}
+              </h3>
+              <button class="btn btn-ghost btn-sm" @click="showLotteryModal = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             
-            <div class="space-y-4">
+            <div class="modal-body space-y-4">
               <div>
                 <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.lotteryName') }}</label>
                 <input 
@@ -1705,8 +1708,8 @@ function getSeriesTitle(seriesId: string): string {
               </div>
             </div>
             
-            <div class="flex justify-end gap-2 mt-6">
-              <button class="btn btn-ghost" @click="showLotteryModal = false">{{ $t('common.cancel') }}</button>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" @click="showLotteryModal = false">{{ $t('common.cancel') }}</button>
               <button class="btn btn-primary" :disabled="savingLottery" @click="saveLottery">
                 {{ savingLottery ? $t('common.saving') : $t('common.save') }}
               </button>
@@ -1718,35 +1721,38 @@ function getSeriesTitle(seriesId: string): string {
 
     <!-- 奖品管理弹窗 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-200"
-        leave-active-class="transition-opacity duration-200"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="modal">
         <div 
           v-if="showPrizesModal" 
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+          class="modal-overlay"
           @click.self="showPrizesModal = false"
         >
-          <div class="card p-6 w-full max-w-2xl my-8">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-medium text-themed">
+          <div class="modal-backdrop" @click="showPrizesModal = false"></div>
+          <div class="modal-content max-w-2xl">
+            <div class="modal-header">
+              <h3 class="modal-title">
                 {{ $t('entertainment.admin.managePrizes') }} - {{ editingPrizes?.name }}
               </h3>
-              <button class="btn btn-sm btn-primary" @click="addPrize">
-                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-                {{ $t('entertainment.admin.addPrize') }}
-              </button>
+              <div class="flex items-center gap-2">
+                <button class="btn btn-sm btn-primary" @click="addPrize">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  {{ $t('entertainment.admin.addPrize') }}
+                </button>
+                <button class="btn btn-ghost btn-sm" @click="showPrizesModal = false">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             
-            <div class="space-y-3 max-h-96 overflow-y-auto">
+            <div class="modal-body space-y-3">
               <div 
                 v-for="(prize, index) in prizes" 
                 :key="index"
-                class="p-3 border border-themed rounded-lg"
+                class="p-3.5 border border-themed rounded-lg bg-themed-secondary"
               >
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
                   <div>
@@ -1833,8 +1839,8 @@ function getSeriesTitle(seriesId: string): string {
               </div>
             </div>
             
-            <div class="flex justify-end gap-2 mt-6">
-              <button class="btn btn-ghost" @click="showPrizesModal = false">{{ $t('common.cancel') }}</button>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" @click="showPrizesModal = false">{{ $t('common.cancel') }}</button>
               <button class="btn btn-primary" :disabled="savingPrizes" @click="savePrizes">
                 {{ savingPrizes ? $t('common.saving') : $t('common.save') }}
               </button>
@@ -1846,23 +1852,26 @@ function getSeriesTitle(seriesId: string): string {
 
     <!-- 通知配置弹窗 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-200"
-        leave-active-class="transition-opacity duration-200"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="modal">
         <div 
           v-if="showNotificationModal" 
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          class="modal-overlay"
           @click.self="showNotificationModal = false"
         >
-          <div class="card p-6 w-full max-w-md">
-            <h3 class="text-lg font-medium text-themed mb-4">
-              {{ $t('entertainment.admin.notification.title') }} - {{ editingNotification?.name }}
-            </h3>
+          <div class="modal-backdrop" @click="showNotificationModal = false"></div>
+          <div class="modal-content max-w-xl">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                {{ $t('entertainment.admin.notification.title') }} - {{ editingNotification?.name }}
+              </h3>
+              <button class="btn btn-ghost btn-sm" @click="showNotificationModal = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             
-            <div class="space-y-4">
+            <div class="modal-body space-y-4">
               <!-- 启用开关 -->
               <div class="flex items-center justify-between">
                 <label class="text-sm font-medium text-themed">{{ $t('entertainment.admin.notification.enabled') }}</label>
@@ -1965,8 +1974,8 @@ function getSeriesTitle(seriesId: string): string {
               </div>
             </div>
             
-            <div class="flex justify-end gap-2 mt-6">
-              <button class="btn btn-ghost" @click="showNotificationModal = false">{{ $t('common.cancel') }}</button>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" @click="showNotificationModal = false">{{ $t('common.cancel') }}</button>
               <button class="btn btn-primary" :disabled="savingNotification" @click="saveNotification">
                 {{ savingNotification ? $t('common.saving') : $t('common.save') }}
               </button>
@@ -1978,61 +1987,66 @@ function getSeriesTitle(seriesId: string): string {
 
     <!-- 系列编辑弹窗 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-200"
-        leave-active-class="transition-opacity duration-200"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="modal">
         <div
           v-if="showSeriesModal"
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+          class="modal-overlay"
           @click.self="showSeriesModal = false"
         >
-          <div class="card p-6 w-full max-w-2xl my-8">
-            <h3 class="text-lg font-medium text-themed mb-4">
-              {{ editingSeries ? $t('entertainment.admin.badgeCatalog.series.editTitle') : $t('entertainment.admin.badgeCatalog.series.createTitle') }}
-            </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.id') }}</label>
-                <input v-model="seriesForm.id" type="text" class="input w-full" :disabled="!!editingSeries" placeholder="supreme" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sort') }}</label>
-                <input v-model.number="seriesForm.displayOrder" type="number" class="input w-full" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.nameZh') }}</label>
-                <input v-model="seriesForm.nameZh" type="text" class="input w-full" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.nameEn') }}</label>
-                <input v-model="seriesForm.nameEn" type="text" class="input w-full" />
-              </div>
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.titleLabel') }}</label>
-                <input v-model="seriesForm.title" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.series.titlePlaceholder')" />
-              </div>
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.descriptionLabel') }}</label>
-                <textarea v-model="seriesForm.description" class="input w-full h-20 resize-none"></textarea>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sourceId') }}</label>
-                <input v-model="seriesForm.sourceId" type="text" class="input w-full" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sourceLabel') }}</label>
-                <input v-model="seriesForm.sourceLabel" type="text" class="input w-full" />
-              </div>
-              <label class="flex items-center gap-2 sm:col-span-2 text-sm text-themed">
-                <input v-model="seriesForm.isActive" type="checkbox" class="checkbox" />
-                {{ $t('entertainment.admin.badgeCatalog.series.enable') }}
-              </label>
+          <div class="modal-backdrop" @click="showSeriesModal = false"></div>
+          <div class="modal-content max-w-2xl">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                {{ editingSeries ? $t('entertainment.admin.badgeCatalog.series.editTitle') : $t('entertainment.admin.badgeCatalog.series.createTitle') }}
+              </h3>
+              <button class="btn btn-ghost btn-sm" @click="showSeriesModal = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div class="flex justify-end gap-2 mt-6">
-              <button class="btn btn-ghost" @click="showSeriesModal = false">{{ $t('common.cancel') }}</button>
+            <div class="modal-body space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.id') }}</label>
+                  <input v-model="seriesForm.id" type="text" class="input w-full" :disabled="!!editingSeries" placeholder="supreme" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sort') }}</label>
+                  <input v-model.number="seriesForm.displayOrder" type="number" class="input w-full" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.nameZh') }}</label>
+                  <input v-model="seriesForm.nameZh" type="text" class="input w-full" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.nameEn') }}</label>
+                  <input v-model="seriesForm.nameEn" type="text" class="input w-full" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.titleLabel') }}</label>
+                  <input v-model="seriesForm.title" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.series.titlePlaceholder')" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.descriptionLabel') }}</label>
+                  <textarea v-model="seriesForm.description" class="input w-full h-20 resize-none"></textarea>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sourceId') }}</label>
+                  <input v-model="seriesForm.sourceId" type="text" class="input w-full" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sourceLabel') }}</label>
+                  <input v-model="seriesForm.sourceLabel" type="text" class="input w-full" />
+                </div>
+                <label class="flex items-center gap-2 sm:col-span-2 text-sm text-themed">
+                  <input v-model="seriesForm.isActive" type="checkbox" class="checkbox" />
+                  {{ $t('entertainment.admin.badgeCatalog.series.enable') }}
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" @click="showSeriesModal = false">{{ $t('common.cancel') }}</button>
               <button class="btn btn-primary" :disabled="savingSeries" @click="saveSeries">
                 {{ savingSeries ? $t('common.saving') : $t('common.save') }}
               </button>
@@ -2044,94 +2058,99 @@ function getSeriesTitle(seriesId: string): string {
 
     <!-- 徽章编辑弹窗 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-200"
-        leave-active-class="transition-opacity duration-200"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="modal">
         <div
           v-if="showBadgeModal"
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+          class="modal-overlay"
           @click.self="showBadgeModal = false"
         >
-          <div class="card p-6 w-full max-w-3xl my-8">
-            <h3 class="text-lg font-medium text-themed mb-4">
-              {{ editingBadge ? $t('entertainment.admin.badgeCatalog.badges.editTitle') : $t('entertainment.admin.badgeCatalog.badges.createTitle') }}
-            </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.id') }}</label>
-                <input v-model="badgeForm.id" type="text" class="input w-full" :disabled="!!editingBadge" placeholder="elite" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.series') }}</label>
-                <select v-model="badgeForm.seriesId" class="input w-full">
-                  <option v-for="series in badgeSeries" :key="series.id" :value="series.id">
-                    {{ series.nameZh }} · {{ series.id }}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.name') }}</label>
-                <input v-model="badgeForm.name" type="text" class="input w-full" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.nameEn') }}</label>
-                <input v-model="badgeForm.nameEn" type="text" class="input w-full" />
-              </div>
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.fullLabel') }}</label>
-                <input v-model="badgeForm.fullLabel" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.badges.fullLabelPlaceholder')" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sourceId') }}</label>
-                <input v-model="badgeForm.sourceId" type="text" class="input w-full" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sourceLabel') }}</label>
-                <input v-model="badgeForm.sourceLabel" type="text" class="input w-full" />
-              </div>
-              <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrl') }}</label>
-                <input v-model="badgeForm.assetUrl" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.badges.assetUrlPlaceholder')" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlDark') }}</label>
-                <input v-model="badgeForm.assetUrlDark" type="text" class="input w-full" placeholder="/badges/dark/elite.svg" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlLight') }}</label>
-                <input v-model="badgeForm.assetUrlLight" type="text" class="input w-full" placeholder="/badges/light/elite.svg" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sort') }}</label>
-                <input v-model.number="badgeForm.displayOrder" type="number" class="input w-full" />
-              </div>
-              <label class="flex items-center gap-2 text-sm text-themed self-end pb-3">
-                <input v-model="badgeForm.isActive" type="checkbox" class="checkbox" />
-                {{ $t('entertainment.admin.badgeCatalog.badges.enable') }}
-              </label>
+          <div class="modal-backdrop" @click="showBadgeModal = false"></div>
+          <div class="modal-content max-w-2xl">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                {{ editingBadge ? $t('entertainment.admin.badgeCatalog.badges.editTitle') : $t('entertainment.admin.badgeCatalog.badges.createTitle') }}
+              </h3>
+              <button class="btn btn-ghost btn-sm" @click="showBadgeModal = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div class="mt-5 rounded-lg border border-themed p-4">
-              <div class="text-sm font-medium text-themed mb-3">{{ $t('entertainment.admin.badgeCatalog.badges.preview') }}</div>
-              <div class="flex items-center gap-4">
-                <img
-                  v-if="badgeForm.assetUrl"
-                  :src="badgeForm.assetUrlLight || badgeForm.assetUrl"
-                  :alt="badgeForm.fullLabel || badgeForm.id"
-                  class="w-16 h-16 object-contain rounded-xl"
-                  loading="lazy"
-                />
+            <div class="modal-body space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <div class="text-base font-semibold text-themed">{{ badgeForm.name || $t('entertainment.admin.badgeCatalog.badges.previewName') }}</div>
-                  <div class="text-sm text-themed-muted">{{ badgeForm.fullLabel || $t('entertainment.admin.badgeCatalog.badges.previewLabel') }}</div>
-                  <div class="text-xs text-themed-faint mt-1">{{ badgeForm.id || 'badge-id' }}</div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.id') }}</label>
+                  <input v-model="badgeForm.id" type="text" class="input w-full" :disabled="!!editingBadge" placeholder="elite" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.series') }}</label>
+                  <select v-model="badgeForm.seriesId" class="input w-full">
+                    <option v-for="series in badgeSeries" :key="series.id" :value="series.id">
+                      {{ series.nameZh }} · {{ series.id }}
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.name') }}</label>
+                  <input v-model="badgeForm.name" type="text" class="input w-full" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.nameEn') }}</label>
+                  <input v-model="badgeForm.nameEn" type="text" class="input w-full" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.fullLabel') }}</label>
+                  <input v-model="badgeForm.fullLabel" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.badges.fullLabelPlaceholder')" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sourceId') }}</label>
+                  <input v-model="badgeForm.sourceId" type="text" class="input w-full" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sourceLabel') }}</label>
+                  <input v-model="badgeForm.sourceLabel" type="text" class="input w-full" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrl') }}</label>
+                  <input v-model="badgeForm.assetUrl" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.badges.assetUrlPlaceholder')" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlDark') }}</label>
+                  <input v-model="badgeForm.assetUrlDark" type="text" class="input w-full" placeholder="/badges/dark/elite.svg" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlLight') }}</label>
+                  <input v-model="badgeForm.assetUrlLight" type="text" class="input w-full" placeholder="/badges/light/elite.svg" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sort') }}</label>
+                  <input v-model.number="badgeForm.displayOrder" type="number" class="input w-full" />
+                </div>
+                <label class="flex items-center gap-2 text-sm text-themed self-end pb-3">
+                  <input v-model="badgeForm.isActive" type="checkbox" class="checkbox" />
+                  {{ $t('entertainment.admin.badgeCatalog.badges.enable') }}
+                </label>
+              </div>
+              <div class="mt-4 rounded-lg border border-themed p-4 bg-themed-secondary">
+                <div class="text-sm font-medium text-themed mb-3">{{ $t('entertainment.admin.badgeCatalog.badges.preview') }}</div>
+                <div class="flex items-center gap-4">
+                  <img
+                    v-if="badgeForm.assetUrl"
+                    :src="badgeForm.assetUrlLight || badgeForm.assetUrl"
+                    :alt="badgeForm.fullLabel || badgeForm.id"
+                    class="w-16 h-16 object-contain rounded-xl"
+                    loading="lazy"
+                  />
+                  <div>
+                    <div class="text-base font-semibold text-themed">{{ badgeForm.name || $t('entertainment.admin.badgeCatalog.badges.previewName') }}</div>
+                    <div class="text-sm text-themed-muted">{{ badgeForm.fullLabel || $t('entertainment.admin.badgeCatalog.badges.previewLabel') }}</div>
+                    <div class="text-xs text-themed-faint mt-1">{{ badgeForm.id || 'badge-id' }}</div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="flex justify-end gap-2 mt-6">
-              <button class="btn btn-ghost" @click="showBadgeModal = false">{{ $t('common.cancel') }}</button>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" @click="showBadgeModal = false">{{ $t('common.cancel') }}</button>
               <button class="btn btn-primary" :disabled="savingBadge" @click="saveBadge">
                 {{ savingBadge ? $t('common.saving') : $t('common.save') }}
               </button>

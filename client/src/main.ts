@@ -15,6 +15,7 @@ import '@fontsource-variable/jetbrains-mono'
 import './styles/main.css'
 import 'flag-icons/css/flag-icons.min.css'
 
+import DrawerModal from './components/DrawerModal.vue'
 import { initDrawerGesture } from './utils/drawer-gesture'
 
 const app = createApp(App)
@@ -23,6 +24,7 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
+app.component('DrawerModal', DrawerModal)
 
 document.documentElement.lang = getLocale()
 installStaleAssetRecovery()

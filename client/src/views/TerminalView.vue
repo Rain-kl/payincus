@@ -93,10 +93,6 @@ const filteredRunningInstances = computed(() => {
   )
 })
 
-const selectedInstance = computed(() => {
-  if (!selectedInstanceId.value) return null
-  return runningInstances.value.find(instance => instance.id === selectedInstanceId.value) || null
-})
 
 // 分页后的实例列表
 const paginatedInstances = computed(() => {
@@ -1515,327 +1511,254 @@ function handleVisibilityChange() {
       @clear="clearTerminal"
     />
 
-    <!-- 实例选择弹窗 -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="showInstanceSelector" class="fixed inset-0 z-50 flex items-end justify-center p-2 sm:items-center sm:p-4">
-          <div
-            class="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            @click="showInstanceSelector = false"
-          />
-          <div
-            class="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-themed bg-themed-surface shadow-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100vh-2rem)]"
-          >
-            <div class="border-b border-themed px-4 py-4 sm:p-6">
-              <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div class="space-y-3">
-                  <div class="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400">
-                    <span class="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
-                    {{ t('terminalPage.runningCount', { count: runningInstances.length }) }}
-                  </div>
-                  <div>
-                    <h3 class="text-xl font-semibold tracking-tight text-themed sm:text-2xl">
-                      {{ t('terminalPage.selectInstance') }}
-                    </h3>
-                    <p class="mt-1 text-sm text-themed-muted">
-                      {{ t('terminalPage.selectionHint') }}
-                    </p>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-w-[360px]">
-                  <div class="rounded-xl border border-themed bg-themed-secondary p-3">
-                    <div class="text-[11px] uppercase tracking-[0.18em] text-themed-faint">
-                      {{ t('terminalPage.selectedInstance') }}
-                    </div>
-                    <div class="mt-2 truncate text-sm font-medium text-themed">
-                      {{ selectedInstance?.name || t('common.notSet') }}
-                    </div>
-                    <div class="mt-1 truncate font-mono text-xs text-themed-muted">
-                      {{ selectedInstance?.imageName || t('terminalPage.selectInstance') }}
-                    </div>
-                  </div>
-                  <div class="rounded-xl border border-themed bg-themed-secondary p-3">
-                    <div class="text-[11px] uppercase tracking-[0.18em] text-themed-faint">
-                      {{ t('terminalPage.connect') }}
-                    </div>
-                    <div class="mt-2 text-sm font-medium text-themed">
-                      {{ t('terminalPage.directShell') }}
-                    </div>
-                    <div class="mt-1 text-xs text-themed-muted">
-                      {{ t('terminalPage.directShellHint') }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="relative mt-4 sm:mt-5">
-                <svg
-                  class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-themed-faint"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  :value="instanceSearchQuery"
-                  :placeholder="t('terminalPage.searchInstances')"
-                  class="w-full rounded-xl border border-themed bg-themed-surface py-2.5 pl-10 pr-10 text-sm text-themed transition-colors placeholder:text-themed-faint focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                  @input="handleInstanceSearch(($event.target as HTMLInputElement).value)"
-                >
-                <button
-                  v-if="instanceSearchQuery"
-                  class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1 text-themed-muted transition-colors hover:bg-themed-hover hover:text-themed"
-                  @click="handleInstanceSearch('')"
-                >
-                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr),280px]">
-              <div class="min-h-0 overflow-y-auto px-4 py-4 sm:p-5">
-                <div v-if="loadingInstances" class="flex items-center justify-center py-20">
-                  <div class="h-8 w-8 animate-spin rounded-full border-2 border-themed border-t-primary-500" />
-                </div>
-                <div v-else-if="runningInstances.length === 0" class="flex h-full flex-col items-center justify-center px-6 py-20 text-center">
-                  <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-                    <svg class="h-8 w-8 text-themed-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                  <p class="text-base font-medium text-themed">{{ t('terminalPage.noRunningInstances') }}</p>
-                  <p class="mt-2 text-sm text-themed-muted">{{ t('terminalPage.noRunningInstancesHint') }}</p>
-                </div>
-                <div v-else-if="filteredRunningInstances.length === 0" class="flex h-full flex-col items-center justify-center px-6 py-20 text-center">
-                  <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-                    <svg class="h-8 w-8 text-themed-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <p class="text-base font-medium text-themed">{{ t('terminalPage.noMatchingInstances') }}</p>
-                  <p class="mt-2 text-sm text-themed-muted">{{ t('terminalPage.noMatchingInstancesHint') }}</p>
-                </div>
-                <div v-else class="space-y-2.5 sm:space-y-3">
-                  <button
-                    v-for="instance in paginatedInstances"
-                    :key="instance.id"
-                    type="button"
-                    class="nimbus-lift group w-full rounded-xl border p-3 text-left shadow-sm sm:p-4"
-                    :class="selectedInstanceId === instance.id
-                      ? 'border-primary-500 bg-primary-500/5 ring-1 ring-primary-500/30'
-                      : 'border-themed bg-themed-surface hover:border-themed hover:bg-themed-hover'"
-                    @click="selectedInstanceId = instance.id"
-                  >
-                    <div class="flex items-start gap-3 sm:gap-4">
-                      <div class="relative flex-shrink-0">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-themed bg-themed-secondary sm:h-12 sm:w-12">
-                          <FlagIcon :code="instance.hostCountryCode" class="h-3.5 w-5 sm:h-4 sm:w-6" />
-                        </div>
-                        <span
-                          class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 bg-green-500 sm:h-3 sm:w-3"
-                          :class="themeStore.isDark ? 'border-[var(--border-color)]' : 'border-white'"
-                        />
-                      </div>
-
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-start justify-between gap-2">
-                          <div class="min-w-0">
-                            <div class="flex items-center gap-1.5 sm:gap-2">
-                              <span class="truncate text-sm font-semibold text-themed">{{ instance.name }}</span>
-                              <span class="rounded-full border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-themed-muted sm:px-2 sm:text-[10px] sm:tracking-[0.18em]">
-                                #{{ instance.id }}
-                              </span>
-                            </div>
-                            <div class="mt-0.5 truncate font-mono text-xs text-themed-muted sm:mt-1 sm:text-sm">{{ instance.imageName }}</div>
-                          </div>
-                          <div
-                            class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors sm:h-6 sm:w-6"
-                            :class="selectedInstanceId === instance.id
-                              ? 'border-primary-500 bg-primary-500 text-white'
-                              : 'border-themed text-transparent'"
-                          >
-                            <svg class="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        </div>
-
-                        <div class="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
-                          <span
-                            v-if="instance.hostName"
-                            class="rounded-full border border-themed bg-themed-secondary px-2 py-0.5 text-[11px] leading-5 text-themed-muted sm:px-2.5 sm:py-1 sm:text-xs"
-                          >
-                            {{ t('terminalPage.host') }}: {{ instance.hostName }}
-                          </span>
-                          <span
-                            v-if="instance.packageName"
-                            class="rounded-full border border-themed bg-themed-secondary px-2 py-0.5 text-[11px] leading-5 text-themed-muted sm:px-2.5 sm:py-1 sm:text-xs"
-                          >
-                            {{ t('terminalPage.package') }}: {{ instance.packageName }}
-                          </span>
-                          <span class="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium leading-5 text-green-600 dark:text-green-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                            <span class="h-1.5 w-1.5 rounded-full bg-current opacity-80" />{{ t('terminalPage.statusRunning') }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                <div
-                  v-if="filteredRunningInstances.length > instancePageSize"
-                  class="mt-4 flex items-center justify-between rounded-xl border border-themed bg-themed-secondary px-3.5 py-2.5 sm:px-4 sm:py-3"
-                >
-                  <span class="font-mono text-xs text-themed-muted">
-                    {{ (instancePage - 1) * instancePageSize + 1 }}-{{ Math.min(instancePage * instancePageSize, filteredRunningInstances.length) }} / {{ filteredRunningInstances.length }}
-                  </span>
-                  <div class="flex items-center gap-2">
-                    <button
-                      class="rounded-lg border border-themed bg-themed-surface px-3 py-1.5 text-xs text-themed-secondary transition-colors hover:bg-themed-hover disabled:cursor-not-allowed disabled:opacity-50"
-                      :disabled="instancePage <= 1"
-                      @click="instancePage--"
-                    >
-                      {{ t('common.prevPage') }}
-                    </button>
-                    <span class="font-mono text-sm text-themed">{{ instancePage }} / {{ instanceTotalPages }}</span>
-                    <button
-                      class="rounded-lg border border-themed bg-themed-surface px-3 py-1.5 text-xs text-themed-secondary transition-colors hover:bg-themed-hover disabled:cursor-not-allowed disabled:opacity-50"
-                      :disabled="instancePage >= instanceTotalPages"
-                      @click="instancePage++"
-                    >
-                      {{ t('common.nextPage') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="hidden min-h-0 overflow-y-auto border-l border-themed bg-themed-secondary p-5 lg:block">
-                <div class="rounded-xl border border-themed bg-themed-surface p-4">
-                  <div class="text-[11px] uppercase tracking-[0.18em] text-themed-faint">{{ t('terminalPage.selectedInstance') }}</div>
-                  <template v-if="selectedInstance">
-                    <div class="mt-4 flex items-start gap-3">
-                      <div class="flex h-11 w-11 items-center justify-center rounded-xl border border-themed bg-themed-secondary">
-                        <FlagIcon :code="selectedInstance.hostCountryCode" class="h-4 w-6" />
-                      </div>
-                      <div class="min-w-0">
-                        <div class="truncate text-sm font-semibold text-themed">{{ selectedInstance.name }}</div>
-                        <div class="mt-1 font-mono text-xs text-themed-muted">{{ selectedInstance.imageName }}</div>
-                      </div>
-                    </div>
-                    <div class="mt-4 space-y-2 text-sm">
-                      <div class="flex items-center justify-between gap-3">
-                        <span class="text-themed-muted">{{ t('terminalPage.host') }}</span>
-                        <span class="truncate text-right text-themed">{{ selectedInstance.hostName || '-' }}</span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3">
-                        <span class="text-themed-muted">{{ t('terminalPage.package') }}</span>
-                        <span class="truncate text-right text-themed">{{ selectedInstance.packageName || '-' }}</span>
-                      </div>
-                      <div class="flex items-center justify-between gap-3">
-                        <span class="text-themed-muted">{{ t('terminalPage.instanceId') }}</span>
-                        <span class="font-mono text-themed">#{{ selectedInstance.id }}</span>
-                      </div>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div class="mt-4 rounded-xl border border-dashed border-themed px-4 py-10 text-center text-sm text-themed-muted">
-                      {{ t('terminalPage.selectionHint') }}
-                    </div>
-                  </template>
-                </div>
-
-                <div class="mt-4 rounded-xl border border-themed bg-themed-surface p-4 text-sm text-themed-muted">
-                  <div class="font-medium text-themed">{{ t('terminalPage.directShell') }}</div>
-                  <p class="mt-2 leading-6">{{ t('terminalPage.directShellHint') }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex shrink-0 flex-col gap-3 border-t border-themed bg-themed-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-              <div class="text-xs text-themed-muted">
-                {{ t('terminalPage.runningCount', { count: filteredRunningInstances.length }) }}
-              </div>
-              <div class="flex gap-3 sm:justify-end">
-                <button
-                  class="btn-secondary flex-1 justify-center sm:flex-none"
-                  @click="showInstanceSelector = false"
-                >
-                  {{ t('common.cancel') }}
-                </button>
-                <button
-                  class="btn-primary flex-1 justify-center sm:flex-none"
-                  :disabled="!selectedInstanceId"
-                  @click="confirmAddInstance"
-                >
-                  {{ t('terminalPage.connect') }}
-                </button>
-              </div>
-            </div>
+    <!-- 实例选择抽屉 -->
+    <DrawerModal
+      :show="showInstanceSelector"
+      max-width="max-w-xl sm:max-w-2xl"
+      raw
+      @close="showInstanceSelector = false"
+    >
+      <!-- 头部 -->
+      <div class="modal-header">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-300">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="modal-title">{{ t('terminalPage.selectInstance') }}</h3>
+            <p class="text-xs text-themed-muted mt-0.5">{{ t('terminalPage.selectionHint') }}</p>
           </div>
         </div>
-      </Transition>
-    </Teleport>
-
-    <!-- 帮助弹窗 -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showHelp"
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          @click.self="showHelp = false"
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          aria-label="close"
+          @click="showInstanceSelector = false"
         >
-          <div class="w-full max-w-md rounded-2xl border border-themed bg-themed-surface p-6 shadow-xl">
-            <div class="mb-5 flex items-center justify-between">
-              <h3 class="text-lg font-semibold tracking-tight text-themed">{{ t('terminal.helpTitle') }}</h3>
-              <button
-                class="rounded-lg p-1.5 text-themed-muted transition-colors hover:bg-themed-hover hover:text-themed"
-                @click="showHelp = false"
-              >
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
-            <!-- 快捷键 -->
-            <div class="mb-4">
-              <h4 class="text-sm font-medium text-themed mb-2">{{ t('terminal.helpShortcuts') }}</h4>
-              <div class="space-y-1.5 text-sm">
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutSearch') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+F</kbd></div>
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutCopy') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+C</kbd></div>
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutPaste') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+V</kbd></div>
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutFontIncrease') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl++</kbd></div>
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutFontDecrease') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+-</kbd></div>
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutFontReset') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+0</kbd></div>
-                <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutExport') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+S</kbd></div>
-              </div>
-            </div>
-
-            <!-- 鼠标操作 -->
-            <div class="mb-4">
-              <h4 class="text-sm font-medium text-themed mb-2">{{ t('terminal.helpMouseOps') }}</h4>
-              <ul class="space-y-1 text-sm text-themed-muted">
-                <li>• {{ t('terminal.helpMouseSelect') }}</li>
-                <li>• {{ t('terminal.helpMouseCopy') }}</li>
-                <li>• {{ t('terminal.helpMouseScroll') }}</li>
-              </ul>
-            </div>
-
-            <!-- 触控操作 -->
-            <div class="mb-4">
-              <h4 class="text-sm font-medium text-themed mb-2">{{ t('terminal.helpTouchOps') }}</h4>
-              <ul class="space-y-1 text-sm text-themed-muted">
-                <li>• {{ t('terminal.helpTouchPinchZoom') }}</li>
-                <li>• {{ t('terminal.helpTouchSwipeScroll') }}</li>
-              </ul>
-            </div>
+      <!-- 搜索与筛选状态栏 -->
+      <div class="border-b border-themed bg-themed-surface px-4 py-3 sm:px-6 shrink-0">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-600 dark:text-green-400 self-start">
+            <span class="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
+            {{ t('terminalPage.runningCount', { count: runningInstances.length }) }}
+          </div>
+          <div class="relative flex-1 sm:max-w-xs">
+            <svg
+              class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-themed-faint"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              :value="instanceSearchQuery"
+              :placeholder="t('terminalPage.searchInstances')"
+              class="w-full rounded-xl border border-themed bg-themed-surface py-2 pl-10 pr-10 text-sm text-themed transition-colors placeholder:text-themed-faint focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+              @input="handleInstanceSearch(($event.target as HTMLInputElement).value)"
+            >
+            <button
+              v-if="instanceSearchQuery"
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1 text-themed-muted transition-colors hover:bg-themed-hover hover:text-themed"
+              @click="handleInstanceSearch('')"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
-      </Transition>
-    </Teleport>
+      </div>
+
+      <!-- 内容区：实例列表 -->
+      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:p-5">
+        <div v-if="loadingInstances" class="flex items-center justify-center py-20">
+          <div class="h-8 w-8 animate-spin rounded-full border-2 border-themed border-t-primary-500" />
+        </div>
+        <div v-else-if="runningInstances.length === 0" class="flex h-full flex-col items-center justify-center px-6 py-20 text-center">
+          <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
+            <svg class="h-8 w-8 text-themed-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </div>
+          <p class="text-base font-medium text-themed">{{ t('terminalPage.noRunningInstances') }}</p>
+          <p class="mt-2 text-sm text-themed-muted">{{ t('terminalPage.noRunningInstancesHint') }}</p>
+        </div>
+        <div v-else-if="filteredRunningInstances.length === 0" class="flex h-full flex-col items-center justify-center px-6 py-20 text-center">
+          <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
+            <svg class="h-8 w-8 text-themed-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <p class="text-base font-medium text-themed">{{ t('terminalPage.noMatchingInstances') }}</p>
+          <p class="mt-2 text-sm text-themed-muted">{{ t('terminalPage.noMatchingInstancesHint') }}</p>
+        </div>
+        <div v-else class="space-y-2.5 sm:space-y-3">
+          <button
+            v-for="instance in paginatedInstances"
+            :key="instance.id"
+            type="button"
+            class="nimbus-lift group w-full rounded-xl border p-3 text-left shadow-sm sm:p-4"
+            :class="selectedInstanceId === instance.id
+              ? 'border-primary-500 bg-primary-500/5 ring-1 ring-primary-500/30'
+              : 'border-themed bg-themed-surface hover:border-themed hover:bg-themed-hover'"
+            @click="selectedInstanceId = instance.id"
+          >
+            <div class="flex items-start gap-3 sm:gap-4">
+              <div class="relative flex-shrink-0">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-themed bg-themed-secondary sm:h-12 sm:w-12">
+                  <FlagIcon :code="instance.hostCountryCode" class="h-3.5 w-5 sm:h-4 sm:w-6" />
+                </div>
+                <span
+                  class="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full border-2 bg-green-500 sm:h-3 sm:w-3"
+                  :class="themeStore.isDark ? 'border-[var(--border-color)]' : 'border-white'"
+                />
+              </div>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 sm:gap-2">
+                      <span class="truncate text-sm font-semibold text-themed">{{ instance.name }}</span>
+                      <span class="rounded-full border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-themed-muted sm:px-2 sm:text-[10px] sm:tracking-[0.18em]">
+                        #{{ instance.id }}
+                      </span>
+                    </div>
+                    <div class="mt-0.5 truncate font-mono text-xs text-themed-muted sm:mt-1 sm:text-sm">{{ instance.imageName }}</div>
+                  </div>
+                  <div
+                    class="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors sm:h-6 sm:w-6"
+                    :class="selectedInstanceId === instance.id
+                      ? 'border-primary-500 bg-primary-500 text-white'
+                      : 'border-themed text-transparent'"
+                  >
+                    <svg class="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div class="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
+                  <span
+                    v-if="instance.hostName"
+                    class="rounded-full border border-themed bg-themed-secondary px-2 py-0.5 text-[11px] leading-5 text-themed-muted sm:px-2.5 sm:py-1 sm:text-xs"
+                  >
+                    {{ t('terminalPage.host') }}: {{ instance.hostName }}
+                  </span>
+                  <span
+                    v-if="instance.packageName"
+                    class="rounded-full border border-themed bg-themed-secondary px-2 py-0.5 text-[11px] leading-5 text-themed-muted sm:px-2.5 sm:py-1 sm:text-xs"
+                  >
+                    {{ t('terminalPage.package') }}: {{ instance.packageName }}
+                  </span>
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium leading-5 text-green-600 dark:text-green-400 sm:px-2.5 sm:py-1 sm:text-xs">
+                    <span class="h-1.5 w-1.5 rounded-full bg-current opacity-80" />{{ t('terminalPage.statusRunning') }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div
+          v-if="filteredRunningInstances.length > instancePageSize"
+          class="mt-4 flex items-center justify-between rounded-xl border border-themed bg-themed-secondary px-3.5 py-2.5 sm:px-4 sm:py-3"
+        >
+          <span class="font-mono text-xs text-themed-muted">
+            {{ (instancePage - 1) * instancePageSize + 1 }}-{{ Math.min(instancePage * instancePageSize, filteredRunningInstances.length) }} / {{ filteredRunningInstances.length }}
+          </span>
+          <div class="flex items-center gap-2">
+            <button
+              class="rounded-lg border border-themed bg-themed-surface px-3 py-1.5 text-xs text-themed-secondary transition-colors hover:bg-themed-hover disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="instancePage <= 1"
+              @click="instancePage--"
+            >
+              {{ t('common.prevPage') }}
+            </button>
+            <span class="font-mono text-sm text-themed">{{ instancePage }} / {{ instanceTotalPages }}</span>
+            <button
+              class="rounded-lg border border-themed bg-themed-surface px-3 py-1.5 text-xs text-themed-secondary transition-colors hover:bg-themed-hover disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="instancePage >= instanceTotalPages"
+              @click="instancePage++"
+            >
+              {{ t('common.nextPage') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底栏 -->
+      <div class="modal-footer flex shrink-0 flex-col gap-3 border-t border-themed px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div class="text-xs text-themed-muted hidden sm:block">
+          {{ t('terminalPage.runningCount', { count: filteredRunningInstances.length }) }}
+        </div>
+        <div class="flex gap-3 w-full sm:w-auto sm:justify-end">
+          <button
+            type="button"
+            class="btn-secondary flex-1 sm:flex-none"
+            @click="showInstanceSelector = false"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="btn-primary flex-1 sm:flex-none"
+            :disabled="!selectedInstanceId"
+            @click="confirmAddInstance"
+          >
+            {{ t('terminalPage.connect') }}
+          </button>
+        </div>
+      </div>
+    </DrawerModal>
+
+    <!-- 帮助抽屉 -->
+    <DrawerModal
+      :show="showHelp"
+      :title="t('terminal.helpTitle')"
+      max-width="max-w-md"
+      @close="showHelp = false"
+    >
+      <!-- 快捷键 -->
+      <div class="mb-5">
+        <h4 class="text-sm font-medium text-themed mb-2">{{ t('terminal.helpShortcuts') }}</h4>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutSearch') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+F</kbd></div>
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutCopy') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+C</kbd></div>
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutPaste') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+V</kbd></div>
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutFontIncrease') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl++</kbd></div>
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutFontDecrease') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+-</kbd></div>
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutFontReset') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+0</kbd></div>
+          <div class="flex justify-between"><span class="text-themed-muted">{{ t('terminal.helpShortcutExport') }}</span><kbd class="rounded-md border border-themed bg-themed-secondary px-1.5 py-0.5 font-mono text-xs text-themed-secondary">Ctrl+Shift+S</kbd></div>
+        </div>
+      </div>
+
+      <!-- 鼠标操作 -->
+      <div class="mb-5">
+        <h4 class="text-sm font-medium text-themed mb-2">{{ t('terminal.helpMouseOps') }}</h4>
+        <ul class="space-y-1 text-sm text-themed-muted">
+          <li>• {{ t('terminal.helpMouseSelect') }}</li>
+          <li>• {{ t('terminal.helpMouseCopy') }}</li>
+          <li>• {{ t('terminal.helpMouseScroll') }}</li>
+        </ul>
+      </div>
+
+      <!-- 触控操作 -->
+      <div class="mb-2">
+        <h4 class="text-sm font-medium text-themed mb-2">{{ t('terminal.helpTouchOps') }}</h4>
+        <ul class="space-y-1 text-sm text-themed-muted">
+          <li>• {{ t('terminal.helpTouchPinchZoom') }}</li>
+          <li>• {{ t('terminal.helpTouchSwipeScroll') }}</li>
+        </ul>
+      </div>
+    </DrawerModal>
 
     <!-- 链接预览 Tooltip -->
     <Teleport to="body">

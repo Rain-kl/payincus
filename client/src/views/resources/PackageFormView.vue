@@ -11,6 +11,7 @@ import type { Host, HostWithDetails, Package, CreatePackageRequest, UpdatePackag
 import { validateName, validateText } from '@/utils/validation'
 import { translateError } from '@/utils/errorHandler'
 import { packagesPath } from '@/utils/app-paths'
+import MyPackagesView from './MyPackagesView.vue'
 
 // 为 KeepAlive exclude 匹配定义组件名称
 defineOptions({
@@ -383,12 +384,12 @@ function getHostStatusLabel(status: string | undefined): string {
 
 function getHostStatusClass(status: string | undefined): string {
   if (status === 'online') {
-    return themeStore.isDark ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+    return themeStore.isDark ? 'bg-emerald-950 text-emerald-300 ring-1 ring-emerald-800' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-300'
   }
   if (status === 'maintenance') {
-    return themeStore.isDark ? 'bg-amber-500/15 text-amber-300 ring-amber-500/30' : 'bg-amber-50 text-amber-700 ring-amber-200'
+    return themeStore.isDark ? 'bg-amber-950 text-amber-300 ring-1 ring-amber-800' : 'bg-amber-50 text-amber-700 ring-1 ring-amber-300'
   }
-  return themeStore.isDark ? 'bg-gray-700 text-gray-300 ring-gray-600' : 'bg-gray-100 text-gray-600 ring-gray-200'
+  return themeStore.isDark ? 'bg-zinc-800 text-zinc-300 ring-1 ring-zinc-700' : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-300'
 }
 
 function getHostOwnerLabel(host: PackageHostOption | null): string {
@@ -805,7 +806,10 @@ async function savePackage(): Promise<void> {
       toast.success(t('admin.packages.packageCreated'))
     }
 
-    router.push(packagesPath())
+    showDrawer.value = false
+    setTimeout(() => {
+      router.push(packagesPath())
+    }, 250)
   } catch (err: any) {
     formError.value = translateError(err) || t('admin.packages.saveFailed')
   } finally {
@@ -813,51 +817,68 @@ async function savePackage(): Promise<void> {
   }
 }
 
+const showDrawer = ref(true)
+
 function goBack(): void {
-  router.push(packagesPath())
+  if (!showDrawer.value) return
+  showDrawer.value = false
+  setTimeout(() => {
+    router.push(packagesPath())
+  }, 250)
 }
 </script>
 
 <template>
-  <div class="pkg-form space-y-6">
-    <!-- Header -->
-    <div class="page-header">
-      <div class="flex items-center gap-4">
+  <div class="package-form-page">
+    <!-- Background view: Packages list -->
+    <MyPackagesView />
+
+    <!-- Drawer Modal -->
+    <DrawerModal
+      :show="showDrawer"
+      max-width="max-w-3xl lg:!max-w-4xl"
+      raw
+      @close="goBack"
+    >
+      <!-- Header -->
+      <div class="modal-header">
+        <div class="flex items-center gap-2 min-w-0">
+          <h3 class="modal-title truncate">
+            {{ isEditMode ? t('packageForm.editTitle') : t('packageForm.createTitle') }}
+          </h3>
+        </div>
         <button
-          class="p-2 rounded-lg transition-colors hover:bg-themed-hover"
+          type="button"
+          class="btn btn-ghost btn-sm -mr-2 p-1.5"
+          aria-label="close"
           @click="goBack"
         >
-          <svg class="w-5 h-5 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        <div>
-          <h1 class="page-title">
-            {{ isEditMode ? t('packageForm.editTitle') : t('packageForm.createTitle') }}
-          </h1>
-          <p class="page-description">{{ t('packageForm.description') }}</p>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body space-y-6">
+        <!-- Loading -->
+        <div v-if="loading" class="card p-12 text-center">
+          <div class="loading-spinner w-8 h-8 mx-auto"></div>
+          <p class="text-themed-muted mt-4">{{ t('common.loading') }}</p>
         </div>
-      </div>
-    </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="card p-12 text-center">
-      <div class="loading-spinner w-8 h-8 mx-auto"></div>
-      <p class="text-themed-muted mt-4">{{ t('common.loading') }}</p>
-    </div>
-
-    <!-- Form -->
-    <form v-else class="space-y-5" novalidate @submit.prevent="savePackage">
-      <!-- Error message -->
-      <div v-if="formError" class="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-400">
-        <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-        </svg>
-        <span>{{ formError }}</span>
-      </div>
+        <!-- Form -->
+        <form v-else id="package-form" class="space-y-5" novalidate @submit.prevent="savePackage">
+          <!-- Error message -->
+          <div v-if="formError" class="flex items-start gap-2 rounded-xl border border-rose-600 bg-rose-50 dark:bg-rose-950 p-4 text-sm text-rose-700 dark:text-rose-200">
+            <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <span>{{ formError }}</span>
+          </div>
 
       <!-- Basic Info Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -885,8 +906,8 @@ function goBack(): void {
                 class="p-4 rounded-xl border transition-all text-left cursor-pointer"
                 :class="[
                   packageCreationMode === 'free'
-                    ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/30'
-                    : 'border-themed bg-themed-secondary hover:border-themed-secondary'
+                    ? 'border-primary-600 bg-themed-secondary ring-1 ring-primary-600'
+                    : 'border-themed bg-themed-surface hover:border-themed-secondary'
                 ]"
                 @click="packageCreationMode = 'free'"
               >
@@ -907,8 +928,8 @@ function goBack(): void {
                 class="p-4 rounded-xl border transition-all text-left cursor-pointer"
                 :class="[
                   packageCreationMode === 'paid'
-                    ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/30'
-                    : 'border-themed bg-themed-secondary hover:border-themed-secondary'
+                    ? 'border-primary-600 bg-themed-secondary ring-1 ring-primary-600'
+                    : 'border-themed bg-themed-surface hover:border-themed-secondary'
                 ]"
                 @click="packageCreationMode = 'paid'"
               >
@@ -952,8 +973,8 @@ function goBack(): void {
                 class="p-4 rounded-xl border transition-all text-left cursor-pointer"
                 :class="[
                   form.instanceType === 'container'
-                    ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/30'
-                    : 'border-themed bg-themed-secondary hover:border-themed-secondary'
+                    ? 'border-primary-600 bg-themed-secondary ring-1 ring-primary-600'
+                    : 'border-themed bg-themed-surface hover:border-themed-secondary'
                 ]"
                 @click="form.instanceType = 'container'"
               >
@@ -975,8 +996,8 @@ function goBack(): void {
                 class="p-4 rounded-xl border transition-all text-left cursor-pointer"
                 :class="[
                   form.instanceType === 'vm'
-                    ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/30'
-                    : 'border-themed bg-themed-secondary hover:border-themed-secondary'
+                    ? 'border-primary-600 bg-themed-secondary ring-1 ring-primary-600'
+                    : 'border-themed bg-themed-surface hover:border-themed-secondary'
                 ]"
                 @click="form.instanceType = 'vm'"
               >
@@ -1063,7 +1084,7 @@ function goBack(): void {
                     type="button"
                     class="w-full rounded-lg border p-3 text-left transition-colors"
                     :class="selectedHostIdSet.has(host.id)
-                      ? 'border-primary-500 bg-primary-500/10 ring-1 ring-primary-500/40'
+                      ? 'border-primary-600 bg-themed-secondary ring-1 ring-primary-600'
                       : 'border-themed bg-themed-surface hover:border-themed-secondary hover:bg-themed-hover'"
                     @click="toggleHostSelection(host.id)"
                   >
@@ -1225,7 +1246,7 @@ function goBack(): void {
       </section>
 
       <!-- Resource Limits Section -->
-      <section v-if="showPackageLevelInstanceDefaults" class="section-card card p-5 sm:p-6">
+      <section v-if="showPackageLevelInstanceDefaults" class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1281,7 +1302,7 @@ function goBack(): void {
       </section>
 
       <!-- Instance Quota Section -->
-      <section v-if="showPackageLevelInstanceDefaults" class="section-card card p-5 sm:p-6">
+      <section v-if="showPackageLevelInstanceDefaults" class="card p-5 sm:p-6">
         <div class="mb-4 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1313,7 +1334,7 @@ function goBack(): void {
       </section>
 
       <!-- Storage I/O Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1392,7 +1413,7 @@ function goBack(): void {
       </section>
 
       <!-- Network Limits Section -->
-      <section v-if="showPackageLevelInstanceDefaults" class="section-card card p-5 sm:p-6">
+      <section v-if="showPackageLevelInstanceDefaults" class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1424,7 +1445,7 @@ function goBack(): void {
       </section>
 
       <!-- Process and CPU Scheduling Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1450,7 +1471,7 @@ function goBack(): void {
       </section>
 
       <!-- Boot Settings Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1494,7 +1515,7 @@ function goBack(): void {
       </section>
 
       <!-- Prerequisite Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1524,7 +1545,7 @@ function goBack(): void {
       </section>
 
       <!-- Visibility Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1562,7 +1583,7 @@ function goBack(): void {
       </section>
 
       <!-- Advanced Options Section -->
-      <section class="section-card card p-5 sm:p-6">
+      <section class="card p-5 sm:p-6">
         <div class="mb-5 flex items-center gap-3">
           <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-themed-secondary">
             <svg class="h-5 w-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -1583,51 +1604,30 @@ function goBack(): void {
         </div>
       </section>
 
-      <!-- Form Actions -->
-      <div class="action-footer sticky bottom-0 z-10 flex items-center justify-end gap-3 rounded-xl border border-themed bg-themed-surface p-4 shadow-lg">
+        </form>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer">
         <button type="button" class="btn-secondary" @click="goBack">
           {{ t('common.cancel') }}
         </button>
-        <button type="submit" class="btn-primary" :disabled="saving || !form.name">
+        <button
+          type="submit"
+          form="package-form"
+          class="btn-primary"
+          :disabled="saving || !form.name"
+          @click="savePackage"
+        >
           <span v-if="saving" class="loading-spinner w-4 h-4"></span>
           <span v-else>{{ isEditMode ? t('common.save') : t('common.create') }}</span>
         </button>
       </div>
-    </form>
+    </DrawerModal>
   </div>
 </template>
 
 <style scoped>
-/* Nimbus: subtle sectioned-card entrance + hover polish */
-.section-card {
-  animation: nimbus-card-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.section-card:nth-of-type(1) { animation-delay: 0.02s; }
-.section-card:nth-of-type(2) { animation-delay: 0.06s; }
-.section-card:nth-of-type(3) { animation-delay: 0.1s; }
-.section-card:nth-of-type(4) { animation-delay: 0.14s; }
-.section-card:nth-of-type(5) { animation-delay: 0.18s; }
-.section-card:nth-of-type(6) { animation-delay: 0.22s; }
-.section-card:nth-of-type(7) { animation-delay: 0.26s; }
-.section-card:nth-of-type(8) { animation-delay: 0.3s; }
-
-.section-card:hover {
-  box-shadow: 0 6px 24px -12px rgba(79, 70, 229, 0.28);
-}
-
-@keyframes nimbus-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -886,10 +886,12 @@ const regionOptions = [
     </div>
 
     <!-- 邮箱源弹窗 -->
-    <Teleport to="body">
-      <div v-if="showSourceModal" class="modal-overlay">
-        <div class="modal-backdrop" @click="showSourceModal = false"></div>
-        <div class="modal-content max-w-lg">
+    <DrawerModal
+      :show="showSourceModal"
+      max-width="max-w-lg"
+      raw
+      @close="showSourceModal = false"
+    >
           <div class="modal-header">
             <h3 class="modal-title flex items-center gap-2">
               <svg class="h-5 w-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -935,7 +937,7 @@ const regionOptions = [
             </label>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showSourceModal = false">{{ t('common.cancel') }}</button>
+            <button class="btn btn-secondary" @click="showSourceModal = false">{{ t('common.cancel') }}</button>
             <button 
               class="btn btn-primary" 
               :disabled="actionLoading === 'save-source'"
@@ -945,15 +947,15 @@ const regionOptions = [
               {{ t('common.save') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 方案弹窗 -->
-    <Teleport to="body">
-      <div v-if="showPlanModal" class="modal-overlay">
-        <div class="modal-backdrop" @click="showPlanModal = false"></div>
-        <div class="modal-content max-w-lg">
+    <DrawerModal
+      :show="showPlanModal"
+      max-width="max-w-lg"
+      raw
+      @close="showPlanModal = false"
+    >
           <div class="modal-header">
             <h3 class="modal-title flex items-center gap-2">
               <svg class="h-5 w-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1009,7 +1011,7 @@ const regionOptions = [
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showPlanModal = false">{{ t('common.cancel') }}</button>
+            <button class="btn btn-secondary" @click="showPlanModal = false">{{ t('common.cancel') }}</button>
             <button 
               class="btn btn-primary" 
               :disabled="actionLoading === 'save-plan'"
@@ -1019,15 +1021,15 @@ const regionOptions = [
               {{ t('common.save') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 退订弹窗 -->
-    <Teleport to="body">
-      <div v-if="showUnsubModal" class="modal-overlay">
-        <div class="modal-backdrop" @click="showUnsubModal = false"></div>
-        <div class="modal-content max-w-lg">
+    <DrawerModal
+      :show="showUnsubModal"
+      max-width="max-w-lg"
+      raw
+      @close="showUnsubModal = false"
+    >
           <div class="modal-header">
             <h3 class="modal-title flex items-center gap-2">
               <svg class="h-5 w-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1104,7 +1106,7 @@ const regionOptions = [
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showUnsubModal = false">{{ t('common.cancel') }}</button>
+            <button class="btn btn-secondary" @click="showUnsubModal = false">{{ t('common.cancel') }}</button>
             <button 
               class="btn btn-error" 
               :disabled="actionLoading === 'unsub'"
@@ -1114,9 +1116,7 @@ const regionOptions = [
               {{ t('admin.mail.unsub.confirm') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
   </div>
 </template>
 

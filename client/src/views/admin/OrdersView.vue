@@ -848,11 +848,13 @@ onMounted(() => {
       </div>
     </section>
 
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="selectedOrder" class="modal-overlay" @click.self="selectedOrder = null">
-          <div class="modal-backdrop" @click="selectedOrder = null"></div>
-          <div class="modal-content max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <DrawerModal
+      v-if="selectedOrder"
+      :show="true"
+      max-width="max-w-3xl"
+      raw
+      @close="selectedOrder = null"
+    >
             <div class="modal-header">
               <div class="min-w-0">
                 <h3 class="modal-title">{{ selectedOrder.title }}</h3>
@@ -1035,10 +1037,7 @@ onMounted(() => {
             <div class="modal-footer flex justify-end">
               <button class="btn btn-secondary btn-sm" @click="selectedOrder = null">关闭</button>
             </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    </DrawerModal>
   </div>
 </template>
 

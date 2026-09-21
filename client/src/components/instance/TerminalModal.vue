@@ -1159,6 +1159,7 @@ function handleVisibilityChange() {
       <!-- 背景遮罩 -->
       <div
         class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        style="background-color: var(--drawer-backdrop); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);"
         :class="visible ? 'opacity-100' : 'opacity-0'"
         @click="closeModal"
       />

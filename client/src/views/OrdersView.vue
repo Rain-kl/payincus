@@ -304,14 +304,19 @@ onMounted(loadOrders)
       </div>
     </section>
 
-    <div v-if="selectedOrder" class="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" @click.self="selectedOrder = null">
-      <aside class="flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-themed bg-themed-surface shadow-2xl">
-        <div class="flex items-start justify-between gap-4 border-b border-themed bg-themed p-6">
+    <DrawerModal
+      v-if="selectedOrder"
+      :show="true"
+      max-width="max-w-xl"
+      raw
+      @close="selectedOrder = null"
+    >
+        <div class="modal-header">
           <div class="min-w-0">
-            <h2 class="truncate text-xl font-semibold text-themed">{{ selectedOrder.title }}</h2>
-            <p class="mt-1 truncate font-mono text-sm text-themed-muted">{{ selectedOrder.orderNo }}</p>
+            <h2 class="modal-title truncate">{{ selectedOrder.title }}</h2>
+            <p class="mt-0.5 truncate font-mono text-xs text-themed-muted">{{ selectedOrder.orderNo }}</p>
           </div>
-          <button class="btn btn-sm btn-secondary gap-1.5" @click="selectedOrder = null">
+          <button class="btn btn-sm btn-ghost gap-1.5" @click="selectedOrder = null">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -320,25 +325,30 @@ onMounted(loadOrders)
           </button>
         </div>
 
-        <div v-if="detailLoading" class="p-6 text-sm text-themed-muted">正在加载详情...</div>
-        <dl v-else class="grid gap-px bg-themed-secondary p-px text-sm">
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">状态</dt><dd class="col-span-2 text-themed"><span :class="['inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', statusClass(selectedOrder.status)]">{{ statusLabel(selectedOrder) }}</span></dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">金额</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.amount) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">实际到账</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ selectedOrder.actualAmount === null ? '-' : formatMoney(selectedOrder.actualAmount) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">手续费</dt><dd class="col-span-2 font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.fee) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">支付渠道</dt><dd class="col-span-2 text-themed">{{ selectedOrder.provider?.name || selectedOrder.paymentMethod || '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">交易号</dt><dd class="col-span-2 break-all font-mono text-themed">{{ selectedOrder.tradeNo || '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">关联实例</dt><dd class="col-span-2 text-themed">{{ instanceName(selectedOrder) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">账期</dt><dd class="col-span-2 text-themed">{{ selectedOrder.months ? `${selectedOrder.months} 个月` : '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">开始时间</dt><dd class="col-span-2 text-themed">{{ formatTime(selectedOrder.periodStart) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">结束时间</dt><dd class="col-span-2 text-themed">{{ formatTime(selectedOrder.periodEnd) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">创建时间</dt><dd class="col-span-2 text-themed">{{ formatTime(selectedOrder.createdAt) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">完成时间</dt><dd class="col-span-2 text-themed">{{ formatTime(selectedOrder.completedAt) }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">失败原因</dt><dd class="col-span-2 text-themed">{{ selectedOrder.failReason || '-' }}</dd></div>
-          <div class="grid grid-cols-3 gap-3 bg-themed-surface px-6 py-3"><dt class="text-themed-muted">备注</dt><dd class="col-span-2 text-themed">{{ selectedOrder.remark || '-' }}</dd></div>
-        </dl>
-      </aside>
-    </div>
+        <div class="modal-body space-y-4">
+          <div v-if="detailLoading" class="p-6 text-sm text-themed-muted">正在加载详情...</div>
+          <dl v-else class="grid gap-2 text-sm">
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">状态</dt><dd><span :class="['inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', statusClass(selectedOrder.status)]">{{ statusLabel(selectedOrder) }}</span></dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">金额</dt><dd class="font-mono font-medium tabular-nums text-themed">{{ formatMoney(selectedOrder.amount) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">实际到账</dt><dd class="font-mono tabular-nums text-themed">{{ selectedOrder.actualAmount === null ? '-' : formatMoney(selectedOrder.actualAmount) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">手续费</dt><dd class="font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.fee) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">支付渠道</dt><dd class="text-themed">{{ selectedOrder.provider?.name || selectedOrder.paymentMethod || '-' }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">交易号</dt><dd class="break-all font-mono text-xs text-themed">{{ selectedOrder.tradeNo || '-' }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">关联实例</dt><dd class="text-themed">{{ instanceName(selectedOrder) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">账期</dt><dd class="text-themed">{{ selectedOrder.months ? `${selectedOrder.months} 个月` : '-' }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">开始时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.periodStart) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">结束时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.periodEnd) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">创建时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.createdAt) }}</dd></div>
+            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">完成时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.completedAt) }}</dd></div>
+            <div v-if="selectedOrder.failReason" class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">失败原因</dt><dd class="text-themed text-xs">{{ selectedOrder.failReason || '-' }}</dd></div>
+            <div v-if="selectedOrder.remark" class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">备注</dt><dd class="text-themed text-xs">{{ selectedOrder.remark || '-' }}</dd></div>
+          </dl>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="selectedOrder = null">关闭</button>
+        </div>
+    </DrawerModal>
   </div>
 </template>
 

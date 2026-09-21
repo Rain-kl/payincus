@@ -663,7 +663,7 @@ function goToNextPage() {
                   <span :class="['text-sm', themeStore.isDark ? 'text-gray-400' : 'text-gray-500']">{{ currentRange.unit }}</span>
                 </div>
                 <p :class="['text-xs mt-1', themeStore.isDark ? 'text-gray-500' : 'text-gray-400']">
-                  {{ t('redeemCodes.rangeHint', { min: currentRange.min, max: currentRange.max, unit: currentRange.unit }) }}
+                  {{ t('redeemCodes.valueRange', { min: currentRange.min, max: currentRange.max }) }}
                 </p>
               </div>
 

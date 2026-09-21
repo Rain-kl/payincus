@@ -99,8 +99,8 @@
     --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
     --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
 
-    /* ---- 抽屉弹窗主题 Token (OCI Slide-over Drawer) ---- */
-    --drawer-backdrop: rgba(0, 0, 0, 0.6);
+    /* ---- 抽屉侧边栏相关主题 Token (OCI 规范) ---- */
+    --drawer-backdrop: rgba(0, 0, 0, 0.45);
     --drawer-bg: #161513;
     --drawer-header-bg: #282522;
     --drawer-header-text: #f4f4f3;
@@ -112,10 +112,23 @@
     --drawer-btn-confirm-border: #ffffff;
     --drawer-btn-cancel-bg: #282522;
     --drawer-btn-cancel-text: #f4f4f3;
-    --drawer-btn-cancel-border: #45413c;
-    --topbar-height: 0px;
-    --footer-height: 0px;
-    --sidebar-width: 0px;
+    --topbar-height: 62px;
+    --footer-height: 32px;
+    --sidebar-width: 240px;
+
+    /* ---- Toast 提示框主题 Token ---- */
+    --toast-error-bg: #000000;
+    --toast-error-text: #ffffff;
+    --toast-error-border: #2C2A29;
+    --toast-info-bg: #ffffff;
+    --toast-info-text: #000000;
+    --toast-info-border: #E4E3E0;
+    --toast-warning-bg: #E8AB3B;
+    --toast-warning-text: #ffffff;
+    --toast-warning-border: #E8AB3B;
+    --toast-success-bg: #5B8033;
+    --toast-success-text: #ffffff;
+    --toast-success-border: #5B8033;
   }
 
   /* 亮色主题变量 · owner 指定色板 */
@@ -204,7 +217,7 @@
     --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
 
     /* ---- 抽屉弹窗主题 Token (OCI Slide-over Drawer) ---- */
-    --drawer-backdrop: rgba(0, 0, 0, 0.35);
+    --drawer-backdrop: rgba(0, 0, 0, 0.3);
     --drawer-bg: #F6F4F3;
     --drawer-header-bg: #E4E3E0;
     --drawer-header-text: #161513;
@@ -217,9 +230,23 @@
     --drawer-btn-cancel-bg: #ffffff;
     --drawer-btn-cancel-text: #161513;
     --drawer-btn-cancel-border: #E4E3E0;
-    --topbar-height: 0px;
-    --footer-height: 0px;
-    --sidebar-width: 0px;
+    --topbar-height: 62px;
+    --footer-height: 32px;
+    --sidebar-width: 240px;
+
+    /* ---- Toast 提示框主题 Token ---- */
+    --toast-error-bg: #000000;
+    --toast-error-text: #ffffff;
+    --toast-error-border: #000000;
+    --toast-info-bg: #ffffff;
+    --toast-info-text: #000000;
+    --toast-info-border: #E4E3E0;
+    --toast-warning-bg: #E8AB3B;
+    --toast-warning-text: #ffffff;
+    --toast-warning-border: #E8AB3B;
+    --toast-success-bg: #5B8033;
+    --toast-success-text: #ffffff;
+    --toast-success-border: #5B8033;
   }
 }
 

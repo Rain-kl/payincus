@@ -10,6 +10,7 @@ import { availableFlagCountryCodes, getLocalizedCountryName } from '@/utils/coun
 import { buildHostApiUrl, validateIdentifier, validateName, validateHostAddress, validateIpAddress } from '@/utils/validation'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { hostsPath } from '@/utils/app-paths'
+import MyHostsView from './MyHostsView.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -266,7 +267,7 @@ async function createHost() {
       showInstallScript.value = true
       installStatus.value = 'waiting'
     } else {
-      router.push(hostsPath())
+      goBack()
     }
   } catch (err: any) {
     const errorCode = err?.code
@@ -283,46 +284,127 @@ function copyCommand() {
   toast.success(t('common.copied'))
 }
 
+const showDrawer = ref(true)
+
+function goBack(): void {
+  if (!showDrawer.value) return
+  showDrawer.value = false
+  setTimeout(() => {
+    router.push(hostsPath())
+  }, 250)
+}
+
 function closeAndGoBack() {
   showInstallScript.value = false
-  router.push(hostsPath())
+  goBack()
 }
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
+  <div class="host-create-page">
+    <!-- Background view: Hosts list -->
+    <MyHostsView />
 
-    <!-- 居中容器 -->
-    <div class="flex justify-center">
-      <div class="w-full max-w-3xl space-y-6">
-        <!-- 页面头部 -->
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">{{ t('resources.hosts.create') }}</h1>
-            <p class="page-description">{{ t('resources.hosts.createDesc') }}</p>
-          </div>
-          <RouterLink :to="hostsPath()" class="btn btn-secondary btn-sm gap-1">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7" /></svg>
-            {{ t('common.back') }}
-          </RouterLink>
+    <!-- Drawer Modal -->
+    <DrawerModal
+      :show="showDrawer"
+      max-width="max-w-3xl lg:!max-w-4xl"
+      raw
+      @close="closeAndGoBack"
+    >
+      <!-- Header -->
+      <div class="modal-header">
+        <div class="flex items-center gap-2 min-w-0">
+          <h3 class="modal-title truncate">
+            {{ showInstallScript ? t('admin.hosts.installScript') : t('resources.hosts.create') }}
+          </h3>
         </div>
-
-        <!-- 部署说明 -->
-        <div class="flex items-start gap-3 rounded-xl border border-themed bg-themed-secondary p-4">
-          <svg class="mt-0.5 h-5 w-5 shrink-0 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm -mr-2 p-1.5"
+          aria-label="close"
+          @click="closeAndGoBack"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
-          <div class="space-y-1.5 text-sm text-themed-secondary">
-            <p>{{ t('resources.hosts.ubuntuOnlyHint') }}</p>
-            <p>{{ t('resources.hosts.installHintTitle') }}</p>
-            <p class="text-xs text-themed-muted">{{ t('resources.hosts.installHintIpv6') }}</p>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body space-y-6">
+        <!-- If install script returned, show install steps -->
+        <div v-if="showInstallScript" class="space-y-6">
+          <!-- 步骤 1: 执行安装命令 -->
+          <div class="space-y-3">
+            <div class="flex items-center gap-2.5">
+              <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold text-white" :class="installStatus === 'success' ? 'bg-emerald-600' : 'bg-primary-600'">1</span>
+              <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step1RunScript') }}</span>
+            </div>
+            <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.runOnHost') }}</p>
+            <div class="ml-8 rounded-lg border border-themed bg-themed-secondary p-3 overflow-x-auto">
+              <code class="block break-all whitespace-pre-wrap font-mono text-xs text-themed">{{ installCommand }}</code>
+            </div>
+            <div class="ml-8">
+              <button type="button" class="btn-secondary btn-sm gap-1.5" @click="copyCommand">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                {{ t('admin.hosts.copyCommand') }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 步骤 2：验证并连接 -->
+          <div class="space-y-3 pt-5 border-t border-themed">
+            <div class="flex items-center gap-2.5">
+              <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold text-white" :class="installStatus === 'success' ? 'bg-emerald-600' : 'bg-themed-secondary text-themed-muted'">2</span>
+              <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step2Verify') }}</span>
+            </div>
+            <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.verifyHint') }}</p>
+
+            <!-- 状态显示 -->
+            <div class="ml-8 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                class="btn-secondary btn-sm gap-1.5"
+                :disabled="installStatus === 'verifying' || installStatus === 'success'"
+                @click="verifyHost"
+              >
+                <span v-if="installStatus === 'verifying'" class="loading-spinner w-3.5 h-3.5"></span>
+                {{ installStatus === 'verifying' ? t('admin.hosts.verifying') : t('admin.hosts.verifyAndConnect') }}
+              </button>
+
+              <!-- 成功状态 -->
+              <span v-if="installStatus === 'success'" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950 px-2.5 py-0.5 text-xs font-mono text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-300 dark:ring-emerald-800">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                {{ t('admin.hosts.verifySuccess') }}
+              </span>
+            </div>
+
+            <!-- 错误提示 -->
+            <div v-if="installStatus === 'error' && verifyError" class="ml-8 rounded-lg border border-rose-600 bg-rose-50 dark:bg-rose-950 p-3 text-sm text-rose-700 dark:text-rose-200">
+              {{ verifyError }}
+            </div>
           </div>
         </div>
 
-        <!-- 表单 -->
-        <form class="space-y-5" @submit.prevent="createHost">
+        <!-- Form view -->
+        <template v-else>
+          <!-- 部署说明 -->
+          <div class="flex items-start gap-3 rounded-xl border border-themed bg-themed-secondary p-4">
+            <svg class="mt-0.5 h-5 w-5 shrink-0 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div class="space-y-1.5 text-sm text-themed-secondary">
+              <p>{{ t('resources.hosts.ubuntuOnlyHint') }}</p>
+              <p>{{ t('resources.hosts.installHintTitle') }}</p>
+              <p class="text-xs text-themed-muted">{{ t('resources.hosts.installHintIpv6') }}</p>
+            </div>
+          </div>
+
+          <!-- 表单 -->
+          <form id="host-create-form" class="space-y-5" @submit.prevent="createHost">
           <!-- 基本信息 -->
-          <section class="nimbus-card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
+          <section class="card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div class="space-y-1.5">
                 <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.hostName') }}</label>
@@ -349,7 +431,7 @@ function closeAndGoBack() {
           </section>
 
           <!-- 连接与网络 -->
-          <section class="nimbus-card relative z-20 !overflow-visible space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6" style="overflow: visible !important;">
+          <section class="card relative z-20 !overflow-visible space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6" style="overflow: visible !important;">
             <!-- 连接方式选择 -->
             <div class="space-y-1.5">
               <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.connectionMode') }}</label>
@@ -477,7 +559,7 @@ function closeAndGoBack() {
           </section>
 
           <!-- NAT 端口映射配置，仅 IPv4 相关模式显示 -->
-          <section v-if="form.networkMode !== 'ipv6_only'" class="nimbus-card relative z-10 space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
+          <section v-if="form.networkMode !== 'ipv6_only'" class="card relative z-10 space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
             <div class="flex items-center gap-2.5">
               <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-themed bg-themed-secondary">
                 <svg class="h-4 w-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18" /></svg>
@@ -517,7 +599,7 @@ function closeAndGoBack() {
           </section>
 
           <!-- 资源限制 -->
-          <section class="nimbus-card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
+          <section class="card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
             <div class="flex items-center gap-2.5">
               <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-themed bg-themed-secondary">
                 <svg class="h-4 w-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 7h10v10H7z" /></svg>
@@ -552,111 +634,42 @@ function closeAndGoBack() {
             <p class="text-xs leading-relaxed text-themed-secondary">{{ t('resources.hosts.storagePoolAfterConnectHint') }}</p>
           </div>
 
-          <!-- 按钮 -->
-          <div class="flex items-center justify-end gap-3 border-t border-themed pt-5">
-            <RouterLink :to="hostsPath()" class="btn-secondary">{{ t('common.cancel') }}</RouterLink>
-            <button type="submit" class="btn-primary" :disabled="saving || (isAdmin ? !form.name : !form.nameSuffix) || (!form.tunnelEnabled && !form.hostAddress)">
-              <svg v-if="saving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-              {{ t('common.create') }}
-            </button>
-          </div>
-        </form>
+          </form>
+        </template>
       </div>
-    </div>
 
-    <!-- 安装脚本弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showInstallScript" class="modal-overlay">
-          <div class="modal-backdrop" @click="closeAndGoBack"></div>
-          <div class="modal-content" style="max-width: 40rem; width: 95%;">
-            <div class="modal-header">
-              <h3 class="modal-title">{{ t('admin.hosts.installScript') }}</h3>
-              <button class="text-themed-muted transition-colors hover:text-themed" @click="closeAndGoBack">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div class="modal-body space-y-5">
-              <!-- 步骤 1: 执行安装命令 -->
-              <div class="space-y-3">
-                <div class="flex items-center gap-2.5">
-                  <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold" :class="installStatus === 'success' ? 'bg-green-500 text-white' : 'bg-primary-600 text-white'">1</span>
-                  <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step1RunScript') }}</span>
-                </div>
-                <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.runOnHost') }}</p>
-                <div class="ml-8 rounded-lg border border-themed bg-themed-secondary p-3 overflow-x-auto">
-                  <code class="block break-all whitespace-pre-wrap font-mono text-xs text-themed">{{ installCommand }}</code>
-                </div>
-                <div class="ml-8">
-                  <button class="btn-secondary btn-sm gap-1.5" @click="copyCommand">
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    {{ t('admin.hosts.copyCommand') }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 步骤 2：验证并连接 -->
-              <div class="space-y-3 pt-5 border-t border-themed">
-                <div class="flex items-center gap-2.5">
-                  <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold" :class="installStatus === 'success' ? 'bg-green-500 text-white' : 'bg-themed-tertiary text-themed-muted'">2</span>
-                  <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step2Verify') }}</span>
-                </div>
-                <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.verifyHint') }}</p>
-
-                <!-- 状态显示 -->
-                <div class="ml-8 flex flex-wrap items-center gap-3">
-                  <button
-                    class="btn-secondary btn-sm gap-1.5"
-                    :disabled="installStatus === 'verifying' || installStatus === 'success'"
-                    @click="verifyHost"
-                  >
-                    <svg v-if="installStatus === 'verifying'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    {{ installStatus === 'verifying' ? t('admin.hosts.verifying') : t('admin.hosts.verifyAndConnect') }}
-                  </button>
-
-                  <!-- 成功状态 -->
-                  <span v-if="installStatus === 'success'" class="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-mono text-green-500">
-                    <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                    {{ t('admin.hosts.verifySuccess') }}
-                  </span>
-                </div>
-
-                <!-- 错误提示 -->
-                <div v-if="installStatus === 'error' && verifyError" class="ml-8 rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-500">
-                  {{ verifyError }}
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-secondary" @click="closeAndGoBack">{{ t('common.close') }}</button>
-              <button v-if="installStatus === 'success'" class="btn-primary" @click="closeAndGoBack">{{ t('common.done') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+      <!-- Footer -->
+      <div class="modal-footer">
+        <template v-if="showInstallScript">
+          <button type="button" class="btn-secondary" @click="closeAndGoBack">{{ t('common.close') }}</button>
+          <button v-if="installStatus === 'success'" type="button" class="btn-primary" @click="closeAndGoBack">{{ t('common.done') }}</button>
+        </template>
+        <template v-else>
+          <button type="button" class="btn-secondary" @click="closeAndGoBack">{{ t('common.cancel') }}</button>
+          <button
+            type="submit"
+            form="host-create-form"
+            class="btn-primary"
+            :disabled="saving || (isAdmin ? !form.name : !form.nameSuffix) || (!form.tunnelEnabled && !form.hostAddress)"
+            @click="createHost"
+          >
+            <span v-if="saving" class="loading-spinner w-4 h-4"></span>
+            <span v-else>{{ t('common.create') }}</span>
+          </button>
+        </template>
+      </div>
+    </DrawerModal>
   </div>
 </template>
 
 <style scoped>
-/* 交互卡片的轻微悬浮抬升 */
-.nimbus-card {
-  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
-}
-
-.nimbus-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.25);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .nimbus-card,
-  .nimbus-card:hover {
-    transition: none;
-    transform: none;
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
   }
 }
 </style>

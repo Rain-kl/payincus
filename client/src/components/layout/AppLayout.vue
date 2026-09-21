@@ -406,7 +406,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 下区：横向贯通页脚 (高度 32px / h-8) -->
-    <footer class="kawaii-app-footer h-8 w-full shrink-0 border-t border-[var(--border-color)] bg-[var(--footer-bg)] text-[var(--text-secondary)] text-xs px-4 flex items-center justify-between select-none z-20">
+    <footer class="kawaii-app-footer h-8 w-full shrink-0 border-t border-[var(--border-color)] bg-[var(--footer-bg)] text-[var(--text-secondary)] text-xs px-4 flex items-center justify-between select-none z-30">
       <!-- 左侧：条款与隐私弹窗 + 联系方式 -->
       <div class="flex items-center gap-3 shrink-0 text-[11px] sm:text-xs">
         <button

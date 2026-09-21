@@ -159,7 +159,8 @@ function handleLinkClick() {
   <!-- Sidebar -->
   <aside
     :class="[
-      'kawaii-sidebar nimbus-sidebar flex flex-col h-full transition-all duration-200 border-r border-[var(--topbar-border)] z-40 flex-shrink-0',
+      'kawaii-sidebar nimbus-sidebar flex flex-col h-full transition-all duration-200 border-r border-[var(--topbar-border)] flex-shrink-0',
+      mobileOpen ? 'z-40' : 'z-10',
       // 移动端：mobileOpen 为 true 时显示，否则隐藏；桌面端始终显示 (md:flex)
       mobileOpen ? 'flex' : 'hidden md:flex',
       // 宽度：展开 240px / 折叠 64px / 移动端全宽

@@ -553,11 +553,12 @@ function formatDate(dateStr: string | null | undefined): string {
     </div>
 
     <!-- Editor Modal -->
-    <Teleport to="body">
-      <div v-if="showEditor" class="modal-overlay" @click.self="showEditor = false">
-        <div class="modal-backdrop" @click="showEditor = false"></div>
-
-        <div class="modal-content max-w-5xl">
+    <DrawerModal
+      :show="showEditor"
+      max-width="max-w-5xl"
+      raw
+      @close="showEditor = false"
+    >
           <!-- Header -->
           <div class="modal-header">
             <h3 class="modal-title truncate">
@@ -599,7 +600,7 @@ function formatDate(dateStr: string | null | undefined): string {
                     v-model="form.slug"
                     type="text"
                     class="input font-mono"
-                    :placeholder="t('admin.helpManage.slugPlaceholder')"
+                    :placeholder="t('admin.helpManage.urlSlugPlaceholder')"
                   />
                 </div>
               </div>
@@ -720,22 +721,21 @@ function formatDate(dateStr: string | null | undefined): string {
           </div>
 
           <!-- Footer -->
-          <div class="flex justify-end gap-3 border-t border-themed px-6 py-4">
+          <div class="modal-footer">
             <button class="btn-secondary" @click="showEditor = false">{{ t('common.cancel') }}</button>
             <button :disabled="formLoading" class="btn-primary" @click="saveArticle">
               {{ formLoading ? t('common.loading') : t('common.save') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- Category Modal -->
-    <Teleport to="body">
-      <div v-if="showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
-        <div class="modal-backdrop" @click="showCategoryModal = false"></div>
-
-        <div class="modal-content max-w-md">
+    <DrawerModal
+      :show="showCategoryModal"
+      max-width="max-w-md"
+      raw
+      @close="showCategoryModal = false"
+    >
           <div class="modal-header">
             <h3 class="modal-title truncate">
               {{ categoryMode === 'create' ? t('admin.helpManage.addCategory') : t('common.edit') }}
@@ -777,7 +777,7 @@ function formatDate(dateStr: string | null | undefined): string {
                   v-for="color in categoryColors"
                   :key="color"
                   class="h-8 w-8 rounded-lg ring-1 ring-inset ring-black/10 transition-all dark:ring-white/10"
-                  :class="categoryForm.color === color ? 'ring-2 ring-offset-2 ring-primary-500 ring-offset-white dark:ring-offset-gray-950' : ''"
+                  :class="categoryForm.color === color ? 'scale-110 shadow-lg ring-2 ring-primary-500' : ''"
                   :style="{ backgroundColor: color }"
                   @click="categoryForm.color = color"
                 ></button>
@@ -791,9 +791,7 @@ function formatDate(dateStr: string | null | undefined): string {
             <button class="btn-secondary" @click="showCategoryModal = false">{{ t('common.cancel') }}</button>
             <button class="btn-primary" @click="saveCategory">{{ t('common.save') }}</button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
   </div>
 </template>
 

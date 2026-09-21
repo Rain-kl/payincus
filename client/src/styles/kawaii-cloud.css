@@ -567,35 +567,45 @@
     -webkit-backdrop-filter: none !important;
   }
 
-  /* OCI 弹窗：实色不透明背景，去掉半透明渐变 */
-  .kawaii-app-shell .modal-content {
-    border-color: var(--kawaii-line) !important;
-    background: var(--kawaii-surface) !important;
-    color: var(--kawaii-text) !important;
-    box-shadow: none !important;
-  }
-
+  /* OCI 侧边抽屉弹窗样式适配 */
   .modal-backdrop {
-    background: var(--kawaii-surface) !important;
-    backdrop-filter: blur(8px);
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   .dark .modal-backdrop {
-    background: var(--kawaii-surface) !important;
+    background: transparent !important;
   }
 
+  .kawaii-app-shell .modal-content,
   .modal-content {
-    border: 1px solid var(--kawaii-line) !important;
-    border-radius: var(--radius-modal);
-    background: var(--kawaii-surface) !important;
-    color: var(--kawaii-text) !important;
-    box-shadow: none !important;
+    border-left: 1px solid var(--drawer-header-border) !important;
+    border-top: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    background: var(--drawer-bg) !important;
+    color: var(--text-primary) !important;
   }
 
-  .modal-header,
+  .dark .modal-content {
+    box-shadow: -16px 0 40px rgba(0, 0, 0, 0.65) !important;
+  }
+
+  .light .modal-content {
+    box-shadow: -12px 0 36px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  .modal-header {
+    border-bottom: 1px solid var(--drawer-header-border) !important;
+    background: var(--drawer-header-bg) !important;
+    color: var(--drawer-header-text) !important;
+  }
+
   .modal-footer {
-    border-color: var(--kawaii-line) !important;
-    background: var(--kawaii-surface) !important;
+    border-top: 1px solid var(--drawer-footer-border) !important;
+    background: var(--drawer-footer-bg) !important;
   }
 
   .modal-title {
@@ -656,22 +666,16 @@
     color: var(--kawaii-text) !important;
   }
 
-  :where([class*='fixed'][class*='inset-0'][class*='bg-black/30'], [class*='fixed'][class*='inset-0'][class*='bg-black/40'], [class*='fixed'][class*='inset-0'][class*='bg-black/45'], [class*='fixed'][class*='inset-0'][class*='bg-black/50'], [class*='fixed'][class*='inset-0'][class*='bg-black/60']) {
-    background: var(--kawaii-surface) !important;
-    backdrop-filter: blur(8px);
-  }
-
-  .dark :where([class*='fixed'][class*='inset-0'][class*='bg-black/30'], [class*='fixed'][class*='inset-0'][class*='bg-black/40'], [class*='fixed'][class*='inset-0'][class*='bg-black/45'], [class*='fixed'][class*='inset-0'][class*='bg-black/50'], [class*='fixed'][class*='inset-0'][class*='bg-black/60']) {
-    background: var(--kawaii-surface) !important;
-  }
-
+  :where([class*='fixed'][class*='inset-0'][class*='bg-black/30'], [class*='fixed'][class*='inset-0'][class*='bg-black/40'], [class*='fixed'][class*='inset-0'][class*='bg-black/45'], [class*='fixed'][class*='inset-0'][class*='bg-black/50'], [class*='fixed'][class*='inset-0'][class*='bg-black/60']),
   :where([class*='absolute'][class*='inset-0'][class*='bg-black/30'], [class*='absolute'][class*='inset-0'][class*='bg-black/40'], [class*='absolute'][class*='inset-0'][class*='bg-black/45'], [class*='absolute'][class*='inset-0'][class*='bg-black/50'], [class*='absolute'][class*='inset-0'][class*='bg-black/60']) {
-    background: var(--kawaii-surface) !important;
-    backdrop-filter: blur(8px);
+    background: var(--drawer-backdrop) !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
 
+  .dark :where([class*='fixed'][class*='inset-0'][class*='bg-black/30'], [class*='fixed'][class*='inset-0'][class*='bg-black/40'], [class*='fixed'][class*='inset-0'][class*='bg-black/45'], [class*='fixed'][class*='inset-0'][class*='bg-black/50'], [class*='fixed'][class*='inset-0'][class*='bg-black/60']),
   .dark :where([class*='absolute'][class*='inset-0'][class*='bg-black/30'], [class*='absolute'][class*='inset-0'][class*='bg-black/40'], [class*='absolute'][class*='inset-0'][class*='bg-black/45'], [class*='absolute'][class*='inset-0'][class*='bg-black/50'], [class*='absolute'][class*='inset-0'][class*='bg-black/60']) {
-    background: var(--kawaii-surface) !important;
+    background: var(--drawer-backdrop) !important;
   }
 
   :where([class*='fixed'][class*='inset-0']) > :where([class*='bg-white'], [class*='bg-gray-900'], [class*='bg-gray-950']) {

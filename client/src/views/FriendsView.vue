@@ -1078,11 +1078,12 @@ onActivated(async () => {
     </Transition>
 
     <!-- 添加好友弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showAddFriendModal" class="modal-overlay">
-          <div class="modal-backdrop" @click="showAddFriendModal = false"></div>
-          <div class="modal-content max-w-sm">
+    <DrawerModal
+      :show="showAddFriendModal"
+      max-width="max-w-sm"
+      raw
+      @close="showAddFriendModal = false"
+    >
             <div class="modal-header">
               <h3 class="modal-title">{{ t('friends.addFriend') }}</h3>
               <button class="text-themed-muted hover:text-themed" @click="showAddFriendModal = false">
@@ -1125,17 +1126,15 @@ onActivated(async () => {
                 <span v-else>{{ t('friends.sendRequest') }}</span>
               </button>
             </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 添加共享弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showAddShareModal" class="modal-overlay">
-          <div class="modal-backdrop" @click="showAddShareModal = false"></div>
-          <div class="modal-content max-w-md">
+    <DrawerModal
+      :show="showAddShareModal"
+      max-width="max-w-md"
+      raw
+      @close="showAddShareModal = false"
+    >
             <div class="modal-header">
               <h3 class="modal-title">{{ t('friends.addShareTitle') }}</h3>
               <button class="text-themed-muted hover:text-themed" @click="showAddShareModal = false">
@@ -1218,17 +1217,15 @@ onActivated(async () => {
                 <span v-else>{{ t('friends.confirmShare') }}</span>
               </button>
             </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 编辑配额弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showEditQuotaModal" class="modal-overlay">
-          <div class="modal-backdrop" @click="showEditQuotaModal = false"></div>
-          <div class="modal-content max-w-md">
+    <DrawerModal
+      :show="showEditQuotaModal"
+      max-width="max-w-md"
+      raw
+      @close="showEditQuotaModal = false"
+    >
             <div class="modal-header">
               <h3 class="modal-title">{{ t('friends.editQuotaTitle') }}</h3>
               <button class="text-themed-muted hover:text-themed" @click="showEditQuotaModal = false">
@@ -1290,10 +1287,7 @@ onActivated(async () => {
                 <span v-else>{{ t('common.save') }}</span>
               </button>
             </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    </DrawerModal>
   </div>
 </template>
 

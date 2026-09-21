@@ -1862,9 +1862,13 @@ function formatAmount() {
     </div>
 
     <!-- 充值弹窗 -->
-    <Teleport to="body">
-      <div v-if="showRechargeModal && !configStore.freeSiteMode" class="modal-overlay" @click.self="showRechargeModal = false">
-        <div class="modal-content max-w-md">
+    <DrawerModal
+      v-if="!configStore.freeSiteMode"
+      :show="showRechargeModal"
+      max-width="max-w-md"
+      raw
+      @close="showRechargeModal = false"
+    >
           <!-- 头部 -->
           <div class="modal-header">
             <div class="flex items-center gap-3">
@@ -2088,14 +2092,16 @@ function formatAmount() {
               {{ providersLoading ? $t('common.loading') : (rechargeLoading ? $t('common.processing') : $t('wallet.pay')) }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 人工充值付款说明 -->
-    <Teleport to="body">
-      <div v-if="showManualPaymentModal && manualPaymentInfo" class="modal-overlay" @click.self="showManualPaymentModal = false">
-        <div class="modal-content max-w-lg">
+    <DrawerModal
+      v-if="manualPaymentInfo"
+      :show="showManualPaymentModal"
+      max-width="max-w-lg"
+      raw
+      @close="showManualPaymentModal = false"
+    >
           <div class="modal-header">
             <div>
               <h3 class="modal-title">{{ $t('wallet.manualPaymentTitle') }}</h3>
@@ -2141,14 +2147,15 @@ function formatAmount() {
           <div class="modal-footer">
             <button class="btn btn-primary" @click="showManualPaymentModal = false">{{ $t('common.confirm') }}</button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 创建优惠码弹窗 -->
-    <Teleport to="body">
-      <div v-if="showCreateCodeModal" class="modal-overlay" @click.self="showCreateCodeModal = false">
-        <div class="modal-content max-w-md">
+    <DrawerModal
+      :show="showCreateCodeModal"
+      max-width="max-w-md"
+      raw
+      @close="showCreateCodeModal = false"
+    >
           <div class="modal-header">
             <h3 class="modal-title">{{ $t('aff.createCode') }}</h3>
             <button class="btn btn-ghost btn-sm rounded-full" @click="showCreateCodeModal = false">
@@ -2260,14 +2267,15 @@ function formatAmount() {
               {{ createCodeLoading ? $t('common.processing') : $t('common.create') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 转化申请弹窗 -->
-    <Teleport to="body">
-      <div v-if="showConvertModal" class="modal-overlay" @click.self="showConvertModal = false">
-        <div class="modal-content max-w-md">
+    <DrawerModal
+      :show="showConvertModal"
+      max-width="max-w-md"
+      raw
+      @close="showConvertModal = false"
+    >
           <div class="modal-header">
             <h3 class="modal-title">{{ $t('aff.convertModal.title') }}</h3>
             <button class="btn btn-ghost btn-sm rounded-full" @click="showConvertModal = false">
@@ -2319,14 +2327,15 @@ function formatAmount() {
               {{ convertLoading ? $t('common.processing') : $t('aff.convertModal.submit') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- AFF 榜单弹窗 -->
-    <Teleport to="body">
-      <div v-if="showLeaderboardModal" class="modal-overlay" @click.self="showLeaderboardModal = false">
-        <div class="modal-content max-w-md">
+    <DrawerModal
+      :show="showLeaderboardModal"
+      max-width="max-w-md"
+      raw
+      @close="showLeaderboardModal = false"
+    >
           <div class="modal-header">
             <div class="flex items-center gap-2">
               <h3 class="modal-title">{{ $t('aff.leaderboard.title') }}</h3>
@@ -2374,12 +2383,9 @@ function formatAmount() {
                     <span v-if="entry.rank <= 3">{{ getRankEmoji(entry.rank) }}</span>
                     <span v-else>{{ entry.rank }}</span>
                   </div>
-                  <!-- 用户名 -->
-                  <div class="flex flex-col">
-                    <span
-                      class="font-medium"
-                      :class="entry.isCurrentUser ? 'text-primary-600 dark:text-primary-300' : 'text-themed'"
-                    >
+                  <!-- 用户信息 -->
+                  <div>
+                    <span class="text-sm font-medium text-themed">
                       {{ entry.username }}
                     </span>
                     <span v-if="entry.isCurrentUser" class="text-xs text-primary-600 dark:text-primary-300">
@@ -2400,9 +2406,7 @@ function formatAmount() {
               {{ $t('common.close') }}
             </button>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </DrawerModal>
 
     <!-- 服务条款弹窗 -->
     <TermsOfServiceModal

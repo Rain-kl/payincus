@@ -742,12 +742,12 @@ function getNetworkModeText(mode: string | null | undefined) {
     </div>
 
     <!-- Reject Modal -->
-    <div
-      v-if="showRejectModal"
-      class="modal-overlay bg-black/50 backdrop-blur-sm"
-      @click.self="showRejectModal = false"
+    <DrawerModal
+      :show="showRejectModal"
+      max-width="max-w-md"
+      raw
+      @close="showRejectModal = false"
     >
-      <div class="modal-content max-w-md">
         <div class="modal-header">
           <h3 class="modal-title">{{ $t('transfer.rejectModal.title') }}</h3>
           <button class="btn btn-sm btn-ghost" @click="showRejectModal = false">
@@ -767,7 +767,7 @@ function getNetworkModeText(mode: string | null | undefined) {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-ghost" @click="showRejectModal = false">
+          <button class="btn btn-secondary" @click="showRejectModal = false">
             {{ $t('common.cancel') }}
           </button>
           <button
@@ -778,16 +778,16 @@ function getNetworkModeText(mode: string | null | undefined) {
             {{ rejectLoading ? $t('common.loading') : $t('transfer.actions.reject') }}
           </button>
         </div>
-      </div>
-    </div>
+    </DrawerModal>
 
     <!-- Config Detail Modal -->
-    <div
-      v-if="showConfigModal && selectedTransfer"
-      class="modal-overlay bg-black/50 backdrop-blur-sm"
-      @click.self="showConfigModal = false"
+    <DrawerModal
+      v-if="selectedTransfer"
+      :show="showConfigModal"
+      max-width="max-w-lg"
+      raw
+      @close="showConfigModal = false"
     >
-      <div class="modal-content max-w-lg">
         <div class="modal-header">
           <h3 class="modal-title">{{ $t('transfer.configModal.title') }}</h3>
           <button class="btn btn-sm btn-ghost" @click="showConfigModal = false">
@@ -864,12 +864,11 @@ function getNetworkModeText(mode: string | null | undefined) {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-ghost" @click="showConfigModal = false">
+          <button class="btn btn-secondary" @click="showConfigModal = false">
             {{ $t('common.close') }}
           </button>
         </div>
-      </div>
-    </div>
+    </DrawerModal>
   </div>
 </template>
 
