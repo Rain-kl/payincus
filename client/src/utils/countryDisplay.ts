@@ -63,7 +63,6 @@ function getRegionDisplayNames(locale: string): Intl.DisplayNames | null {
 
 export const availableFlagCountryCodes = flagCountries
   .map(country => country.code)
-  .filter(code => code !== 'cn')
 
 export function normalizeCountryCodeForFlag(code: string): string {
   return code.toLowerCase()

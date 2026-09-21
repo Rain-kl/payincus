@@ -358,7 +358,7 @@ async function saveConfig() {
 <template>
   <form class="space-y-6" @submit.prevent="saveConfig">
     <!-- ① 基础信息 -->
-    <section class="card">
+    <section class="card relative z-20">
       <div class="border-b border-themed px-5 py-4 sm:px-6">
         <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.basicInfo') }}</h2>
         <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.basicInfoHint') }}</p>
@@ -406,14 +406,14 @@ async function saveConfig() {
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <!-- 国家选择 -->
-          <div ref="countryDropdownRef" class="relative">
+          <div ref="countryDropdownRef" class="relative z-30">
             <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.country') }}</label>
             <button type="button" class="input w-full flex items-center justify-between" @click="toggleCountryDropdown">
               <span class="flex items-center gap-2"><FlagIcon :code="form.countryCode" size="sm" />{{ selectedCountry?.name }}</span>
               <svg class="w-4 h-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
             </button>
-            <div v-if="showCountryDropdown" class="absolute z-50 w-full mt-1 overflow-hidden rounded-lg border shadow-xl" :class="themeStore.isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'">
-              <div class="p-2 border-b" :class="themeStore.isDark ? 'border-gray-700' : 'border-gray-100'">
+            <div v-if="showCountryDropdown" class="dropdown-menu kawaii-menu-panel absolute z-50 w-full mt-1 overflow-hidden rounded-lg border border-themed bg-[var(--bg-surface)] shadow-2xl">
+              <div class="p-2 border-b border-themed bg-[var(--bg-surface)]">
                 <input
                   v-model="countrySearch"
                   type="search"
@@ -425,16 +425,13 @@ async function saveConfig() {
                   @keydown.stop
                 />
               </div>
-              <div class="max-h-60 overflow-auto py-1">
+              <div class="max-h-60 overflow-auto py-1 bg-[var(--bg-surface)]">
                 <button
                   v-for="c in filteredCountries"
                   :key="c.code"
                   type="button"
-                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors"
-                  :class="[
-                    themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100',
-                    form.countryCode === c.code ? (themeStore.isDark ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900') : ''
-                  ]"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-themed-hover"
+                  :class="form.countryCode === c.code ? 'bg-themed-secondary text-themed font-semibold' : 'text-themed-secondary'"
                   @click="selectCountry(c.code)"
                 >
                   <FlagIcon :code="c.code" size="sm" />{{ c.name }}
@@ -467,7 +464,7 @@ async function saveConfig() {
     </section>
 
     <!-- ② 网络连接 -->
-    <section class="card">
+    <section class="card relative z-10">
       <div class="border-b border-themed px-5 py-4 sm:px-6">
         <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.connectionConfig') }}</h2>
         <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.connectionConfigHint') }}</p>

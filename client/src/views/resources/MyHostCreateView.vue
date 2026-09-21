@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
-import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/stores/toast'
 import { onClickOutside } from '@vueuse/core'
@@ -15,7 +14,6 @@ import { hostsPath } from '@/utils/app-paths'
 const { t, locale } = useI18n()
 const router = useRouter()
 const toast = useToast()
-const themeStore = useThemeStore()
 const authStore = useAuthStore()
 
 const isAdmin = computed(() => authStore.user?.role === 'admin')
@@ -351,7 +349,7 @@ function closeAndGoBack() {
           </section>
 
           <!-- 连接与网络 -->
-          <section class="nimbus-card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
+          <section class="nimbus-card relative z-20 space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
             <!-- 连接方式选择 -->
             <div class="space-y-1.5">
               <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.connectionMode') }}</label>
@@ -412,14 +410,14 @@ function closeAndGoBack() {
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
               <!-- 国家选择 -->
-              <div ref="countryDropdownRef" class="relative space-y-1.5">
+              <div ref="countryDropdownRef" class="relative z-30 space-y-1.5">
                 <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.country') }}</label>
                 <button type="button" class="input flex w-full items-center justify-between" @click="toggleCountryDropdown">
                   <span class="flex items-center gap-2"><FlagIcon :code="form.countryCode" size="sm" />{{ selectedCountry?.name }}</span>
                   <svg class="h-4 w-4 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </button>
-                <div v-if="showCountryDropdown" class="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-themed bg-themed-surface shadow-xl" :class="themeStore.isDark ? 'shadow-black/40' : 'shadow-black/10'">
-                  <div class="border-b border-themed p-2">
+                <div v-if="showCountryDropdown" class="dropdown-menu kawaii-menu-panel absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-themed bg-[var(--bg-surface)] shadow-2xl">
+                  <div class="border-b border-themed p-2 bg-[var(--bg-surface)]">
                     <input
                       v-model="countrySearch"
                       type="search"
@@ -431,13 +429,13 @@ function closeAndGoBack() {
                       @keydown.stop
                     />
                   </div>
-                  <div class="max-h-60 overflow-auto py-1">
+                  <div class="max-h-60 overflow-auto py-1 bg-[var(--bg-surface)]">
                     <button
                       v-for="c in filteredCountries"
                       :key="c.code"
                       type="button"
                       class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-themed-hover"
-                      :class="form.countryCode === c.code ? 'bg-themed-secondary text-themed' : 'text-themed-secondary'"
+                      :class="form.countryCode === c.code ? 'bg-themed-secondary text-themed font-semibold' : 'text-themed-secondary'"
                       @click="selectCountry(c.code)"
                     >
                       <FlagIcon :code="c.code" size="sm" />{{ c.name }}
@@ -479,7 +477,7 @@ function closeAndGoBack() {
           </section>
 
           <!-- NAT 端口映射配置，仅 IPv4 相关模式显示 -->
-          <section v-if="form.networkMode !== 'ipv6_only'" class="nimbus-card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
+          <section v-if="form.networkMode !== 'ipv6_only'" class="nimbus-card relative z-10 space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
             <div class="flex items-center gap-2.5">
               <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-themed bg-themed-secondary">
                 <svg class="h-4 w-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18" /></svg>
