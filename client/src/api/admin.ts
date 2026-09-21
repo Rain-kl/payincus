@@ -1322,6 +1322,10 @@ const api = {
     }> => http.get(`/hosts/${id}/caddy`),
     installCaddy: (id: number): Promise<{ message: string; accepted: boolean }> =>
       http.post(`/hosts/${id}/caddy/install`),
+    uninstallCaddy: (id: number): Promise<{ message: string; accepted: boolean }> =>
+      http.post(`/hosts/${id}/caddy/uninstall`),
+    createAgentLogsTicket: (id: number): Promise<{ ticket: string; expiresIn: number }> =>
+      http.post(`/hosts/${id}/agent/logs/ticket`),
     getCaddySites: (id: number, params: { page?: number; pageSize?: number } = {}): Promise<{
       sites: Array<{
         id: number

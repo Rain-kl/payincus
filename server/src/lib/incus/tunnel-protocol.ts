@@ -13,6 +13,8 @@ export enum TunnelFrameType {
   CLOSE = 0x03,  // 正常关闭流（双向，发送端结束发送 / EOF）
   RESET = 0x04,  // 异常重置流（双向，连接中断或错误）
   CONFIG = 0x05, // 控制指令（Server -> Agent），StreamID = 0，Payload 为 JSON 配置
+  LOG_CTL = 0x06,  // 日志流控制（Server -> Agent），StreamID = 0，Payload 为 JSON { action: 'start' | 'stop', lines?: number }
+  LOG_DATA = 0x07, // 日志流数据（Agent -> Server），StreamID = 0，Payload 为一行 UTF-8 文本；空 Payload 表示流结束
 }
 
 export interface DecodedFrame {

@@ -6165,6 +6165,17 @@ export default {
 
     // Host Caddy management
     host: {
+        // Host Agent runtime logs
+        agentLogs: {
+            title: 'Logs',
+            failed: 'Failed to load Agent logs',
+            empty: 'No logs yet',
+            emptyWaitingAgent: 'Agent is offline or has not reported logs. Will retry automatically.',
+            autoRetry: 'Reconnects every 5 seconds',
+            refresh: 'Refresh',
+            online: 'Agent online',
+            offline: 'Agent offline',
+        },
         caddy: {
             title: 'Caddy Proxy',
             description: 'Provide domain reverse proxy service for your instances through Caddy, with automatic SSL certificate. Installation is handled by the host Agent automatically; the admin API stays loopback-only.',
@@ -6174,6 +6185,10 @@ export default {
             install: 'Install Caddy',
             installAccepted: 'Agent notified to install Caddy. It will be enabled automatically once complete.',
             installFailed: 'Failed to install Caddy',
+            uninstall: 'Uninstall Caddy',
+            uninstallConfirm: 'Uninstall Caddy? The Agent will permanently remove Caddy and its configuration. This cannot be undone.',
+            uninstallAccepted: 'Agent notified to uninstall Caddy. It will be removed and the status updated automatically.',
+            uninstallFailed: 'Failed to uninstall Caddy',
             agentOfflineHint: 'Host Agent is offline and cannot install automatically. Make sure the Agent is online first.',
             agentOnlineHint: 'Host Agent is online. Click the button below to install automatically.',
             apiPort: 'Admin Port',

@@ -13,7 +13,7 @@ import net from 'node:net'
 import { Agent, request as undiciRequest } from 'undici'
 import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
-import { caddyInstallRequested } from './agent.js'
+import { caddyInstallRequested, caddyUninstallRequested } from './agent.js'
 import { checkHostingAccess } from '../lib/hosting-access.js'
 import { createInboxMessage } from '../db/inbox.js'
 import { createLog } from '../db/logs.js'
@@ -39,6 +39,8 @@ import { validateName, validateUrl, validateIpAddress, validateIdentifier, valid
 import { sendNotification } from '../lib/notifier.js'
 import { sendReleaseNotification } from '../lib/release-notifier.js'
 import { getCaddyClientForHost } from '../lib/caddy-client.js'
+import { agentLogStreamManager } from '../lib/agent-log-stream.js'
+import { generateAgentLogStreamTicket, consumeAgentLogStreamTicket } from '../lib/action-ticket.js'
 import { normalizeArchitecture } from '../lib/architecture.js'
 import { generateIncusConfig } from '../lib/incus-config-generator.js'
 import { sendAdminInstanceCreatedEmail, sendRenewalPriceUpdatedEmail } from '../lib/mailer.js'
@@ -3967,6 +3969,198 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
   })
 
+  // ==================== 独立 IPv4 地址池管理路由 ====================
+
+  /** 归一化 dns / addresses 字段：兼容数组与换行/逗号/空格分隔字符串 */
+  function parsePublicIpv4List(value: unknown): string[] {
+    if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean)
+    if (typeof value === 'string') return value.split(/[\n,\s]+/).map(item => item.trim()).filter(Boolean)
+    return []
+  }
+
+  /** 获取宿主机的独立 IPv4 地址池列表 GET /hosts/:id/public-ipv4/pools */
+  fastify.get<{
+    Params: { id: string }
+  }>('/:id/public-ipv4/pools', {
+    onRequest: [fastify.authenticate]
+  }, async (request, reply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+    if (!hostId) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+
+    const auth = await getAuthorizedOpsHost(hostId, user)
+    if (!auth.host) return reply.code(auth.status).send(auth.error)
+
+    const dbPools = await db.listPublicIpv4Pools(hostId)
+    return {
+      pools: dbPools.map(pool => {
+        const stats = {
+          total: pool.addresses.length,
+          free: pool.addresses.filter(address => address.status === 'free').length,
+          assigned: pool.addresses.filter(address => address.status === 'assigned').length,
+          disabled: pool.addresses.filter(address => address.status === 'disabled').length
+        }
+        return {
+          id: pool.id,
+          name: pool.name,
+          cidr: pool.cidr,
+          gateway: pool.gateway,
+          prefixLength: pool.prefixLength,
+          dns: pool.dns,
+          enabled: pool.enabled,
+          notes: pool.notes,
+          stats,
+          addresses: pool.addresses
+        }
+      })
+    }
+  })
+
+  /** 创建独立 IPv4 地址池 POST /hosts/:id/public-ipv4/pools */
+  fastify.post<{
+    Params: { id: string }
+    Body: {
+      name: string
+      cidr?: string
+      gateway: string
+      prefixLength?: number
+      dns?: string[] | string
+      notes?: string
+      addresses?: string[] | string
+    }
+  }>('/:id/public-ipv4/pools', {
+    onRequest: [fastify.authenticate]
+  }, async (request, reply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+    if (!hostId) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+
+    const auth = await getAuthorizedOpsHost(hostId, user)
+    if (!auth.host) return reply.code(auth.status).send(auth.error)
+
+    const { name, gateway, prefixLength, cidr, notes } = request.body
+    if (!name || !name.trim() || !gateway || !gateway.trim()) {
+      return reply.code(400).send({ error: '地址池名称与网关必填' })
+    }
+
+    try {
+      const pool = await db.createPublicIpv4Pool({
+        hostId,
+        name,
+        gateway,
+        cidr: cidr || null,
+        prefixLength,
+        dns: parsePublicIpv4List(request.body.dns),
+        notes: notes || null,
+        addresses: parsePublicIpv4List(request.body.addresses)
+      })
+      return reply.code(201).send({ message: 'IPv4 地址池创建成功', id: pool.id })
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      request.log.error(err, 'Failed to create public IPv4 pool')
+      return reply.code(500).send({ error: `创建 IPv4 地址池失败: ${errorMessage}` })
+    }
+  })
+
+  /** 向地址池批量添加地址 POST /hosts/:id/public-ipv4/pools/:poolId/addresses */
+  fastify.post<{
+    Params: { id: string; poolId: string }
+    Body: { addresses: string[] | string }
+  }>('/:id/public-ipv4/pools/:poolId/addresses', {
+    onRequest: [fastify.authenticate]
+  }, async (request, reply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+    const poolId = parsePositiveRouteId(request.params.poolId)
+    if (!hostId || !poolId) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+
+    const auth = await getAuthorizedOpsHost(hostId, user)
+    if (!auth.host) return reply.code(auth.status).send(auth.error)
+
+    const addresses = parsePublicIpv4List(request.body.addresses)
+    if (addresses.length === 0) {
+      return reply.code(400).send({ error: '至少需要提供一个 IP 地址' })
+    }
+
+    try {
+      const result = await db.addPublicIpv4Addresses({ hostId, poolId, addresses })
+      return { message: '地址添加成功', count: result.count }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage === 'PUBLIC_IPV4_POOL_NOT_FOUND') {
+        return reply.code(404).send({ error: 'IPv4 地址池不存在' })
+      }
+      request.log.error(err, 'Failed to add public IPv4 addresses')
+      return reply.code(500).send({ error: `添加地址失败: ${errorMessage}` })
+    }
+  })
+
+  /** 更新地址状态（free/disabled） PATCH /hosts/:id/public-ipv4/addresses/:addressId */
+  fastify.patch<{
+    Params: { id: string; addressId: string }
+    Body: { status: 'free' | 'disabled' }
+  }>('/:id/public-ipv4/addresses/:addressId', {
+    onRequest: [fastify.authenticate]
+  }, async (request, reply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+    const addressId = parsePositiveRouteId(request.params.addressId)
+    if (!hostId || !addressId) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+
+    const auth = await getAuthorizedOpsHost(hostId, user)
+    if (!auth.host) return reply.code(auth.status).send(auth.error)
+
+    const { status } = request.body
+    if (status !== 'free' && status !== 'disabled') {
+      return reply.code(400).send({ error: '无效的地址状态' })
+    }
+
+    try {
+      await db.setPublicIpv4AddressStatus(hostId, addressId, status)
+      return { message: '地址状态更新成功' }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage === 'PUBLIC_IPV4_ADDRESS_NOT_FOUND') {
+        return reply.code(404).send({ error: 'IP 地址不存在' })
+      }
+      if (errorMessage === 'PUBLIC_IPV4_ADDRESS_ASSIGNED') {
+        return reply.code(400).send({ error: '该地址已被实例占用，无法修改状态' })
+      }
+      request.log.error(err, 'Failed to update public IPv4 address status')
+      return reply.code(500).send({ error: `更新地址状态失败: ${errorMessage}` })
+    }
+  })
+
+  /** 删除地址（仅 free/disabled 状态） DELETE /hosts/:id/public-ipv4/addresses/:addressId */
+  fastify.delete<{
+    Params: { id: string; addressId: string }
+  }>('/:id/public-ipv4/addresses/:addressId', {
+    onRequest: [fastify.authenticate]
+  }, async (request, reply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+    const addressId = parsePositiveRouteId(request.params.addressId)
+    if (!hostId || !addressId) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+
+    const auth = await getAuthorizedOpsHost(hostId, user)
+    if (!auth.host) return reply.code(auth.status).send(auth.error)
+
+    try {
+      await db.deletePublicIpv4Address(hostId, addressId)
+      return { message: '地址删除成功' }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage === 'PUBLIC_IPV4_ADDRESS_NOT_FOUND') {
+        return reply.code(404).send({ error: 'IP 地址不存在' })
+      }
+      if (errorMessage === 'PUBLIC_IPV4_ADDRESS_ASSIGNED') {
+        return reply.code(400).send({ error: '该地址已被实例占用，无法删除' })
+      }
+      request.log.error(err, 'Failed to delete public IPv4 address')
+      return reply.code(500).send({ error: `删除地址失败: ${errorMessage}` })
+    }
+  })
+
   // ==================== Caddy 反代管理路由（纯本地 + Agent 自动安装）====================
 
   /**
@@ -4084,6 +4278,162 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
   })
 
+  /**
+   * 触发 Agent 在宿主机本地卸载 Caddy（彻底删除）
+   * POST /hosts/:id/caddy/uninstall
+   *
+   * 幂等：通过心跳响应向 Agent 下发 uninstall 指令；Agent 本地删除后
+   * 在后续心跳上报 available=false，面板据此自动将 caddy_enabled 置为 false。
+   */
+  fastify.post<{
+    Params: { id: string }
+  }>('/:id/caddy/uninstall', {
+    onRequest: [fastify.authenticate]
+  }, async (request: FastifyRequest<{
+    Params: { id: string }
+  }>, reply: FastifyReply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+
+    if (!hostId) {
+      return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+    }
+
+    const host = await db.getHostById(hostId)
+    if (!host) {
+      return reply.code(404).send(apiError(ErrorCode.HOST_NOT_FOUND))
+    }
+
+    if (host.user_id !== user.id && user.role !== 'admin') {
+      return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
+    }
+
+    if (!host.caddy_enabled) {
+      return reply.code(400).send({ error: 'Caddy 未安装，无需卸载' })
+    }
+
+    // 卸载由 Agent 本地执行，只要求心跳在线（不依赖隧道）。
+    const agent = await prisma.hostAgent.findFirst({
+      where: { hostId, enabled: true },
+      select: { status: true, lastSeenAt: true }
+    })
+    const agentHeartbeatAlive = !!agent && agent.status === 'online' &&
+      !!agent.lastSeenAt && (Date.now() - agent.lastSeenAt.getTime()) < 3 * 60 * 1000
+    if (!agentHeartbeatAlive) {
+      return reply.code(400).send({ error: '宿主机 Agent 未在线，无法卸载 Caddy（请确认 Agent 心跳正常）' })
+    }
+
+    // 记录本次显式卸载请求：之后的心跳响应据此下发 uninstall 指令。
+    caddyUninstallRequested.add(hostId)
+
+    await createLog(
+      user.id,
+      'host',
+      'caddy.uninstall.request',
+      `Requested Agent to uninstall Caddy from host "${host.name}"`,
+      'success'
+    )
+
+    // 卸载结果由 Agent 后续心跳上报驱动 caddy_enabled；前端轮询等待翻转。
+    return {
+      message: '已通知 Agent 卸载 Caddy，请等候其完成上报',
+      accepted: true
+    }
+  })
+
+  /**
+   * 换取 Agent 运行日志流票据（打开 SSE 前调用，单次使用）
+   * POST /hosts/:id/agent/logs/ticket
+   */
+  fastify.post<{
+    Params: { id: string }
+  }>('/:id/agent/logs/ticket', {
+    onRequest: [fastify.authenticate]
+  }, async (request: FastifyRequest<{
+    Params: { id: string }
+  }>, reply: FastifyReply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+
+    if (!hostId) {
+      return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+    }
+
+    const host = await db.getHostById(hostId)
+    if (!host) {
+      return reply.code(404).send(apiError(ErrorCode.HOST_NOT_FOUND))
+    }
+
+    if (host.user_id !== user.id && user.role !== 'admin') {
+      return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
+    }
+
+    const issuedAt = request.user.iat
+    if (!issuedAt) {
+      return reply.code(401).send(apiError(ErrorCode.UNAUTHORIZED))
+    }
+
+    const ticket = generateAgentLogStreamTicket(user.id, hostId, issuedAt, request.user.sid)
+    return { ticket, expiresIn: 60 }
+  })
+
+  /**
+   * Agent 运行日志流（SSE）
+   * GET /hosts/:id/agent/logs/stream?ticket=xxx
+   *
+   * 持有有效票据即可订阅：面板向 Agent 下发 LOG_CTL(start) 指令，
+   * Agent 经出站 WS 逐行回传 LOG_DATA，由 agentLogStreamManager 扇出到此处。
+   * Agent 离线时连接保持打开，显示离线状态，待其重连后自动恢复日志流。
+   */
+  fastify.get<{
+    Params: { id: string }
+    Querystring: { ticket?: string }
+  }>('/:id/agent/logs/stream', async (request: FastifyRequest<{
+    Params: { id: string }
+    Querystring: { ticket?: string }
+  }>, reply: FastifyReply) => {
+    const hostId = parsePositiveRouteId(request.params.id)
+    if (!hostId) {
+      return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+    }
+
+    const ticket = request.query.ticket
+    if (!ticket) {
+      return reply.code(401).send(apiError(ErrorCode.UNAUTHORIZED))
+    }
+    const consume = consumeAgentLogStreamTicket(ticket, hostId)
+    if (!consume.valid) {
+      return reply.code(401).send(apiError(ErrorCode.UNAUTHORIZED))
+    }
+
+    reply.hijack()
+    const res = reply.raw
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    })
+
+    const client = {
+      write(chunk: string): boolean {
+        if (res.writableEnded || res.destroyed) return false
+        try {
+          res.write(chunk)
+          return true
+        } catch {
+          return false
+        }
+      }
+    }
+
+    agentLogStreamManager.subscribe(hostId, client)
+    const cleanup = () => {
+      agentLogStreamManager.unsubscribe(hostId, client)
+    }
+    request.raw.on('close', cleanup)
+    res.on('close', cleanup)
+  })
 
   /**
    * 获取宿主机的所有反代站点列表

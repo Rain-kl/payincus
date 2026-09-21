@@ -14,6 +14,7 @@ import HostInstancesTab from '@/components/host/HostInstancesTab.vue'
 import HostStorageTab from '@/components/host/HostStorageTab.vue'
 import HostPublicIpv4Tab from '@/components/host/HostPublicIpv4Tab.vue'
 import HostCaddyTab from '@/components/host/HostCaddyTab.vue'
+import HostAgentLogsTab from '@/components/host/HostAgentLogsTab.vue'
 import HostRedeemCodesTab from '@/components/host/HostRedeemCodesTab.vue'
 import HostCreateInstanceTab from '@/components/host/HostCreateInstanceTab.vue'
 import HostOpsTab from '@/components/host/HostOpsTab.vue'
@@ -35,7 +36,7 @@ const authStore = useAuthStore()
 // 是否是管理员
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-type TabType = 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'redeemCodes' | 'ops' | 'create'
+type TabType = 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'agentLogs' | 'redeemCodes' | 'ops' | 'create'
 const activeTab = ref<TabType>('info')
 
 interface Host {
@@ -363,6 +364,7 @@ const tabs = [
   { key: 'storage', labelKey: 'admin.hosts.tabStorage', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4' },
   { key: 'publicIpv4', labelKey: 'admin.hosts.tabPublicIpv4', icon: 'M12 11c0 1.657-1.79 3-4 3s-4-1.343-4-3 1.79-3 4-3 4 1.343 4 3zm0 0c0-1.657 1.79-3 4-3s4 1.343 4 3-1.79 3-4 3-4-1.343-4-3zm-4 3v4m8-4v4M8 6V3m8 3V3' },
   { key: 'caddy', labelKey: 'host.caddy.title', icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9' },
+  { key: 'agentLogs', labelKey: 'host.agentLogs.title', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   { key: 'redeemCodes', labelKey: 'redeemCodes.title', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
   { key: 'instances', labelKey: 'admin.hosts.tabInstances', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
   { key: 'ops', labelKey: 'admin.hosts.tabOps', icon: 'M5 13l4 4L19 7M12 6v6l4 2' },
@@ -497,6 +499,7 @@ const tabs = [
         <HostStorageTab v-if="activeTab === 'storage'" :host-id="host.id" />
         <HostPublicIpv4Tab v-if="activeTab === 'publicIpv4'" :host-id="host.id" />
         <HostCaddyTab v-if="activeTab === 'caddy'" :host-id="host.id" />
+        <HostAgentLogsTab v-if="activeTab === 'agentLogs'" :host-id="host.id" />
         <HostRedeemCodesTab v-if="activeTab === 'redeemCodes'" :host-id="host.id" />
         <HostInstancesTab v-if="activeTab === 'instances'" :host-id="host.id" :host-name="host.name" />
         <HostOpsTab v-if="activeTab === 'ops'" :host-id="host.id" :host-name="host.name" />

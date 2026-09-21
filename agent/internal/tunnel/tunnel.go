@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -9,6 +10,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -198,8 +201,15 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 
 	log.Printf("[tunnel] reverse tunnel established to %s", wsURL)
 
+	// 日志流绑定本次连接生命周期：连接断开即取消 journalctl 推送
+	connCtx, connCancel := context.WithCancel(ctx)
+	defer connCancel()
+
 	writeChan := make(chan []byte, 128)
 	writeErrChan := make(chan error, 1)
+
+	var logsMu sync.Mutex
+	var logStreamCancel context.CancelFunc
 
 	var streamsMu sync.Mutex
 	streams := make(map[uint32]*streamEntry)
@@ -413,6 +423,85 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 				log.Printf("[tunnel] dynamic config update received: target=%s:%d", cfg.TargetHost, cfg.TargetPort)
 				w.setTarget(cfg.TargetHost, cfg.TargetPort)
 			}
+
+		case FrameTypeLogCtl:
+			var ctl LogControl
+			if err := json.Unmarshal(payload, &ctl); err != nil {
+				log.Printf("[tunnel] log control decode error: %v", err)
+				continue
+			}
+			logsMu.Lock()
+			switch ctl.Action {
+			case "start":
+				if logStreamCancel != nil {
+					logStreamCancel()
+					logStreamCancel = nil
+				}
+				lines := ctl.Lines
+				if lines <= 0 {
+					lines = 100
+				}
+				logCtx, cancel := context.WithCancel(connCtx)
+				logStreamCancel = cancel
+				log.Printf("[tunnel] starting agent log stream (last %d lines, follow)", lines)
+				go streamJournalLogs(logCtx, writeChan, "incudal-agent", lines)
+			case "stop":
+				if logStreamCancel != nil {
+					log.Printf("[tunnel] stopping agent log stream")
+					logStreamCancel()
+					logStreamCancel = nil
+				}
+			}
+			logsMu.Unlock()
 		}
+	}
+}
+
+// LogControl 是 LOG_CTL 帧的载荷：面板请求 Agent 启停日志推送。
+type LogControl struct {
+	Action string `json:"action"`
+	Lines  int    `json:"lines"`
+}
+
+func streamJournalLogs(ctx context.Context, writeChan chan<- []byte, unit string, lines int) {
+	// 流结束时发送空 Payload 帧，通知面板日志流已结束。
+	defer func() {
+		select {
+		case writeChan <- EncodeFrame(FrameTypeLogData, 0, nil):
+		case <-ctx.Done():
+		}
+	}()
+
+	args := []string{"-u", unit, "-n", strconv.Itoa(lines), "-f", "--no-pager", "-o", "short-iso"}
+	cmd := exec.CommandContext(ctx, "journalctl", args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Printf("[tunnel] journalctl stdout pipe error: %v", err)
+		return
+	}
+	if err := cmd.Start(); err != nil {
+		log.Printf("[tunnel] journalctl start error: %v", err)
+		return
+	}
+	defer func() { _ = cmd.Wait() }()
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if len(line) > 8000 {
+			line = line[:8000] + "…"
+		}
+		select {
+		case writeChan <- EncodeFrame(FrameTypeLogData, 0, []byte(line)):
+		case <-ctx.Done():
+			return
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("[tunnel] journalctl read error: %v", err)
 	}
 }

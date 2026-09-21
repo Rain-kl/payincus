@@ -2649,6 +2649,17 @@ const zhTW = {
             authSecret: '認證金鑰',
             authSecretPlaceholder: '輸入認證金鑰',
         },
+        // 宿主机 Agent 運行日誌
+        agentLogs: {
+            title: '日誌',
+            failed: '取得 Agent 日誌失敗',
+            empty: '暫無日誌',
+            emptyWaitingAgent: 'Agent 離線或尚未回報日誌，將自動重試連線',
+            autoRetry: '每 5 秒自動重連',
+            refresh: '重新整理',
+            online: 'Agent 在線',
+            offline: 'Agent 離線',
+        },
         caddy: {
             title: 'Caddy 反向代理',
             description: '透過 Caddy 為您的實例提供網域反向代理服務，自動申請 SSL 憑證。安裝由宿主机 Agent 自動完成，管理介面僅在本機回環開放。',
@@ -2658,6 +2669,10 @@ const zhTW = {
             install: '安裝 Caddy',
             installAccepted: '已通知 Agent 安裝 Caddy，安裝完成後將自動啟用',
             installFailed: '安裝 Caddy 失敗',
+            uninstall: '卸載 Caddy',
+            uninstallConfirm: '確定卸載 Caddy 嗎？Agent 將徹底刪除 Caddy 及其配置，此操作不可恢復。',
+            uninstallAccepted: '已通知 Agent 卸載 Caddy，將自動移除並更新狀態',
+            uninstallFailed: '卸載 Caddy 失敗',
             agentOfflineHint: '宿主机 Agent 離線，無法自動安裝，請先確保 Agent 在線',
             agentOnlineHint: '宿主机 Agent 在線，點擊下方按鈕即可自動安裝',
             apiPort: '管理連接埠',

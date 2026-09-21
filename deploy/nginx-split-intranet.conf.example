@@ -76,6 +76,20 @@ server {
     proxy_buffering off;
   }
 
+  # Agent 日志流 (SSE)：必须关闭缓冲，实时透传
+  location ~ ^/api/hosts/[0-9]+/agent/logs/stream {
+    proxy_pass http://10.0.0.12:3001;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $incudal_forwarded_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $incudal_forwarded_proto;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_buffering off;
+  }
+
   location /api/ {
     proxy_pass http://10.0.0.12:3001/api/;
     proxy_http_version 1.1;
@@ -143,6 +157,20 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $incudal_forwarded_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $incudal_forwarded_proto;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_buffering off;
+  }
+
+  # Agent 日志流 (SSE)：必须关闭缓冲，实时透传
+  location ~ ^/api/hosts/[0-9]+/agent/logs/stream {
+    proxy_pass http://10.0.0.12:3001;
+    proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Host $incudal_forwarded_host;
     proxy_set_header X-Real-IP $remote_addr;

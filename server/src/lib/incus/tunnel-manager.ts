@@ -135,6 +135,25 @@ export class HostTunnelManager extends EventEmitter {
   }
 
   /**
+   * 向指定宿主机下发日志流控制帧（启停 Agent 的 journalctl 推送）
+   */
+  sendLogControl(hostId: number, action: 'start' | 'stop', lines?: number): boolean {
+    const ws = this.activeTunnels.get(hostId)
+    if (!ws || ws.readyState !== WS_OPEN) {
+      return false
+    }
+    const payload = Buffer.from(JSON.stringify({ action, ...(lines ? { lines } : {}) }), 'utf8')
+    const frame = encodeFrame(TunnelFrameType.LOG_CTL, 0, payload)
+    try {
+      ws.send(frame)
+      return true
+    } catch (err) {
+      console.error(`[HostTunnelManager] Failed to send log control frame to host ${hostId}:`, err)
+      return false
+    }
+  }
+
+  /**
    * 为指定宿主机创建并返回一个用于 Incus API 请求的多路复用 Duplex 虚拟流
    */
   createDuplexStream(hostId: number, targetHost: string = '127.0.0.1', targetPort: number = 8443): Duplex {
@@ -247,7 +266,13 @@ export class HostTunnelManager extends EventEmitter {
 
       case TunnelFrameType.OPEN:
       case TunnelFrameType.CONFIG:
-        // 服务端目前仅发出 OPEN / CONFIG，忽略 Agent 错误发来的此类控制帧
+      case TunnelFrameType.LOG_CTL:
+        // 服务端目前仅发出 OPEN / CONFIG / LOG_CTL，忽略 Agent 错误发来的此类控制帧
+        break
+
+      case TunnelFrameType.LOG_DATA:
+        // Agent 推送的日志行（空 Payload 表示日志流结束）
+        this.emit('log_data', hostId, payload.length > 0 ? payload.toString('utf8') : null)
         break
 
       default:

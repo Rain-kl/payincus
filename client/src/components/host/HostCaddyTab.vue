@@ -186,6 +186,25 @@ async function installCaddy() {
 
 const isEnabled = computed(() => caddyStatus.value.enabled)
 const agentOnline = computed(() => caddyStatus.value.agentOnline)
+
+const uninstalling = ref(false)
+
+async function uninstallCaddy() {
+  if (uninstalling.value) return
+  if (!confirm(t('host.caddy.uninstallConfirm'))) return
+  uninstalling.value = true
+  try {
+    const res = await api.hosts.uninstallCaddy(props.hostId)
+    toast.success(res.message || t('host.caddy.uninstallAccepted'))
+    stopPolling()
+    startPolling()
+  } catch (err: unknown) {
+    const error = err as { response?: { data?: { error?: string } }, message?: string }
+    toast.error(error?.response?.data?.error || error?.message || t('host.caddy.uninstallFailed'))
+  } finally {
+    uninstalling.value = false
+  }
+}
 </script>
 
 <template>
@@ -272,6 +291,23 @@ const agentOnline = computed(() => caddyStatus.value.agentOnline)
             </dd>
           </div>
         </dl>
+
+        <div class="flex gap-3 pt-2 border-t" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
+          <button
+            :disabled="uninstalling"
+            class="btn-ghost text-red-600 hover:text-red-700"
+            @click="uninstallCaddy"
+          >
+            <span v-if="uninstalling" class="flex items-center gap-2">
+              <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {{ t('common.loading') }}
+            </span>
+            <span v-else>{{ t('host.caddy.uninstall') }}</span>
+          </button>
+        </div>
       </div>
     </div>
 

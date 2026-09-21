@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
 
-export type ActionTicketType = 'oauth-bind' | 'terminal'
+export type ActionTicketType = 'oauth-bind' | 'terminal' | 'agent-log-stream'
 
 interface BaseActionTicket {
   type: ActionTicketType
@@ -22,13 +22,19 @@ interface TerminalTicket extends BaseActionTicket {
   instanceId: number
 }
 
-type ActionTicket = OAuthBindTicket | TerminalTicket
+interface AgentLogStreamTicket extends BaseActionTicket {
+  type: 'agent-log-stream'
+  hostId: number
+}
+
+type ActionTicket = OAuthBindTicket | TerminalTicket | AgentLogStreamTicket
 
 const actionTickets = new Map<string, ActionTicket>()
 
 const ACTION_TICKET_TTL_MS = {
   'oauth-bind': 60 * 1000,
-  terminal: 60 * 1000
+  terminal: 60 * 1000,
+  'agent-log-stream': 60 * 1000
 } as const
 
 setInterval(() => {
@@ -78,6 +84,29 @@ export function generateTerminalAccessTicket(
     issuedAt,
     sessionId,
     expiresAt: now + ACTION_TICKET_TTL_MS.terminal,
+    createdAt: now,
+    usageCount: 0,
+    maxUsage: 1
+  })
+}
+
+/**
+ * Agent 运行日志流访问票据：单次使用，绑定宿主机，打开 SSE 日志流前换取。
+ */
+export function generateAgentLogStreamTicket(
+  userId: number,
+  hostId: number,
+  issuedAt: number,
+  sessionId?: string
+): string {
+  const now = Date.now()
+  return createTicket({
+    type: 'agent-log-stream',
+    userId,
+    hostId,
+    issuedAt,
+    sessionId,
+    expiresAt: now + ACTION_TICKET_TTL_MS['agent-log-stream'],
     createdAt: now,
     usageCount: 0,
     maxUsage: 1
@@ -157,6 +186,50 @@ export function consumeTerminalAccessTicket(
     valid: true,
     userId: ticket.userId,
     instanceId: ticket.instanceId,
+    issuedAt: ticket.issuedAt,
+    sessionId: ticket.sessionId
+  }
+}
+
+export interface AgentLogStreamTicketConsumeResult {
+  valid: boolean
+  userId?: number
+  hostId?: number
+  issuedAt?: number
+  sessionId?: string
+  error?: string
+}
+
+export function consumeAgentLogStreamTicket(
+  token: string,
+  expectedHostId?: number
+): AgentLogStreamTicketConsumeResult {
+  const ticket = actionTickets.get(token)
+  if (!ticket || ticket.type !== 'agent-log-stream') {
+    return { valid: false, error: 'Ticket not found or already used' }
+  }
+
+  if (Date.now() > ticket.expiresAt) {
+    actionTickets.delete(token)
+    return { valid: false, error: 'Ticket expired' }
+  }
+
+  if (expectedHostId !== undefined && ticket.hostId !== expectedHostId) {
+    actionTickets.delete(token)
+    return { valid: false, error: 'Host mismatch' }
+  }
+
+  ticket.usageCount += 1
+  if (ticket.usageCount >= ticket.maxUsage) {
+    actionTickets.delete(token)
+  } else {
+    actionTickets.set(token, ticket)
+  }
+
+  return {
+    valid: true,
+    userId: ticket.userId,
+    hostId: ticket.hostId,
     issuedAt: ticket.issuedAt,
     sessionId: ticket.sessionId
   }

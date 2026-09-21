@@ -6350,6 +6350,17 @@ export default {
 
     // 宿主机 Caddy 管理
     host: {
+        // 宿主机 Agent 运行日志
+        agentLogs: {
+            title: '日志',
+            failed: '获取 Agent 日志失败',
+            empty: '暂无日志',
+            emptyWaitingAgent: 'Agent 离线或尚未上报日志，将自动重试连接',
+            autoRetry: '每 5 秒自动重连',
+            refresh: '刷新',
+            online: 'Agent 在线',
+            offline: 'Agent 离线',
+        },
         caddy: {
             title: 'Caddy 反代',
             description: '通过 Caddy 为您的实例提供域名反向代理服务，自动申请 SSL 证书。安装由宿主机 Agent 自动完成，管理接口仅在本机回环开放。',
@@ -6359,6 +6370,10 @@ export default {
             install: '安装 Caddy',
             installAccepted: '已通知 Agent 安装 Caddy，安装完成后将自动启用',
             installFailed: '安装 Caddy 失败',
+            uninstall: '卸载 Caddy',
+            uninstallConfirm: '确定卸载 Caddy 吗？Agent 将彻底删除 Caddy 及其配置，此操作不可恢复。',
+            uninstallAccepted: '已通知 Agent 卸载 Caddy，将自动移除并更新状态',
+            uninstallFailed: '卸载 Caddy 失败',
             agentOfflineHint: '宿主机 Agent 离线，无法自动安装，请先确保 Agent 在线',
             agentOnlineHint: '宿主机 Agent 在线，点击下方按钮即可自动安装',
             apiPort: '管理端口',

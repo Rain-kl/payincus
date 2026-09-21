@@ -118,6 +118,12 @@ const __dirname = dirname(__filename)
  */
 export const caddyInstallRequested = new Set<number>()
 
+/**
+ * 显式请求过「卸载 Caddy」的宿主机集合（进程内状态）。
+ * 卸载指令只对集合内的宿主机下发；Agent 上报已移除后清除。
+ */
+export const caddyUninstallRequested = new Set<number>()
+
 const agentBinaryNamePattern = /^incudal-agent-linux-(amd64|arm64)(?:\.gz)?$/
 const agentReleaseBinaryNamePattern = /^incudal-agent-(x86_64|aarch64)-v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/
 const defaultAgentReleaseRepository = 'VipMaxxxx/payincus'
@@ -1562,12 +1568,30 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       request.log.info({ agentId: agent.agentId, hostId: agent.hostId }, '[Caddy] Agent reported Caddy available; auto-enabled host')
     }
 
+    // Agent 上报 Caddy 已移除时，自动将宿主机标记为未启用（卸载完成）。
+    const caddyUninstallRequestedNow = caddyUninstallRequested.has(agent.hostId)
+    if (caddyUninstallRequestedNow && caddyEnabled && !caddyAvailable) {
+      await prisma.host.update({
+        where: { id: agent.hostId },
+        data: { caddyEnabled: false }
+      })
+      caddyEnabled = false
+      caddyUninstallRequested.delete(agent.hostId)
+      caddyInstallRequested.delete(agent.hostId)
+      request.log.info({ agentId: agent.agentId, hostId: agent.hostId }, '[Caddy] Agent reported Caddy removed; auto-disabled host')
+    }
+
     const caddyPort = typeof caddyReported.port === 'number' && caddyReported.port > 0
       ? Math.min(65535, Math.floor(caddyReported.port))
       : 2019
 
-    // 安装指令只由面板显式「安装 Caddy」触发：曾请求安装且尚未启用才下发 install。
-    const caddyCommand = (!caddyEnabled && caddyInstallRequested.has(agent.hostId)) ? 'install' : 'idle'
+    // 指令优先级：卸载 > 安装 > 空转。均由面板显式触发（安装/卸载按钮）。
+    let caddyCommand = 'idle'
+    if (caddyUninstallRequestedNow) {
+      caddyCommand = 'uninstall'
+    } else if (!caddyEnabled && caddyInstallRequested.has(agent.hostId)) {
+      caddyCommand = 'install'
+    }
 
     return {
       ok: true,
