@@ -681,7 +681,7 @@ assert.ok(
     !sideNavUserItemsSource.includes("path: '/resources/packages'") &&
     !sideNavUserItemsSource.includes('/admin/') &&
     sideNavAdminItemsSource.includes("path: '/admin/tickets'") &&
-    sideNavAdminItemsSource.includes("path: '/admin/profile'") &&
+    sideNavAdminItemsSource.includes("path: '/admin/settings'") &&
     sideNavAdminItemsSource.includes("path: '/admin/resources/hosts'"),
   'shared SideNav menu tables must be build-time aliased so customer bundles do not keep admin navigation entries'
 )

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
+import { systemSettingsNavigationItems } from '@/constants/adminSettings'
 import type { AdminOAuthAuthorization, OAuthClientApp, OAuthConfig, PublicApiScope, PublicApiScopeMetadata, UpdateOAuthConfigRequest } from '@/types/api'
 import { buildPublicApiUrl } from '@/utils/api-url'
 
+const route = useRoute()
 const { t } = useI18n()
 const toast = useToast()
 const themeStore = useThemeStore()
@@ -425,19 +428,26 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
 
 <template>
   <div class="kawaii-page nimbus-view space-y-6 animate-fade-in">
-    <header class="flex flex-col gap-4 border-b border-themed pb-5 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex items-start gap-3">
-        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500 sm:flex">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.909c0-.464.184-.909.513-1.237l6.706-6.706c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-          </svg>
-        </span>
-        <div>
-          <h1 class="text-xl font-semibold text-themed sm:text-2xl">{{ t('admin.oauth.title') }}</h1>
-          <p class="mt-1 text-sm text-themed-muted">{{ t('admin.oauth.description') }}</p>
-        </div>
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">{{ t('admin.system.title') || '系统设置' }}</h1>
+        <p class="page-description">{{ t('admin.oauth.description') || '配置第三方登录（GitHub、Google）及 OAuth 客户端应用' }}</p>
       </div>
-    </header>
+    </div>
+
+    <div class="flex gap-1 overflow-x-auto border-b border-themed">
+      <router-link
+        v-for="item in systemSettingsNavigationItems"
+        :key="item.path"
+        :to="item.path"
+        class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors duration-150"
+        :class="route.path === item.path
+          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+          : 'border-transparent text-themed-muted hover:text-themed'"
+      >
+        {{ t(item.labelKey) }}
+      </router-link>
+    </div>
 
     <!-- Loading -->
     <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -77,7 +77,7 @@ const menuKeywords: Record<string, string[]> = {
   'admin-entertainment': ['福利管理', '抽奖配置', 'entertainment'],
   'admin-profile': ['管理员设置', '账号设置', 'admin', 'profile'],
   'admin-statistics': ['系统统计', '业务监控', '数据看板', 'statistics', 'metrics', 'analytics'],
-  'admin-oauth': ['OAuth配置', '第三方登录', 'oauth', 'sso']
+  'admin-settings-oauth': ['OAuth配置', '第三方登录', 'oauth', 'sso']
 }
 
 interface SearchableItem {
@@ -127,6 +127,14 @@ const searchableList = computed<SearchableItem[]>(() => {
   }
 
   if (isAdminEntry) {
+    result.push({
+      name: 'admin-settings-oauth',
+      path: '/admin/settings/oauth',
+      icon: 'key',
+      title: t('admin.system.tabs.oauth') || 'OAuth 设置',
+      groupName: '系统',
+      keywords: menuKeywords['admin-settings-oauth'] || ['OAuth配置', '第三方登录', 'oauth', 'sso']
+    })
     result.push({
       name: 'admin-settings-update',
       path: '/admin/settings/update',

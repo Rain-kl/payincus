@@ -3242,6 +3242,7 @@ export default {
             tabs: {
                 system: 'System Settings',
                 popupAnnouncement: 'Popup Notice',
+                oauth: 'OAuth Settings',
                 telegram: 'Telegram Settings',
             },
             sections: {

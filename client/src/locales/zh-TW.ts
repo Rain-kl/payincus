@@ -4223,6 +4223,7 @@ const zhTW = {
             tabs: {
                 system: '系統設定',
                 popupAnnouncement: '彈窗公告',
+                oauth: 'OAuth 設定',
                 telegram: 'Telegram 設定',
             },
             sections: {

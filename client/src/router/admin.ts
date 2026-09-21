@@ -106,9 +106,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin/oauth',
-    name: 'admin-oauth',
-    component: () => import('@/views/admin/OAuthConfigView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.oauth', title: 'OAuth' }
+    redirect: '/admin/settings/oauth'
   },
   {
     path: '/admin/gift-cards',
@@ -174,6 +172,12 @@ const routes: RouteRecordRaw[] = [
     name: 'admin-settings-popup-announcement',
     component: () => import('@/views/admin/SystemConfigView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'admin.system.popupAnnouncement.title', title: '弹窗公告' }
+  },
+  {
+    path: '/admin/settings/oauth',
+    name: 'admin-settings-oauth',
+    component: () => import('@/views/admin/OAuthConfigView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'admin.system.tabs.oauth', title: 'OAuth 设置' }
   },
   {
     path: '/admin/settings/telegram',

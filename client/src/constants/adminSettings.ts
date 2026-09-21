@@ -1,7 +1,7 @@
 export type SystemSettingsSectionKey = 'access' | 'brand' | 'security' | 'mail' | 'tickets' | 'popup' | 'operations'
 
 export interface SystemSettingsNavigationItem {
-  key: SystemSettingsSectionKey | 'telegram' | 'update'
+  key: SystemSettingsSectionKey | 'oauth' | 'telegram' | 'update'
   path: string
   labelKey: string
   descriptionKey?: string
@@ -54,6 +54,11 @@ export const systemSettingsSections: Array<SystemSettingsNavigationItem & { key:
 
 export const systemSettingsNavigationItems: SystemSettingsNavigationItem[] = [
   ...systemSettingsSections,
+  {
+    key: 'oauth',
+    path: '/admin/settings/oauth',
+    labelKey: 'admin.system.tabs.oauth'
+  },
   {
     key: 'telegram',
     path: '/admin/settings/telegram',

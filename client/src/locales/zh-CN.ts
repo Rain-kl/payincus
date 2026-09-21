@@ -3425,6 +3425,7 @@ export default {
             tabs: {
                 system: '系统设置',
                 popupAnnouncement: '弹窗公告',
+                oauth: 'OAuth 设置',
                 telegram: 'Telegram 设置',
             },
             sections: {

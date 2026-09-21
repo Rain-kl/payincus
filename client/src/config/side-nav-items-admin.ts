@@ -24,6 +24,5 @@ export const navMenuItems: MenuItem[] = [
   { name: 'admin-broadcast', path: '/admin/broadcast', icon: 'bell', label: 'nav.broadcast' },
   { name: 'admin-logs', path: '/admin/logs', icon: 'logs', label: 'nav.logs' },
   { name: 'admin-help', path: '/admin/help', icon: 'book', label: 'nav.helpManage' },
-  { name: 'admin-oauth', path: '/admin/oauth', icon: 'key', label: 'nav.oauth' },
   { name: 'admin-settings', path: '/admin/settings', icon: 'cog', label: 'nav.system' },
 ]
