@@ -98,7 +98,7 @@ const DEFAULT_AVATAR_SRC = '/images/user-icon.png'
 const customImgFailed = ref(false)
 const defaultImgFailed = ref(false)
 
-watch(() => [props.avatarStyle, props.username, props.email], () => {
+watch(() => [props.avatarStyle, props.username, props.email, props.badgeId], () => {
   customImgFailed.value = false
   defaultImgFailed.value = false
 })
