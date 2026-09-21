@@ -17,7 +17,7 @@
 
 .dark .markdown-body .hljs {
   color: #c9d1d9;
-  background: transparent;
+  background: inherit;
 }
 
 .dark .markdown-body .hljs-keyword,
@@ -58,7 +58,7 @@
 
 .light .markdown-body .hljs {
   color: #24292f;
-  background: transparent;
+  background: inherit;
 }
 
 .light .markdown-body .hljs-keyword,

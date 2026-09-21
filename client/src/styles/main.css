@@ -36,7 +36,7 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--bg-primary);
   }
 
   .dark ::-webkit-scrollbar-thumb {
@@ -57,7 +57,8 @@
 
   /* 选择文本 */
   ::selection {
-    background-color: rgba(120, 120, 128, 0.28);
+    background-color: var(--accent);
+    color: var(--bg-surface);
   }
 }
 
@@ -89,7 +90,7 @@
   }
 
   .dark .btn-secondary {
-    @apply bg-transparent text-gray-100 border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)];
+    @apply bg-[var(--bg-surface)] text-gray-100 border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)];
   }
 
   .light .btn-secondary {
@@ -102,21 +103,21 @@
   }
 
   .dark .btn-ghost {
-    @apply bg-transparent text-gray-400 hover:text-gray-100 hover:bg-gray-800;
+    @apply bg-[var(--bg-surface)] text-gray-400 hover:text-gray-100 hover:bg-gray-800;
   }
 
   .light .btn-ghost {
-    @apply bg-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100;
+    @apply bg-[var(--bg-surface)] text-gray-600 hover:text-gray-900 hover:bg-gray-100;
   }
 
   /* 危险按钮 */
   .btn-danger {
-    @apply btn bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20;
+    @apply btn bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_30%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--error)_20%,var(--bg-surface))];
   }
 
   /* 警告按钮 */
   .btn-warning {
-    @apply btn bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20;
+    @apply btn bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_30%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--warning)_20%,var(--bg-surface))];
   }
 
   .btn-sm {
@@ -168,7 +169,7 @@
   }
 
   .input-error {
-    @apply border-red-500/50 focus:border-red-500 focus:ring-red-500/50;
+    @apply border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500;
   }
 
   /* ============ 卡片 - OCI 纯平小圆角无阴影 ============ */
@@ -474,7 +475,7 @@
 /* 加载动画 Spinner */
 .loading-spinner {
   @apply animate-spin;
-  border: 2px solid transparent;
+  border: 2px solid var(--border-color);
   border-top-color: currentColor;
   border-radius: 50%;
 }
@@ -698,11 +699,11 @@
 }
 
 .toast-success {
-  @apply border-green-500/30;
+  @apply border-green-600;
 }
 
 .dark .toast-success {
-  @apply bg-green-950/50;
+  @apply bg-green-950;
 }
 
 .light .toast-success {
@@ -710,11 +711,11 @@
 }
 
 .toast-error {
-  @apply border-red-500/30;
+  @apply border-red-600;
 }
 
 .dark .toast-error {
-  @apply bg-red-950/50;
+  @apply bg-red-950;
 }
 
 .light .toast-error {
@@ -722,11 +723,11 @@
 }
 
 .toast-warning {
-  @apply border-yellow-500/30;
+  @apply border-yellow-600;
 }
 
 .dark .toast-warning {
-  @apply bg-yellow-950/50;
+  @apply bg-yellow-950;
 }
 
 .light .toast-warning {
@@ -734,11 +735,11 @@
 }
 
 .toast-info {
-  @apply border-blue-500/30;
+  @apply border-blue-600;
 }
 
 .dark .toast-info {
-  @apply bg-blue-950/50;
+  @apply bg-blue-950;
 }
 
 .light .toast-info {
@@ -787,12 +788,12 @@
 /* ============ 输入框聚焦效果 ============ */
 .dark .input:focus {
   border-color: color-mix(in srgb, var(--accent) 68%, var(--bg-surface));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 68%, var(--bg-surface)), 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 68%, var(--bg-surface)), 0 0 0 4px color-mix(in srgb, var(--accent) 20%, var(--bg-surface));
 }
 
 .light .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
 }
 
 /* ============ 按钮点击效果 ============ */
@@ -840,11 +841,11 @@
 
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 40%, var(--bg-surface));
   }
 
   50% {
-    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0);
+    box-shadow: 0 0 0 4px var(--bg-surface);
   }
 }
 
@@ -852,11 +853,11 @@
 
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 40%, var(--bg-surface));
   }
 
   50% {
-    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 4px var(--bg-surface);
   }
 }
 
@@ -866,7 +867,7 @@
 }
 
 .dark .card-interactive {
-  @apply bg-gray-950 border border-gray-800 hover:border-gray-700 hover:bg-gray-900/50;
+  @apply bg-gray-950 border border-gray-800 hover:border-gray-700 hover:bg-gray-900;
 }
 
 .light .card-interactive {
@@ -879,8 +880,8 @@
 
 .light .card-interactive:hover,
 .dark .card-interactive:hover {
-  border-color: color-mix(in srgb, var(--kawaii-primary) 40%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 40%, transparent), 0 4px 20px -6px color-mix(in srgb, var(--kawaii-primary) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--kawaii-primary) 40%, var(--bg-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 40%, var(--bg-surface)), 0 4px 20px -6px color-mix(in srgb, var(--kawaii-primary) 30%, var(--bg-surface)) !important;
 }
 
 /* ============ 数字徽章动画 ============ */
@@ -932,7 +933,7 @@
 }
 
 .dark .sidebar-link {
-  @apply text-gray-400 hover:text-gray-100 hover:bg-gray-800/50;
+  @apply text-gray-400 hover:text-gray-100 hover:bg-gray-800;
 }
 
 .light .sidebar-link {
@@ -1044,7 +1045,7 @@
 }
 
 .dark .bg-themed-tertiary {
-  @apply bg-gray-800/50;
+  @apply bg-gray-900;
 }
 
 .light .bg-themed-tertiary {
@@ -1115,7 +1116,7 @@
 }
 
 .dark .table-themed thead {
-  @apply bg-gray-900/50 border-b border-gray-800;
+  @apply bg-gray-900 border-b border-gray-800;
 }
 
 .light .table-themed thead {
@@ -1131,7 +1132,7 @@
 }
 
 .dark .table-themed tbody tr:hover {
-  @apply bg-gray-900/30;
+  @apply bg-gray-900;
 }
 
 .light .table-themed tbody tr:hover {
@@ -1276,7 +1277,7 @@
 .kawaii-menu-item.is-active,
 .kawaii-sidebar a.router-link-active {
   background-image: none !important;
-  background-color: color-mix(in srgb, var(--nav-active) 8%, transparent) !important;
+  background-color: color-mix(in srgb, var(--nav-active) 8%, var(--bg-surface)) !important;
   color: var(--nav-active) !important;
   box-shadow: none !important;
   border-radius: var(--radius-btn) !important;
@@ -1297,7 +1298,7 @@
   border-bottom: 1px solid var(--border-color, var(--kawaii-line)) !important;
   border-radius: 0 !important;
   background-image: none !important;
-  background-color: transparent !important;
+  background-color: var(--bg-primary) !important;
   box-shadow: none !important;
   animation: none !important;
   padding-left: 0 !important;
@@ -1434,7 +1435,7 @@ textarea.input,
 
 /* ============ 成功/警告/信息卡片主题 ============ */
 .dark .info-card-blue {
-  @apply bg-blue-900/30;
+  @apply bg-blue-950;
 }
 
 .light .info-card-blue {
@@ -1442,7 +1443,7 @@ textarea.input,
 }
 
 .dark .info-card-green {
-  @apply bg-green-900/30;
+  @apply bg-green-950;
 }
 
 .light .info-card-green {
@@ -1450,7 +1451,7 @@ textarea.input,
 }
 
 .dark .info-card-yellow {
-  @apply bg-yellow-900/30;
+  @apply bg-yellow-950;
 }
 
 .light .info-card-yellow {
@@ -1458,7 +1459,7 @@ textarea.input,
 }
 
 .dark .info-card-purple {
-  @apply bg-purple-900/30;
+  @apply bg-purple-950;
 }
 
 .light .info-card-purple {
@@ -1551,7 +1552,7 @@ html.light .oci-user-dropdown {
 }
 
 .dark .skeleton-bg-soft {
-  @apply bg-gray-800/50;
+  @apply bg-gray-800;
 }
 
 .light .skeleton-bg-soft {
@@ -1589,15 +1590,15 @@ html.light .oci-user-dropdown {
   width: 2px;
   height: 16px;
   background: linear-gradient(180deg, 
-    transparent 0%, 
+    var(--bg-surface) 0%, 
     var(--accent) 20%, 
     color-mix(in srgb, var(--accent) 70%, var(--bg-surface)) 50%, 
     var(--accent) 80%, 
-    transparent 100%
+    var(--bg-surface) 100%
   );
   border-radius: 1px;
   animation: creating-scan 1.8s ease-in-out infinite;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, var(--bg-surface)), 0 0 16px color-mix(in srgb, var(--accent) 30%, var(--bg-surface));
 }
 
 /* 移动端卡片 - 边框流光效果 */
@@ -1626,13 +1627,13 @@ html.light .oci-user-dropdown {
   padding: 1px;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    transparent 30%,
+    var(--bg-surface) 0%,
+    var(--bg-surface) 30%,
     var(--accent) 45%,
     color-mix(in srgb, var(--accent) 70%, var(--bg-surface)) 50%,
     var(--accent) 55%,
-    transparent 70%,
-    transparent 100%
+    var(--bg-surface) 70%,
+    var(--bg-surface) 100%
   );
   background-size: 300% 100%;
   animation: creating-border-flow 2.5s ease-in-out infinite;
@@ -1644,11 +1645,11 @@ html.light .oci-user-dropdown {
 }
 
 .dark .creating-card::before {
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 20%, var(--bg-surface));
 }
 
 .light .creating-card::before {
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 15%, var(--bg-surface));
 }
 
 /* Vercel Style Slider */
@@ -1680,12 +1681,12 @@ html.light .oci-user-dropdown {
   border: 2px solid var(--accent);
   cursor: grab;
   transition: all 0.15s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--border-color);
 }
 
 .vercel-slider::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, var(--bg-surface));
 }
 
 .vercel-slider::-webkit-slider-thumb:active {

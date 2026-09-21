@@ -233,7 +233,7 @@ export default {
         'glow-lavender': 'none',
         'glow-sunny': 'none',
         'glow-mint': 'none',
-        'pop': '0 4px 12px rgba(0, 0, 0, 0.06)'
+        'pop': 'none'
       },
       animation: {
         'fade-in': 'fadeIn 0.15s ease-out',
@@ -289,8 +289,8 @@ export default {
           '70%': { transform: 'scale(1)' }
         },
         glowPulse: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgb(255 79 156 / 0.4)' },
-          '50%': { boxShadow: '0 0 0 6px rgb(255 79 156 / 0)' }
+          '0%, 100%': { boxShadow: 'none' },
+          '50%': { boxShadow: 'none' }
         },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },

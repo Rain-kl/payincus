@@ -64,16 +64,16 @@
     --alert-warning: #facc15;
     --alert-danger: #f87171;
     --alert-note: #9ca3af;
-    --alert-info-bg: rgba(59, 130, 246, 0.15);
-    --alert-success-bg: rgba(34, 197, 94, 0.15);
-    --alert-warning-bg: rgba(234, 179, 8, 0.15);
-    --alert-danger-bg: rgba(239, 68, 68, 0.15);
-    --alert-note-bg: rgba(107, 114, 128, 0.15);
-    --alert-border: rgba(59, 130, 246, 0.3);
-    --alert-border-success: rgba(34, 197, 94, 0.3);
-    --alert-border-warning: rgba(234, 179, 8, 0.3);
-    --alert-border-danger: rgba(239, 68, 68, 0.3);
-    --alert-border-note: rgba(107, 114, 128, 0.3);
+    --alert-info-bg: #172554;
+    --alert-success-bg: #052e16;
+    --alert-warning-bg: #422006;
+    --alert-danger-bg: #450a0a;
+    --alert-note-bg: #18181b;
+    --alert-border: #1e3a8a;
+    --alert-border-success: #14532d;
+    --alert-border-warning: #713f12;
+    --alert-border-danger: #7f1d1d;
+    --alert-border-note: #3f3f46;
 
     /* =========================================================
      * 统一圆角规格阶梯 (集中抽离维护)
@@ -156,11 +156,11 @@
     --alert-warning-bg: #fefce8;
     --alert-danger-bg: #fef2f2;
     --alert-note-bg: #f9fafb;
-    --alert-border: rgba(59, 130, 246, 0.3);
-    --alert-border-success: rgba(34, 197, 94, 0.3);
-    --alert-border-warning: rgba(234, 179, 8, 0.3);
-    --alert-border-danger: rgba(239, 68, 68, 0.3);
-    --alert-border-note: rgba(107, 114, 128, 0.3);
+    --alert-border: #bfdbfe;
+    --alert-border-success: #bbf7d0;
+    --alert-border-warning: #fef08a;
+    --alert-border-danger: #fecaca;
+    --alert-border-note: #e5e7eb;
 
     /* =========================================================
      * 统一圆角规格阶梯 (集中抽离维护)
