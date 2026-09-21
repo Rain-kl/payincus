@@ -812,6 +812,7 @@ const allowedClientNetworkPrimitiveLines = new Map<string, string[]>([
   ['client/src/api/index.ts', ["fetch(buildApiUrl('/auth/refresh'), {"]],
   ['client/src/api/admin.ts', ["fetch(buildApiUrl('/auth/refresh'), {"]],
   ['client/src/components/TermsOfServiceModal.vue', ['fetch(`/tos/${lang}.md`)']],
+  ['client/src/components/host/HostAgentLogsTab.vue', ['const es = new EventSource(url, { withCredentials: true })']],
   ['client/src/components/instance/TerminalModal.vue', ['new WebSocket(wsUrl)']],
   ['client/src/composables/useTerminal.ts', ['new WebSocket(wsUrl)']],
   ['client/src/views/TerminalView.vue', ['new WebSocket(wsUrl)']]

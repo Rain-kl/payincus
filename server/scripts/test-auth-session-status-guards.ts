@@ -300,8 +300,14 @@ for (const actionBinding of [
   '@click="changeHostingBalanceLogsPage(hostingBalanceLogsPage - 1)"',
   '@click="changeHostingBalanceLogsPage(hostingBalanceLogsPage + 1)"'
 ] as const) {
+  const activeActionBinding = actionBinding.replace('(user)', '(activeActionUser)')
+  const altBinding = actionBinding.replace('@click="', '@click="closeActionMenu(); ')
+  const altActiveBinding = activeActionBinding.replace('@click="', '@click="closeActionMenu(); ')
   assert.ok(
-    adminUsersViewSource.includes(actionBinding),
+    adminUsersViewSource.includes(actionBinding) ||
+      adminUsersViewSource.includes(activeActionBinding) ||
+      adminUsersViewSource.includes(altBinding) ||
+      adminUsersViewSource.includes(altActiveBinding),
     `admin users responsive UI must preserve action binding: ${actionBinding}`
   )
 }

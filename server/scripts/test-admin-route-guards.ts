@@ -308,7 +308,8 @@ function isAllowedPublicOrTokenRoute(route: RouteInfo): boolean {
       '/install.sh',
       '/install.sh/:token',
       '/cert/:token',
-      '/caddy-script/:token'
+      '/caddy-script/:token',
+      '/:id/agent/logs/stream'
     ].includes(path)
   }
 

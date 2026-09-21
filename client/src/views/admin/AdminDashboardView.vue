@@ -934,7 +934,7 @@ function formatTick(label: string): string {
           </div>
 
           <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-            <span>系统单实例: 127.0.0.1:3001 正常</span>
+            <span>系统服务: 单实例运行正常</span>
             <button
               type="button"
               class="text-primary-600 dark:text-primary-400 hover:underline font-medium"

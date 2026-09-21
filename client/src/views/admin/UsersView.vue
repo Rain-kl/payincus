@@ -1191,7 +1191,7 @@ function _getQuotaPercent(used, limit) {
       <template v-else>
         <div class="space-y-3 lg:hidden">
           <div
-            v-for="(user, index) in users"
+            v-for="user in users"
             :key="user.id"
             class="card p-4 relative"
             :class="{ 'z-20': activeActionMenuUserId === user.id }"
@@ -1360,7 +1360,7 @@ function _getQuotaPercent(used, limit) {
               </tr>
             </thead>
             <tbody class="divide-y divide-themed">
-              <tr v-for="(user, index) in users" :key="user.id" class="hover:bg-themed-hover transition-colors">
+              <tr v-for="user in users" :key="user.id" class="hover:bg-themed-hover transition-colors">
                 <!-- 用户 ID -->
                 <td class="px-4 py-3 whitespace-nowrap">
                   <span class="text-sm font-mono tabular-nums text-themed-muted">#{{ user.id }}</span>
