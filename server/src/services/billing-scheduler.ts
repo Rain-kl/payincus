@@ -16,9 +16,12 @@ import {
 import { createLog } from '../db/logs.js'
 import {
   performRenewal,
-  calculateRenewBilling
+  calculateRenewBilling,
+  calculateMonthlyPrice
 } from '../db/billing-operations.js'
 import { getInstanceAffBinding } from '../db/aff.js'
+import { getInstancePromoBinding } from '../db/promo-codes.js'
+import { PromoCodeEngine } from './promo-engine.js'
 import { arbitrateVipPrice, getUserContinuousVipBenefit } from './vip-benefits.js'
 import {
   getAutoRenewInstances,
@@ -172,10 +175,27 @@ async function processAutoRenew(instance: any): Promise<void> {
 
     const balance = Number(user.balance)
     const affBinding = await getInstanceAffBinding(instance.id)
+    const promoBinding = await getInstancePromoBinding(instance.id)
+    const now = new Date()
+    const isPromoActive = Boolean(
+      promoBinding &&
+      promoBinding.promoCode.enabled &&
+      (!promoBinding.promoCode.expiresAt || promoBinding.promoCode.expiresAt > now)
+    )
+    let promoQuote: ReturnType<typeof PromoCodeEngine.calculateRenewalQuote> | null = null
+    if (isPromoActive && promoBinding) {
+      const monthlyPrice = calculateMonthlyPrice(instance)
+      promoQuote = PromoCodeEngine.calculateRenewalQuote(monthlyPrice, renewMonths, promoBinding)
+    }
+
     const vip = await getUserContinuousVipBenefit(instance.userId)
+    const legacyAffRate = affBinding?.affCode.enabled ? Number(affBinding.affCode.discountRate) : 0
+    const promoRate = promoQuote && renewInfo.amount > 0 ? promoQuote.discountAmount / renewInfo.amount : 0
+    const effectiveDiscountRate = Math.max(legacyAffRate, promoRate)
+
     const renewAmount = arbitrateVipPrice({
       basePrice: renewInfo.amount,
-      affDiscountRate: affBinding?.affCode.enabled ? Number(affBinding.affCode.discountRate) : 0,
+      affDiscountRate: effectiveDiscountRate,
       vipDiscountPercent: vip.benefit.orderDiscountPercent
     }).finalPrice
 

@@ -186,3 +186,8 @@ export * from './host-notification-email-tasks.js'
 
 // 导出托管拉黑相关操作
 export * from './hosting-blocks.js'
+
+// 导出统一优惠码相关操作
+export * from './promo-codes.js'
+export * from './promo-redemptions.js'
+

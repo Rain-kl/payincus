@@ -43,9 +43,10 @@ release-packages/
 server/plugin-staging/
 server/theme-staging/
 
-# ==================== IDE/编辑器 ====================
+# ==================== IDE/编辑器与本地工具 ====================
 .vscode/
 .idea/
+.superpowers/
 *.swp
 *.swo
 *.sublime-workspace

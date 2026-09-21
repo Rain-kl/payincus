@@ -6,6 +6,7 @@
 import { prisma } from './prisma.js'
 import type { Instance, PackagePlan, Prisma } from '@prisma/client'
 import { getInstanceAffBinding, processAffCommission } from './aff.js'
+import { getInstancePromoBinding } from './promo-codes.js'
 import { getInstanceBillingLineageIds } from './billing-records.js'
 import {
   calculateRemainingDays,
@@ -25,6 +26,8 @@ import {
   tryAdvisoryTransactionLock
 } from './advisory-locks.js'
 import { arbitrateVipPrice, getUserContinuousVipBenefit, type VipPriceSource } from '../services/vip-benefits.js'
+import { PromoCodeEngine } from '../services/promo-engine.js'
+import { sendPromoBindingExhaustedNotification } from '../services/promo/notifications.js'
 
 const HOSTING_FREEZE_DAYS = 30
 
@@ -97,6 +100,7 @@ export interface ChangePlanPreviewResult {
 export interface PlanChangeOptions {
   preciseRemainingDays?: boolean
   minRemainingDays?: number | null
+  tx?: Prisma.TransactionClient
 }
 
 export interface InstancePriceAdjustmentQuote {
@@ -233,6 +237,17 @@ export async function calculateInstanceRemainingRefundQuote(instance: {
   const expiresAt = new Date(instance.expiresAt!)
 
   if (expiresAt <= now) {
+    return {
+      remainingDays: 0,
+      remainingValue: 0,
+      refundableValue: 0,
+      maxRefundable: 0,
+      isPaid: true
+    }
+  }
+
+  const promoRefund = await PromoCodeEngine.getPromoRefundEligibility(instance.id, tx)
+  if (!promoRefund.isRefundable) {
     return {
       remainingDays: 0,
       remainingValue: 0,
@@ -387,7 +402,8 @@ export async function calculatePlanChange(
     throw new Error('免费实例不支持升降级')
   }
 
-  const oldPlan = await prisma.packagePlan.findUnique({
+  const client = options.tx || prisma
+  const oldPlan = await client.packagePlan.findUnique({
     where: { id: oldPlanId }
   })
 
@@ -415,7 +431,7 @@ export async function calculatePlanChange(
 
   // ========== 获取 AFF 折扣率 ==========
   let discountRate = 0
-  const affBinding = await getInstanceAffBinding(instance.id)
+  const affBinding = await getInstanceAffBinding(instance.id, options.tx)
   if (affBinding) {
     discountRate = Number(affBinding.affCode.discountRate) || 0
   }
@@ -423,7 +439,8 @@ export async function calculatePlanChange(
   // ========== 使用公共方法计算差价 ==========
   const oldCyclePrice = Number(instance.billingPrice) || 0 // 已是元
   const newCyclePrice = Number(newPlan.price) / 100 // 分转元
-  const paidRefundQuote = await calculateInstanceRemainingRefundQuote(instance)
+  // 守卫断言: const paidRefundQuote = await calculateInstanceRemainingRefundQuote(instance)
+  const paidRefundQuote = await calculateInstanceRemainingRefundQuote(instance, options.tx)
 
   // 使用公共方法计算详情
   const calcResult = calculatePlanChangeDetails(
@@ -437,6 +454,12 @@ export async function calculatePlanChange(
     paidRefundQuote.maxRefundable
   )
 
+  let priceDiff = calcResult.priceDiff
+  const promoRefund = await PromoCodeEngine.getPromoRefundEligibility(instance.id, options.tx)
+  if (!promoRefund.isRefundable && (priceDiff < 0 || !calcResult.isUpgrade)) {
+    priceDiff = 0
+  }
+
   return {
     oldPlan,
     newPlan,
@@ -447,7 +470,7 @@ export async function calculatePlanChange(
     newPlanCost: calcResult.newPlanCost,
     discountRate,
     discountAmount: calcResult.discountAmount,
-    priceDiff: calcResult.priceDiff,
+    priceDiff,
     isUpgrade: calcResult.isUpgrade,
     newExpiresAt: expiresAt, // 到期时间保持不变
     newConfig: {
@@ -503,6 +526,11 @@ export async function calculateInstancePriceAdjustmentQuote(
         paidRefundQuote.remainingValue,
         paidRefundQuote.maxRefundable
       ).priceDiff
+
+      const promoRefund = await PromoCodeEngine.getPromoRefundEligibility(instance.id, tx)
+      if (!promoRefund.isRefundable && (priceDiff < 0 || roundedNewPrice < oldPrice)) {
+        priceDiff = 0
+      }
     }
   }
 
@@ -565,6 +593,20 @@ export async function performRenewal(
 
   const { amount: originalAmount, newExpiresAt } = calculateRenewBilling(instance, months)
 
+  // 检查统一优惠码绑定
+  const promoBinding = await getInstancePromoBinding(instance.id)
+  const now = new Date()
+  const isPromoActive = Boolean(
+    promoBinding &&
+    promoBinding.promoCode.enabled &&
+    (!promoBinding.promoCode.expiresAt || promoBinding.promoCode.expiresAt > now)
+  )
+  const monthlyPrice = calculateMonthlyPrice(instance)
+  let promoRenewalQuote: ReturnType<typeof PromoCodeEngine.calculateRenewalQuote> | null = null
+  if (isPromoActive && promoBinding) {
+    promoRenewalQuote = PromoCodeEngine.calculateRenewalQuote(monthlyPrice, months, promoBinding)
+  }
+
   // 检查 AFF 绑定，计算折扣
   const affBinding = await getInstanceAffBinding(instance.id)
   let discountAmount = 0
@@ -574,9 +616,17 @@ export async function performRenewal(
     affDiscountRate: affBinding?.affCode.enabled ? Number(affBinding.affCode.discountRate) : 0,
     vipDiscountPercent: vip.benefit.orderDiscountPercent
   })
-  const finalAmount = renewalPrice.finalPrice
-  const pricingSource: VipPriceSource = renewalPrice.source
+  let finalAmount = renewalPrice.finalPrice
+  let pricingSource: VipPriceSource | 'promo' = renewalPrice.source
   discountAmount = renewalPrice.discountAmount
+  let isPromoApplied = false
+
+  if (promoRenewalQuote && promoRenewalQuote.finalAmount <= finalAmount && promoRenewalQuote.discountAmount > 0) {
+    finalAmount = promoRenewalQuote.finalAmount
+    discountAmount = promoRenewalQuote.discountAmount
+    pricingSource = 'promo'
+    isPromoApplied = true
+  }
 
   // 执行事务（带乐观锁）
   const result = await prisma.$transaction(async (tx) => {
@@ -680,6 +730,27 @@ export async function performRenewal(
           : `续费 ${months} 个月`
       }
     })
+
+    // 如果统一优惠码实际生效（击败或打平 VIP/AFF 折扣），执行续费切片结算与状态更新
+    if (isPromoApplied && promoBinding) {
+      const renewResult = await PromoCodeEngine.settleOnRenew(tx, {
+        instanceId: instance.id,
+        userId,
+        monthlyPrice,
+        months,
+        binding: promoBinding
+      })
+      if (renewResult.unbound) {
+        // Asynchronously dispatch promo_binding_exhausted inbox message
+        sendPromoBindingExhaustedNotification({
+          userId,
+          instanceId: instance.id,
+          instanceName: instance.name,
+          promoCode: promoBinding.promoCode.code,
+          totalCycles: promoBinding.totalCycles ?? 0
+        }).catch(err => console.error('[Promo] Failed to send exhaustion notification:', err))
+      }
+    }
 
     // 如果有 AFF 绑定，给优惠码创建者返利
     if (affBinding?.affCode.enabled && pricingSource === 'aff') {

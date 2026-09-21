@@ -17,6 +17,7 @@ export const navMenuItems: MenuItem[] = [
   { name: 'admin-gift-cards', path: '/admin/gift-cards', icon: 'gift', label: 'nav.giftCards' },
   { name: 'admin-orders', path: '/admin/orders', icon: 'card', label: 'nav.orders' },
   { divider: true, label: 'nav.marketing' },
+  { name: 'admin-promos', path: '/admin/promos', icon: 'ticket', label: 'nav.promos' },
   { name: 'admin-entertainment', path: '/admin/entertainment', icon: 'gift', label: 'nav.entertainment' },
   { name: 'admin-mail', path: '/admin/mail', icon: 'mail', label: 'nav.mail' },
   { divider: true, label: 'nav.operations' },

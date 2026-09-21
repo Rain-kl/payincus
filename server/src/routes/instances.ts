@@ -75,6 +75,7 @@ import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
 import { addInstancePortMapping, provisionAutoRemotePort } from '../lib/instance-port-mapping.js'
 import { applyTrafficMultiplier, normalizeTrafficMultiplier, resolveInstanceTrafficLimitForHost } from '../lib/traffic-multiplier.js'
 import { arbitrateVipPrice, getUserContinuousVipBenefit } from '../services/vip-benefits.js'
+import { PromoCodeEngine, type PromoValidationResult } from '../services/promo-engine.js'
 import {
   networkModeAllowsPortMapping,
   networkModeNeedsNatIpv4,
@@ -1378,33 +1379,54 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     // 1.4 计算费用并验证余额（付费方案）
     let billing: ReturnType<typeof calculateCreateBilling> | null = null
     let validatedAffCode: { id: number; userId: number; discountRate: number } | null = null
+    let promoValidation: PromoValidationResult | null = null
+    let promoQuote: { originalPrice: number; discountAmount: number; finalPrice: number } | null = null
     let discountAmount = 0
     let actualPrice = 0
+    let pricingSource: 'base' | 'aff' | 'vip' = 'base'
 
     if (selectedPlan) {
       billing = calculateCreateBilling(selectedPlan)
       // 1.4.1 如果提供了优惠码，验证并计算折扣
       if (promoCode && promoCode.trim()) {
-        const validation = await db.validateAffCode(promoCode.trim(), selectedPlan.id, user.id)
-        if (!validation.valid) {
-          return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, validation.error || '优惠码无效'))
+        const pVal = await PromoCodeEngine.validate({
+          code: promoCode.trim(),
+          packageId: pkg.id,
+          packagePlanId: selectedPlan.id,
+          userId: user.id
+        })
+        if (pVal.valid) {
+          promoValidation = pVal
+          promoQuote = PromoCodeEngine.calculateCreationQuote(billing.totalPrice, pVal.promoCode!)
+        } else if (pVal.errorCode === 'PROMO_NOT_FOUND') {
+          // 降级尝试旧版 AFF 优惠码
+          const validation = await db.validateAffCode(promoCode.trim(), selectedPlan.id, user.id)
+          if (!validation.valid) {
+            return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, validation.error || pVal.error || '优惠码无效'))
+          }
+          validatedAffCode = {
+            id: validation.affCode!.id,
+            userId: validation.affCode!.userId,
+            discountRate: validation.discountRate!
+          }
+        } else {
+          return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, pVal.error || '优惠码无效'))
         }
-        validatedAffCode = {
-          id: validation.affCode!.id,
-          userId: validation.affCode!.userId,
-          discountRate: validation.discountRate!
-        }
-        // 计算折扣金额（折扣应用于方案价格）
       }
+
+      const affDiscountRate = promoQuote
+        ? (billing.totalPrice > 0 ? promoQuote.discountAmount / billing.totalPrice : 0)
+        : validatedAffCode?.discountRate
 
       const vip = await getUserContinuousVipBenefit(user.id)
       const priceDecision = arbitrateVipPrice({
         basePrice: billing.totalPrice,
-        affDiscountRate: validatedAffCode?.discountRate,
+        affDiscountRate,
         vipDiscountPercent: vip.benefit.orderDiscountPercent
       })
       actualPrice = priceDecision.finalPrice
       discountAmount = priceDecision.discountAmount
+      pricingSource = priceDecision.source
 
       const userBalance = await getUserBalance(user.id)
       if (userBalance < actualPrice) {
@@ -1560,7 +1582,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     }
 
     // 用户托管节点不允许使用优惠码（托管节点命名前四位固定为 peer）
-    if (validatedAffCode && preCheckHost.name.toLowerCase().startsWith('peer')) {
+    if ((validatedAffCode || promoValidation) && preCheckHost.name.toLowerCase().startsWith('peer')) {
       return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '用户托管节点不支持使用优惠码'))
     }
 
@@ -1872,8 +1894,24 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
             }
           })
 
-          // 如果使用了优惠码，创建 AFF 绑定并处理返利
-          if (validatedAffCode) {
+          // 如果使用了优惠码，核销并记录流水（及绑定）
+          if (promoValidation && promoValidation.promoCode) {
+            // 当 VIP 折扣更优时（pricingSource === 'vip'），优惠码实际贡献减免为 0，防止将 VIP 补贴计入优惠码统计
+            const promoDiscountAmount = pricingSource === 'aff' ? discountAmount : 0
+            await PromoCodeEngine.settleOnCreate(tx, {
+              instanceId: instance.id,
+              userId: user.id,
+              promoCodeId: promoValidation.promoCode.id,
+              quote: {
+                discountAmount: promoDiscountAmount,
+                finalPrice: actualPrice,
+                originalPrice: billing.totalPrice
+              },
+              durationType: promoValidation.durationType!,
+              durationCycles: promoValidation.durationCycles,
+              commissionRate: Number(promoValidation.promoCode.commissionRate)
+            })
+          } else if (validatedAffCode) {
             // 创建实例与优惠码的永久绑定
             await db.createAffBinding(instance.id, validatedAffCode.id, tx as any)
 

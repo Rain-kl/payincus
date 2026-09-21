@@ -115,6 +115,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.giftCards', title: '礼品卡' }
   },
   {
+    path: '/admin/promos',
+    name: 'admin-promos',
+    component: () => import('@/views/admin/PromoCodesView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.promos', title: '优惠码' }
+  },
+  {
     path: '/admin/help',
     name: 'admin-help',
     component: () => import('@/views/admin/HelpManageView.vue'),

@@ -380,6 +380,23 @@ enum FriendshipStatus {
   removed // 已删除（双方都已不是好友，但保留历史记录）
 }
 
+// 统一优惠码引擎枚举
+enum PromoCodeType {
+  AFF_USER
+  ADMIN_PROMO
+}
+
+enum PromoDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum PromoDurationType {
+  ONCE
+  REPEATING
+  FOREVER
+}
+
 // ==================== 用户相关模型 ====================
 
 model User {
@@ -495,6 +512,10 @@ model User {
   affCodes         AffCode[]
   affLogs          AffLog[]
   affWithdrawals   AffWithdrawal[]
+
+  // 统一优惠码系统
+  promoCodes          PromoCode[]
+  promoRedemptionLogs PromoRedemptionLog[]
 
   // 托管余额系统
   hostingBalance      Decimal              @default(0) @map("hosting_balance") @db.Decimal(10, 2) // 可用托管余额
@@ -976,6 +997,7 @@ model Package {
   requiredPackage  Package?  @relation("PackagePrerequisite", fields: [requiredPackageId], references: [id], onDelete: NoAction)
   dependentPackages Package[] @relation("PackagePrerequisite")
   releaseChannel NotificationChannel? @relation("PackageReleaseChannel", fields: [releaseChannelId], references: [id], onDelete: SetNull)
+  promoCodeScopes PromoCodeScope[]
 
   @@unique([userId, name]) // 同一用户下名称唯一
   @@index([userId])
@@ -1101,6 +1123,8 @@ model Instance {
   redeemCodeUsages RedeemCodeUsage[]
   billingRecords   InstanceBillingRecord[]  // 计费记录
   affBinding       AffBinding?              // AFF优惠码绑定
+  promoBinding     InstancePromoBinding?    // 统一优惠码绑定
+  promoRedemptionLogs PromoRedemptionLog[]  // 优惠码核销记录
   resourcePoolLogs ResourcePoolLog[]        // 资源池应用记录
   destroyRecords   UserDestroyRecord[]      // 销毁记录
   appliedBadgeOwnerships UserBadgeOwnership[] @relation("InstanceAppliedBadgeOwnerships")
@@ -2804,6 +2828,7 @@ model PackagePlan {
   package   Package    @relation(fields: [packageId], references: [id], onDelete: Cascade)
   instances Instance[]
   affCodes  AffCode[]  // AFF优惠码
+  promoCodeScopes PromoCodeScope[]
 
   @@unique([packageId, name]) // 同一套餐下方案名称唯一
   @@index([packageId, isActive])
@@ -3530,3 +3555,111 @@ model GiftCard {
   @@index([usedById])
   @@map("gift_cards")
 }
+
+// ==================== 统一优惠码引擎模型 ====================
+
+model PromoCode {
+  id                  Int               @id @default(autoincrement())
+  code                String            @unique @db.VarChar(64)
+  name                String?           @db.VarChar(128)
+  type                PromoCodeType     @default(ADMIN_PROMO)
+  
+  userId              Int?              @map("user_id")
+  adminId             Int?              @map("admin_id")
+  
+  isGlobal            Boolean           @default(false) @map("is_global")
+  
+  discountType        PromoDiscountType @default(PERCENTAGE) @map("discount_type")
+  discountValue       Decimal           @db.Decimal(10, 2) @map("discount_value")
+  commissionRate      Decimal           @default(0) @db.Decimal(5, 4) @map("commission_rate")
+  
+  durationType        PromoDurationType @default(FOREVER) @map("duration_type")
+  durationCycles      Int?              @map("duration_cycles")
+  
+  maxTotalUses        Int?              @map("max_total_uses")
+  usedTotalCount      Int               @default(0) @map("used_total_count")
+  maxUsesPerUser      Int?              @default(1) @map("max_uses_per_user")
+  
+  startsAt            DateTime?         @map("starts_at")
+  expiresAt           DateTime?         @map("expires_at")
+  enabled             Boolean           @default(true)
+  
+  totalDiscountAmount Decimal           @default(0) @db.Decimal(10, 2) @map("total_discount_amount")
+  totalEarnings       Decimal           @default(0) @db.Decimal(10, 2) @map("total_earnings")
+  
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  user                User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scopes              PromoCodeScope[]
+  bindings            InstancePromoBinding[]
+  redemptionLogs      PromoRedemptionLog[]
+
+  @@index([type, enabled])
+  @@index([userId])
+  @@map("promo_codes")
+}
+
+model PromoCodeScope {
+  id              Int               @id @default(autoincrement())
+  promoCodeId     Int               @map("promo_code_id")
+  packageId       Int?              @map("package_id")
+  packagePlanId   Int?              @map("package_plan_id")
+  
+  promoCode       PromoCode         @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  package         Package?          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  packagePlan     PackagePlan?      @relation(fields: [packagePlanId], references: [id], onDelete: Cascade)
+
+  @@index([promoCodeId])
+  @@index([packageId])
+  @@index([packagePlanId])
+  @@map("promo_code_scopes")
+}
+
+model InstancePromoBinding {
+  id              Int               @id @default(autoincrement())
+  instanceId      Int               @unique @map("instance_id")
+  promoCodeId     Int               @map("promo_code_id")
+  
+  durationType    PromoDurationType @map("duration_type")
+  totalCycles     Int?              @map("total_cycles")
+  usedCycles      Int               @default(0) @map("used_cycles")
+  remainingCycles Int?              @map("remaining_cycles")
+  
+  boundAt         DateTime          @default(now()) @map("bound_at")
+  lastRedeemedAt  DateTime          @default(now()) @map("last_redeemed_at")
+
+  instance        Instance          @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  promoCode       PromoCode         @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  @@index([promoCodeId])
+  @@map("instance_promo_bindings")
+}
+
+model PromoRedemptionLog {
+  id               Int               @id @default(autoincrement())
+  promoCodeId      Int               @map("promo_code_id")
+  instanceId       Int               @map("instance_id")
+  userId           Int               @map("user_id")
+  
+  actionType       String            @map("action_type") @db.VarChar(32)
+  cycleIndex       Int               @map("cycle_index")
+  months           Int               @default(1)
+  
+  originalPrice    Decimal           @db.Decimal(10, 2) @map("original_price")
+  discountAmount   Decimal           @db.Decimal(10, 2) @map("discount_amount")
+  finalPrice       Decimal           @db.Decimal(10, 2) @map("final_price")
+  commissionAmount Decimal           @default(0) @db.Decimal(10, 2) @map("commission_amount")
+  
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  promoCode        PromoCode         @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  instance         Instance          @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([promoCodeId])
+  @@index([instanceId])
+  @@index([userId])
+  @@map("promo_redemption_logs")
+}
+

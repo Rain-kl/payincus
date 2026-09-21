@@ -191,7 +191,8 @@
     "test:instance-create-failure-compensation": "node --import tsx scripts/test-instance-create-failure-compensation.ts",
     "test:instance-create-turnstile-guards": "node --import tsx scripts/test-instance-create-turnstile-guards.ts",
     "test:websocket-origin-guard": "node --import tsx scripts/test-websocket-origin-guard.ts",
-    "test:nat-ipv4-allocation-guards": "node --import tsx scripts/test-nat-ipv4-allocation-guards.ts"
+    "test:nat-ipv4-allocation-guards": "node --import tsx scripts/test-nat-ipv4-allocation-guards.ts",
+    "test:promo-engine-guards": "node --import tsx scripts/test-promo-engine-guards.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

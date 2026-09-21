@@ -225,6 +225,89 @@ export interface VipBenefitOverviewResponse {
   }
 }
 
+export type PromoCodeType = 'ADMIN_PROMO' | 'AFF_USER'
+export type PromoDiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT'
+export type PromoDurationType = 'ONCE' | 'REPEATING' | 'FOREVER'
+
+export interface AdminPromoScope {
+  id: number
+  packageId: number | null
+  packagePlanId: number | null
+  package?: { id: number; name: string } | null
+  packagePlan?: { id: number; name: string } | null
+}
+
+export interface AdminPromoCode {
+  id: number
+  code: string
+  name: string | null
+  type: PromoCodeType
+  discountType: PromoDiscountType
+  discountValue: number
+  commissionRate: number
+  durationType: PromoDurationType
+  durationCycles: number | null
+  isGlobal: boolean
+  scopes: AdminPromoScope[]
+  maxTotalUses: number | null
+  usedTotalCount: number
+  maxUsesPerUser: number | null
+  startsAt: string | null
+  expiresAt: string | null
+  enabled: boolean
+  totalDiscountAmount: number
+  totalEarnings: number
+  activeBindingsCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatePromoCodeRequest {
+  code: string
+  name?: string
+  type?: PromoCodeType
+  discountType: PromoDiscountType
+  discountValue: number
+  durationType: PromoDurationType
+  durationCycles?: number | null
+  isGlobal: boolean
+  scopes?: Array<{ packageId: number; packagePlanId?: number | null }>
+  maxTotalUses?: number | null
+  maxUsesPerUser?: number | null
+  startsAt?: string | null
+  expiresAt?: string | null
+  enabled?: boolean
+}
+
+export interface AdminPromoBoundInstance {
+  instanceId: number
+  instanceName: string
+  userId: number
+  username: string
+  totalCycles: number | null
+  usedCycles: number
+  remainingCycles: number | null
+  boundAt: string
+}
+
+export interface AdminPromoListResponse {
+  promos: AdminPromoCode[]
+  items?: AdminPromoCode[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface AdminPromoInstancesResponse {
+  instances: AdminPromoBoundInstance[]
+  items?: AdminPromoBoundInstance[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 // API 超时配置（毫秒）
 const TIMEOUT = {
   DEFAULT: 30000,           // 30秒 - 普通请求
@@ -4078,6 +4161,32 @@ const api = {
       refundAmount: number
       refundType: string
     }> => http.post(`/mail/admin/subscriptions/${id}/cancel`, data)
+  },
+
+  // ==================== 统一优惠码管理 ====================
+  promos: {
+    list: (params?: {
+      page?: number
+      pageSize?: number
+      search?: string
+      type?: PromoCodeType
+      enabled?: boolean | string
+    }): Promise<AdminPromoListResponse> => http.get('/admin/promos', { params }),
+
+    create: (data: CreatePromoCodeRequest): Promise<AdminPromoCode> =>
+      http.post('/admin/promos', data),
+
+    toggle: (id: number, enabled: boolean): Promise<{ success: boolean; enabled: boolean }> =>
+      http.patch(`/admin/promos/${id}/toggle`, { enabled }),
+
+    delete: (id: number): Promise<{ success: boolean; affectedInstances: number }> =>
+      http.delete(`/admin/promos/${id}`),
+
+    listInstances: (id: number, params?: { page?: number; pageSize?: number }): Promise<AdminPromoInstancesResponse> =>
+      http.get(`/admin/promos/${id}/instances`, { params }),
+
+    unbindInstance: (id: number, instanceId: number): Promise<{ success: boolean; message: string }> =>
+      http.post(`/admin/promos/${id}/unbind/${instanceId}`)
   }
 }
 
@@ -4087,3 +4196,4 @@ export default api
 export const authApi = api.auth
 export const usersApi = api.users
 export const instancesApi = api.instances
+export const promosApi = api.promos
