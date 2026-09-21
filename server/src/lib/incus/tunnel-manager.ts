@@ -300,3 +300,76 @@ export class HostTunnelManager extends EventEmitter {
  * 全局单例
  */
 export const hostTunnelManager = new HostTunnelManager()
+
+/**
+ * 宿主机隧道状态同步至数据库
+ */
+async function syncTunnelHostStatus(hostId: number, isOnline: boolean): Promise<void> {
+  try {
+    const { prisma } = await import('../../db/prisma.js')
+    const host = await prisma.host.findUnique({
+      where: { id: hostId },
+      select: { status: true, tunnelEnabled: true }
+    })
+    if (!host || !host.tunnelEnabled) {
+      return
+    }
+    // 维护模式由管理员显式设置，不自动覆盖
+    if (host.status === 'maintenance') {
+      return
+    }
+    const targetStatus = isOnline ? 'online' : 'offline'
+    if (host.status !== targetStatus) {
+      await prisma.host.update({
+        where: { id: hostId },
+        data: { status: targetStatus }
+      })
+      console.log(`[HostTunnel] Host ${hostId} tunnel ${isOnline ? 'connected' : 'disconnected'}, status updated to ${targetStatus}`)
+    }
+  } catch (err) {
+    console.error(`[HostTunnel] Failed to sync status for host ${hostId}:`, err)
+  }
+}
+
+hostTunnelManager.on('tunnel_connected', (hostId: number) => {
+  void syncTunnelHostStatus(hostId, true)
+})
+
+hostTunnelManager.on('tunnel_disconnected', (hostId: number) => {
+  void syncTunnelHostStatus(hostId, false)
+})
+
+/**
+ * 服务启动或定时巡检时，核对所有穿透模式宿主机的状态。
+ * 若无有效活动隧道且未处于维护模式，校正为 offline。
+ */
+export async function reconcileTunnelHostsStatus(): Promise<number> {
+  try {
+    const { prisma } = await import('../../db/prisma.js')
+    const tunnelHosts = await prisma.host.findMany({
+      where: {
+        tunnelEnabled: true,
+        status: 'online'
+      },
+      select: { id: true }
+    })
+    let corrected = 0
+    for (const host of tunnelHosts) {
+      if (!hostTunnelManager.isTunnelOnline(host.id)) {
+        await prisma.host.update({
+          where: { id: host.id },
+          data: { status: 'offline' }
+        })
+        corrected++
+      }
+    }
+    if (corrected > 0) {
+      console.log(`[HostTunnel] Reconciled ${corrected} offline tunnel host(s) to status 'offline'`)
+    }
+    return corrected
+  } catch (err) {
+    console.error('[HostTunnel] Failed to reconcile tunnel hosts status:', err)
+    return 0
+  }
+}
+

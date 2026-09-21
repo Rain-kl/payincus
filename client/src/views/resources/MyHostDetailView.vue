@@ -70,6 +70,8 @@ interface Host {
     portRangeEnd: number | null
     portsUsedCount?: number
   }
+  tunnelEnabled?: boolean
+  tunnelOnline?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -101,7 +103,11 @@ const statusInfo = computed(() => {
     offline: { label: t('admin.hosts.statusOffline'), class: 'badge-default', dot: 'bg-gray-500' },
     maintenance: { label: t('admin.hosts.statusMaintenance'), class: 'badge-warning', dot: 'bg-yellow-500' }
   }
-  return map[host.value.status] || map.offline
+  let currentStatus = host.value.status
+  if (currentStatus !== 'maintenance' && host.value.tunnelEnabled && !host.value.tunnelOnline) {
+    currentStatus = 'offline'
+  }
+  return map[currentStatus] || map.offline
 })
 
 // 本组件被用户端和管理端共用，两侧的路由名不同：

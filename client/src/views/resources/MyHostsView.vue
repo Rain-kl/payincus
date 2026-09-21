@@ -57,7 +57,7 @@ const totalPages = ref(0)
 const takingOverHostId = ref(null)
 
 // 在线节点数量（用于校对按钮禁用状态）
-const onlineHostsCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
+const onlineHostsCount = computed(() => hosts.value.filter(h => h.status === 'online' && (!h.tunnelEnabled || h.tunnelOnline)).length)
 
 // 计算可显示的页码列表
 const pageNumbers = computed(() => {
@@ -345,7 +345,10 @@ function formatMemory(mb) {
 }
 
 // 获取状态样式
-function getStatusClass(status) {
+function getStatusClass(status, host) {
+  if (host?.tunnelEnabled && !host?.tunnelOnline && status !== 'maintenance') {
+    return 'bg-gray-600'
+  }
   const map = {
     online: 'bg-green-500',
     offline: 'bg-gray-600',
@@ -486,8 +489,8 @@ onActivated(() => {
               </div>
             </div>
             <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-themed px-2 py-1 text-xs font-mono text-themed-secondary">
-              <span :class="['h-1.5 w-1.5 rounded-full', getStatusClass(host.status)]"></span>
-              {{ host.status }}
+              <span :class="['h-1.5 w-1.5 rounded-full', getStatusClass(host.status, host)]"></span>
+              {{ host.tunnelEnabled && !host.tunnelOnline && host.status !== 'maintenance' ? 'offline' : host.status }}
             </span>
           </div>
 
@@ -584,8 +587,8 @@ onActivated(() => {
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <span class="inline-flex items-center gap-1.5 rounded-full border border-themed px-2 py-0.5 text-xs font-mono text-themed-secondary">
-                  <span :class="['h-1.5 w-1.5 rounded-full', getStatusClass(host.status)]"></span>
-                  {{ host.status }}
+                  <span :class="['h-1.5 w-1.5 rounded-full', getStatusClass(host.status, host)]"></span>
+                  {{ host.tunnelEnabled && !host.tunnelOnline && host.status !== 'maintenance' ? 'offline' : host.status }}
                 </span>
               </td>
               <td class="px-4 py-3 text-themed-secondary whitespace-nowrap">

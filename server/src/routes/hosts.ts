@@ -129,6 +129,22 @@ const HOST_BATCH_INSTANCE_MAX_ITEMS = 100
 const HOST_GIFT_DAYS_MAX = 365
 const HOST_RENEWAL_PRICE_MAX = 99999
 
+export function deriveEffectiveHostStatus(host: {
+  id: number
+  status: string
+  tunnelEnabled?: boolean
+  tunnel_enabled?: boolean
+}): 'online' | 'offline' | 'maintenance' {
+  if (host.status === 'maintenance') {
+    return 'maintenance'
+  }
+  const isTunnel = host.tunnelEnabled ?? host.tunnel_enabled ?? false
+  if (isTunnel && !hostTunnelManager.isTunnelOnline(host.id)) {
+    return 'offline'
+  }
+  return host.status as 'online' | 'offline' | 'maintenance'
+}
+
 function formatStoragePoolCreateError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   const lowerMessage = message.toLowerCase()
@@ -900,8 +916,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         id: host.id,
         name: host.name,
         url: host.url,
-        status: host.status,
-        maintenance: host.status === 'maintenance',
+        status: deriveEffectiveHostStatus(host),
+        maintenance: deriveEffectiveHostStatus(host) === 'maintenance',
         location: host.location,
         countryCode: host.country_code || 'us',
         architecture: host.architecture || 'x86_64',
@@ -2012,6 +2028,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         architecture: hostArchitecture
       })
 
+      if (host.status === 'offline') {
+        await db.updateHostStatus(hostId, 'online')
+      }
+
       await client.close()
 
       return {
@@ -2024,6 +2044,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         }
       }
     } catch (error) {
+      if (host.status === 'online') {
+        await db.updateHostStatus(hostId, 'offline')
+      }
+
       const errorMessage = error instanceof Error ? error.message : String(error)
 
       return reply.code(400).send({
@@ -2058,6 +2082,11 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
+    const effectiveStatus = deriveEffectiveHostStatus(host)
+    if (host.status === 'online' && effectiveStatus === 'offline') {
+      void db.updateHostStatus(hostId, 'offline')
+    }
+
     // 获取该宿主机上的实例列表
     const instances = await db.getInstancesByHost(hostId)
 
@@ -2065,7 +2094,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     let diskTotalMB = host.storage_size ? host.storage_size * 1024 : (host.disk_total || 0) // 默认值：使用创建时输入的存储大小（GB转MB）
     
     // 如果宿主机在线，尝试从存储池获取实际大小
-    if (host.status === 'online' && host.cert_path && host.key_path) {
+    if (effectiveStatus === 'online' && host.cert_path && host.key_path) {
       try {
         const client = await getIncusClient(host)
         // 获取所有系统盘存储池（purpose = 'instance_data'）
@@ -2103,8 +2132,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         id: host.id,
         name: host.name,
         url: host.url,
-        status: host.status,
-        maintenance: host.status === 'maintenance',
+        status: effectiveStatus,
+        maintenance: effectiveStatus === 'maintenance',
         location: host.location,
         countryCode: host.country_code || 'us',
         architecture: host.architecture || 'x86_64',
@@ -2935,6 +2964,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         }
       }
     } catch (error) {
+      if (host.status === 'online') {
+        await db.updateHostStatus(hostId, 'offline')
+      }
       const errorMessage = error instanceof Error ? error.message : String(error)
       return reply.code(500).send({ error: errorMessage })
     }

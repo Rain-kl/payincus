@@ -1023,9 +1023,13 @@ const start = async (): Promise<void> => {
     startTicketAutoCloseScheduler()
 
     // 启动 AI 工单自动接管调度器（仅插件 auto 模式实际处理）
-            // 启动节点连接地址监控（启动即回填，之后每 30 分钟轮训域名型地址）
+    // 启动节点连接地址监控（启动即回填，之后每 30 分钟轮训域名型地址）
     const { startHostAddressMonitor } = await import('./services/host-address-monitor.js')
     startHostAddressMonitor()
+
+    // 校准穿透模式宿主机在线状态（无活动隧道的节点重置为 offline）
+    const { reconcileTunnelHostsStatus } = await import('./lib/incus/tunnel-manager.js')
+    await reconcileTunnelHostsStatus()
 
     console.log(`🔒 安全模式: ${process.env.NODE_ENV === 'production' ? '生产环境' : '开发环境'}`)
     printRateLimitSummary()

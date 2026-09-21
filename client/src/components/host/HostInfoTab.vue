@@ -203,7 +203,11 @@ const statusInfo = computed(() => {
     offline: { label: t('admin.hosts.statusOffline'), class: 'badge-default', dot: 'bg-gray-500' },
     maintenance: { label: t('admin.hosts.statusMaintenance'), class: 'badge-warning', dot: 'bg-yellow-500' }
   }
-  return map[props.host.status] || map.offline
+  let currentStatus = props.host.status
+  if (currentStatus !== 'maintenance' && props.host.tunnelEnabled && !props.host.tunnelOnline) {
+    currentStatus = 'offline'
+  }
+  return map[currentStatus] || map.offline
 })
 
 const agentStatusInfo = computed(() => {
