@@ -456,6 +456,7 @@ export default {
         createInstance: '创建实例',
         create: '创建',
         entertainment: '福利',
+        marketing: '营销',
         hosting: '托管',
         hostingWallet: '托管收益',
         earnings: '收益',

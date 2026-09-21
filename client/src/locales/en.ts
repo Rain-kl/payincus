@@ -276,6 +276,7 @@ export default {
         createInstance: 'Create Instance',
         create: 'Create',
         entertainment: 'Benefits',
+        marketing: 'Marketing',
         hosting: 'Hosting',
         hostingWallet: 'Hosting Wallet',
         earnings: 'Earnings',

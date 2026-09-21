@@ -280,6 +280,7 @@ const zhTW = {
         createInstance: '建立實例',
         create: '建立',
         entertainment: '福利',
+        marketing: '营销',
         hosting: '託管',
         hostingWallet: '託管收益',
         earnings: '收益',
