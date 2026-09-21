@@ -2,18 +2,20 @@
 
 ## 背景与目标
 
-1. **隐藏托管功能（前端全部隐藏，不删代码）**
-   - 用户端：隐藏侧边栏「资源」分组及所属菜单（我的节点 `/resources/hosts`、我的套餐 `/resources/packages`、托管收益 `/hosting-wallet`），全局搜索框（`MenuSearchBox`）同步过滤。
-   - 用户端实例创建页（`/instances/create`）：隐藏托管套餐及专区选项卡，仅展示官方/自营套餐，隐藏多源切换胶囊条。
-   - 管理端：侧边栏隐藏「托管 (`/admin/hosting`)」，全局搜索框同步过滤；系统设置导航项中隐藏「托管与站点 (`/admin/settings/hosting`)」。
-   - 代码与后端保持：后端所有 API 与 DB 数据模型 100% 保持不变；路由定义与客户端 API 保持，仅在前端视图与导航入口处彻底隐藏。
+1. **隐藏托管功能（前端全部隐藏，不删后端与数据，拒绝历史包袱与临时垫片）**
+   - 用户端侧边栏（`side-nav-items-user.ts`）：彻底移除「资源」分组及所属菜单（我的节点 `/resources/hosts`、我的套餐 `/resources/packages`、托管收益 `/hosting-wallet`）。
+   - 全局搜索框（`MenuSearchBox.vue`）：移除托管关键词与冗余逻辑。
+   - 用户端实例创建页（`/instances/create`）：彻底移除托管套餐及专区逻辑，仅保留官方直营套餐。
+   - 管理端侧边栏（`side-nav-items-admin.ts`）：移除「托管 (`/admin/hosting`)」。
+   - 系统设置导航项（`constants/adminSettings.ts`）：移除「托管与站点 (`/admin/settings/hosting`)」。
+   - 后端与 DB 模型：100% 保持不变。
 
-2. **控制面板调整：将运维->更新移动到系统设置新建 Tab**
+2. **控制面板调整：将运维->更新直接迁移到系统设置新建 Tab（不做历史重定向包袱）**
    - 管理端侧边栏：从「运维 (`nav.operations`)」分组中移除「更新 (`admin-system-update`)」。
    - 系统设置导航选项卡：在 `client/src/constants/adminSettings.ts` 中增加 `update`（更新）选项卡，路径为 `/admin/settings/update`。
-   - 路由配置：`/admin/settings/update` 挂载 `SystemUpdateView.vue`，保留原 `/admin/system-update` 路径并重定向至 `/admin/settings/update`。
+   - 路由配置：直接将系统更新路由挂载到 `/admin/settings/update`，不保留旧路径 `/admin/system-update`，不做历史重定向。
    - 视图表现：在 `SystemUpdateView.vue` 顶部引入与 `SystemConfigView`、`TelegramConfigView` 完全一致的系统设置选项卡导航条，确保在系统设置各 Tab 之间平滑切换。
-   - 守卫测试兼容：同步适配 `server/scripts/test-system-update-guards.ts` 及相关守卫测试。
+   - 守卫测试：更新 `server/scripts/test-system-update-guards.ts` 与 `test-frontend-route-guards.ts`，严格匹配最新纯净架构。
 
 ## 详细设计方案
 
