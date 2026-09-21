@@ -269,6 +269,60 @@ function shouldShowTick(index: number, length: number): boolean {
 function formatTick(label: string): string {
   return label.length === 10 ? label.slice(5) : label
 }
+
+// 营销活动概览
+const marketing = computed(() => stats.value?.marketing)
+const activeLotteries = computed(() => marketing.value?.activeLotteries || [])
+const totalActiveLotteries = computed(() => marketing.value?.totalActiveLotteries || 0)
+const checkinInfo = computed(() => marketing.value?.checkin || {
+  enabled: false,
+  minPoints: 1,
+  maxPoints: 500,
+  requireInstance: false,
+  todayCheckins: 0
+})
+
+// 最近开机记录
+const recentInstances = computed(() => stats.value?.recentInstances || [])
+
+function formatRelativeTime(dateStr: string): string {
+  if (!dateStr) return ''
+  const now = Date.now()
+  const time = new Date(dateStr).getTime()
+  const diffSeconds = Math.max(0, Math.floor((now - time) / 1000))
+  if (diffSeconds < 60) return '刚刚'
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  if (diffMinutes < 60) return `${diffMinutes} 分钟前`
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours} 小时前`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 30) return `${diffDays} 天前`
+  return dateStr.slice(0, 10)
+}
+
+function getInstanceStatusDotClass(status: string): string {
+  switch (status) {
+    case 'running':
+      return 'bg-emerald-600'
+    case 'creating':
+    case 'starting':
+    case 'stopping':
+    case 'rebuilding':
+      return 'bg-amber-600'
+    case 'error':
+    case 'stopped':
+    case 'frozen':
+    default:
+      return 'bg-rose-600'
+  }
+}
+
+function formatPlanSpecs(plan: { name: string; cpu: number; memory: number; disk: number } | null): string {
+  if (!plan) return '基础实例'
+  const ramGb = plan.memory >= 1024 ? `${(plan.memory / 1024).toFixed(0)}G` : `${plan.memory}M`
+  const cores = Math.max(1, Math.round(plan.cpu / 100))
+  return `${cores}C ${ramGb} · ${plan.name}`
+}
 </script>
 
 <template>
@@ -600,9 +654,9 @@ function formatTick(label: string): string {
         </div>
       </section>
 
-      <!-- Level 3: 核心走势与业务构成 (Analytical Grid) -->
-      <section aria-label="Analytics and Structure" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <!-- 1. 营收与消费走势 -->
+      <!-- Level 3: 核心走势 (Revenue & Consumption Trend - Full Width) -->
+      <section aria-label="Revenue Trend" class="w-full">
+        <!-- 营收与消费走势 -->
         <div class="card p-5 flex flex-col justify-between">
           <div>
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-themed pb-4">
@@ -693,255 +747,416 @@ function formatTick(label: string): string {
             </button>
           </div>
         </div>
+      </section>
 
-        <!-- 2. 今日订单履约漏斗 -->
-        <div class="card p-5 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
-              <div>
-                <h2 class="text-base font-semibold tracking-tight text-themed">
-                  {{ t('admin.dashboard.fulfillmentTitle') }}
-                </h2>
-                <p class="text-xs text-themed-muted mt-0.5">
-                  今日创建 {{ ordersTodayTotal }} 笔订单履约转化分析
-                </p>
-              </div>
-              <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
-                {{ t('admin.dashboard.fulfillmentRate', { rate: orderFulfillmentRate }) }}
-              </span>
-            </div>
-
-            <!-- 分割进度条 -->
-            <div class="mt-6">
-              <div class="h-3 rounded-full overflow-hidden bg-themed-tertiary flex border border-themed">
-                <div
-                  class="bg-emerald-600"
-                  :style="{ width: `${orderSuccessPct}%` }"
-                  :title="`成功: ${ordersTodaySuccess} (${orderSuccessPct}%)`"
-                ></div>
-                <div
-                  class="bg-amber-600"
-                  :style="{ width: `${orderPendingPct}%` }"
-                  :title="`待处理: ${ordersTodayPending} (${orderPendingPct}%)`"
-                ></div>
-                <div
-                  class="bg-rose-600"
-                  :style="{ width: `${orderFailedPct}%` }"
-                  :title="`失败: ${ordersTodayFailed} (${orderFailedPct}%)`"
-                ></div>
-              </div>
-
-              <div class="grid grid-cols-3 gap-2 mt-4 text-center">
-                <div class="p-2.5 rounded-lg border border-themed bg-themed-surface">
-                  <div class="flex items-center justify-center gap-1.5 text-xs text-themed-muted">
-                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                    {{ t('admin.dashboard.fulfillmentSuccess') }}
-                  </div>
-                  <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-themed">
-                    {{ ordersTodaySuccess }}
+      <!-- Level 4: 业务与运维多维分析 (Analytical Grid) -->
+      <section aria-label="Operations and Infrastructure Grid" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <!-- 左列: 业务转化与营销主线 -->
+        <div class="space-y-5">
+          <!-- 1. 今日订单履约漏斗 -->
+          <div class="card p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+                <div>
+                  <h2 class="text-base font-semibold tracking-tight text-themed">
+                    {{ t('admin.dashboard.fulfillmentTitle') }}
+                  </h2>
+                  <p class="text-xs text-themed-muted mt-0.5">
+                    今日创建 {{ ordersTodayTotal }} 笔订单履约转化分析
                   </p>
-                  <p class="text-[11px] font-mono text-themed-faint">{{ orderSuccessPct }}%</p>
                 </div>
-
-                <div class="p-2.5 rounded-lg border border-themed bg-themed-surface">
-                  <div class="flex items-center justify-center gap-1.5 text-xs text-themed-muted">
-                    <span class="w-2 h-2 rounded-full bg-amber-600"></span>
-                    {{ t('admin.dashboard.fulfillmentPending') }}
-                  </div>
-                  <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-themed">
-                    {{ ordersTodayPending }}
-                  </p>
-                  <p class="text-[11px] font-mono text-themed-faint">{{ orderPendingPct }}%</p>
-                </div>
-
-                <div class="p-2.5 rounded-lg border border-themed bg-themed-surface">
-                  <div class="flex items-center justify-center gap-1.5 text-xs text-themed-muted">
-                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
-                    {{ t('admin.dashboard.fulfillmentFailed') }}
-                  </div>
-                  <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-themed">
-                    {{ ordersTodayFailed }}
-                  </p>
-                  <p class="text-[11px] font-mono text-themed-faint">{{ orderFailedPct }}%</p>
-                </div>
+                <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
+                  {{ t('admin.dashboard.fulfillmentRate', { rate: orderFulfillmentRate }) }}
+                </span>
               </div>
-            </div>
-          </div>
 
-          <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-            <span>待关注阻断订单: {{ stats.operations.orders.needsAttention }} 笔</span>
-            <button
-              type="button"
-              class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-              @click="jumpTo('/admin/orders')"
-            >
-              进入订单中心 ➔
-            </button>
-          </div>
-        </div>
-
-        <!-- 3. 实例构成与到期分布 -->
-        <div class="card p-5 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
-              <div>
-                <h2 class="text-base font-semibold tracking-tight text-themed">
-                  {{ t('admin.dashboard.instanceStructureTitle') }}
-                </h2>
-                <p class="text-xs text-themed-muted mt-0.5">
-                  全平台 {{ totalInstances }} 台未删除实例的订购模式与健康状态
-                </p>
-              </div>
-              <span class="text-xs font-mono text-themed-secondary">
-                总量: {{ totalInstances }}
-              </span>
-            </div>
-
-            <div class="mt-6 space-y-4">
-              <!-- 付费与免费占比条 -->
-              <div>
-                <div class="flex justify-between text-xs text-themed-secondary mb-1.5">
-                  <span class="inline-flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-blue-600"></span>
-                    {{ t('admin.statistics.labels.paidInstances') }} ({{ paidInstances }}台)
-                  </span>
-                  <span class="inline-flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                    {{ t('admin.statistics.labels.freeInstances') }} ({{ freeInstances }}台)
-                  </span>
-                </div>
+              <!-- 分割进度条 -->
+              <div class="mt-6">
                 <div class="h-3 rounded-full overflow-hidden bg-themed-tertiary flex border border-themed">
-                  <div class="bg-blue-600" :style="{ width: `${paidInstancesPct}%` }"></div>
-                  <div class="bg-emerald-600" :style="{ width: `${freeInstancesPct}%` }"></div>
+                  <div
+                    class="bg-emerald-600"
+                    :style="{ width: `${orderSuccessPct}%` }"
+                    :title="`成功: ${ordersTodaySuccess} (${orderSuccessPct}%)`"
+                  ></div>
+                  <div
+                    class="bg-amber-600"
+                    :style="{ width: `${orderPendingPct}%` }"
+                    :title="`待处理: ${ordersTodayPending} (${orderPendingPct}%)`"
+                  ></div>
+                  <div
+                    class="bg-rose-600"
+                    :style="{ width: `${orderFailedPct}%` }"
+                    :title="`失败: ${ordersTodayFailed} (${orderFailedPct}%)`"
+                  ></div>
                 </div>
-              </div>
 
-              <!-- 临期与健康概览 -->
-              <div class="grid grid-cols-2 gap-3 mt-4">
-                <div class="p-3 rounded-lg border border-themed bg-themed-surface">
-                  <p class="text-xs text-themed-muted">{{ t('admin.dashboard.expiringNotice') }}</p>
-                  <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
-                    {{ expiringSoonInstances }}
-                    <span class="text-xs text-themed-faint font-normal">台</span>
-                  </p>
-                  <p class="text-[11px] text-themed-faint mt-1">需关注续费留存</p>
-                </div>
+                <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+                  <div class="p-2.5 rounded-lg border border-themed bg-themed-surface">
+                    <div class="flex items-center justify-center gap-1.5 text-xs text-themed-muted">
+                      <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      {{ t('admin.dashboard.fulfillmentSuccess') }}
+                    </div>
+                    <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-themed">
+                      {{ ordersTodaySuccess }}
+                    </p>
+                    <p class="text-[11px] font-mono text-themed-faint">{{ orderSuccessPct }}%</p>
+                  </div>
 
-                <div class="p-3 rounded-lg border border-themed bg-themed-surface">
-                  <p class="text-xs text-themed-muted">今日新交付实例</p>
-                  <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
-                    +{{ stats.operations.instances.newToday }}
-                    <span class="text-xs text-themed-faint font-normal">台</span>
-                  </p>
-                  <p class="text-[11px] text-themed-faint mt-1">生产环境在线增长</p>
+                  <div class="p-2.5 rounded-lg border border-themed bg-themed-surface">
+                    <div class="flex items-center justify-center gap-1.5 text-xs text-themed-muted">
+                      <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+                      {{ t('admin.dashboard.fulfillmentPending') }}
+                    </div>
+                    <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-themed">
+                      {{ ordersTodayPending }}
+                    </p>
+                    <p class="text-[11px] font-mono text-themed-faint">{{ orderPendingPct }}%</p>
+                  </div>
+
+                  <div class="p-2.5 rounded-lg border border-themed bg-themed-surface">
+                    <div class="flex items-center justify-center gap-1.5 text-xs text-themed-muted">
+                      <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                      {{ t('admin.dashboard.fulfillmentFailed') }}
+                    </div>
+                    <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-themed">
+                      {{ ordersTodayFailed }}
+                    </p>
+                    <p class="text-[11px] font-mono text-themed-faint">{{ orderFailedPct }}%</p>
+                  </div>
                 </div>
               </div>
             </div>
+
+            <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+              <span>待关注阻断订单: {{ stats.operations.orders.needsAttention }} 笔</span>
+              <button
+                type="button"
+                class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                @click="jumpTo('/admin/orders')"
+              >
+                进入订单中心 ➔
+              </button>
+            </div>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-            <span>托管 / 自营实例全部在线统计</span>
-            <button
-              type="button"
-              class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-              @click="jumpTo('/admin/hosting')"
-            >
-              管理托管实例 ➔
-            </button>
+          <!-- 2. 进行中的活动 (营销卡片) -->
+          <div class="card p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+                <div>
+                  <h2 class="text-base font-semibold tracking-tight text-themed">
+                    {{ t('admin.dashboard.marketingTitle') }}
+                  </h2>
+                  <p class="text-xs text-themed-muted mt-0.5">
+                    {{ t('admin.dashboard.marketingDescription') }}
+                  </p>
+                </div>
+                <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
+                  {{ t('admin.dashboard.activeCampaignsBadge', { count: totalActiveLotteries }) }}
+                </span>
+              </div>
+
+              <!-- 签到活动状态条 -->
+              <div class="mt-4 p-3 rounded-lg border border-themed bg-themed-surface flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <span
+                    class="w-2.5 h-2.5 rounded-full"
+                    :class="checkinInfo.enabled ? 'bg-emerald-600' : 'bg-rose-600'"
+                  ></span>
+                  <div>
+                    <span class="text-xs font-semibold text-themed">{{ t('admin.dashboard.dailyCheckin') }}</span>
+                    <span class="text-[11px] text-themed-muted ml-2">
+                      {{ checkinInfo.enabled ? t('admin.dashboard.checkinRule', { min: checkinInfo.minPoints, max: checkinInfo.maxPoints }) : t('admin.dashboard.checkinDisabled') }}
+                    </span>
+                  </div>
+                </div>
+                <span class="text-xs font-mono tabular-nums text-themed-secondary">
+                  {{ t('admin.dashboard.todayCheckinsCount', { count: checkinInfo.todayCheckins }) }}
+                </span>
+              </div>
+
+              <!-- 生效中的抽奖活动列表 -->
+              <div class="mt-4">
+                <div v-if="activeLotteries.length > 0" class="divide-y divide-themed border border-themed rounded-lg overflow-hidden bg-themed-surface">
+                  <div
+                    v-for="lottery in activeLotteries"
+                    :key="lottery.id"
+                    class="p-3 flex items-center justify-between hover:bg-themed-hover transition-colors"
+                  >
+                    <div class="min-w-0 pr-3">
+                      <p class="text-xs font-medium text-themed truncate">
+                        {{ lottery.name }}
+                      </p>
+                      <p class="text-[11px] text-themed-muted mt-0.5">
+                        {{ t('admin.dashboard.costPointsPerDraw', { points: lottery.costPoints }) }}
+                        <span class="mx-1 text-themed-faint">·</span>
+                        {{ t('admin.dashboard.drawsCount', { count: lottery.totalDraws }) }}
+                      </p>
+                    </div>
+                    <span class="text-[11px] font-mono px-2 py-0.5 rounded border border-themed bg-themed-tertiary text-themed-secondary shrink-0">
+                      {{ lottery.endAt ? lottery.endAt.slice(0, 10) : t('admin.dashboard.longTermActive') }}
+                    </span>
+                  </div>
+                </div>
+
+                <div v-else class="p-6 text-center border border-themed rounded-lg bg-themed-surface">
+                  <p class="text-xs text-themed-muted">{{ t('admin.dashboard.noActiveLotteries') }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+              <span>{{ t('admin.dashboard.dailyCheckin') }}与抽奖活动</span>
+              <button
+                type="button"
+                class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                @click="jumpTo('/admin/entertainment')"
+              >
+                {{ t('admin.dashboard.manageMarketing') }}
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- 4. 平台运行事实 (Platform Pulse) -->
-        <div class="card p-5 flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
-              <div>
-                <h2 class="text-base font-semibold tracking-tight text-themed">
-                  {{ t('admin.dashboard.platformPulseTitle') }}
-                </h2>
-                <p class="text-xs text-themed-muted mt-0.5">
-                  服务组件、工单、通知及底层状态
-                </p>
+        <!-- 右列: 资源交付与平台运行主线 -->
+        <div class="space-y-5">
+          <!-- 3. 最近开机记录卡片 -->
+          <div class="card p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+                <div>
+                  <h2 class="text-base font-semibold tracking-tight text-themed">
+                    {{ t('admin.dashboard.recentInstancesTitle') }}
+                  </h2>
+                  <p class="text-xs text-themed-muted mt-0.5">
+                    {{ t('admin.dashboard.recentInstancesDescription') }}
+                  </p>
+                </div>
+                <span class="text-xs font-mono font-semibold px-2 py-1 rounded border border-themed bg-themed-tertiary text-themed">
+                  {{ t('admin.dashboard.newInstancesTodayBadge', { count: stats?.operations.instances.newToday || 0 }) }}
+                </span>
               </div>
-              <span class="text-xs font-mono text-themed-faint">
-                实时状态
-              </span>
+
+              <!-- 实例创建列表 -->
+              <div class="mt-4">
+                <div v-if="recentInstances.length > 0" class="divide-y divide-themed border border-themed rounded-lg overflow-hidden bg-themed-surface">
+                  <div
+                    v-for="instance in recentInstances"
+                    :key="instance.id"
+                    class="p-3 flex items-center justify-between hover:bg-themed-hover transition-colors"
+                  >
+                    <div class="flex items-center gap-2.5 min-w-0 pr-3">
+                      <span
+                        class="w-2 h-2 rounded-full shrink-0"
+                        :class="getInstanceStatusDotClass(instance.status)"
+                        :title="instance.status"
+                      ></span>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-xs font-mono font-semibold text-themed truncate">
+                            {{ instance.name }}
+                          </span>
+                          <span class="text-[11px] font-mono text-themed-faint truncate">
+                            #{{ instance.id }}
+                          </span>
+                        </div>
+                        <p class="text-[11px] text-themed-muted mt-0.5 truncate">
+                          {{ instance.user.username }}
+                          <span class="mx-1 text-themed-faint">·</span>
+                          {{ instance.host.name }}
+                          <span class="mx-1 text-themed-faint">·</span>
+                          {{ formatPlanSpecs(instance.packagePlan) }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span class="text-[11px] font-mono text-themed-muted shrink-0">
+                      {{ formatRelativeTime(instance.createdAt) }}
+                    </span>
+                  </div>
+                </div>
+
+                <div v-else class="p-6 text-center border border-themed rounded-lg bg-themed-surface">
+                  <p class="text-xs text-themed-muted">{{ t('admin.dashboard.noRecentInstances') }}</p>
+                </div>
+              </div>
             </div>
 
-            <div class="mt-4 divide-y divide-themed">
-              <!-- 待执行交付队列 -->
-              <div class="py-2.5 flex items-center justify-between">
-                <span class="text-xs text-themed-secondary">
-                  {{ t('admin.statistics.operations.facts.pendingDelivery') }}
-                </span>
-                <span
-                  class="font-mono text-xs font-semibold tabular-nums"
-                  :class="stats.operations.delivery.pendingTasks > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-themed'"
-                >
-                  {{ stats.operations.delivery.pendingTasks }}
-                </span>
-              </div>
-
-              <!-- 24h 失败交付 -->
-              <div class="py-2.5 flex items-center justify-between">
-                <span class="text-xs text-themed-secondary">
-                  {{ t('admin.statistics.operations.facts.failedDelivery') }}
-                </span>
-                <span
-                  class="font-mono text-xs font-semibold tabular-nums"
-                  :class="stats.operations.delivery.failedTasks24h > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-themed'"
-                >
-                  {{ stats.operations.delivery.failedTasks24h }}
-                </span>
-              </div>
-
-              <!-- 待处理工单 -->
-              <div class="py-2.5 flex items-center justify-between">
-                <span class="text-xs text-themed-secondary">
-                  {{ t('admin.statistics.operations.cards.openTickets') }}
-                </span>
-                <span
-                  class="font-mono text-xs font-semibold tabular-nums"
-                  :class="stats.operations.support.openTickets > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-themed'"
-                >
-                  {{ stats.operations.support.openTickets }}
-                </span>
-              </div>
-
-              <!-- 宿主机与在线 Agent -->
-              <div class="py-2.5 flex items-center justify-between">
-                <span class="text-xs text-themed-secondary">
-                  {{ t('admin.dashboard.hostsOverview') }}
-                </span>
-                <span class="font-mono text-xs font-semibold tabular-nums text-themed">
-                  {{ hostsOnline }}/{{ hostsTotal }} 在线 ({{ agentsOnline }} Agent)
-                </span>
-              </div>
-
-              <!-- 24h 通知 / 邮件失败 -->
-              <div class="py-2.5 flex items-center justify-between">
-                <span class="text-xs text-themed-secondary">
-                  24h 通知与邮件失败
-                </span>
-                <span
-                  class="font-mono text-xs font-semibold tabular-nums"
-                  :class="(stats.operations.support.failedNotifications24h + stats.operations.support.failedEmails24h) > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-themed'"
-                >
-                  {{ stats.operations.support.failedNotifications24h + stats.operations.support.failedEmails24h }}
-                </span>
-              </div>
+            <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+              <span>全平台最新实例交付流</span>
+              <button
+                type="button"
+                class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                @click="jumpTo('/admin/instances')"
+              >
+                {{ t('admin.dashboard.viewAllInstances') }}
+              </button>
             </div>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-            <span>系统服务: 单实例运行正常</span>
-            <button
-              type="button"
-              class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-              @click="jumpTo('/admin/logs')"
-            >
-              审计日志 ➔
-            </button>
+          <!-- 4. 实例构成与到期分布 -->
+          <div class="card p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+                <div>
+                  <h2 class="text-base font-semibold tracking-tight text-themed">
+                    {{ t('admin.dashboard.instanceStructureTitle') }}
+                  </h2>
+                  <p class="text-xs text-themed-muted mt-0.5">
+                    全平台 {{ totalInstances }} 台未删除实例的订购模式与健康状态
+                  </p>
+                </div>
+                <span class="text-xs font-mono text-themed-secondary">
+                  总量: {{ totalInstances }}
+                </span>
+              </div>
+
+              <div class="mt-6 space-y-4">
+                <!-- 付费与免费占比条 -->
+                <div>
+                  <div class="flex justify-between text-xs text-themed-secondary mb-1.5">
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                      {{ t('admin.statistics.labels.paidInstances') }} ({{ paidInstances }}台)
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      {{ t('admin.statistics.labels.freeInstances') }} ({{ freeInstances }}台)
+                    </span>
+                  </div>
+                  <div class="h-3 rounded-full overflow-hidden bg-themed-tertiary flex border border-themed">
+                    <div class="bg-blue-600" :style="{ width: `${paidInstancesPct}%` }"></div>
+                    <div class="bg-emerald-600" :style="{ width: `${freeInstancesPct}%` }"></div>
+                  </div>
+                </div>
+
+                <!-- 临期与健康概览 -->
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                  <div class="p-3 rounded-lg border border-themed bg-themed-surface">
+                    <p class="text-xs text-themed-muted">{{ t('admin.dashboard.expiringNotice') }}</p>
+                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
+                      {{ expiringSoonInstances }}
+                      <span class="text-xs text-themed-faint font-normal">台</span>
+                    </p>
+                    <p class="text-[11px] text-themed-faint mt-1">需关注续费留存</p>
+                  </div>
+
+                  <div class="p-3 rounded-lg border border-themed bg-themed-surface">
+                    <p class="text-xs text-themed-muted">今日新交付实例</p>
+                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-themed">
+                      +{{ stats.operations.instances.newToday }}
+                      <span class="text-xs text-themed-faint font-normal">台</span>
+                    </p>
+                    <p class="text-[11px] text-themed-faint mt-1">生产环境在线增长</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+              <span>托管 / 自营实例全部在线统计</span>
+              <button
+                type="button"
+                class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                @click="jumpTo('/admin/hosting')"
+              >
+                管理托管实例 ➔
+              </button>
+            </div>
+          </div>
+
+          <!-- 5. 平台运行事实 (Platform Pulse) -->
+          <div class="card p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-3 border-b border-themed pb-4">
+                <div>
+                  <h2 class="text-base font-semibold tracking-tight text-themed">
+                    {{ t('admin.dashboard.platformPulseTitle') }}
+                  </h2>
+                  <p class="text-xs text-themed-muted mt-0.5">
+                    服务组件、工单、通知及底层状态
+                  </p>
+                </div>
+                <span class="text-xs font-mono text-themed-faint">
+                  实时状态
+                </span>
+              </div>
+
+              <div class="mt-4 divide-y divide-themed">
+                <!-- 待执行交付队列 -->
+                <div class="py-2.5 flex items-center justify-between">
+                  <span class="text-xs text-themed-secondary">
+                    {{ t('admin.statistics.operations.facts.pendingDelivery') }}
+                  </span>
+                  <span
+                    class="font-mono text-xs font-semibold tabular-nums"
+                    :class="stats.operations.delivery.pendingTasks > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-themed'"
+                  >
+                    {{ stats.operations.delivery.pendingTasks }}
+                  </span>
+                </div>
+
+                <!-- 24h 失败交付 -->
+                <div class="py-2.5 flex items-center justify-between">
+                  <span class="text-xs text-themed-secondary">
+                    {{ t('admin.statistics.operations.facts.failedDelivery') }}
+                  </span>
+                  <span
+                    class="font-mono text-xs font-semibold tabular-nums"
+                    :class="stats.operations.delivery.failedTasks24h > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-themed'"
+                  >
+                    {{ stats.operations.delivery.failedTasks24h }}
+                  </span>
+                </div>
+
+                <!-- 待处理工单 -->
+                <div class="py-2.5 flex items-center justify-between">
+                  <span class="text-xs text-themed-secondary">
+                    {{ t('admin.statistics.operations.cards.openTickets') }}
+                  </span>
+                  <span
+                    class="font-mono text-xs font-semibold tabular-nums"
+                    :class="stats.operations.support.openTickets > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-themed'"
+                  >
+                    {{ stats.operations.support.openTickets }}
+                  </span>
+                </div>
+
+                <!-- 宿主机与在线 Agent -->
+                <div class="py-2.5 flex items-center justify-between">
+                  <span class="text-xs text-themed-secondary">
+                    {{ t('admin.dashboard.hostsOverview') }}
+                  </span>
+                  <span class="font-mono text-xs font-semibold tabular-nums text-themed">
+                    {{ hostsOnline }}/{{ hostsTotal }} 在线 ({{ agentsOnline }} Agent)
+                  </span>
+                </div>
+
+                <!-- 24h 通知 / 邮件失败 -->
+                <div class="py-2.5 flex items-center justify-between">
+                  <span class="text-xs text-themed-secondary">
+                    24h 通知与邮件失败
+                  </span>
+                  <span
+                    class="font-mono text-xs font-semibold tabular-nums"
+                    :class="(stats.operations.support.failedNotifications24h + stats.operations.support.failedEmails24h) > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-themed'"
+                  >
+                    {{ stats.operations.support.failedNotifications24h + stats.operations.support.failedEmails24h }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
+              <span>系统服务: 单实例运行正常</span>
+              <button
+                type="button"
+                class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                @click="jumpTo('/admin/logs')"
+              >
+                审计日志 ➔
+              </button>
+            </div>
           </div>
         </div>
       </section>

@@ -2714,6 +2714,33 @@ const api = {
           count: number
         }>
       }
+      marketing?: {
+        activeLotteries: Array<{
+          id: number
+          name: string
+          costPoints: number
+          totalDraws: number
+          startAt: string | null
+          endAt: string | null
+        }>
+        totalActiveLotteries: number
+        checkin: {
+          enabled: boolean
+          minPoints: number
+          maxPoints: number
+          requireInstance: boolean
+          todayCheckins: number
+        }
+      }
+      recentInstances?: Array<{
+        id: number
+        name: string
+        status: string
+        createdAt: string
+        user: { id: number; username: string; email: string }
+        host: { id: number; name: string; countryCode?: string | null }
+        packagePlan: { name: string; cpu: number; memory: number; disk: number } | null
+      }>
     }> => http.get('/admin/statistics/overview'),
 
     // ==================== VIP 等级规则 ====================
