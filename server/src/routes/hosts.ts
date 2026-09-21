@@ -1208,7 +1208,12 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     let hostId: number
     try {
       hostId = await withHostAddressRegistryLock(async () => {
-        const lockedSnapshot = await prepareHostAddressSnapshotForWrite(url)
+        // 隧道模式：面板经 Agent 出站隧道连到宿主机本机回环端点，
+        // 该端点是逐宿主机独立的，不是全局唯一地址，无需也不能做唯一性注册
+        //（否则第二台隧道模式宿主的 127.0.0.1 会与第一台冲突）。
+        const lockedSnapshot = tunnelEnabled
+          ? null
+          : await prepareHostAddressSnapshotForWrite(url)
 
         return prisma.$transaction(async tx => {
           const createdHostId = await db.createHost({
@@ -1257,7 +1262,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             })
           }
 
-          await persistHostAddressSnapshot(createdHostId, lockedSnapshot, 'create', tx)
+          if (lockedSnapshot) {
+            await persistHostAddressSnapshot(createdHostId, lockedSnapshot, 'create', tx)
+          }
           return createdHostId
         })
       })
@@ -2542,8 +2549,17 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
     try {
       if (updates.url !== undefined) {
+        // 隧道模式端点为宿主机本机回环，逐宿主独立，跳过全局唯一性注册
+        // （更新后生效的隧道态：本次请求要改的 或 宿主当前的）
+        const tunnelModeEffective = updates.tunnelEnabled ??
+          (host as any).tunnel_enabled ??
+          (host as any).tunnelEnabled ??
+          false
+
         await withHostAddressRegistryLock(async () => {
-          const lockedSnapshot = await prepareHostAddressSnapshotForWrite(updates.url!, hostId)
+          const lockedSnapshot = tunnelModeEffective
+            ? null
+            : await prepareHostAddressSnapshotForWrite(updates.url!, hostId)
 
           await prisma.$transaction(async tx => {
             await db.updateHost(hostId, {
@@ -2622,7 +2638,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
               })
             }
 
-            await persistHostAddressSnapshot(hostId, lockedSnapshot, 'update', tx)
+            if (lockedSnapshot) {
+              await persistHostAddressSnapshot(hostId, lockedSnapshot, 'update', tx)
+            }
           })
         })
       } else {
@@ -4427,7 +4445,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       }
     }
 
-    agentLogStreamManager.subscribe(hostId, client)
+    await agentLogStreamManager.subscribe(hostId, client)
     const cleanup = () => {
       agentLogStreamManager.unsubscribe(hostId, client)
     }

@@ -6360,6 +6360,8 @@ export default {
             refresh: '刷新',
             online: 'Agent 在线',
             offline: 'Agent 离线',
+            tunnelRequired: '隧道未开启',
+            tunnelRequiredHint: 'Agent 心跳在线但隧道未开启（直连模式）。请在宿主配置里打开「隧道模式」后再刷新本页。',
         },
         caddy: {
             title: 'Caddy 反代',

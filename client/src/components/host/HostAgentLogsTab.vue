@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
@@ -16,11 +16,27 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// connecting: 正在建立 SSE；online: 已连接；offline: Agent 不可用
-type LogState = 'connecting' | 'online' | 'offline'
+// connecting: 正在建立 SSE；online: 已连接且在收流；
+// tunnelOff: Agent 心跳在线但宿主机隧道未开启（直连模式）；offline: Agent 心跳离线
+type LogState = 'connecting' | 'online' | 'offline' | 'tunnelOff'
 const state = ref<LogState>('connecting')
+const agentOnline = ref(false)
+const tunnelOnline = ref(false)
 const lines = ref<string[]>([])
 const MAX_LINES = 500
+
+const stateLabel = computed(() => {
+  switch (state.value) {
+    case 'online':
+      return t('host.agentLogs.online')
+    case 'tunnelOff':
+      return t('host.agentLogs.tunnelRequired')
+    case 'connecting':
+      return t('common.loading')
+    default:
+      return t('host.agentLogs.offline')
+  }
+})
 
 let eventSource: EventSource | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -80,8 +96,16 @@ async function connect(): Promise<void> {
 
   es.addEventListener('status', (ev) => {
     try {
-      const payload = JSON.parse((ev as MessageEvent).data) as { online?: boolean }
-      state.value = payload.online ? 'online' : 'offline'
+      const payload = JSON.parse((ev as MessageEvent).data) as { agentOnline?: boolean; tunnelOnline?: boolean }
+      if (typeof payload.agentOnline === 'boolean') agentOnline.value = payload.agentOnline
+      if (typeof payload.tunnelOnline === 'boolean') tunnelOnline.value = payload.tunnelOnline
+      if (!agentOnline.value) {
+        state.value = 'offline'
+      } else if (!tunnelOnline.value) {
+        state.value = 'tunnelOff'
+      } else {
+        state.value = 'online'
+      }
     } catch {
       // 忽略畸形状态帧
     }
@@ -167,12 +191,14 @@ function reconnectNow(): void {
           :class="[
             state === 'online'
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-400'
-              : state === 'connecting'
-                ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-400'
+              : state === 'tunnelOff'
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-400'
+                : state === 'connecting'
+                  ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-400'
           ]"
         >
-          {{ state === 'online' ? t('host.agentLogs.online') : state === 'connecting' ? t('common.loading') : t('host.agentLogs.offline') }}
+          {{ stateLabel }}
         </span>
       </div>
     </div>
@@ -188,16 +214,16 @@ function reconnectNow(): void {
         <span>{{ t('common.loading') }}</span>
       </div>
       <p v-else-if="lines.length === 0" class="text-center py-10" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'">
-        {{ state === 'offline' ? t('host.agentLogs.offline') : t('host.agentLogs.empty') }}
+        {{ state === 'offline' ? t('host.agentLogs.offline') : state === 'tunnelOff' ? t('host.agentLogs.tunnelRequired') : t('host.agentLogs.empty') }}
       </p>
       <template v-else>
         <div v-for="(line, index) in lines" :key="index">{{ line }}</div>
       </template>
     </div>
 
-    <div v-if="state === 'offline'" class="flex items-center justify-between text-xs mt-3"
+    <div v-if="state === 'offline' || state === 'tunnelOff'" class="flex items-center justify-between text-xs mt-3"
       :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'">
-      <span>{{ t('host.agentLogs.emptyWaitingAgent') }}</span>
+      <span>{{ state === 'tunnelOff' ? t('host.agentLogs.tunnelRequiredHint') : t('host.agentLogs.emptyWaitingAgent') }}</span>
       <span v-if="state === 'offline'" class="text-gray-400">{{ t('host.agentLogs.autoRetry') }}</span>
     </div>
   </div>

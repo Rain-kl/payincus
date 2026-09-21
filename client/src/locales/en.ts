@@ -6175,6 +6175,8 @@ export default {
             refresh: 'Refresh',
             online: 'Agent online',
             offline: 'Agent offline',
+            tunnelRequired: 'Tunnel disabled',
+            tunnelRequiredHint: 'Agent heartbeat is online but the host tunnel is off (direct-connect mode). Enable "Tunnel mode" in the host configuration, then refresh this page.',
         },
         caddy: {
             title: 'Caddy Proxy',

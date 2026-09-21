@@ -2659,6 +2659,8 @@ const zhTW = {
             refresh: '重新整理',
             online: 'Agent 在線',
             offline: 'Agent 離線',
+            tunnelRequired: '隧道未開啟',
+            tunnelRequiredHint: 'Agent 心跳在線但隧道未開啟（直連模式）。請在宿主機配置開啟「隧道模式」後再重新整理本頁。',
         },
         caddy: {
             title: 'Caddy 反向代理',

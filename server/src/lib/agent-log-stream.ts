@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import { prisma } from '../db/prisma.js'
 import { hostTunnelManager } from './incus/tunnel-manager.js'
 
 /**
@@ -11,6 +12,11 @@ import { hostTunnelManager } from './incus/tunnel-manager.js'
  * 面板收到浏览器的日志订阅后用 LOG_CTL 帧请求 Agent 启动 journalctl 流；
  * Agent 通过其既有出站 WebSocket（agent 主动连接面板的常驻通道）逐行回传 LOG_DATA；
  * 管理器把每行扇出给该宿主机的全部 SSE 订阅者。
+ *
+ * 状态语义：隧道在线（tunnelOnline）是日志流的必要不充分条件 ——
+ * 心跳在线但隧道未开启（宿主机配置为直连模式）时，订阅者会收到
+ * { agentOnline: true, tunnelOnline: false }，前端据此给出可操作提示，
+ * 而不是笼统显示「Agent 离线」。
  */
 
 export interface AgentLogStreamClient {
@@ -24,6 +30,7 @@ interface AgentLogSession {
 }
 
 const SSE_KEEPALIVE_MS = 15 * 1000
+const AGENT_HEARTBEAT_STALE_MS = 3 * 60 * 1000
 
 class AgentLogStreamManager extends EventEmitter {
   private sessions = new Map<number, AgentLogSession>()
@@ -37,13 +44,13 @@ class AgentLogStreamManager extends EventEmitter {
       if (!session || session.clients.size === 0) return
       // Agent 隧道重建后自动恢复日志流，浏览器无需重连
       hostTunnelManager.sendLogControl(hostId, 'start', 100)
-      this.broadcastStatus(session, true)
+      this.broadcastStatus(session, { tunnelOnline: true })
     })
     hostTunnelManager.on('tunnel_disconnected', (hostId: number) => {
       const session = this.sessions.get(hostId)
       if (!session || session.clients.size === 0) return
       // 保持连接打开：等待 Agent 重连后自动恢复
-      this.broadcastStatus(session, false)
+      this.broadcastStatus(session, { tunnelOnline: false })
     })
     hostTunnelManager.on('log_data', (hostId: number, line: string | null) => {
       const session = this.sessions.get(hostId)
@@ -89,8 +96,8 @@ class AgentLogStreamManager extends EventEmitter {
     return `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
   }
 
-  private broadcastStatus(session: AgentLogSession, online: boolean): void {
-    const chunk = this.sseEvent('status', { online })
+  private broadcastStatus(session: AgentLogSession, status: Record<string, boolean>): void {
+    const chunk = this.sseEvent('status', status)
     for (const client of session.clients) {
       client.write(chunk)
     }
@@ -98,8 +105,9 @@ class AgentLogStreamManager extends EventEmitter {
 
   /**
    * 注册一个浏览器 SSE 订阅者；首个订阅者会触发 Agent 端开始推送日志。
+   * 订阅时探测心跳在线与隧道在线，把真实状态回给前端。
    */
-  subscribe(hostId: number, client: AgentLogStreamClient): void {
+  async subscribe(hostId: number, client: AgentLogStreamClient): Promise<void> {
     this.ensureAttached()
 
     let session = this.sessions.get(hostId)
@@ -119,9 +127,22 @@ class AgentLogStreamManager extends EventEmitter {
       }, SSE_KEEPALIVE_MS)
     }
 
-    const online = hostTunnelManager.isTunnelOnline(hostId)
-    client.write(this.sseEvent('status', { online }))
-    if (online) {
+    const tunnelOnline = hostTunnelManager.isTunnelOnline(hostId)
+
+    let agentOnline = false
+    try {
+      const agent = await prisma.hostAgent.findFirst({
+        where: { hostId, enabled: true },
+        select: { status: true, lastSeenAt: true }
+      })
+      agentOnline = !!agent && agent.status === 'online' &&
+        !!agent.lastSeenAt && (Date.now() - agent.lastSeenAt.getTime()) < AGENT_HEARTBEAT_STALE_MS
+    } catch {
+      // DB 读取失败不影响订阅流程，仅以隧道状态为准
+    }
+
+    client.write(this.sseEvent('status', { agentOnline, tunnelOnline }))
+    if (tunnelOnline) {
       hostTunnelManager.sendLogControl(hostId, 'start', 100)
     }
   }
