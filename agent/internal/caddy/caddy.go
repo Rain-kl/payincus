@@ -201,12 +201,11 @@ func ensureService(ctx context.Context) error {
 	return nil
 }
 
-// ensureSystemdUnit 检查 caddy.service 是否存在，不存在则写入最小 unit。
+// ensureSystemdUnit 保证 caddy.service 是我们生成的 root 运行版本。
+// 幂等重写：旧版可能残留 User=caddy（会导致 Caddyfile 权限失败），
+// 因此只要文件缺失或内容与我们期望的不一致就覆盖。
 func ensureSystemdUnit() error {
 	const unitPath = "/etc/systemd/system/caddy.service"
-	if _, err := os.Stat(unitPath); err == nil {
-		return nil
-	}
 	content := `[Unit]
 Description=Caddy
 After=network.target
@@ -225,6 +224,12 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 [Install]
 WantedBy=multi-user.target
 `
+
+	// 已存在且内容一致则跳过，避免每次 install 都触碰 unit 文件。
+	if existing, err := os.ReadFile(unitPath); err == nil && string(existing) == content {
+		_ = os.MkdirAll(caddyConfigDir, 0o755)
+		return nil
+	}
 	if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil {
 		return err
 	}
