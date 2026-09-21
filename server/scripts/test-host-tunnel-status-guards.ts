@@ -36,8 +36,8 @@ assert.ok(
 const hostsRouteSource = readRepoFile('server/src/routes/hosts.ts')
 
 assert.ok(
-  hostsRouteSource.includes('export function deriveEffectiveHostStatus('),
-  'hosts.ts must export deriveEffectiveHostStatus helper'
+  hostsRouteSource.includes('deriveEffectiveHostStatus'),
+  'hosts.ts must export and use deriveEffectiveHostStatus helper'
 )
 assert.ok(
   hostsRouteSource.includes('status: deriveEffectiveHostStatus(host)'),
@@ -87,8 +87,7 @@ assert.ok(
 )
 
 // 5. 逻辑单元测试：deriveEffectiveHostStatus
-const { deriveEffectiveHostStatus } = await import('../src/routes/hosts.js')
-const { hostTunnelManager } = await import('../src/lib/incus/tunnel-manager.js')
+const { deriveEffectiveHostStatus, hostTunnelManager } = await import('../src/lib/incus/tunnel-manager.js')
 
 // 5.1 维护模式下的节点，无论穿透是否在线，均保持 maintenance
 assert.equal(
@@ -156,3 +155,4 @@ assert.equal(
 )
 
 console.log('host tunnel status guard tests passed')
+process.exit(0)

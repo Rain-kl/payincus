@@ -29,7 +29,7 @@ import {
   tryAdvisoryTransactionLock
 } from '../db/advisory-locks.js'
 import { IncusClient, getIncusClient, removeIncusClient } from '../lib/incus/index.js'
-import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
+import { deriveEffectiveHostStatus, hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { getInstance, updateInstance } from '../lib/incus/incus-instances.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
 import { listStoragePools, getStoragePoolResources, createStoragePool, deleteStoragePool, updateStoragePool } from '../lib/incus/incus-storage.js'
@@ -129,21 +129,7 @@ const HOST_BATCH_INSTANCE_MAX_ITEMS = 100
 const HOST_GIFT_DAYS_MAX = 365
 const HOST_RENEWAL_PRICE_MAX = 99999
 
-export function deriveEffectiveHostStatus(host: {
-  id: number
-  status: string
-  tunnelEnabled?: boolean
-  tunnel_enabled?: boolean
-}): 'online' | 'offline' | 'maintenance' {
-  if (host.status === 'maintenance') {
-    return 'maintenance'
-  }
-  const isTunnel = host.tunnelEnabled ?? host.tunnel_enabled ?? false
-  if (isTunnel && !hostTunnelManager.isTunnelOnline(host.id)) {
-    return 'offline'
-  }
-  return host.status as 'online' | 'offline' | 'maintenance'
-}
+export { deriveEffectiveHostStatus } from '../lib/incus/tunnel-manager.js'
 
 function formatStoragePoolCreateError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)

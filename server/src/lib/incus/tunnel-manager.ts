@@ -302,6 +302,26 @@ export class HostTunnelManager extends EventEmitter {
 export const hostTunnelManager = new HostTunnelManager()
 
 /**
+ * 计算宿主机的有效运行时状态
+ * 穿透模式下：若无活动隧道且未处于维护模式，则有效状态必然为 offline
+ */
+export function deriveEffectiveHostStatus(host: {
+  id: number
+  status: string
+  tunnelEnabled?: boolean
+  tunnel_enabled?: boolean
+}): 'online' | 'offline' | 'maintenance' {
+  if (host.status === 'maintenance') {
+    return 'maintenance'
+  }
+  const isTunnel = host.tunnelEnabled ?? host.tunnel_enabled ?? false
+  if (isTunnel && !hostTunnelManager.isTunnelOnline(host.id)) {
+    return 'offline'
+  }
+  return host.status as 'online' | 'offline' | 'maintenance'
+}
+
+/**
  * 宿主机隧道状态同步至数据库
  */
 async function syncTunnelHostStatus(hostId: number, isOnline: boolean): Promise<void> {
