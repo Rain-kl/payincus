@@ -4,6 +4,7 @@ export const isAdminEntry = true
 
 export const navMenuItems: MenuItem[] = [
   { divider: true, label: 'nav.admin' },
+  { name: 'admin-dashboard', path: '/admin/dashboard', icon: 'chart', label: 'nav.dashboard' },
   { name: 'admin-users', path: '/admin/users', icon: 'users', label: 'nav.users' },
   { name: 'admin-hosting', path: '/admin/hosting', icon: 'coin', label: 'nav.hosting' },
   { name: 'admin-settings', path: '/admin/settings', icon: 'cog', label: 'nav.system' },
