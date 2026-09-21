@@ -5,6 +5,7 @@
 import { FastifyInstance } from 'fastify'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../db/prisma.js'
+import { getDailyCheckinSettings } from '../db/checkin.js'
 import { BUSINESS_TIMEZONE, getDateStringInTimezone, getMonthStringInTimezone } from '../lib/timezone.js'
 
 const BUSINESS_TZ_OFFSET_MINUTES = 8 * 60
@@ -209,7 +210,12 @@ export default async function adminStatisticsRoutes(app: FastifyInstance): Promi
         enabledNotificationChannels,
         smtpEnabledConfigs,
         failedUpdateTasks,
-        diskUpdateErrorTasks
+        diskUpdateErrorTasks,
+        activeLotteries,
+        totalActiveLotteries,
+        todayCheckins,
+        checkinSettings,
+        recentInstances
       ] = await Promise.all([
         prisma.user.count(),
         prisma.instance.count({ where: { status: { not: 'deleted' } } }),
@@ -442,6 +448,73 @@ export default async function adminStatisticsRoutes(app: FastifyInstance): Promi
               { errorMessage: { contains: '磁碟空間不足' } }
             ]
           }
+        }),
+        prisma.lottery.findMany({
+          where: {
+            isActive: true,
+            OR: [
+              { endAt: null },
+              { endAt: { gte: now } }
+            ]
+          },
+          select: {
+            id: true,
+            name: true,
+            costPoints: true,
+            totalDraws: true,
+            startAt: true,
+            endAt: true
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        }),
+        prisma.lottery.count({
+          where: {
+            isActive: true,
+            OR: [
+              { endAt: null },
+              { endAt: { gte: now } }
+            ]
+          }
+        }),
+        prisma.dailyCheckin.count({
+          where: {
+            dateKey: getDateStringInTimezone(now, BUSINESS_TIMEZONE)
+          }
+        }),
+        getDailyCheckinSettings(),
+        prisma.instance.findMany({
+          where: { status: { not: 'deleted' } },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                username: true,
+                email: true
+              }
+            },
+            host: {
+              select: {
+                id: true,
+                name: true,
+                countryCode: true
+              }
+            },
+            packagePlan: {
+              select: {
+                name: true,
+                cpu: true,
+                memory: true,
+                disk: true
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
         })
       ])
 
@@ -533,7 +606,34 @@ export default async function adminStatisticsRoutes(app: FastifyInstance): Promi
             failedEmails24h: failedEmailTasks
           },
           risks: operationRisks
-        }
+        },
+        marketing: {
+          activeLotteries: activeLotteries.map(l => ({
+            id: l.id,
+            name: l.name,
+            costPoints: l.costPoints,
+            totalDraws: l.totalDraws,
+            startAt: l.startAt ? l.startAt.toISOString() : null,
+            endAt: l.endAt ? l.endAt.toISOString() : null
+          })),
+          totalActiveLotteries,
+          checkin: {
+            enabled: checkinSettings.enabled,
+            minPoints: checkinSettings.minPoints,
+            maxPoints: checkinSettings.maxPoints,
+            requireInstance: checkinSettings.requireInstance,
+            todayCheckins
+          }
+        },
+        recentInstances: recentInstances.map(inst => ({
+          id: inst.id,
+          name: inst.name,
+          status: inst.status,
+          createdAt: inst.createdAt.toISOString(),
+          user: inst.user,
+          host: inst.host,
+          packagePlan: inst.packagePlan
+        }))
       }
     } catch (error) {
       request.log.error(error, '获取统计数据失败')

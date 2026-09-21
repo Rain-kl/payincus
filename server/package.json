@@ -37,6 +37,7 @@
     "test:admin-billing-route-id-guards": "node --import tsx scripts/test-admin-billing-route-id-guards.ts",
     "test:admin-entertainment-route-guards": "node --import tsx scripts/test-admin-entertainment-route-guards.ts",
     "test:admin-route-guards": "node --import tsx scripts/test-admin-route-guards.ts",
+    "test:admin-dashboard-overview-guards": "node --import tsx scripts/test-admin-dashboard-overview-guards.ts",
     "test:aff-review-ui-guards": "node --import tsx scripts/test-aff-review-ui-guards.ts",
     "test:auth-session-status-guards": "node --import tsx scripts/test-auth-session-status-guards.ts",
     "test:auto-policy-scheduler-guards": "node --import tsx scripts/test-auto-policy-scheduler-guards.ts",
