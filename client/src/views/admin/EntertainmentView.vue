@@ -1051,50 +1051,98 @@ function getSeriesTitle(seriesId: string): string {
                   </span>
                 </td>
                 <td class="px-4 py-3">
-                  <div class="flex flex-wrap gap-1">
-                    <button class="btn btn-xs btn-ghost" :title="$t('entertainment.admin.managePrizes')" @click="openPrizesModal(lottery)">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H4.5a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21" />
-                      </svg>
-                    </button>
-                    <button
-                      class="btn btn-xs btn-ghost"
-                      :class="{ 'text-green-500': lottery.notificationConfig?.enabled }"
-                      :title="$t('entertainment.admin.notification.title')"
-                      @click="openNotificationModal(lottery)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                      </svg>
-                    </button>
-                    <button class="btn btn-xs btn-ghost" @click="openEditLotteryModal(lottery)">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      v-if="deleteConfirmId !== lottery.id"
-                      class="btn btn-xs btn-ghost text-red-500"
-                      @click="deleteConfirmId = lottery.id"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                  <div class="flex items-center gap-2">
+                    <div class="relative inline-flex items-center group/tooltip">
+                      <button
+                        type="button"
+                        class="p-1 rounded text-themed-muted hover:text-themed transition-colors focus:outline-none cursor-pointer"
+                        :aria-label="$t('entertainment.admin.managePrizes')"
+                        @click="openPrizesModal(lottery)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H4.5a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21" />
+                        </svg>
+                      </button>
+                      <span
+                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
+                        role="tooltip"
+                      >
+                        {{ $t('entertainment.admin.managePrizes') }}
+                      </span>
+                    </div>
+                    <div class="relative inline-flex items-center group/tooltip">
+                      <button
+                        type="button"
+                        class="p-1 rounded transition-colors focus:outline-none cursor-pointer"
+                        :class="lottery.notificationConfig?.enabled ? 'text-[var(--success)] hover:brightness-110' : 'text-themed-muted hover:text-themed'"
+                        :aria-label="$t('entertainment.admin.notification.title')"
+                        @click="openNotificationModal(lottery)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                      </button>
+                      <span
+                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
+                        role="tooltip"
+                      >
+                        {{ $t('entertainment.admin.notification.title') }}
+                      </span>
+                    </div>
+                    <div class="relative inline-flex items-center group/tooltip">
+                      <button
+                        type="button"
+                        class="p-1 rounded text-themed-muted hover:text-themed transition-colors focus:outline-none cursor-pointer"
+                        :aria-label="$t('entertainment.admin.editLottery')"
+                        @click="openEditLotteryModal(lottery)"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <span
+                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
+                        role="tooltip"
+                      >
+                        {{ $t('entertainment.admin.editLottery') }}
+                      </span>
+                    </div>
+                    <div v-if="deleteConfirmId !== lottery.id" class="relative inline-flex items-center group/tooltip">
+                      <button
+                        type="button"
+                        class="p-1 rounded text-rose-500 hover:text-rose-600 transition-colors focus:outline-none cursor-pointer"
+                        :aria-label="$t('common.delete')"
+                        @click="deleteConfirmId = lottery.id"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <span
+                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
+                        role="tooltip"
+                      >
+                        {{ $t('common.delete') }}
+                      </span>
+                    </div>
                     <template v-else>
-                      <button
-                        class="btn btn-xs btn-error"
-                        :disabled="deleting"
-                        @click="deleteLottery(lottery.id)"
-                      >
-                        {{ $t('common.confirm') }}
-                      </button>
-                      <button
-                        class="btn btn-xs btn-ghost"
-                        @click="deleteConfirmId = null"
-                      >
-                        {{ $t('common.cancel') }}
-                      </button>
+                      <div class="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          class="px-1.5 py-0.5 text-xs rounded font-medium bg-[var(--error)] text-white hover:brightness-110 transition-colors cursor-pointer"
+                          :disabled="deleting"
+                          @click="deleteLottery(lottery.id)"
+                        >
+                          {{ $t('common.confirm') }}
+                        </button>
+                        <button
+                          type="button"
+                          class="px-1.5 py-0.5 text-xs rounded text-themed-muted hover:text-themed transition-colors cursor-pointer"
+                          @click="deleteConfirmId = null"
+                        >
+                          {{ $t('common.cancel') }}
+                        </button>
+                      </div>
                     </template>
                   </div>
                 </td>
@@ -1512,13 +1560,61 @@ function getSeriesTitle(seriesId: string): string {
                         {{ $t('entertainment.admin.badgeCatalog.badges.usage', { ownership: badge.ownershipCount || 0, avatar: badge.avatarUseCount || 0, instance: badge.instanceUseCount || 0 }) }}
                       </td>
                       <td class="px-4 py-3">
-                        <div class="flex flex-wrap gap-1">
-                          <button class="btn btn-xs btn-ghost" @click="openEditBadgeModal(badge)">{{ $t('common.edit') }}</button>
-                          <template v-if="deletingBadgeId === badge.id">
-                            <button class="btn btn-xs btn-error" @click="deleteBadge(badge.id)">{{ $t('common.confirm') }}</button>
-                            <button class="btn btn-xs btn-ghost" @click="deletingBadgeId = null">{{ $t('common.cancel') }}</button>
+                        <div class="flex items-center gap-2">
+                          <div class="relative inline-flex items-center group/tooltip">
+                            <button
+                              type="button"
+                              class="p-1 rounded text-themed-muted hover:text-themed transition-colors focus:outline-none cursor-pointer"
+                              :aria-label="$t('common.edit')"
+                              @click="openEditBadgeModal(badge)"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <span
+                              class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
+                              role="tooltip"
+                            >
+                              {{ $t('common.edit') }}
+                            </span>
+                          </div>
+                          <div v-if="deletingBadgeId !== badge.id" class="relative inline-flex items-center group/tooltip">
+                            <button
+                              type="button"
+                              class="p-1 rounded text-rose-500 hover:text-rose-600 transition-colors focus:outline-none cursor-pointer"
+                              :aria-label="$t('common.delete')"
+                              @click="deletingBadgeId = badge.id"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                            <span
+                              class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
+                              role="tooltip"
+                            >
+                              {{ $t('common.delete') }}
+                            </span>
+                          </div>
+                          <template v-else>
+                            <div class="inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                class="px-1.5 py-0.5 text-xs rounded font-medium bg-[var(--error)] text-white hover:brightness-110 transition-colors cursor-pointer"
+                                @click="deleteBadge(badge.id)"
+                              >
+                                {{ $t('common.confirm') }}
+                              </button>
+                              <button
+                                type="button"
+                                class="px-1.5 py-0.5 text-xs rounded text-themed-muted hover:text-themed transition-colors cursor-pointer"
+                                @click="deletingBadgeId = null"
+                              >
+                                {{ $t('common.cancel') }}
+                              </button>
+                            </div>
                           </template>
-                          <button v-else class="btn btn-xs btn-ghost text-red-500" @click="deletingBadgeId = badge.id">{{ $t('common.delete') }}</button>
                         </div>
                       </td>
                     </tr>
