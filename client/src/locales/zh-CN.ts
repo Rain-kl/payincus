@@ -2908,8 +2908,8 @@ export default {
     // 管理后台
     admin: {
         dashboard: {
-            title: '运营大盘',
-            description: '实例、用户、计费与基础设施运行状态聚合',
+            title: '仪表盘',
+            description: '实例、用户、计费与基础设施',
             autoRefresh: '自动刷新（30秒）',
             quickActions: '快捷操作',
             actionHubTitle: '运维待办与风险雷达',

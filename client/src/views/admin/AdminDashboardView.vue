@@ -21,7 +21,6 @@ const { t, locale } = useI18n()
 
 const loading = ref(true)
 const stats = ref<StatisticsOverview | null>(null)
-const autoRefresh = ref(true)
 const lastUpdated = ref<string>('')
 const timer = ref<ReturnType<typeof setInterval> | null>(null)
 
@@ -98,20 +97,9 @@ function stopAutoRefresh() {
   }
 }
 
-function toggleAutoRefresh() {
-  autoRefresh.value = !autoRefresh.value
-  if (autoRefresh.value) {
-    startAutoRefresh()
-  } else {
-    stopAutoRefresh()
-  }
-}
-
 onMounted(() => {
   void loadData()
-  if (autoRefresh.value) {
-    startAutoRefresh()
-  }
+  startAutoRefresh()
 })
 
 onUnmounted(() => {
@@ -302,18 +290,6 @@ function formatTick(label: string): string {
       </div>
 
       <div class="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm inline-flex items-center gap-1.5"
-          :class="autoRefresh ? 'border-primary-600 dark:border-primary-400 text-themed' : 'text-themed-muted'"
-          @click="toggleAutoRefresh"
-        >
-          <span
-            class="w-2 h-2 rounded-full"
-            :class="autoRefresh ? 'bg-emerald-600' : 'bg-themed-tertiary border border-themed'"
-          ></span>
-          {{ t('admin.dashboard.autoRefresh') }}
-        </button>
 
         <span v-if="lastUpdated" class="text-xs font-mono text-themed-faint hidden sm:inline-block">
           {{ lastUpdated }}
