@@ -566,13 +566,13 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
       </div>
 
       <div class="px-6 pt-5">
-        <div v-if="oauthAppSecret" class="flex gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
+        <div v-if="oauthAppSecret" class="flex gap-3 rounded-xl border border-themed bg-themed-secondary p-4 text-sm text-themed">
           <svg class="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
           <div class="min-w-0 flex-1">
             <div class="font-medium">Client Secret 只显示一次</div>
-            <code class="mt-2 block break-all rounded-lg bg-themed-surface/70 p-2 font-mono text-xs text-themed">{{ oauthAppSecret }}</code>
+            <code class="mt-2 block break-all rounded-lg border border-themed bg-themed-surface p-2 font-mono text-xs text-themed">{{ oauthAppSecret }}</code>
           </div>
         </div>
       </div>
@@ -611,8 +611,8 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
 
           <!-- 下拉框触发条（展示已选 Tag） -->
           <div
-            class="input min-h-[42px] h-auto cursor-pointer py-1.5 pr-9 relative flex flex-wrap items-center gap-1.5 transition-colors"
-            :class="isScopeDropdownOpen ? 'ring-2 ring-accent/30 border-accent' : ''"
+            class="input min-h-[42px] h-auto cursor-pointer py-1.5 pr-9 relative flex flex-wrap items-center gap-1.5 transition-colors bg-themed-surface"
+            :class="isScopeDropdownOpen ? 'ring-1 ring-accent border-accent' : ''"
             @click="toggleScopeDropdown"
           >
             <span v-if="oauthAppForm.scopes.length === 0" class="text-themed-muted text-sm select-none">
@@ -654,15 +654,15 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
           <!-- 下拉浮层面板 -->
           <div
             v-if="isScopeDropdownOpen"
-            class="absolute left-0 right-0 z-50 mt-1.5 rounded-xl border border-themed bg-themed-surface shadow-2xl overflow-hidden animate-fade-in"
+            class="dropdown-menu absolute left-0 right-0 z-50 mt-1.5 rounded-xl border border-themed bg-themed-surface shadow-2xl overflow-hidden animate-fade-in"
           >
             <!-- 搜索与快捷操作 -->
-            <div class="p-2.5 border-b border-themed bg-themed-secondary/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-between">
+            <div class="p-2.5 border-b border-themed bg-themed-secondary flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-between">
               <div class="relative flex-1">
                 <input
                   v-model="scopeSearchQuery"
                   type="text"
-                  class="input input-sm w-full pl-8 py-1 text-xs"
+                  class="input input-sm w-full pl-8 py-1 text-xs bg-themed-surface"
                   placeholder="搜索 Scope 标识、名称或描述..."
                   @click.stop
                 />
@@ -697,12 +697,12 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
             </div>
 
             <!-- 选项列表 -->
-            <div class="max-h-72 overflow-y-auto p-2 space-y-1.5 text-sm">
+            <div class="max-h-72 overflow-y-auto p-2 space-y-1.5 text-sm bg-themed-surface">
               <div
                 v-for="scope in filteredOAuthScopes"
                 :key="scope.scope"
-                class="flex items-start gap-2.5 rounded-lg border border-transparent p-2.5 transition-colors cursor-pointer hover:bg-themed-hover"
-                :class="oauthAppForm.scopes.includes(scope.scope) ? 'bg-themed-secondary/70 border-themed' : ''"
+                class="flex items-start gap-2.5 rounded-lg border border-themed p-2.5 transition-colors cursor-pointer hover:bg-themed-hover"
+                :class="oauthAppForm.scopes.includes(scope.scope) ? 'bg-themed-secondary border-accent' : 'bg-themed-surface'"
                 @click.stop="toggleScope(scope.scope)"
               >
                 <input
@@ -764,7 +764,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
                 <div class="font-medium text-themed">{{ appItem.name }}</div>
                 <div class="mt-1 break-all font-mono text-xs text-themed-muted">{{ appItem.clientId }}</div>
               </div>
-              <span class="shrink-0 rounded-full border px-2 py-0.5 text-2xs font-medium" :class="appItem.enabled ? 'border-success/30 text-success' : 'border-warning/30 text-warning'">{{ appItem.enabled ? '启用' : '停用' }}</span>
+              <span class="shrink-0 rounded-full border px-2 py-0.5 text-2xs font-medium" :class="appItem.enabled ? 'border-success text-success' : 'border-warning text-warning'">{{ appItem.enabled ? '启用' : '停用' }}</span>
             </div>
             <div class="mt-3 space-y-2 text-xs text-themed-muted">
               <div>
@@ -816,7 +816,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
                 </div>
               </td>
               <td class="py-3 pr-4">
-                <span class="inline-flex rounded-full border px-2 py-0.5 text-2xs font-medium" :class="appItem.enabled ? 'border-success/30 text-success' : 'border-warning/30 text-warning'">{{ appItem.enabled ? '启用' : '停用' }}</span>
+                <span class="inline-flex rounded-full border px-2 py-0.5 text-2xs font-medium" :class="appItem.enabled ? 'border-success text-success' : 'border-warning text-warning'">{{ appItem.enabled ? '启用' : '停用' }}</span>
               </td>
               <td class="py-3 pr-6">
                 <div class="flex flex-wrap gap-2">
@@ -882,7 +882,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
                 <div class="font-medium text-themed">{{ authorization.user.username }}</div>
                 <div class="mt-1 break-all text-xs text-themed-muted">#{{ authorization.user.id }} · {{ authorization.user.email || '无邮箱' }}</div>
               </div>
-              <span class="shrink-0 rounded-full border px-2 py-0.5 text-2xs font-medium" :class="authorization.active ? 'border-success/30 text-success' : 'border-warning/30 text-warning'">
+              <span class="shrink-0 rounded-full border px-2 py-0.5 text-2xs font-medium" :class="authorization.active ? 'border-success text-success' : 'border-warning text-warning'">
                 {{ formatOAuthAuthorizationStatus(authorization) }}
               </span>
             </div>
@@ -952,7 +952,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
                 </div>
               </td>
               <td class="py-3 pr-4">
-                <span class="inline-flex rounded-full border px-2 py-0.5 text-2xs font-medium" :class="authorization.active ? 'border-success/30 text-success' : 'border-warning/30 text-warning'">
+                <span class="inline-flex rounded-full border px-2 py-0.5 text-2xs font-medium" :class="authorization.active ? 'border-success text-success' : 'border-warning text-warning'">
                   {{ formatOAuthAuthorizationStatus(authorization) }}
                 </span>
                 <div v-if="authorization.revokedAt" class="mt-1 text-xs text-themed-muted">{{ new Date(authorization.revokedAt).toLocaleString() }}</div>

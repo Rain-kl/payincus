@@ -331,26 +331,26 @@
 
   .kawaii-app-shell .text-themed-faint,
   .kawaii-public-shell .text-themed-faint {
-    color: color-mix(in srgb, var(--kawaii-muted) 74%, transparent) !important;
+    color: var(--kawaii-faint) !important;
   }
 
   .kawaii-app-shell .bg-themed,
   .kawaii-public-shell .bg-themed,
   .kawaii-app-shell .bg-themed-surface,
   .kawaii-public-shell .bg-themed-surface {
-    background: color-mix(in srgb, var(--kawaii-surface) 90%, transparent) !important;
+    background: var(--kawaii-surface) !important;
   }
 
   .kawaii-app-shell .bg-themed-secondary,
   .kawaii-public-shell .bg-themed-secondary,
   .kawaii-app-shell .bg-themed-tertiary,
   .kawaii-public-shell .bg-themed-tertiary {
-    background: color-mix(in srgb, var(--kawaii-surface-soft) 78%, transparent) !important;
+    background: var(--kawaii-surface-soft) !important;
   }
 
   .kawaii-app-shell .bg-themed-hover,
   .kawaii-public-shell .bg-themed-hover {
-    background: color-mix(in srgb, var(--kawaii-surface-soft) 86%, transparent) !important;
+    background: var(--kawaii-surface-soft) !important;
   }
 
   .kawaii-app-shell .border-themed,
@@ -364,7 +364,7 @@
   .kawaii-public-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea) {
     border-color: var(--kawaii-line) !important;
     border-radius: var(--radius-input);
-    background-color: color-mix(in srgb, var(--kawaii-surface) 84%, transparent) !important;
+    background-color: var(--kawaii-surface) !important;
     color: var(--kawaii-text) !important;
   }
 
