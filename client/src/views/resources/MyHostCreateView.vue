@@ -349,7 +349,7 @@ function closeAndGoBack() {
           </section>
 
           <!-- 连接与网络 -->
-          <section class="nimbus-card relative z-20 space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
+          <section class="nimbus-card relative z-20 !overflow-visible space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6" style="overflow: visible !important;">
             <!-- 连接方式选择 -->
             <div class="space-y-1.5">
               <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.connectionMode') }}</label>

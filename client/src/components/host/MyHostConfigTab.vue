@@ -358,7 +358,7 @@ async function saveConfig() {
 <template>
   <form class="space-y-6" @submit.prevent="saveConfig">
     <!-- ① 基础信息 -->
-    <section class="card relative z-20">
+    <section class="card relative z-20 !overflow-visible" style="overflow: visible !important;">
       <div class="border-b border-themed px-5 py-4 sm:px-6">
         <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.basicInfo') }}</h2>
         <p class="text-xs text-themed-muted mt-0.5">{{ t('admin.hosts.basicInfoHint') }}</p>
