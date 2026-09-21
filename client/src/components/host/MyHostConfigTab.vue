@@ -68,7 +68,7 @@ const saving = ref(false)
 const form = ref({
   name: '',
   nameSuffix: '',
-  tunnelEnabled: false,
+  tunnelEnabled: true,
   hostAddress: '',
   apiPort: 8443,
   targetHost: '127.0.0.1',
@@ -172,7 +172,7 @@ watch(() => props.host, (newHost) => {
     form.value = {
       name: hostName,
       nameSuffix: nameSuffix,
-      tunnelEnabled: newHost.tunnelEnabled || false,
+      tunnelEnabled: newHost.tunnelEnabled ?? true,
       hostAddress: extractHostAddressFromUrl(newHost.url || ''),
       apiPort: extractPortFromUrl(newHost.url || ''),
       targetHost: newHost.targetHost || '127.0.0.1',
@@ -479,21 +479,21 @@ async function saveConfig() {
           <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.connectionMode') }}</label>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label
+                class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+                :class="form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
+            >
+              <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
+              <div>
+                <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
+              </div>
+            </label>
+            <label
               class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
               :class="!form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
             >
               <input type="radio" :value="false" v-model="form.tunnelEnabled" class="radio text-primary" />
               <div>
                 <div class="text-sm">{{ t('admin.hosts.directMode') }}</div>
-              </div>
-            </label>
-            <label
-              class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
-              :class="form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
-            >
-              <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
-              <div>
-                <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
               </div>
             </label>
           </div>

@@ -1250,7 +1250,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             cpuAllowanceMax: cpuAllowanceMax,
             memoryMax: memoryMax,
             instanceType: instanceType,
-            tunnelEnabled: tunnelEnabled ?? false,
+            tunnelEnabled: tunnelEnabled ?? true,
             targetHost: targetHost ?? '127.0.0.1',
             targetPort: targetPort ?? 8443
           }, tx)
