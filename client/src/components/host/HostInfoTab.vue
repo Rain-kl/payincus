@@ -5,6 +5,8 @@ import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 import api from '@/api'
 import FlagIcon from '@/components/FlagIcon.vue'
+import TrafficLineChart from '@/components/traffic/TrafficLineChart.vue'
+import { fillContinuousDays, type TrafficHistoryItem } from '@/utils/traffic'
 import type { HostAgentStatus } from '@/types/api'
 
 const { t } = useI18n()
@@ -43,6 +45,7 @@ interface Host {
   targetHost?: string
   targetPort?: number
   tunnelOnline?: boolean
+  trafficResetDay?: number
   createdAt?: string
   updatedAt?: string
 }
@@ -61,17 +64,6 @@ const instanceStats = ref({
   diskUsed: 0
 })
 
-// 流量历史数据
-interface TrafficHistoryItem {
-  date: string
-  rxTotal: string
-  txTotal: string
-  rxFormatted: string
-  txFormatted: string
-  total: string
-  totalFormatted: string
-}
-
 interface TrafficSummary {
   totalUsed: string
   totalUsedFormatted: string
@@ -82,7 +74,31 @@ interface TrafficSummary {
 const trafficHistory = ref<TrafficHistoryItem[]>([])
 const trafficSummary = ref<TrafficSummary | null>(null)
 const trafficPeriod = ref<{ periodStart: string; periodEnd: string } | null>(null)
+const trafficResetDay = ref<number>(props.host.trafficResetDay || 1)
 const trafficLoading = ref(true)
+
+const hostUsageDisplayText = computed(() => {
+  if (!trafficSummary.value) return ''
+  const used = trafficSummary.value.totalUsedFormatted
+  const limit = trafficSummary.value.totalLimitFormatted
+  if (!limit || limit === '0 B' || Number(trafficSummary.value.totalLimit) <= 0) {
+    return `${used} / ${t('traffic.unlimited')}`
+  }
+  const usedParts = used.split(' ')
+  const limitParts = limit.split(' ')
+  if (usedParts.length === 2 && limitParts.length === 2 && usedParts[1] === limitParts[1]) {
+    return `${usedParts[0]} / ${limitParts[0]} ${limitParts[1]}`
+  }
+  return `${used} / ${limit}`
+})
+
+const hostTrafficProgressPercent = computed(() => {
+  if (!trafficSummary.value) return 0
+  const used = Number(trafficSummary.value.totalUsed) || 0
+  const limit = Number(trafficSummary.value.totalLimit) || 0
+  if (limit <= 0) return 0
+  return Math.max(0, Math.min(100, (used / limit) * 100))
+})
 
 const agentStatus = ref<HostAgentStatus | null>(null)
 const agentStatusLoading = ref(true)
@@ -121,12 +137,16 @@ async function loadTrafficHistory() {
   trafficLoading.value = true
   try {
     const response = await api.traffic.getHostTrafficHistory(props.host.id)
-    trafficHistory.value = response.data
+    trafficResetDay.value = response.trafficResetDay ?? props.host.trafficResetDay ?? 1
     trafficSummary.value = response.summary
     trafficPeriod.value = {
       periodStart: response.periodStart,
       periodEnd: response.periodEnd
     }
+    trafficHistory.value = fillContinuousDays(response.data, {
+      start: response.periodStart,
+      end: response.periodEnd
+    })
   } catch (error) {
     console.error('Failed to load traffic history:', error)
   } finally {
@@ -418,12 +438,6 @@ const diskUsagePercent = computed(() => {
   return Math.min(100, Math.round((instanceStats.value.diskUsed / total) * 100))
 })
 
-const chartMaxValue = computed(() => {
-  if (trafficHistory.value.length === 0) return 1
-  const max = Math.max(...trafficHistory.value.map(h => Number(h.total)))
-  return max || 1
-})
-
 // 格式化字节数为可读字符串
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0'
@@ -432,40 +446,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + 'M'
   return (bytes / 1073741824).toFixed(1) + 'G'
 }
-
-// Y 轴刻度标�?
-const yAxisLabels = computed(() => {
-  const max = chartMaxValue.value
-  return {
-    top: formatBytes(max),
-    mid: formatBytes(max / 2),
-    bottom: '0'
-  }
-})
-
-// 格式化日期显�?(MM-DD)
-function formatDateLabel(dateStr: string): string {
-  return dateStr.slice(5) // 去掉年份，只保留 MM-DD
-}
-
-// X 轴标签（显示 5-7 个日期点�?
-const xAxisLabels = computed(() => {
-  const len = trafficHistory.value.length
-  if (len === 0) return []
-  if (len <= 7) return trafficHistory.value.map((h, index) => ({ date: formatDateLabel(h.date), index }))
-  
-  // 显示首、尾和中间均匀分布的点
-  const step = Math.floor(len / 5)
-  const labels = []
-  for (let i = 0; i < len; i += step) {
-    labels.push({ date: formatDateLabel(trafficHistory.value[i].date), index: i })
-  }
-  // 确保最后一个日期显�?
-  if (labels[labels.length - 1].index !== len - 1) {
-    labels.push({ date: formatDateLabel(trafficHistory.value[len - 1].date), index: len - 1 })
-  }
-  return labels
-})
 </script>
 
 <template>
@@ -943,120 +923,64 @@ const xAxisLabels = computed(() => {
   </div>
 
   <!-- 流量统计 -->
-  <div class="card p-5 mt-4">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-sm font-medium" :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
-        {{ t('admin.hosts.trafficStats') }}
-        <span v-if="trafficPeriod" class="text-xs font-normal ml-2" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-          ({{ trafficPeriod.periodStart.slice(5) }} ~ {{ trafficPeriod.periodEnd.slice(5) }})
+  <div class="card p-6 mt-4">
+    <!-- Top Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">
+          {{ t('admin.hosts.trafficStats') }}
+          <span v-if="trafficPeriod" class="text-xs font-normal ml-2 text-[var(--text-tertiary)]">
+            ({{ trafficPeriod.periodStart.slice(5) }} ~ {{ trafficPeriod.periodEnd.slice(5) }})
+          </span>
+        </h2>
+        <p class="text-xs text-[var(--text-secondary)] mt-1">
+          {{ t('traffic.historySubtitle') }}
+        </p>
+      </div>
+      <div v-if="trafficSummary" class="flex items-center gap-2">
+        <span class="text-xs px-2.5 py-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
+          {{ t('traffic.periodResetHint', { date: trafficResetDay }) }}
         </span>
-      </h2>
-      <span 
-        v-if="!trafficLoading && trafficSummary"
-        class="text-xs px-2 py-1 rounded-full"
-        :class="themeStore.isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600'"
-      >
-        {{ t('admin.hosts.monthlyUsed') }}: {{ trafficSummary.totalUsedFormatted }} | {{ t('admin.hosts.hostTotalLimit') }}: {{ trafficSummary.totalLimitFormatted }}
-      </span>
+      </div>
     </div>
 
-    <!-- 加载状�?-->
-    <div v-if="trafficLoading" class="animate-pulse">
-      <div class="flex items-end gap-1 h-32">
-        <div 
-          v-for="i in 30" 
-          :key="i" 
-          class="flex-1 rounded-t"
-          :class="themeStore.isDark ? 'bg-gray-700' : 'bg-gray-200'"
-          :style="{ height: `${Math.random() * 100}%` }"
+    <!-- Usage & Progress -->
+    <div v-if="trafficLoading && !trafficSummary" class="animate-pulse space-y-3 mb-6">
+      <div class="h-4 bg-[var(--bg-secondary)] rounded w-1/4"></div>
+      <div class="h-1 bg-[var(--bg-secondary)] rounded"></div>
+      <div class="h-3 bg-[var(--bg-secondary)] rounded w-1/3"></div>
+    </div>
+    <div v-else-if="trafficSummary" class="space-y-2 mb-6">
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-sm font-medium text-[var(--text-secondary)]">{{ t('admin.hosts.monthlyUsed') }}</span>
+        <span class="text-base font-bold text-[var(--text-primary)]">
+          {{ hostUsageDisplayText }}
+        </span>
+      </div>
+
+      <!-- Thin progress bar with indicator dot -->
+      <div class="relative w-full h-[3px] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-full my-3">
+        <div
+          class="absolute left-0 top-0 h-full bg-[var(--accent)] rounded-full transition-all duration-300"
+          :style="{ width: `${hostTrafficProgressPercent}%` }"
+        ></div>
+        <div
+          class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[var(--accent)] transition-all duration-300 pointer-events-none"
+          :style="{ left: `${hostTrafficProgressPercent}%` }"
         ></div>
       </div>
-    </div>
 
-    <!-- 有数据显示图�?-->
-    <template v-else-if="trafficHistory.length > 0">
-      <div class="flex">
-        <!-- Y 轴刻�?-->
-        <div class="flex flex-col justify-between h-32 pr-2 text-xs w-10" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-          <span class="text-right">{{ yAxisLabels.top }}</span>
-          <span class="text-right">{{ yAxisLabels.mid }}</span>
-          <span class="text-right">{{ yAxisLabels.bottom }}</span>
-        </div>
-        
-        <!-- 图表区域 -->
-        <div class="flex-1">
-          <!-- 背景网格�?-->
-          <div class="relative h-32">
-            <div 
-              class="absolute inset-0 flex flex-col justify-between pointer-events-none"
-            >
-              <div class="border-b" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"></div>
-              <div class="border-b" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"></div>
-              <div class="border-b" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"></div>
-            </div>
-            
-            <!-- 柱状�?-->
-            <div class="absolute inset-0 flex items-end gap-0.5 px-1">
-              <div 
-                v-for="(item, index) in trafficHistory" 
-                :key="item.date"
-                class="flex-1 min-w-0.5 rounded-t transition-all duration-200 cursor-pointer group relative"
-                :class="[
-                  themeStore.isDark 
-                    ? 'bg-gradient-to-t from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300' 
-                    : 'bg-gradient-to-t from-blue-500 to-blue-400 hover:from-blue-400 hover:to-blue-300'
-                ]"
-                :style="{ height: `${Math.max((Number(item.total) / chartMaxValue) * 100, 1)}%` }"
-              >
-                <!-- Tooltip -->
-                <div 
-                  class="absolute bottom-full mb-2 px-2.5 py-1.5 text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10"
-                  :class="[
-                    themeStore.isDark ? 'bg-gray-800 text-gray-200 border border-gray-700' : 'bg-white text-gray-900 border border-gray-200 shadow-md',
-                    index < 5 ? 'left-0' : index > trafficHistory.length - 5 ? 'right-0' : 'left-1/2 -translate-x-1/2'
-                  ]"
-                >
-                  <div class="font-medium mb-1">{{ item.date }}</div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span>{{ t('traffic.download') }}: {{ item.rxFormatted }}</span>
-                  </div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-orange-500"></span>
-                    <span>{{ t('traffic.upload') }}: {{ item.txFormatted }}</span>
-                  </div>
-                  <div 
-                    class="mt-1 pt-1 font-medium"
-                    :class="themeStore.isDark ? 'border-t border-gray-700' : 'border-t border-gray-200'"
-                  >
-                    {{ t('traffic.total') }}: {{ item.totalFormatted }}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- X轴标�?-->
-          <div class="relative h-5 mt-1">
-            <div 
-              v-for="label in xAxisLabels" 
-              :key="label.index"
-              class="absolute text-xs transform -translate-x-1/2"
-              :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-              :style="{ left: `${(label.index / Math.max(trafficHistory.length - 1, 1)) * 100}%` }"
-            >
-              {{ label.date }}
-            </div>
-          </div>
-        </div>
+      <!-- Total limit note -->
+      <div class="text-xs text-[var(--text-secondary)]">
+        {{ t('admin.hosts.hostTotalLimit') }}: {{ trafficSummary.totalLimitFormatted || t('traffic.unlimited') }}
       </div>
-    </template>
-
-    <!-- 无数据状�?-->
-    <div v-else class="text-center py-8">
-      <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'">
-        {{ t('traffic.noHistoryData') }}
-      </span>
     </div>
+
+    <!-- Reusable Line Chart -->
+    <TrafficLineChart
+      :history="trafficHistory"
+      :loading="trafficLoading"
+      id-prefix="host-traffic"
+    />
   </div>
 </template>
