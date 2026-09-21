@@ -163,6 +163,7 @@
     "test:system-monitor-webhook-guard": "node --import tsx scripts/test-system-monitor-webhook-guard.ts",
     "test:terminal-saved-command-route-id-guards": "node --import tsx scripts/test-terminal-saved-command-route-id-guards.ts",
     "test:terminal-route-id-guards": "node --import tsx scripts/test-terminal-route-id-guards.ts",
+    "test:terminal-tunnel-guards": "node --import tsx scripts/test-terminal-tunnel-guards.ts",
     "test:telegram-webhook-url-guard": "node --import tsx scripts/test-telegram-webhook-url-guard.ts",
     "test:ticket-query-guards": "node --import tsx scripts/test-ticket-query-guards.ts",
     "test:ticket-auto-close-guards": "node --import tsx scripts/test-ticket-auto-close-guards.ts",

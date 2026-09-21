@@ -4,11 +4,14 @@
  * 负责在客户端 WebSocket 和 Incus Console API 之间建立双向数据转发
  */
 
+import net from 'node:net'
+import tls from 'node:tls'
 import type { WebSocket as WsWebSocket } from 'ws'
 import { Agent, request } from 'undici'
 import { readFileSync } from 'fs'
 import type { Host } from '../types/database.js'
 import { resolveCertificatePair } from './incus/certificate-paths.js'
+import { hostTunnelManager } from './incus/tunnel-manager.js'
 
 // 证书缓存（避免每次连接都读取文件）
 interface CertCache {
@@ -389,8 +392,18 @@ export async function createIncusConsoleConnection(
     instanceName: string,
     instanceType: 'container' | 'vm' = 'container'
 ): Promise<{ controlWs: WsWebSocket | null; dataWs: WsWebSocket; operationId: string; mode: 'exec' | 'console' }> {
-    // 构建 Incus API URL
-    const baseUrl = host.url
+    const tunnelEnabled = (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false
+    const targetHost = (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1'
+    const targetPort = (host as any).targetPort ?? (host as any).target_port ?? 8443
+
+    if (tunnelEnabled && !hostTunnelManager.isTunnelOnline(host.id)) {
+        throw new Error('宿主机内网穿透通道未连接（Agent 离线），无法连接到终端')
+    }
+
+    // 构建 Incus API URL（穿透模式下若为内部标识则回退为目标主机端口）
+    const baseUrl = tunnelEnabled && (!host.url || !host.url.startsWith('http'))
+        ? `https://${targetHost}:${targetPort}`
+        : host.url
 
     // 创建 mTLS Agent
     if (!host.cert_path || !host.key_path) {
@@ -400,13 +413,54 @@ export async function createIncusConsoleConnection(
     // 使用缓存的证书（避免每次连接都读取文件）
     const { cert, key } = getCachedCertificates(host.cert_path, host.key_path)
 
-    const agent = new Agent({
-        connect: {
-            cert,
-            key,
-            rejectUnauthorized: false
-        }
-    })
+    let agent: Agent
+    if (tunnelEnabled) {
+        agent = new Agent({
+            connect: (_opts: any, cb: (err: Error | null, socket: any) => void) => {
+                try {
+                    const duplex = hostTunnelManager.createDuplexStream(
+                        host.id,
+                        targetHost,
+                        targetPort
+                    )
+                    const rawHost = _opts?.servername || _opts?.hostname
+                    const servername = rawHost && !net.isIP(rawHost) ? rawHost : undefined
+                    const tlsSocket = tls.connect({
+                        socket: duplex,
+                        cert,
+                        key,
+                        rejectUnauthorized: false,
+                        servername
+                    })
+                    let cbCalled = false
+                    tlsSocket.once('secureConnect', () => {
+                        if (!cbCalled) {
+                            cbCalled = true
+                            cb(null, tlsSocket)
+                        }
+                    })
+                    tlsSocket.once('error', (err) => {
+                        if (!cbCalled) {
+                            cbCalled = true
+                            cb(err, null as any)
+                        }
+                    })
+                } catch (err: any) {
+                    cb(err, null as any)
+                }
+            },
+            headersTimeout: 120000,
+            bodyTimeout: 300000
+        })
+    } else {
+        agent = new Agent({
+            connect: {
+                cert,
+                key,
+                rejectUnauthorized: false
+            }
+        })
+    }
 
     // 对于容器始终使用 exec。
     // 对于 VM 优先使用 exec（依赖 qemu-guest-agent，更接近 SSH 体验），失败时回退到 console。
@@ -475,19 +529,45 @@ export async function createIncusConsoleConnection(
     // 使用原生 WebSocket（需要 mTLS）
     const WebSocket = (await import('ws')).default
 
-    const dataWs = new WebSocket(dataWsUrl, {
+    const createTunnelSocket = (_opts: any) => {
+        const duplex = hostTunnelManager.createDuplexStream(
+            host.id,
+            targetHost,
+            targetPort
+        )
+        const rawHost = _opts?.servername || _opts?.host || _opts?.hostname
+        const servername = rawHost && !net.isIP(rawHost) ? rawHost : undefined
+        return tls.connect({
+            socket: duplex,
+            cert,
+            key,
+            rejectUnauthorized: false,
+            servername
+        })
+    }
+
+    const dataWsOptions: any = {
         cert,
         key,
         rejectUnauthorized: false
-    })
+    }
+    if (tunnelEnabled) {
+        dataWsOptions.createConnection = createTunnelSocket
+    }
+
+    const dataWs = new WebSocket(dataWsUrl, dataWsOptions)
 
     let controlWs: WsWebSocket | null = null
     if (controlWsUrl) {
-        controlWs = new WebSocket(controlWsUrl, {
+        const controlWsOptions: any = {
             cert,
             key,
             rejectUnauthorized: false
-        }) as WsWebSocket
+        }
+        if (tunnelEnabled) {
+            controlWsOptions.createConnection = createTunnelSocket
+        }
+        controlWs = new WebSocket(controlWsUrl, controlWsOptions) as WsWebSocket
     }
 
     // 等待连接建立（带资源清理）
