@@ -215,28 +215,36 @@ onMounted(loadPools)
       </table>
     </div>
 
-    <div v-if="showCreate" class="modal-overlay">
-      <div class="modal-backdrop" @click="showCreate = false"></div>
-      <div class="modal-content max-w-2xl">
-        <div class="modal-header">
-          <h3 class="modal-title">{{ t('hostPublicIpv4.newPoolTitle') }}</h3>
-          <button class="text-themed-muted hover:text-themed" @click="showCreate = false">×</button>
-        </div>
-        <div class="modal-body space-y-4">
-          <div class="grid md:grid-cols-2 gap-4">
-            <label class="block"><span class="text-xs text-themed-muted">{{ t('common.name') }}</span><input v-model="form.name" class="input w-full mt-1" placeholder="HK IPv4 Pool" /></label>
-            <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.cidrOptional') }}</span><input v-model="form.cidr" class="input w-full mt-1" placeholder="203.0.113.0/29" /></label>
-            <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.gateway') }}</span><input v-model="form.gateway" class="input w-full mt-1" placeholder="203.0.113.1" /></label>
-            <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.prefixLength') }}</span><input v-model.number="form.prefixLength" type="number" min="1" max="32" class="input w-full mt-1" /></label>
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showCreate" class="modal-overlay">
+          <div class="modal-backdrop" @click="showCreate = false"></div>
+          <div class="modal-content max-w-2xl">
+            <div class="modal-header">
+              <h3 class="modal-title">{{ t('hostPublicIpv4.newPoolTitle') }}</h3>
+              <button class="text-themed-muted hover:text-themed" @click="showCreate = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="modal-body space-y-4">
+              <div class="grid md:grid-cols-2 gap-4">
+                <label class="block"><span class="text-xs text-themed-muted">{{ t('common.name') }}</span><input v-model="form.name" class="input w-full mt-1" placeholder="HK IPv4 Pool" /></label>
+                <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.cidrOptional') }}</span><input v-model="form.cidr" class="input w-full mt-1" placeholder="203.0.113.0/29" /></label>
+                <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.gateway') }}</span><input v-model="form.gateway" class="input w-full mt-1" placeholder="203.0.113.1" /></label>
+                <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.prefixLength') }}</span><input v-model.number="form.prefixLength" type="number" min="1" max="32" class="input w-full mt-1" /></label>
+              </div>
+              <label class="block"><span class="text-xs text-themed-muted">DNS</span><textarea v-model="form.dns" class="input w-full mt-1 min-h-20 font-mono text-sm"></textarea></label>
+              <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.initialAddresses') }}</span><textarea v-model="form.addresses" class="input w-full mt-1 min-h-32 font-mono text-sm" :placeholder="t('hostPublicIpv4.addressesPlaceholder')"></textarea></label>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-secondary" @click="showCreate = false">{{ t('common.cancel') }}</button>
+              <button class="btn-primary" :disabled="actionLoading === 'create'" @click="createPool">{{ t('common.create') }}</button>
+            </div>
           </div>
-          <label class="block"><span class="text-xs text-themed-muted">DNS</span><textarea v-model="form.dns" class="input w-full mt-1 min-h-20 font-mono text-sm"></textarea></label>
-          <label class="block"><span class="text-xs text-themed-muted">{{ t('hostPublicIpv4.initialAddresses') }}</span><textarea v-model="form.addresses" class="input w-full mt-1 min-h-32 font-mono text-sm" :placeholder="t('hostPublicIpv4.addressesPlaceholder')"></textarea></label>
         </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" @click="showCreate = false">{{ t('common.cancel') }}</button>
-          <button class="btn-primary" :disabled="actionLoading === 'create'" @click="createPool">{{ t('common.create') }}</button>
-        </div>
-      </div>
-    </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
