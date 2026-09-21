@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, {
@@ -11,7 +11,6 @@ import api, {
 import { useToast } from '@/stores/toast'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
 import BillingOverviewIcon from '@/components/admin/BillingOverviewIcon.vue'
 import { calculateDiscountedPrice } from '@/utils/billing'
 import { instanceDetailPath } from '@/utils/app-paths'
@@ -195,6 +194,56 @@ const reconciliationSavingId = ref<number | null>(null)
 const reconciliationExporting = ref<string | null>(null)
 const reconciliationNotes = ref<Record<number, string>>({})
 const reconciliationStatusDrafts = ref<Record<number, FinancialReconciliationStatus>>({})
+
+// 实例操作下拉菜单状态
+const activeInstanceMenuId = ref<number | null>(null)
+const instanceMenuPosition = ref<{ top: number; right: number }>({ top: 0, right: 0 })
+
+const activeMenuInstance = computed(() => {
+  if (!activeInstanceMenuId.value) return null
+  return instances.value.find(i => i.id === activeInstanceMenuId.value) || null
+})
+
+function toggleInstanceMenu(instanceId: number, e?: Event) {
+  if (e) {
+    e.stopPropagation()
+  }
+  if (activeInstanceMenuId.value === instanceId) {
+    activeInstanceMenuId.value = null
+    return
+  }
+  if (e) {
+    const btn = (e.currentTarget || e.target) as HTMLElement | null
+    if (btn && typeof btn.getBoundingClientRect === 'function') {
+      const rect = btn.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = 220
+      if (spaceBelow < menuHeight && rect.top > menuHeight) {
+        instanceMenuPosition.value = {
+          top: Math.max(8, rect.top - menuHeight - 4),
+          right: Math.max(12, window.innerWidth - rect.right)
+        }
+      } else {
+        instanceMenuPosition.value = {
+          top: rect.bottom + 4,
+          right: Math.max(12, window.innerWidth - rect.right)
+        }
+      }
+    }
+  }
+  activeInstanceMenuId.value = instanceId
+}
+
+function closeInstanceMenu() {
+  activeInstanceMenuId.value = null
+}
+
+function handleGlobalClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (target && !target.closest('.billing-action-menu-container') && !target.closest('.kawaii-menu-panel')) {
+    activeInstanceMenuId.value = null
+  }
+}
 
 // 操作弹窗
 const showActionModal = ref(false)
@@ -545,7 +594,16 @@ function loadTabData(tab: BillingTab) {
 }
 
 onMounted(() => {
+  document.addEventListener('click', handleGlobalClick)
+  window.addEventListener('resize', closeInstanceMenu)
+  window.addEventListener('scroll', closeInstanceMenu, true)
   loadTabData(activeTab.value)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('resize', closeInstanceMenu)
+  window.removeEventListener('scroll', closeInstanceMenu, true)
 })
 
 async function loadOverview() {
@@ -748,6 +806,7 @@ watch(
 )
 
 function openActionModal(type: 'suspend' | 'unsuspend' | 'extend' | 'deleteRefund' | 'deleteRefundDatabaseOnly' | 'applyDiscount', instance: any) {
+  closeInstanceMenu()
   actionType.value = type
   actionTarget.value = instance
   actionForm.value = {
@@ -826,6 +885,7 @@ async function executeAction() {
 
 // 打开修改价格弹窗
 function openPriceModal(instance: any) {
+  closeInstanceMenu()
   priceTarget.value = instance
   pricePreviewRequestId += 1
   priceForm.value = {
@@ -1030,6 +1090,7 @@ async function submitUpdatePrice() {
 
 // 打开切换方案弹窗
 async function openUpgradeModal(instance: any) {
+  closeInstanceMenu()
   upgradeTarget.value = instance
   selectedPlanId.value = null
   upgradeData.value = { currentPlan: null, remainingDays: 0, availablePlans: [], userBalance: 0 }
@@ -1735,14 +1796,6 @@ function copyToClipboard(text: string) {
             </div>
 
             <div class="mt-4 flex flex-wrap gap-2">
-              <span
-                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                :class="inst.isHostedInstance
-                  ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                  : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
-              >
-                {{ inst.isHostedInstance ? $t('admin.billing.hosted') : $t('admin.billing.direct') }}
-              </span>
               <button
                 class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
                 :class="inst.instanceTypeLabel === 'PRIME' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
@@ -1755,12 +1808,9 @@ function copyToClipboard(text: string) {
             <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <div class="text-xs text-themed-muted">{{ $t('admin.billing.user') }}</div>
-                <div class="mt-1 flex min-w-0 items-center gap-2">
-                  <UserAvatar :username="inst.user?.username || ''" :avatar-style="inst.user?.avatarStyle || ''" :badge-id="inst.user?.avatarBadgeId || null" :size="24" />
-                  <div class="min-w-0">
-                    <div class="truncate text-themed">{{ inst.user?.username || '-' }}</div>
-                    <div class="truncate text-xs text-themed-muted">#{{ inst.user?.id }} {{ inst.user?.email || '' }}</div>
-                  </div>
+                <div class="mt-1 min-w-0">
+                  <div class="truncate text-themed">{{ inst.user?.username || '-' }}</div>
+                  <div class="truncate text-xs text-themed-muted">#{{ inst.user?.id }} {{ inst.user?.email || '' }}</div>
                 </div>
               </div>
               <div>
@@ -1811,33 +1861,19 @@ function copyToClipboard(text: string) {
             </div>
 
             <div class="mt-4 flex flex-wrap justify-end gap-1 border-t border-themed pt-3">
-              <button
-                v-if="inst.status === 'suspended'"
-                class="btn btn-xs btn-ghost"
-                @click="openActionModal('unsuspend', inst)"
-              >
-                {{ $t('admin.billing.unsuspend') }}
-              </button>
-              <button class="btn btn-xs btn-ghost" @click="openActionModal('extend', inst)">
-                {{ $t('admin.billing.extend') }}
-              </button>
-              <button
-                v-if="inst.remainingDays > 0"
-                class="btn btn-xs btn-ghost text-themed"
-                @click="openUpgradeModal(inst)"
-              >
-                {{ $t('admin.billing.upgradePlan') }}
-              </button>
-              <button
-                v-if="!inst.hasAffBinding"
-                class="btn btn-xs btn-ghost"
-                @click="openActionModal('applyDiscount', inst)"
-              >
-                {{ $t('admin.billing.applyDiscount') }}
-              </button>
-              <button class="btn btn-xs btn-ghost text-rose-500" @click="openActionModal('deleteRefund', inst)">
-                {{ $t('admin.billing.deleteRefund') }}
-              </button>
+              <div class="relative inline-block text-left billing-action-menu-container">
+                <button
+                  type="button"
+                  class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                  :class="{ 'text-themed bg-themed-hover': activeInstanceMenuId === inst.id }"
+                  :title="$t('common.actions')"
+                  @click.stop="toggleInstanceMenu(inst.id, $event)"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1857,7 +1893,6 @@ function copyToClipboard(text: string) {
                     @change="toggleSelectAllCurrentPage"
                   />
                 </th>
-                <th class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.hostingType') }}</th>
                 <th class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.instanceType') }}</th>
                 <th class="text-left p-3 whitespace-nowrap">ID</th>
                 <th class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.instanceName') }}</th>
@@ -1871,7 +1906,7 @@ function copyToClipboard(text: string) {
                 <th v-if="showDateColumns" class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.purchaseDate') }}</th>
                 <th v-if="showDateColumns" class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.expiresAt') }}</th>
                 <th class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.remainingDays') }}</th>
-                <th class="text-left p-3 whitespace-nowrap">{{ $t('common.actions') }}</th>
+                <th class="text-right p-3 whitespace-nowrap">{{ $t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -1885,17 +1920,6 @@ function copyToClipboard(text: string) {
                     :disabled="inst.status === 'deleted'"
                     :aria-label="$t('admin.billing.selectInstance')"
                   />
-                </td>
-                <!-- 托管类型 -->
-                <td class="p-3 whitespace-nowrap">
-                  <span 
-                    class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                    :class="inst.isHostedInstance 
-                      ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
-                  >
-                    {{ inst.isHostedInstance ? $t('admin.billing.hosted') : $t('admin.billing.direct') }}
-                  </span>
                 </td>
                 <!-- 实例类型图标 -->
                 <td class="p-3 whitespace-nowrap">
@@ -1938,14 +1962,11 @@ function copyToClipboard(text: string) {
                 </td>
                 <!-- 用户 -->
                 <td class="p-3 whitespace-nowrap">
-                  <div class="flex items-center gap-2">
-                    <UserAvatar :username="inst.user?.username || ''" :avatar-style="inst.user?.avatarStyle || ''" :badge-id="inst.user?.avatarBadgeId || null" :size="28" />
-                    <div class="flex flex-col">
-                      <span class="truncate text-themed font-medium">{{ inst.user?.username || '-' }}</span>
-                      <div class="flex items-center gap-1 text-xs text-themed-muted">
-                        <span>#{{ inst.user?.id }}</span>
-                        <span v-if="inst.user?.email" class="truncate max-w-32" :title="inst.user.email">{{ inst.user.email }}</span>
-                      </div>
+                  <div class="flex flex-col">
+                    <span class="truncate text-themed font-medium">{{ inst.user?.username || '-' }}</span>
+                    <div class="flex items-center gap-1 text-xs text-themed-muted">
+                      <span>#{{ inst.user?.id }}</span>
+                      <span v-if="inst.user?.email" class="truncate max-w-32" :title="inst.user.email">{{ inst.user.email }}</span>
                     </div>
                   </div>
                 </td>
@@ -1987,34 +2008,18 @@ function copyToClipboard(text: string) {
                   <span v-else>-</span>
                 </td>
                 <!-- 操作 -->
-                <td class="p-3 whitespace-nowrap">
-                  <div class="flex flex-wrap items-center gap-1">
+                <td class="p-3 text-right whitespace-nowrap">
+                  <div class="relative inline-block text-left billing-action-menu-container">
                     <button
-                      v-if="inst.status === 'suspended'"
-                      class="btn btn-xs btn-ghost"
-                      @click="openActionModal('unsuspend', inst)"
+                      type="button"
+                      class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                      :class="{ 'text-themed bg-themed-hover': activeInstanceMenuId === inst.id }"
+                      :title="$t('common.actions')"
+                      @click.stop="toggleInstanceMenu(inst.id, $event)"
                     >
-                      {{ $t('admin.billing.unsuspend') }}
-                    </button>
-                    <button class="btn btn-xs btn-ghost" @click="openActionModal('extend', inst)">
-                      {{ $t('admin.billing.extend') }}
-                    </button>
-                    <button 
-                      v-if="inst.remainingDays > 0" 
-                      class="btn btn-xs btn-ghost text-themed"
-                      @click="openUpgradeModal(inst)"
-                    >
-                      {{ $t('admin.billing.upgradePlan') }}
-                    </button>
-                    <button
-                      v-if="!inst.hasAffBinding"
-                      class="btn btn-xs btn-ghost"
-                      @click="openActionModal('applyDiscount', inst)"
-                    >
-                      {{ $t('admin.billing.applyDiscount') }}
-                    </button>
-                    <button class="btn btn-xs btn-ghost text-rose-500" @click="openActionModal('deleteRefund', inst)">
-                      {{ $t('admin.billing.deleteRefund') }}
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                      </svg>
                     </button>
                   </div>
                 </td>
@@ -2068,6 +2073,71 @@ function copyToClipboard(text: string) {
         </div>
       </div>
     </div>
+
+    <!-- 实例操作下拉菜单 (Teleport 挂载到 body) -->
+    <Teleport to="body">
+      <div 
+        v-if="activeMenuInstance" 
+        class="fixed inset-0 z-40" 
+        @click.stop="closeInstanceMenu"
+      ></div>
+      <div
+        v-if="activeMenuInstance"
+        class="kawaii-menu-panel fixed z-50 min-w-[9.5rem] rounded py-1 border shadow-lg"
+        :style="{ top: `${instanceMenuPosition.top}px`, right: `${instanceMenuPosition.right}px` }"
+        @click.stop
+      >
+        <template v-for="inst in [activeMenuInstance]" :key="inst.id">
+          <!-- 解除封停 -->
+          <button
+            v-if="inst.status === 'suspended'"
+            type="button"
+            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+            @click="openActionModal('unsuspend', inst)"
+          >
+            {{ $t('admin.billing.unsuspend') }}
+          </button>
+
+          <!-- 延期 -->
+          <button
+            type="button"
+            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+            @click="openActionModal('extend', inst)"
+          >
+            {{ $t('admin.billing.extend') }}
+          </button>
+
+          <!-- 切换方案 -->
+          <button
+            v-if="inst.remainingDays > 0"
+            type="button"
+            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer text-themed"
+            @click="openUpgradeModal(inst)"
+          >
+            {{ $t('admin.billing.upgradePlan') }}
+          </button>
+
+          <!-- 应用折扣 -->
+          <button
+            v-if="!inst.hasAffBinding"
+            type="button"
+            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+            @click="openActionModal('applyDiscount', inst)"
+          >
+            {{ $t('admin.billing.applyDiscount') }}
+          </button>
+
+          <!-- 删除退款 -->
+          <button
+            type="button"
+            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer text-rose-500"
+            @click="openActionModal('deleteRefund', inst)"
+          >
+            {{ $t('admin.billing.deleteRefund') }}
+          </button>
+        </template>
+      </div>
+    </Teleport>
 
     <!-- 记录 Tab -->
     <div v-show="activeTab === 'records'">
@@ -2546,71 +2616,71 @@ function copyToClipboard(text: string) {
 
     <!-- 操作弹窗 -->
     <Teleport to="body">
-      <div v-if="showActionModal" class="modal-overlay" @click.self="showActionModal = false">
-        <div class="modal-content max-w-md">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t(`admin.billing.${actionType}Title`) }}</h3>
-            <button class="btn btn-ghost btn-sm" @click="showActionModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div class="modal-body space-y-4">
-            <p class="text-themed-secondary">
-              {{ $t('admin.billing.targetInstance') }}: <strong>{{ actionTarget?.name }}</strong>
-            </p>
+      <Transition name="modal">
+        <div v-if="showActionModal" class="modal-overlay">
+          <div class="modal-backdrop" @click="showActionModal = false"></div>
+          <div class="modal-content max-w-md">
+            <div class="modal-header">
+              <h3 class="modal-title">{{ $t(`admin.billing.${actionType}Title`) }}</h3>
+              <button class="btn btn-ghost btn-sm" @click="showActionModal = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div class="modal-body space-y-4">
+              <p class="text-themed-secondary">
+                {{ $t('admin.billing.targetInstance') }}: <strong>{{ actionTarget?.name }}</strong>
+              </p>
 
-            <!-- 封停/解封 -->
-            <template v-if="actionType === 'suspend'">
-              <div>
-                <label class="label">{{ $t('admin.billing.reason') }}</label>
-                <textarea v-model="actionForm.reason" class="input w-full" rows="3" :placeholder="$t('admin.billing.reasonPlaceholder')"></textarea>
-              </div>
-            </template>
-
-            <!-- 延期 -->
-            <template v-if="actionType === 'extend'">
-              <div>
-                <label class="label">{{ $t('admin.billing.extendDays') }}</label>
-                <input v-model.number="actionForm.days" type="number" class="input w-full" min="1" max="365" />
-              </div>
-              <label class="flex items-center gap-2">
-                <input v-model="actionForm.freeExtend" type="checkbox" class="checkbox" />
-                {{ $t('admin.billing.freeExtend') }}
-              </label>
-              <div>
-                <label class="label">{{ $t('admin.billing.reason') }}</label>
-                <input v-model="actionForm.reason" type="text" class="input w-full" />
-              </div>
-            </template>
-
-            <!-- 删除并退款 -->
-            <template v-if="actionType === 'deleteRefund'">
-              <div class="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-lg border border-rose-200 dark:border-rose-800">
-                <p class="text-sm text-rose-600 dark:text-rose-400">
-                  {{ $t('admin.billing.deleteRefundWarning') }}
-                </p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.billing.refundTypeLabel') }} *</label>
-                <div class="flex flex-col gap-2">
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input v-model="actionForm.refundType" type="radio" value="remaining" class="radio" />
-                    <span>{{ $t('admin.billing.refundTypeRemaining') }}</span>
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input v-model="actionForm.refundType" type="radio" value="full" class="radio" />
-                    <span>{{ $t('admin.billing.refundTypeFull') }}</span>
-                  </label>
+              <!-- 封停/解封 -->
+              <template v-if="actionType === 'suspend'">
+                <div>
+                  <label class="label">{{ $t('admin.billing.reason') }}</label>
+                  <textarea v-model="actionForm.reason" class="input w-full" rows="3" :placeholder="$t('admin.billing.reasonPlaceholder')"></textarea>
                 </div>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.billing.reason') }} *</label>
-                <textarea v-model="actionForm.reason" class="input w-full" rows="3" :placeholder="$t('admin.billing.deleteRefundReasonPlaceholder')"></textarea>
-              </div>
-            </template>
+              </template>
+
+              <!-- 延期 -->
+              <template v-else-if="actionType === 'extend'">
+                <div>
+                  <label class="label">{{ $t('admin.billing.extendDays') }}</label>
+                  <input v-model.number="actionForm.days" type="number" min="1" max="365" class="input w-full" />
+                </div>
+                <div class="flex items-center gap-2">
+                  <input id="freeExtend" v-model="actionForm.freeExtend" type="checkbox" class="checkbox" />
+                  <label for="freeExtend" class="text-sm text-themed-secondary">{{ $t('admin.billing.freeExtend') }}</label>
+                </div>
+                <div>
+                  <label class="label">{{ $t('admin.billing.reason') }}</label>
+                  <input v-model="actionForm.reason" type="text" class="input w-full" :placeholder="$t('admin.billing.reasonPlaceholder')" />
+                </div>
+              </template>
+
+              <!-- 删除退款 -->
+              <template v-else-if="actionType === 'deleteRefund'">
+                <div class="p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 rounded-lg text-sm">
+                  {{ $t('admin.billing.deleteRefundWarning') }}
+                </div>
+                <div>
+                  <label class="label">{{ $t('admin.billing.refundTypeLabel') }} *</label>
+                  <div class="flex flex-col gap-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input v-model="actionForm.refundType" type="radio" value="remaining" class="radio" />
+                      <span>{{ $t('admin.billing.refundTypeRemaining') }}</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input v-model="actionForm.refundType" type="radio" value="full" class="radio" />
+                      <span>{{ $t('admin.billing.refundTypeFull') }}</span>
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <label class="label">{{ $t('admin.billing.reason') }} *</label>
+                  <textarea v-model="actionForm.reason" class="input w-full" rows="3" :placeholder="$t('admin.billing.deleteRefundReasonPlaceholder')"></textarea>
+                </div>
+              </template>
 
             <!-- 应用折扣 -->
             <template v-if="actionType === 'applyDiscount'">
@@ -2653,12 +2723,15 @@ function copyToClipboard(text: string) {
           </div>
         </div>
       </div>
-    </Teleport>
+    </Transition>
+  </Teleport>
 
     <!-- 批量修改价格弹窗 -->
     <Teleport to="body">
-      <div v-if="showBatchPriceModal" class="modal-overlay" @click.self="showBatchPriceModal = false">
-        <div class="modal-content max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <Transition name="modal">
+        <div v-if="showBatchPriceModal" class="modal-overlay">
+          <div class="modal-backdrop" @click="showBatchPriceModal = false"></div>
+          <div class="modal-content max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <div class="modal-header">
             <h3 class="modal-title">{{ $t('admin.billing.batchUpdatePrice') }}</h3>
             <button class="btn btn-ghost btn-sm" @click="showBatchPriceModal = false">
@@ -2861,12 +2934,15 @@ function copyToClipboard(text: string) {
           </div>
         </div>
       </div>
-    </Teleport>
+    </Transition>
+  </Teleport>
 
     <!-- 修改价格弹窗 -->
     <Teleport to="body">
-      <div v-if="showPriceModal" class="modal-overlay" @click.self="showPriceModal = false">
-        <div class="modal-content max-w-md">
+      <Transition name="modal">
+        <div v-if="showPriceModal" class="modal-overlay">
+          <div class="modal-backdrop" @click="showPriceModal = false"></div>
+          <div class="modal-content max-w-md">
           <div class="modal-header">
             <h3 class="modal-title">{{ $t('admin.billing.updatePrice') }}</h3>
             <button class="btn btn-ghost btn-sm" @click="showPriceModal = false">
@@ -3000,12 +3076,15 @@ function copyToClipboard(text: string) {
           </div>
         </div>
       </div>
-    </Teleport>
+    </Transition>
+  </Teleport>
 
     <!-- 切换方案弹窗 -->
     <Teleport to="body">
-      <div v-if="showUpgradeModal" class="modal-overlay" @click.self="showUpgradeModal = false">
-        <div class="modal-content max-w-lg">
+      <Transition name="modal">
+        <div v-if="showUpgradeModal" class="modal-overlay">
+          <div class="modal-backdrop" @click="showUpgradeModal = false"></div>
+          <div class="modal-content max-w-lg">
           <div class="modal-header">
             <h3 class="modal-title">{{ $t('admin.billing.upgradePlanTitle') }}</h3>
             <button class="btn btn-ghost btn-sm" @click="showUpgradeModal = false">
@@ -3113,7 +3192,8 @@ function copyToClipboard(text: string) {
           </div>
         </div>
       </div>
-    </Teleport>
+    </Transition>
+  </Teleport>
   </div>
 </template>
 
