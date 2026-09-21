@@ -140,6 +140,9 @@ export async function createHostAddressResolutionLog(
 
 export async function getHostsForAddressBackfill() {
   return prisma.host.findMany({
+    where: {
+      tunnelEnabled: false
+    },
     select: {
       id: true,
       name: true,
@@ -154,6 +157,7 @@ export async function getHostsForAddressBackfill() {
 export async function getHostsWithDomainInputAlias() {
   return prisma.host.findMany({
     where: {
+      tunnelEnabled: false,
       addressAliases: {
         some: {
           source: 'input',
@@ -170,6 +174,61 @@ export async function getHostsWithDomainInputAlias() {
       id: 'asc'
     }
   })
+}
+
+export async function removeHostAddressAliases(
+  hostId: number,
+  client: DbClient = prisma
+): Promise<string[]> {
+  const existingAliases = await client.hostAddressAlias.findMany({
+    where: { hostId },
+    select: { address: true }
+  })
+
+  if (existingAliases.length === 0) {
+    return []
+  }
+
+  await client.hostAddressAlias.deleteMany({
+    where: { hostId }
+  })
+
+  return existingAliases.map(item => item.address)
+}
+
+export async function cleanupTunnelHostAddressAliases(
+  client: DbClient = prisma
+): Promise<HostAddressConflictInfo[]> {
+  const tunnelHosts = await client.host.findMany({
+    where: { tunnelEnabled: true },
+    select: { id: true }
+  })
+
+  if (tunnelHosts.length === 0) {
+    return []
+  }
+
+  const tunnelHostIds = tunnelHosts.map(h => h.id)
+  const aliases = await client.hostAddressAlias.findMany({
+    where: {
+      hostId: { in: tunnelHostIds }
+    },
+    select: { address: true }
+  })
+
+  if (aliases.length === 0) {
+    return []
+  }
+
+  const affectedAddresses = [...new Set(aliases.map(a => a.address))]
+
+  await client.hostAddressAlias.deleteMany({
+    where: {
+      hostId: { in: tunnelHostIds }
+    }
+  })
+
+  return syncHostAddressConflicts(affectedAddresses, client)
 }
 
 export async function syncHostAddressConflicts(

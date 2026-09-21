@@ -2640,6 +2640,11 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
             if (lockedSnapshot) {
               await persistHostAddressSnapshot(hostId, lockedSnapshot, 'update', tx)
+            } else if (tunnelModeEffective) {
+              const removed = await db.removeHostAddressAliases(hostId, tx)
+              if (removed.length > 0) {
+                await db.syncHostAddressConflicts(removed, tx)
+              }
             }
           })
         })
@@ -2721,6 +2726,12 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             })
           }
 
+          if (updates.tunnelEnabled === true) {
+            const removed = await db.removeHostAddressAliases(hostId, tx)
+            if (removed.length > 0) {
+              await db.syncHostAddressConflicts(removed, tx)
+            }
+          }
         })
       }
     } catch (error) {

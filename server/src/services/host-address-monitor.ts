@@ -7,10 +7,12 @@ import { acquireLock, releaseLock } from '../lib/distributed-lock.js'
 import { ErrorCode, type ErrorCodeType } from '../lib/errors.js'
 import { prisma } from '../db/prisma.js'
 import {
+  cleanupTunnelHostAddressAliases,
   createHostAddressResolutionLog,
   getAliasesByAddresses,
   getHostsForAddressBackfill,
   getHostsWithDomainInputAlias,
+  removeHostAddressAliases,
   replaceHostResolvedAliases,
   syncHostAddressConflicts,
   type HostAddressAliasInput,
@@ -367,6 +369,24 @@ export async function syncExistingHostAddressState(
   trigger: Extract<HostAddressCheckTrigger, 'backfill' | 'poll'>
 ): Promise<{ success: boolean }> {
   try {
+    const host = await prisma.host.findUnique({
+      where: { id: hostId },
+      select: { tunnelEnabled: true }
+    })
+
+    if (host?.tunnelEnabled) {
+      // 隧道模式宿主机不参与连接地址注册与冲突检测，清理可能遗留的别名
+      await withHostAddressRegistryLock(async () => {
+        return prisma.$transaction(async tx => {
+          const removed = await removeHostAddressAliases(hostId, tx)
+          if (removed.length > 0) {
+            await syncHostAddressConflicts(removed, tx)
+          }
+        })
+      })
+      return { success: true }
+    }
+
     const input = extractInputAddress(url)
     const resolved = input.kind === 'domain'
       ? await resolveDomainAddresses(input.address)
@@ -406,6 +426,17 @@ export async function syncExistingHostAddressState(
 }
 
 export async function runHostAddressBackfillJob(): Promise<void> {
+  // 启动回填前先清理内网穿透宿主机误写入的别名，并自动解除冲突
+  try {
+    await withHostAddressRegistryLock(async () => {
+      return prisma.$transaction(async tx => {
+        return cleanupTunnelHostAddressAliases(tx)
+      })
+    })
+  } catch (cleanupError) {
+    console.error('[HostAddress] Failed to clean up tunnel host address aliases:', cleanupError)
+  }
+
   const hosts = await getHostsForAddressBackfill()
   let successCount = 0
   let failedCount = 0
