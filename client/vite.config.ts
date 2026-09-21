@@ -490,12 +490,19 @@ export default defineConfig(({ mode }) => {
           timeout: 120000,
           configure: (proxy, _options) => {
             proxy.on('error', (err, _req, res) => {
-              // Handle proxy errors gracefully
-              if (res && !res.headersSent) {
-                res.writeHead(500, {
-                  'Content-Type': 'application/json'
-                })
-                res.end(JSON.stringify({ error: 'Proxy error: Backend server may not be ready yet' }))
+              // Handle proxy errors gracefully. 长连接（SSE / WebSocket 隧道）断开或后端
+              // 重载时，http-proxy 的 error 事件可能携带非标准响应对象，必须防御性处理，
+              // 绝不能因 writeHead 不存在而把整个 Vite dev server 带崩。
+              try {
+                const maybeRes = res as (NodeJS.WritableStream & { headersSent?: boolean; writeHead?: (...args: never[]) => void }) | undefined
+                if (maybeRes && typeof maybeRes.writeHead === 'function' && !maybeRes.headersSent) {
+                  maybeRes.writeHead(500, {
+                    'Content-Type': 'application/json'
+                  } as never)
+                  maybeRes.end(JSON.stringify({ error: 'Proxy error: Backend server may not be ready yet' }))
+                }
+              } catch {
+                // ignore: 长连接异常路径下响应对象结构不完整时静默放弃
               }
             })
             proxy.on('proxyReq', (proxyReq, req, _res) => {
