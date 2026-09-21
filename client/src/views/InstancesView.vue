@@ -2527,17 +2527,14 @@ async function confirmBatchDestroy(): Promise<void> {
     <Teleport to="body">
       <div
         v-if="showResetTrafficModal && resetTrafficTarget"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="closeResetTrafficModal()"
       >
-        <div class="absolute inset-0 bg-black/60" @click="closeResetTrafficModal()"></div>
-        <div
-          class="relative w-full max-w-md rounded-2xl p-5 shadow-2xl"
-          :class="'bg-themed-surface border border-themed'"
-        >
-          <div class="flex items-start justify-between gap-4">
+        <div class="modal-backdrop" @click="closeResetTrafficModal()"></div>
+        <div class="modal-content max-w-md">
+          <div class="modal-header">
             <div>
-              <h3 class="text-lg font-semibold" :class="'text-themed'">
+              <h3 class="modal-title">
                 {{ $t('admin.hosts.resetTrafficTitle') }}
               </h3>
               <p class="mt-1 text-sm text-themed-muted">
@@ -2545,28 +2542,30 @@ async function confirmBatchDestroy(): Promise<void> {
               </p>
             </div>
             <button class="p-1 rounded hover:bg-gray-500/20" :disabled="resetTrafficSubmitting" @click="closeResetTrafficModal()">
-              <svg class="w-5 h-5" :class="'text-themed-muted'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <div class="mt-4 space-y-2 rounded-xl border p-4 text-sm" :class="'border-themed bg-themed-secondary'">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-themed-muted">{{ $t('instance.trafficLabel') }}</span>
-              <span :class="'text-themed'">{{ getInstanceTrafficUsage(resetTrafficTarget) }}</span>
+          <div class="modal-body">
+            <div class="space-y-2 rounded-xl border p-4 text-sm border-themed bg-themed-secondary">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-themed-muted">{{ $t('instance.trafficLabel') }}</span>
+                <span class="text-themed">{{ getInstanceTrafficUsage(resetTrafficTarget) }}</span>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-themed-muted">{{ $t('instance.card.trafficReset') }}</span>
+                <span class="text-themed">{{ getInstanceResetTrafficPrice(resetTrafficTarget) }}</span>
+              </div>
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-themed-muted">{{ $t('instance.card.trafficReset') }}</span>
-              <span class="text-themed">{{ getInstanceResetTrafficPrice(resetTrafficTarget) }}</span>
-            </div>
+
+            <p class="mt-4 text-sm text-yellow-600 dark:text-yellow-400">
+              {{ $t('admin.hosts.resetTrafficWarning') }}
+            </p>
           </div>
 
-          <p class="mt-4 text-sm text-yellow-600 dark:text-yellow-400">
-            {{ $t('admin.hosts.resetTrafficWarning') }}
-          </p>
-
-          <div class="mt-5 flex justify-end gap-2">
+          <div class="modal-footer">
             <button
               type="button"
               class="btn-ghost btn-sm"
@@ -2589,29 +2588,26 @@ async function confirmBatchDestroy(): Promise<void> {
 
       <div
         v-if="!isAdminEntry && showBatchRenewModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="closeBatchRenewModal()"
       >
-        <div class="absolute inset-0 bg-black/60" @click="closeBatchRenewModal()"></div>
-        <div
-          class="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col"
-          :class="'bg-themed-surface border border-themed'"
-        >
-          <div class="flex items-center justify-between px-5 py-4 border-b" :class="'border-themed'">
+        <div class="modal-backdrop" @click="closeBatchRenewModal()"></div>
+        <div class="modal-content max-w-4xl">
+          <div class="modal-header">
             <div>
-              <h3 class="text-lg font-semibold" :class="'text-themed'">
+              <h3 class="modal-title">
                 {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewTitle : $t('instance.batch.renewTitle') }}
               </h3>
               <p class="text-sm text-themed-muted mt-1">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewDescription : $t('instance.batch.renewDescription') }}</p>
             </div>
             <button class="p-1 rounded hover:bg-gray-500/20" @click="closeBatchRenewModal()">
-              <svg class="w-5 h-5" :class="'text-themed-muted'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <div class="flex-1 overflow-y-auto p-5 space-y-4">
+          <div class="modal-body">
             <div v-if="batchRenewLoading" class="flex items-center justify-center py-12">
               <svg class="w-8 h-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -2738,7 +2734,7 @@ async function confirmBatchDestroy(): Promise<void> {
             </template>
           </div>
 
-          <div class="flex items-center justify-between gap-3 px-5 py-4 border-t" :class="'border-themed'">
+          <div class="modal-footer flex items-center justify-between gap-3">
             <span class="text-xs text-themed-muted">{{ $t('instance.batch.currentPageOnly') }}</span>
             <div class="flex items-center gap-2">
               <button class="btn-ghost btn-sm" :disabled="batchRenewSubmitting" @click="closeBatchRenewModal()">
@@ -2760,29 +2756,26 @@ async function confirmBatchDestroy(): Promise<void> {
     <Teleport to="body">
       <div
         v-if="!isAdminEntry && showBatchDestroyModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="closeBatchDestroyModal()"
       >
-        <div class="absolute inset-0 bg-black/60" @click="closeBatchDestroyModal()"></div>
-        <div
-          class="relative w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col"
-          :class="'bg-themed-surface border border-themed'"
-        >
-          <div class="flex items-center justify-between px-5 py-4 border-b" :class="'border-themed'">
+        <div class="modal-backdrop" @click="closeBatchDestroyModal()"></div>
+        <div class="modal-content max-w-4xl">
+          <div class="modal-header">
             <div>
-              <h3 class="text-lg font-semibold" :class="'text-themed'">
+              <h3 class="modal-title">
                 {{ $t('instance.batch.destroyTitle') }}
               </h3>
               <p class="text-sm text-themed-muted mt-1">{{ $t('instance.batch.destroyDescription') }}</p>
             </div>
             <button class="p-1 rounded hover:bg-gray-500/20" @click="closeBatchDestroyModal()">
-              <svg class="w-5 h-5" :class="'text-themed-muted'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <div class="flex-1 overflow-y-auto p-5 space-y-4">
+          <div class="modal-body">
             <div v-if="batchDestroyLoading" class="flex items-center justify-center py-12">
               <svg class="w-8 h-8 animate-spin text-red-500" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -2913,7 +2906,7 @@ async function confirmBatchDestroy(): Promise<void> {
             </template>
           </div>
 
-          <div class="flex items-center justify-between gap-3 px-5 py-4 border-t" :class="'border-themed'">
+          <div class="modal-footer flex items-center justify-between gap-3">
             <span class="text-xs text-themed-muted">{{ $t('instance.batch.currentPageOnly') }}</span>
             <div class="flex items-center gap-2">
               <button class="btn-ghost btn-sm" :disabled="batchDestroySubmitting" @click="closeBatchDestroyModal()">

@@ -15,6 +15,8 @@ import '@fontsource-variable/jetbrains-mono'
 import '../styles/main.css'
 import 'flag-icons/css/flag-icons.min.css'
 
+import { initDrawerGesture } from '../utils/drawer-gesture'
+
 const app = createApp(App)
 const pinia = createPinia()
 
@@ -24,6 +26,7 @@ app.use(i18n)
 
 document.documentElement.lang = getLocale()
 installStaleAssetRecovery()
+initDrawerGesture()
 
 app.config.errorHandler = (err, _instance, info) => {
   console.error('Vue应用错误:', err, info)

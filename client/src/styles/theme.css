@@ -98,6 +98,24 @@
     --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
     --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
     --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
+
+    /* ---- 抽屉弹窗主题 Token (OCI Slide-over Drawer) ---- */
+    --drawer-backdrop: rgba(0, 0, 0, 0.6);
+    --drawer-bg: #161513;
+    --drawer-header-bg: #282522;
+    --drawer-header-text: #f4f4f3;
+    --drawer-header-border: #2C2A29;
+    --drawer-footer-bg: #1f1d1b;
+    --drawer-footer-border: #2C2A29;
+    --drawer-btn-confirm-bg: #ffffff;
+    --drawer-btn-confirm-text: #161513;
+    --drawer-btn-confirm-border: #ffffff;
+    --drawer-btn-cancel-bg: #282522;
+    --drawer-btn-cancel-text: #f4f4f3;
+    --drawer-btn-cancel-border: #45413c;
+    --topbar-height: 0px;
+    --footer-height: 0px;
+    --sidebar-width: 0px;
   }
 
   /* 亮色主题变量 · owner 指定色板 */
@@ -183,7 +201,31 @@
     --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
     --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
     --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
-    --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
     --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
+
+    /* ---- 抽屉弹窗主题 Token (OCI Slide-over Drawer) ---- */
+    --drawer-backdrop: rgba(0, 0, 0, 0.35);
+    --drawer-bg: #F6F4F3;
+    --drawer-header-bg: #E4E3E0;
+    --drawer-header-text: #161513;
+    --drawer-header-border: #E4E3E0;
+    --drawer-footer-bg: #FFFFFF;
+    --drawer-footer-border: #E4E3E0;
+    --drawer-btn-confirm-bg: #161513;
+    --drawer-btn-confirm-text: #ffffff;
+    --drawer-btn-confirm-border: #161513;
+    --drawer-btn-cancel-bg: #ffffff;
+    --drawer-btn-cancel-text: #161513;
+    --drawer-btn-cancel-border: #E4E3E0;
+    --topbar-height: 0px;
+    --footer-height: 0px;
+    --sidebar-width: 0px;
+  }
+}
+
+@media (max-width: 767px) {
+  :root,
+  .light {
+    --sidebar-width: 0px !important;
   }
 }

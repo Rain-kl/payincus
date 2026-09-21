@@ -302,12 +302,13 @@ async function sendBroadcast() {
     <Teleport to="body">
       <div
         v-if="selectedAnnouncement"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        class="modal-overlay"
         @click.self="closeDetail"
       >
-        <div class="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-themed bg-themed-surface shadow-2xl">
+        <div class="modal-backdrop" @click="closeDetail"></div>
+        <div class="modal-content max-w-2xl">
           <!-- 弹窗头部 -->
-          <div class="flex items-center justify-between gap-3 border-b border-themed px-6 py-4">
+          <div class="modal-header">
             <div class="flex min-w-0 items-center gap-2">
               <span
                 class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-medium"
@@ -329,7 +330,7 @@ async function sendBroadcast() {
           </div>
 
           <!-- 弹窗内容 -->
-          <div class="overflow-y-auto px-6 py-4">
+          <div class="modal-body">
             <div class="mb-4 flex flex-wrap gap-4 text-xs text-themed-muted">
               <span>{{ t('admin.broadcast.sender') }}: {{ selectedAnnouncement.sender.username }}</span>
               <span class="font-mono tabular-nums">{{ t('admin.broadcast.recipients', { count: selectedAnnouncement.recipientCount }) }}</span>
@@ -339,7 +340,7 @@ async function sendBroadcast() {
           </div>
 
           <!-- 弹窗底部 -->
-          <div class="flex justify-end border-t border-themed px-6 py-4">
+          <div class="modal-footer">
             <button
               type="button"
               class="btn-secondary"

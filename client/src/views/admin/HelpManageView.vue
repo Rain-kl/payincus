@@ -554,13 +554,13 @@ function formatDate(dateStr: string | null | undefined): string {
 
     <!-- Editor Modal -->
     <Teleport to="body">
-      <div v-if="showEditor" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showEditor = false"></div>
+      <div v-if="showEditor" class="modal-overlay" @click.self="showEditor = false">
+        <div class="modal-backdrop" @click="showEditor = false"></div>
 
-        <div class="relative flex h-[90vh] w-full max-w-5xl flex-col rounded-xl border border-themed bg-themed-surface shadow-2xl animate-fade-in">
+        <div class="modal-content max-w-5xl">
           <!-- Header -->
-          <div class="flex items-center justify-between gap-4 border-b border-themed px-6 py-4">
-            <h3 class="truncate text-lg font-semibold text-themed">
+          <div class="modal-header">
+            <h3 class="modal-title truncate">
               {{ editorMode === 'create' ? t('admin.helpManage.createArticle') : t('admin.helpManage.editArticle') }}
             </h3>
             <div class="flex flex-shrink-0 items-center gap-3">
@@ -599,9 +599,8 @@ function formatDate(dateStr: string | null | undefined): string {
                     v-model="form.slug"
                     type="text"
                     class="input font-mono"
-                    :placeholder="t('admin.helpManage.urlSlugPlaceholder')"
+                    :placeholder="t('admin.helpManage.slugPlaceholder')"
                   />
-                  <p class="mt-1 text-xs text-themed-muted">{{ t('admin.helpManage.urlSlugHint') }}</p>
                 </div>
               </div>
 
@@ -733,12 +732,12 @@ function formatDate(dateStr: string | null | undefined): string {
 
     <!-- Category Modal -->
     <Teleport to="body">
-      <div v-if="showCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showCategoryModal = false"></div>
+      <div v-if="showCategoryModal" class="modal-overlay" @click.self="showCategoryModal = false">
+        <div class="modal-backdrop" @click="showCategoryModal = false"></div>
 
-        <div class="relative w-full max-w-md rounded-xl border border-themed bg-themed-surface shadow-2xl animate-fade-in">
-          <div class="flex items-center justify-between gap-4 border-b border-themed px-6 py-4">
-            <h3 class="truncate text-lg font-semibold text-themed">
+        <div class="modal-content max-w-md">
+          <div class="modal-header">
+            <h3 class="modal-title truncate">
               {{ categoryMode === 'create' ? t('admin.helpManage.addCategory') : t('common.edit') }}
             </h3>
             <button class="btn-ghost btn-sm -mr-2 p-1.5" @click="showCategoryModal = false">
@@ -748,7 +747,7 @@ function formatDate(dateStr: string | null | undefined): string {
             </button>
           </div>
 
-          <div class="space-y-4 p-6">
+          <div class="modal-body space-y-4">
             <div>
               <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.categoryId') }} *</label>
               <input
@@ -788,7 +787,7 @@ function formatDate(dateStr: string | null | undefined): string {
             <div v-if="categoryError" class="text-sm text-error">{{ categoryError }}</div>
           </div>
 
-          <div class="flex justify-end gap-3 border-t border-themed px-6 py-4">
+          <div class="modal-footer">
             <button class="btn-secondary" @click="showCategoryModal = false">{{ t('common.cancel') }}</button>
             <button class="btn-primary" @click="saveCategory">{{ t('common.save') }}</button>
           </div>

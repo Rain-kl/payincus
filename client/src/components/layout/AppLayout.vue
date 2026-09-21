@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -121,14 +121,34 @@ const currentLocaleDisplay = computed(() => {
   return getLocaleDisplayName(locale.value as Locale)
 })
 
+function updateLayoutVars() {
+  if (typeof document === 'undefined') return
+  document.documentElement.style.setProperty('--topbar-height', '62px')
+  document.documentElement.style.setProperty('--footer-height', '32px')
+  document.documentElement.style.setProperty('--sidebar-width', sidebarCollapsed.value ? '64px' : '240px')
+}
+
+function resetLayoutVars() {
+  if (typeof document === 'undefined') return
+  document.documentElement.style.removeProperty('--topbar-height')
+  document.documentElement.style.removeProperty('--footer-height')
+  document.documentElement.style.removeProperty('--sidebar-width')
+}
+
+watch(sidebarCollapsed, () => {
+  updateLayoutVars()
+})
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   // 启动站内信轮询
   inboxStore.startPolling()
+  updateLayoutVars()
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  resetLayoutVars()
 })
 </script>
 
@@ -376,7 +396,7 @@ onUnmounted(() => {
       />
 
       <!-- 主内容区 (下面右侧) -->
-      <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         <main class="kawaii-workspace nimbus-workspace flex-1 px-4 md:px-6 xl:px-10 py-5 md:py-6" :class="isSplitPane ? 'overflow-auto lg:overflow-hidden' : 'overflow-auto'">
           <div class="w-full mx-auto" :class="isSplitPane ? 'lg:h-full' : 'max-w-[1680px]'">
             <slot />

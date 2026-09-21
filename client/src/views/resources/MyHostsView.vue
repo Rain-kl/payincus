@@ -680,47 +680,59 @@ onActivated(() => {
   <!-- 托管准入条件不满足弹窗 -->
   <div
     v-if="showAccessDeniedModal"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    class="modal-overlay"
     @click.self="showAccessDeniedModal = false"
   >
-    <div class="w-full max-w-md rounded-xl border border-themed bg-themed-surface p-6 shadow-2xl">
-      <div class="flex items-center gap-3 mb-4">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-full"
-          :class="themeStore.isDark ? 'bg-amber-500/15' : 'bg-amber-100'"
-        >
-          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
+    <div class="modal-backdrop" @click="showAccessDeniedModal = false"></div>
+    <div class="modal-content max-w-md">
+      <div class="modal-header">
+        <div class="flex items-center gap-3">
+          <div
+            class="flex h-10 w-10 items-center justify-center rounded-full"
+            :class="themeStore.isDark ? 'bg-amber-500/15' : 'bg-amber-100'"
+          >
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 class="modal-title">{{ t('hosting.accessDenied.title') }}</h3>
         </div>
-        <h3 class="text-lg font-semibold text-themed">{{ t('hosting.accessDenied.title') }}</h3>
+        <button class="p-1 rounded hover:bg-gray-500/20" @click="showAccessDeniedModal = false">
+          <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
-      <p class="text-sm text-themed-muted mb-4">{{ t('hosting.accessDenied.description') }}</p>
+      <div class="modal-body space-y-4">
+        <p class="text-sm text-themed-muted">{{ t('hosting.accessDenied.description') }}</p>
 
-      <div class="space-y-3 mb-6">
-        <!-- 条件：至少拥有过1台实例 -->
-        <div class="flex items-center gap-3 rounded-lg border border-themed bg-themed-secondary p-3">
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-themed-hover text-themed-muted">
-            <span class="text-xs font-medium">!</span>
-          </div>
-          <div class="flex-1">
-            <div class="text-sm font-medium text-themed">{{ accessDeniedConditionText }}</div>
-            <div class="text-xs text-themed-muted">
-              {{ accessDeniedStatusText }}
+        <div class="space-y-3">
+          <!-- 条件：至少拥有过1台实例 -->
+          <div class="flex items-center gap-3 rounded-lg border border-themed bg-themed-secondary p-3">
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-themed-hover text-themed-muted">
+              <span class="text-xs font-medium">!</span>
+            </div>
+            <div class="flex-1">
+              <div class="text-sm font-medium text-themed">{{ accessDeniedConditionText }}</div>
+              <div class="text-xs text-themed-muted">
+                {{ accessDeniedStatusText }}
+              </div>
             </div>
           </div>
         </div>
+
+        <p class="text-xs text-themed-muted">{{ accessDeniedHintText }}</p>
       </div>
 
-      <p class="text-xs text-themed-muted mb-4">{{ accessDeniedHintText }}</p>
-
-      <button
-        class="btn-primary w-full"
-        @click="showAccessDeniedModal = false"
-      >
-        {{ t('common.confirm') }}
-      </button>
+      <div class="modal-footer">
+        <button
+          class="btn-primary w-full"
+          @click="showAccessDeniedModal = false"
+        >
+          {{ t('common.confirm') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>

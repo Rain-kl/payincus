@@ -239,15 +239,15 @@ function handleClose() {
     <Transition name="modal">
       <div 
         v-if="show" 
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="handleClose"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="modal-backdrop" @click="handleClose"></div>
         
         <!-- Modal -->
         <div 
-          class="modal-content relative w-full max-w-3xl rounded-xl shadow-xl"
+          class="modal-content relative w-full max-w-3xl"
           :class="themeStore.isDark ? 'bg-gray-900' : 'bg-white'"
         >
           <!-- Header -->

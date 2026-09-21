@@ -613,18 +613,19 @@ function goToNextPage() {
     <!-- 创建兑换码弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showCreateModal = false">
-          <div :class="['w-full max-w-md rounded-xl shadow-xl', themeStore.isDark ? 'bg-gray-900' : 'bg-white']">
-            <div :class="['flex items-center justify-between px-6 py-4 border-b', themeStore.isDark ? 'border-gray-800' : 'border-gray-200']">
-              <h3 :class="['text-lg font-semibold', themeStore.isDark ? 'text-white' : 'text-gray-900']">{{ t('redeemCodes.createTitle') }}</h3>
-              <button :class="themeStore.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'" @click="showCreateModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
+          <div class="modal-backdrop" @click="showCreateModal = false"></div>
+          <div class="modal-content max-w-md">
+            <div class="modal-header">
+              <h3 class="modal-title">{{ t('redeemCodes.createTitle') }}</h3>
+              <button class="p-1 rounded hover:bg-gray-500/20" @click="showCreateModal = false">
+                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div class="px-6 py-4 space-y-4">
+            <div class="modal-body space-y-4">
               <!-- 资源类型 -->
               <div>
                 <label :class="['block text-sm font-medium mb-1', themeStore.isDark ? 'text-gray-300' : 'text-gray-700']">{{ t('redeemCodes.resourceType') }}</label>
@@ -659,12 +660,10 @@ function goToNextPage() {
                         : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'
                     ]"
                   />
-                  <span :class="['text-sm font-medium', themeStore.isDark ? 'text-gray-400' : 'text-gray-500']">
-                    {{ currentRange.unit }}
-                  </span>
+                  <span :class="['text-sm', themeStore.isDark ? 'text-gray-400' : 'text-gray-500']">{{ currentRange.unit }}</span>
                 </div>
                 <p :class="['text-xs mt-1', themeStore.isDark ? 'text-gray-500' : 'text-gray-400']">
-                  {{ t('redeemCodes.valueRange', { min: currentRange.min, max: currentRange.max }) }}
+                  {{ t('redeemCodes.rangeHint', { min: currentRange.min, max: currentRange.max, unit: currentRange.unit }) }}
                 </p>
               </div>
 
@@ -737,7 +736,7 @@ function goToNextPage() {
               </div>
             </div>
 
-            <div :class="['flex justify-end gap-3 px-6 py-4 border-t', themeStore.isDark ? 'border-gray-800' : 'border-gray-200']">
+            <div class="modal-footer">
               <button
                 :class="[
                   'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
@@ -775,20 +774,21 @@ function goToNextPage() {
     <!-- 批量创建结果弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showBatchResultModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showBatchResultModal = false">
-          <div :class="['w-full max-w-lg rounded-xl shadow-xl', themeStore.isDark ? 'bg-gray-900' : 'bg-white']">
-            <div :class="['flex items-center justify-between px-6 py-4 border-b', themeStore.isDark ? 'border-gray-800' : 'border-gray-200']">
-              <h3 :class="['text-lg font-semibold', themeStore.isDark ? 'text-white' : 'text-gray-900']">{{ t('redeemCodes.batchResult') }}</h3>
-              <button :class="themeStore.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'" @click="showBatchResultModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div v-if="showBatchResultModal" class="modal-overlay" @click.self="showBatchResultModal = false">
+          <div class="modal-backdrop" @click="showBatchResultModal = false"></div>
+          <div class="modal-content max-w-lg">
+            <div class="modal-header">
+              <h3 class="modal-title">{{ t('redeemCodes.batchResult') }}</h3>
+              <button class="p-1 rounded hover:bg-gray-500/20" @click="showBatchResultModal = false">
+                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div class="px-6 py-4">
+            <div class="modal-body space-y-4">
               <!-- 批次 ID -->
-              <div v-if="batchCreatedBatchId" :class="['mb-4 p-3 rounded-lg', themeStore.isDark ? 'bg-blue-900/30' : 'bg-blue-50']">
+              <div v-if="batchCreatedBatchId" :class="['p-3 rounded-lg', themeStore.isDark ? 'bg-blue-900/30' : 'bg-blue-50']">
                 <p :class="['text-sm', themeStore.isDark ? 'text-blue-400' : 'text-blue-600']">
                   <span class="font-medium">{{ t('redeemCodes.batchId') }}:</span>
                   <code :class="['ml-2 px-2 py-0.5 rounded', themeStore.isDark ? 'bg-blue-900/50' : 'bg-blue-100']">{{ batchCreatedBatchId }}</code>
@@ -802,7 +802,7 @@ function goToNextPage() {
               </div>
             </div>
 
-            <div :class="['flex justify-end gap-3 px-6 py-4 border-t', themeStore.isDark ? 'border-gray-800' : 'border-gray-200']">
+            <div class="modal-footer">
               <button
                 :class="[
                   'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
@@ -829,18 +829,19 @@ function goToNextPage() {
     <!-- 使用记录弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showUsagesModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showUsagesModal = false">
-          <div :class="['w-full max-w-lg rounded-xl shadow-xl', themeStore.isDark ? 'bg-gray-900' : 'bg-white']">
-            <div :class="['flex items-center justify-between px-6 py-4 border-b', themeStore.isDark ? 'border-gray-800' : 'border-gray-200']">
-              <h3 :class="['text-lg font-semibold', themeStore.isDark ? 'text-white' : 'text-gray-900']">{{ t('redeemCodes.usageRecords') }}</h3>
-              <button :class="themeStore.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'" @click="showUsagesModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div v-if="showUsagesModal" class="modal-overlay" @click.self="showUsagesModal = false">
+          <div class="modal-backdrop" @click="showUsagesModal = false"></div>
+          <div class="modal-content max-w-lg">
+            <div class="modal-header">
+              <h3 class="modal-title">{{ t('redeemCodes.usageRecords') }}</h3>
+              <button class="p-1 rounded hover:bg-gray-500/20" @click="showUsagesModal = false">
+                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div class="px-6 py-4">
+            <div class="modal-body space-y-4">
               <div v-if="usagesLoading" class="py-8 text-center">
                 <div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               </div>
@@ -861,6 +862,15 @@ function goToNextPage() {
                 </div>
               </div>
             </div>
+
+            <div class="modal-footer">
+              <button
+                class="btn-secondary"
+                @click="showUsagesModal = false"
+              >
+                {{ t('common.close') }}
+              </button>
+            </div>
           </div>
         </div>
       </Transition>
@@ -869,44 +879,54 @@ function goToNextPage() {
     <!-- 删除确认弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="showDeleteModal = false">
-          <div :class="['w-full max-w-sm rounded-xl shadow-xl', themeStore.isDark ? 'bg-gray-900' : 'bg-white']">
-            <div class="p-6 text-center">
-              <div :class="['w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center', themeStore.isDark ? 'bg-red-900/30' : 'bg-red-100']">
+        <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
+          <div class="modal-backdrop" @click="showDeleteModal = false"></div>
+          <div class="modal-content max-w-sm">
+            <div class="modal-header">
+              <h3 class="modal-title">{{ t('redeemCodes.confirmDelete') }}</h3>
+              <button class="p-1 rounded hover:bg-gray-500/20" @click="showDeleteModal = false">
+                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="modal-body text-center space-y-4">
+              <div :class="['w-12 h-12 mx-auto rounded-full flex items-center justify-center', themeStore.isDark ? 'bg-red-900/30' : 'bg-red-100']">
                 <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 :class="['text-lg font-semibold mb-2', themeStore.isDark ? 'text-white' : 'text-gray-900']">{{ t('redeemCodes.confirmDelete') }}</h3>
-              <p :class="['text-sm mb-6', themeStore.isDark ? 'text-gray-400' : 'text-gray-500']">
+              <p :class="['text-sm', themeStore.isDark ? 'text-gray-400' : 'text-gray-500']">
                 {{ t('redeemCodes.confirmDeleteMessage', { count: selectedIds.size }) }}
               </p>
-              <div class="flex gap-3">
-                <button
-                  :class="[
-                    'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                    themeStore.isDark
-                      ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  ]"
-                  @click="showDeleteModal = false"
-                >
-                  {{ t('common.cancel') }}
-                </button>
-                <button
-                  :disabled="deleting"
-                  :class="[
-                    'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                    deleting ? 'opacity-50 cursor-not-allowed' : '',
-                    themeStore.isDark
-                      ? 'bg-red-600 text-white hover:bg-red-500'
-                      : 'bg-red-600 text-white hover:bg-red-700'
-                  ]"
-                  @click="confirmDelete"
-                >
-                  {{ deleting ? t('common.deleting') : t('common.delete') }}
-                </button>
-              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button
+                :class="[
+                  'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+                  themeStore.isDark
+                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ]"
+                @click="showDeleteModal = false"
+              >
+                {{ t('common.cancel') }}
+              </button>
+              <button
+                :disabled="deleting"
+                :class="[
+                  'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+                  deleting ? 'opacity-50 cursor-not-allowed' : '',
+                  themeStore.isDark
+                    ? 'bg-red-600 text-white hover:bg-red-500'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                ]"
+                @click="confirmDelete"
+              >
+                {{ deleting ? t('common.deleting') : t('common.delete') }}
+              </button>
             </div>
           </div>
         </div>
@@ -918,11 +938,21 @@ function goToNextPage() {
 <style scoped>
 .modal-enter-active,
 .modal-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+.modal-enter-active .modal-content,
+.modal-leave-active .modal-content {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+  transform: translateX(100%);
 }
 </style>

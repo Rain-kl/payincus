@@ -61,28 +61,25 @@ onMounted(() => {
     <Transition name="modal">
       <div
         v-if="show"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="modal-overlay"
         @click.self="emit('close')"
       >
         <!-- Backdrop -->
         <div 
-          class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          class="modal-backdrop"
           @click="emit('close')"
         />
         
         <!-- Modal -->
         <div
-          class="modal-content relative w-full max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[85vh] rounded-xl shadow-2xl overflow-hidden flex flex-col"
-          :class="themeStore.isDark ? 'bg-[var(--bg-surface)] border border-[var(--border-color)]' : 'bg-[var(--bg-surface)]'"
+          class="modal-content max-w-3xl md:max-w-4xl lg:max-w-5xl"
         >
           <!-- Header -->
           <div 
-            class="flex items-center justify-between px-6 py-4 border-b"
-            :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'"
+            class="modal-header"
           >
             <h2 
-              class="text-lg font-semibold"
-              :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'"
+              class="modal-title"
             >
               {{ $t('auth.tos.title') }}
             </h2>
@@ -100,7 +97,7 @@ onMounted(() => {
           </div>
           
           <!-- Content -->
-          <div class="flex-1 overflow-y-auto px-6 py-4">
+          <div class="modal-body">
             <!-- Loading -->
             <div v-if="loading" class="flex items-center justify-center py-12">
               <svg class="animate-spin h-8 w-8" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'" fill="none" viewBox="0 0 24 24">
@@ -111,7 +108,7 @@ onMounted(() => {
             
             <!-- Error -->
             <div v-else-if="error" class="text-center py-12">
-              <p class="text-red-500 mb-4">{{ error }}</p>
+              <p :class="themeStore.isDark ? 'text-red-400' : 'text-red-600'" class="mb-4">{{ error }}</p>
               <button 
                 class="btn-secondary"
                 @click="loadTerms"
@@ -120,22 +117,18 @@ onMounted(() => {
               </button>
             </div>
             
-            <!-- Terms Content -->
+            <!-- Content -->
             <div 
               v-else 
-              :class="themeStore.isDark ? 'dark' : 'light'"
-            >
-              <div 
-                class="markdown-body prose prose-sm max-w-none"
-                v-html="content"
-              />
-            </div>
+              class="markdown-body text-sm"
+              :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
+              v-html="content"
+            />
           </div>
           
           <!-- Footer -->
           <div 
-            class="px-6 py-4 border-t"
-            :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'"
+            class="modal-footer"
           >
             <button
               class="btn-primary w-full"
@@ -153,7 +146,7 @@ onMounted(() => {
 <style scoped>
 .modal-enter-active,
 .modal-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-enter-from,
@@ -163,12 +156,12 @@ onMounted(() => {
 
 .modal-enter-active > div:last-child,
 .modal-leave-active > div:last-child {
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-enter-from > div:last-child,
 .modal-leave-to > div:last-child {
-  transform: scale(0.95);
+  transform: translateX(100%);
 }
 </style>
 

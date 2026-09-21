@@ -529,16 +529,15 @@
   transform: translateY(10px);
 }
 
-/* ============ 模态框过渡动画 ============ */
-/* 背景遮罩与弹窗卡片分别独立过渡，避免 backdrop-filter 在父层 opacity 过渡时闪现 */
+/* ============ 模态框/侧边抽屉过渡动画 (OCI Slide-over Drawer) ============ */
 .modal-enter-active .modal-backdrop,
 .modal-leave-active .modal-backdrop {
-  transition: opacity 0.22s ease, backdrop-filter 0.22s ease;
+  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), backdrop-filter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-enter-active .modal-content,
 .modal-leave-active .modal-content {
-  transition: transform 0.22s ease, opacity 0.22s ease;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-enter-from .modal-backdrop,
@@ -549,8 +548,14 @@
 
 .modal-enter-from .modal-content,
 .modal-leave-to .modal-content {
-  transform: scale(0.96);
-  opacity: 0;
+  transform: translateX(100%);
+  opacity: 1;
+}
+
+.modal-enter-to .modal-content,
+.modal-leave-from .modal-content {
+  transform: translateX(0);
+  opacity: 1;
 }
 
 /* ============ 列表项过渡动画 ============ */
@@ -604,79 +609,152 @@
   transform: translateY(-10px);
 }
 
-/* ============ 弹窗样式 ============ */
+/* ============ 侧边抽屉弹窗 (OCI Slide-over Drawer) ============ */
 .modal-overlay {
-  @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+  position: fixed;
+  top: var(--topbar-height, 0px);
+  bottom: var(--footer-height, 0px);
+  left: var(--sidebar-width, 0px);
+  right: 0;
+  z-index: 25;
+  display: flex;
+  justify-content: flex-end;
+  overflow: hidden;
 }
 
 .modal-backdrop {
-  @apply absolute inset-0 backdrop-blur-sm;
-}
-
-.dark .modal-backdrop {
-  @apply bg-black/60;
-}
-
-.light .modal-backdrop {
-  @apply bg-black/30;
+  position: absolute;
+  inset: 0;
+  background-color: var(--drawer-backdrop);
+  backdrop-filter: blur(1px);
 }
 
 .modal-content {
-  @apply relative w-full max-w-md mx-4 sm:mx-auto rounded-xl shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto;
+  position: relative;
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--drawer-header-border);
+  background-color: var(--drawer-bg);
+  color: var(--text-primary);
+  overflow: hidden;
+  border-radius: 0 !important;
+}
+
+@media (min-width: 640px) {
+  .modal-content {
+    max-width: 36rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .modal-content {
+    max-width: 42rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .modal-content {
+    max-width: 48rem;
+  }
 }
 
 .dark .modal-content {
-  @apply bg-gray-900 border border-gray-800;
+  box-shadow: -12px 0 36px rgba(0, 0, 0, 0.55);
 }
 
 .light .modal-content {
-  @apply bg-white border border-gray-200;
+  box-shadow: -10px 0 32px rgba(0, 0, 0, 0.12);
 }
 
 .modal-header {
-  @apply flex items-center justify-between p-4 sm:p-5 border-b;
-}
-
-.dark .modal-header {
-  @apply border-gray-800;
-}
-
-.light .modal-header {
-  @apply border-gray-200;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--drawer-header-border);
+  background-color: var(--drawer-header-bg);
+  color: var(--drawer-header-text);
 }
 
 .modal-title {
-  @apply text-sm sm:text-base font-medium;
-}
-
-.dark .modal-title {
-  @apply text-gray-100;
-}
-
-.light .modal-title {
-  @apply text-gray-900;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--drawer-header-text);
 }
 
 .modal-body {
-  @apply p-4 sm:p-5 space-y-4;
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  background-color: var(--drawer-bg);
+  color: var(--text-primary);
 }
 
 .modal-footer {
-  @apply flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 p-4 sm:p-5 border-t;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--drawer-footer-border);
+  background-color: var(--drawer-footer-bg);
+}
+
+@media (min-width: 640px) {
+  .modal-footer {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+}
+
+/* 按钮规范: 确认按钮使用黑色, 取消按钮使用白色 */
+.modal-footer .btn-primary,
+.modal-footer button[type="submit"]:not(.btn-secondary):not(.btn-ghost):not(.btn-danger),
+.modal-footer button.btn-primary {
+  background-color: var(--drawer-btn-confirm-bg) !important;
+  color: var(--drawer-btn-confirm-text) !important;
+  border: 1px solid var(--drawer-btn-confirm-border) !important;
+}
+
+.modal-footer .btn-secondary,
+.modal-footer .btn-ghost,
+.modal-footer button.btn-secondary {
+  background-color: var(--drawer-btn-cancel-bg) !important;
+  color: var(--drawer-btn-cancel-text) !important;
+  border: 1px solid var(--drawer-btn-cancel-border) !important;
+}
+
+.modal-footer .btn-primary:hover,
+.modal-footer button[type="submit"]:not(.btn-secondary):not(.btn-ghost):not(.btn-danger):hover {
+  filter: brightness(1.15);
+}
+
+.modal-footer .btn-secondary:hover,
+.modal-footer .btn-ghost:hover {
+  background-color: var(--drawer-header-bg) !important;
 }
 
 .modal-footer .btn-primary,
 .modal-footer .btn-secondary,
-.modal-footer .btn-danger {
-  @apply w-full sm:w-auto;
+.modal-footer .btn-danger,
+.modal-footer .btn-ghost {
+  width: 100%;
 }
 
-.dark .modal-footer {
-  @apply border-gray-800;
-}
-
-.light .modal-footer {
-  @apply border-gray-200;
+@media (min-width: 640px) {
+  .modal-footer .btn-primary,
+  .modal-footer .btn-secondary,
+  .modal-footer .btn-danger,
+  .modal-footer .btn-ghost {
+    width: auto;
+  }
 }
 
 /* ============ Toast 通知 ============ */

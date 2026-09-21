@@ -559,15 +559,16 @@ async function boostProcesses(): Promise<void> {
     </template>
 
     <!-- 提升进程数确认弹窗 -->
+    <!-- 提升进程数确认弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showBoostModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div v-if="showBoostModal" class="modal-overlay" @click.self="showBoostModal = false">
           <!-- 背景遮罩 -->
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showBoostModal = false"></div>
+          <div class="modal-backdrop" @click="showBoostModal = false"></div>
           <!-- 弹窗内容 -->
-          <div class="relative w-full max-w-md mx-4 rounded-2xl shadow-pop overflow-hidden bg-surface border-2 border-themed">
+          <div class="modal-content max-w-md">
             <!-- 头部 -->
-            <div class="px-6 py-4 border-b-2 border-themed">
+            <div class="modal-header">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center border-2 border-accent-primary/30">
                   <svg class="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -575,14 +576,19 @@ async function boostProcesses(): Promise<void> {
                   </svg>
                 </div>
                 <div>
-                  <h3 class="text-lg font-semibold text-themed">
+                  <h3 class="modal-title">
                     {{ t('instanceConfig.boostProcesses.title') }}
                   </h3>
                 </div>
               </div>
+              <button class="p-1 rounded hover:bg-gray-500/20" @click="showBoostModal = false">
+                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             <!-- 内容 -->
-            <div class="px-6 py-4">
+            <div class="modal-body">
               <p class="text-sm leading-relaxed text-themed-muted">
                 {{ t('instanceConfig.boostProcesses.confirm', {
                   type: instanceType === 'vm' ? 'KVM' : 'LXC',
@@ -599,7 +605,7 @@ async function boostProcesses(): Promise<void> {
               </div>
             </div>
             <!-- 底部按钮 -->
-            <div class="px-6 py-4 border-t-2 border-themed flex justify-end gap-3 bg-surface-secondary">
+            <div class="modal-footer">
               <button
                 class="btn-secondary"
                 :disabled="boostLoading"
@@ -627,15 +633,20 @@ async function boostProcesses(): Promise<void> {
     <!-- SWAP 操作确认弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showSwapModal" class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showSwapModal = false"></div>
-          <div class="relative w-full max-w-md mx-4 rounded-2xl shadow-pop overflow-hidden bg-surface border-2 border-themed">
-            <div class="px-6 py-4 border-b-2 border-themed">
-              <h3 class="text-lg font-semibold text-themed">
+        <div v-if="showSwapModal" class="modal-overlay" @click.self="showSwapModal = false">
+          <div class="modal-backdrop" @click="showSwapModal = false"></div>
+          <div class="modal-content max-w-md">
+            <div class="modal-header">
+              <h3 class="modal-title">
                 {{ t(`instanceConfig.swap.${swapAction}ConfirmTitle`) }}
               </h3>
+              <button class="p-1 rounded hover:bg-gray-500/20" @click="showSwapModal = false">
+                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div class="px-6 py-4 space-y-3">
+            <div class="modal-body space-y-3">
               <p class="text-sm leading-relaxed text-themed-muted">
                 {{ t(`instanceConfig.swap.${swapAction}ConfirmText`, { size: formatSwapSize(config?.swap.sizeMb || 0) }) }}
               </p>
@@ -643,7 +654,7 @@ async function boostProcesses(): Promise<void> {
                 <p class="text-sm">{{ t('instanceConfig.swap.toggleHint') }}</p>
               </div>
             </div>
-            <div class="px-6 py-4 border-t-2 border-themed flex justify-end gap-3 bg-surface-secondary">
+            <div class="modal-footer">
               <button
                 class="btn-secondary"
                 :disabled="swapActionLoading"

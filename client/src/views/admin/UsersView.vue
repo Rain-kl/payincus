@@ -2753,22 +2753,25 @@ function _getQuotaPercent(used, limit) {
     
     <!-- 积分调整弹窗 -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition-opacity duration-200"
-        leave-active-class="transition-opacity duration-200"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="modal">
         <div 
           v-if="showPointsModal" 
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          class="modal-overlay"
           @click.self="showPointsModal = false"
         >
-          <div class="card p-6 w-full max-w-md">
-            <h3 class="text-lg font-semibold text-themed mb-4">
-              {{ t('admin.users.adjustPoints') }} - {{ pointsUser?.username }}
-            </h3>
-            <div class="space-y-4">
+          <div class="modal-backdrop" @click="showPointsModal = false"></div>
+          <div class="modal-content max-w-lg">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                {{ t('admin.users.adjustPoints') }} - {{ pointsUser?.username }}
+              </h3>
+              <button class="btn-ghost btn-sm -mr-2 p-1.5" @click="showPointsModal = false">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="modal-body space-y-4">
               <!-- 当前积分 -->
               <div class="flex items-center justify-between py-2 px-3 bg-themed-tertiary rounded-lg">
                 <span class="text-sm text-themed-muted">{{ t('admin.users.currentPoints') }}</span>
@@ -2790,30 +2793,31 @@ function _getQuotaPercent(used, limit) {
               <!-- 理由 -->
               <div>
                 <label class="block text-sm text-themed-secondary mb-1.5">
-                  {{ t('admin.users.adjustReason') }} <span class="text-error">*</span>
+                  {{ t('admin.users.adjustReason') }}
+                  <span class="text-error">*</span>
                 </label>
                 <textarea 
                   v-model="adjustPointsForm.reason" 
                   class="input min-h-[80px]" 
-                  :placeholder="t('admin.users.pointsReasonPlaceholder')"
-                  maxlength="200"
+                  :placeholder="t('admin.users.adjustReasonPlaceholder')"
+                  rows="3"
                 ></textarea>
               </div>
-              <!-- 按钮 -->
-              <div class="flex justify-end gap-2 pt-2">
-                <button class="btn btn-ghost" @click="showPointsModal = false">{{ t('common.cancel') }}</button>
-                <button 
-                  class="btn btn-primary" 
-                  :disabled="adjustPointsLoading || !adjustPointsForm.amount || !adjustPointsForm.reason.trim()"
-                  @click="submitAdjustPoints"
-                >
-                  <svg v-if="adjustPointsLoading" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                  {{ adjustPointsLoading ? t('common.submitting') : t('common.confirm') }}
-                </button>
-              </div>
+            </div>
+            <!-- 按钮 -->
+            <div class="modal-footer">
+              <button class="btn btn-ghost" @click="showPointsModal = false">{{ t('common.cancel') }}</button>
+              <button 
+                class="btn btn-primary" 
+                :disabled="adjustPointsLoading || !adjustPointsForm.amount || !adjustPointsForm.reason.trim()"
+                @click="submitAdjustPoints"
+              >
+                <svg v-if="adjustPointsLoading" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                {{ adjustPointsLoading ? t('common.submitting') : t('common.confirm') }}
+              </button>
             </div>
           </div>
         </div>

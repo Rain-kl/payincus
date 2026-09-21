@@ -194,15 +194,14 @@ watch(() => [props.instanceId, props.canChangeHost, props.instanceStatus], () =>
 
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeModal"></div>
+      <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+        <div class="modal-backdrop" @click="closeModal"></div>
         <div
-          class="relative flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl shadow-xl"
-          :class="themeStore.isDark ? 'bg-gray-900' : 'bg-white'"
+          class="modal-content max-w-3xl"
         >
-          <div class="flex items-start justify-between gap-4 border-b px-5 py-4" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'">
+          <div class="modal-header">
             <div>
-              <h3 class="text-base font-semibold" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
+              <h3 class="modal-title">
                 {{ t('instanceConfig.changeHost.modalTitle') }}
               </h3>
               <p class="mt-1 text-sm text-themed-muted">
@@ -221,7 +220,7 @@ watch(() => [props.instanceId, props.canChangeHost, props.instanceStatus], () =>
             </button>
           </div>
 
-          <div class="overflow-y-auto px-5 py-4">
+          <div class="modal-body">
             <div
               class="mb-4 rounded-lg border p-3 text-sm"
               :class="themeStore.isDark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-700'"
@@ -309,7 +308,7 @@ watch(() => [props.instanceId, props.canChangeHost, props.instanceStatus], () =>
             </div>
           </div>
 
-          <div class="flex flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900/80' : 'border-gray-100 bg-gray-50'">
+          <div class="modal-footer">
             <button class="btn-secondary" :disabled="submitting" @click="closeModal">
               {{ t('common.cancel') }}
             </button>

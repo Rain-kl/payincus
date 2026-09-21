@@ -675,13 +675,20 @@ onMounted(() => {
 
     <!-- Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50" @click="showModal = false"></div>
-        <div class="relative w-full max-w-lg overflow-hidden rounded-xl border border-themed bg-themed-surface shadow-2xl">
-          <div class="p-6">
-            <h3 class="mb-5 text-base font-semibold text-themed">{{ modalTitle }}</h3>
-            
-            <form class="space-y-4" @submit.prevent="saveImage">
+      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+        <div class="modal-backdrop" @click="showModal = false"></div>
+        <div class="modal-content max-w-lg">
+          <div class="modal-header">
+            <h3 class="modal-title">{{ modalTitle }}</h3>
+            <button class="p-1 rounded hover:bg-gray-500/20" @click="showModal = false">
+              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <form class="flex-1 flex flex-col min-h-0" @submit.prevent="saveImage">
+            <div class="modal-body space-y-4">
               <div>
                 <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.name') }} *</label>
                 <input v-model="form.name" type="text" class="input" :placeholder="t('admin.images.placeholder.name')" />
@@ -736,16 +743,16 @@ onMounted(() => {
                 <input :id="'hidden'" v-model="form.hidden" type="checkbox" class="w-4 h-4 rounded" />
                 <label :for="'hidden'" class="text-sm text-themed-secondary cursor-pointer">{{ t('admin.images.fields.hidden') }}</label>
               </div>
-              
-              <div class="flex justify-end gap-3 pt-4">
-                <button type="button" class="btn-secondary" @click="showModal = false">{{ t('common.cancel') }}</button>
-                <button type="submit" class="btn-primary" :disabled="saving">
-                  <span v-if="saving" class="loading-spinner w-4 h-4 mr-2"></span>
-                  {{ isEditMode ? t('common.save') : t('common.create') }}
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button type="button" class="btn-secondary" @click="showModal = false">{{ t('common.cancel') }}</button>
+              <button type="submit" class="btn-primary" :disabled="saving">
+                <span v-if="saving" class="loading-spinner w-4 h-4 mr-2"></span>
+                {{ isEditMode ? t('common.save') : t('common.create') }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </Teleport>
