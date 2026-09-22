@@ -917,20 +917,20 @@ async function verifyPromoCode(): Promise<void> {
   promoCodeError.value = ''
   
   try {
-    const res = await api.aff.validateCode(form.value.promoCode.trim(), form.value.planId)
-    if ((res as any).valid) {
+    const res = await api.coupon.validate(form.value.promoCode.trim(), form.value.planId, form.value.packageId)
+    if (res.valid) {
       promoCodeValid.value = true
-      promoCodeDiscount.value = parseFloat((res as any).discountRate) || 0
+      promoCodeDiscount.value = parseFloat(String(res.discountRate ?? 0)) || 0
       // 从验证响应中获取返利率（如果有的话）
-      const commissionRate = parseFloat((res as any).commissionRate) || 0
+      const commissionRate = parseFloat(String(res.commissionRate ?? 0)) || 0
       promoCodeCommissionRate.value = commissionRate
     } else {
       promoCodeValid.value = false
-      promoCodeError.value = (res as any).error || t('aff.promoCodeInvalid')
+      promoCodeError.value = res.error || t('aff.promoCodeInvalid')
     }
   } catch (err: any) {
     promoCodeValid.value = false
-    promoCodeError.value = err.message || t('aff.promoCodeInvalid')
+    promoCodeError.value = err?.response?.data?.error || err.message || t('aff.promoCodeInvalid')
   } finally {
     promoCodeVerifying.value = false
   }

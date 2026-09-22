@@ -33,12 +33,11 @@ export default async function promoCodesRoutes(fastify: FastifyInstance) {
       }
     }
 
-    const packageId = Number(body.packageId)
-    const packagePlanId = Number(body.packagePlanId)
-    if (!packageId || !Number.isSafeInteger(packageId) || !packagePlanId || !Number.isSafeInteger(packagePlanId)) {
+    let packagePlanId = Number(body.packagePlanId)
+    if (!packagePlanId || !Number.isSafeInteger(packagePlanId)) {
       return {
         valid: false,
-        error: '套餐或方案参数无效',
+        error: '方案 ID 无效',
         errorCode: 'INVALID_PARAMS'
       }
     }
@@ -47,12 +46,24 @@ export default async function promoCodesRoutes(fastify: FastifyInstance) {
       where: { id: packagePlanId }
     })
 
-    if (!plan || plan.packageId !== packageId) {
-      return {
-        valid: false,
-        error: '套餐方案不存在',
-        errorCode: 'PLAN_NOT_FOUND'
+    let packageId = Number(body.packageId)
+    if (packageId && Number.isSafeInteger(packageId)) {
+      if (!plan || plan.packageId !== packageId) {
+        return {
+          valid: false,
+          error: '套餐方案不存在',
+          errorCode: 'PLAN_NOT_FOUND'
+        }
       }
+    } else {
+      if (!plan) {
+        return {
+          valid: false,
+          error: '套餐方案不存在',
+          errorCode: 'PLAN_NOT_FOUND'
+        }
+      }
+      packageId = plan.packageId
     }
 
     const user = (request as any).user
@@ -73,6 +84,8 @@ export default async function promoCodesRoutes(fastify: FastifyInstance) {
 
     const billing = calculateCreateBilling(plan)
     const quote = PromoCodeEngine.calculateCreationQuote(billing.totalPrice, validation.promoCode)
+    const discountRate = billing.totalPrice > 0 ? (quote.discountAmount / billing.totalPrice) : 0
+    const commissionRate = Number(validation.promoCode.commissionRate || 0)
 
     return {
       valid: true,
@@ -81,6 +94,8 @@ export default async function promoCodesRoutes(fastify: FastifyInstance) {
       discountValue: Number(validation.discountValue),
       durationType: validation.durationType,
       durationCycles: validation.durationCycles,
+      discountRate,
+      commissionRate,
       estimatedDiscount: quote.discountAmount,
       finalPrice: quote.finalPrice
     }

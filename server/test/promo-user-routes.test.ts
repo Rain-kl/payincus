@@ -36,6 +36,7 @@ async function buildTestApp() {
     // mock admin check
   })
 
+  await app.register(promoCodesRoutes, { prefix: '/api/coupon' })
   await app.register(promoCodesRoutes, { prefix: '/api/promos' })
   await app.register(affRoutes, { prefix: '/api/aff' })
   await app.ready()
@@ -602,8 +603,149 @@ async function runTests() {
       assert.equal(res.statusCode, 404)
     }
 
-    // ==================== 4. POST /api/aff/validate Tests ====================
-    console.log('  4. Testing POST /api/aff/validate (Unified Promo Engine + Legacy Fallback)...')
+    // ==================== 4. Unified /api/coupon/* API Tests ====================
+    console.log('  4. Testing Unified /api/coupon/* routes (No Historical Baggage)...')
+
+    // 4.1 POST /api/coupon/validate with only packagePlanId (packageId auto-resolved)
+    {
+      ;(prisma as any).packagePlan = {
+        findUnique: async (args: any) => {
+          if (args.where.id === 1) {
+            return { id: 1, packageId: 1, price: new Prisma.Decimal(1000), billingCycle: 1 } // 10.00 CNY
+          }
+          return null
+        }
+      }
+      ;(prisma as any).promoCode = {
+        findUnique: async (args: any) => {
+          if (args.where.code === 'CPVW768UQ2') {
+            return {
+              id: 1,
+              code: 'CPVW768UQ2',
+              name: '50% Promo',
+              type: 'ADMIN_PROMO',
+              userId: null,
+              adminId: 1,
+              isGlobal: true,
+              discountType: 'PERCENTAGE',
+              discountValue: new Prisma.Decimal(0.5),
+              commissionRate: new Prisma.Decimal(0),
+              durationType: 'ONCE',
+              durationCycles: null,
+              maxTotalUses: null,
+              usedTotalCount: 0,
+              maxUsesPerUser: 5,
+              startsAt: null,
+              expiresAt: null,
+              enabled: true,
+              totalDiscountAmount: new Prisma.Decimal(0),
+              totalEarnings: new Prisma.Decimal(0),
+              scopes: [],
+              _count: { bindings: 0, redemptionLogs: 0 }
+            }
+          }
+          return null
+        }
+      }
+      ;(prisma as any).promoRedemptionLog = { count: async () => 0 }
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/coupon/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'CPVW768UQ2',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 200)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.valid, true)
+      assert.equal(body.code, 'CPVW768UQ2')
+      assert.equal(body.discountType, 'PERCENTAGE')
+      assert.equal(body.discountValue, 0.5)
+      assert.equal(body.discountRate, 0.5)
+      assert.equal(body.commissionRate, 0)
+      assert.equal(body.estimatedDiscount, 5)
+      assert.equal(body.finalPrice, 5)
+    }
+
+    // 4.2 POST /api/coupon/validate with lowercase code
+    {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/coupon/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'cpvw768uq2',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 200)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.valid, true)
+      assert.equal(body.discountRate, 0.5)
+      assert.equal(body.code, 'CPVW768UQ2')
+    }
+
+    // 4.3 GET /api/coupon/renew-preview/:instanceId
+    {
+      ;(prisma as any).instance = {
+        findUnique: async (args: any) => {
+          if (args.where.id === 201) {
+            return {
+              id: 201,
+              userId: 10,
+              monthlyPrice: new Prisma.Decimal(50),
+              packagePlan: { price: new Prisma.Decimal(5000), billingCycle: 1 }
+            }
+          }
+          return null
+        }
+      }
+      ;(prisma as any).instancePromoBinding = {
+        findUnique: async (args: any) => {
+          if (args.where.instanceId === 201) {
+            return {
+              id: 1,
+              instanceId: 201,
+              promoCodeId: 1,
+              durationType: 'REPEATING',
+              totalCycles: 3,
+              usedCycles: 1,
+              remainingCycles: 2,
+              lastRedeemedAt: new Date(),
+              promoCode: {
+                id: 1,
+                code: 'REPEAT3M',
+                enabled: true,
+                expiresAt: null,
+                discountValue: new Prisma.Decimal(0.2),
+                scopes: []
+              }
+            }
+          }
+          return null
+        }
+      }
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/coupon/renew-preview/201',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) }
+      })
+
+      assert.equal(res.statusCode, 200)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.hasBinding, true)
+      assert.equal(body.instanceId, 201)
+      assert.equal(Array.isArray(body.options), true)
+    }
+
+    // ==================== 5. POST /api/aff/validate Tests ====================
+    console.log('  5. Testing POST /api/aff/validate (Unified Promo Engine + Legacy Fallback)...')
 
     // 4.1 Valid unified promo code
     {
@@ -791,8 +933,14 @@ async function runTests() {
       assert.equal(body.error, '套餐方案不存在')
     }
 
-    // ==================== 5. Instance Creation & Renewal Integration Check ====================
-    console.log('  5. Testing instances.ts & billing integration structure...')
+    // ==================== 6. Instance Creation & Renewal Integration Check ====================
+    console.log('  6. Testing instances.ts & billing integration structure...')
+    const appSource = readFileSync(resolve(process.cwd(), 'src/app.ts'), 'utf8')
+    assert.ok(
+      appSource.includes("await fastify.register(promoCodesRoutes, { prefix: '/api/coupon' })"),
+      'app.ts must register coupon routes under /api/coupon'
+    )
+
     const instancesSource = readFileSync(resolve(process.cwd(), 'src/routes/instances.ts'), 'utf8')
 
     assert.ok(

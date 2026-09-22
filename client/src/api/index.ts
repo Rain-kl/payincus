@@ -3313,11 +3313,13 @@ const api = {
       }>
     }> => http.get('/aff/leaderboard'),
 
-    // 验证优惠码
+    // 验证优惠码（统一使用优惠码引擎）
     validateCode: (code: string, packagePlanId: number): Promise<{
       valid: boolean
       discountRate?: number
-    }> => http.post('/aff/validate', { code, packagePlanId }),
+      commissionRate?: number
+      error?: string
+    }> => http.post('/coupon/validate', { code, packagePlanId }),
 
     // 创建转化申请
     createConvert: (amount: number): Promise<{
@@ -3989,6 +3991,49 @@ const api = {
     // 删除邮箱账户
     deleteAccount: (domainId: number, accountId: number): Promise<{ success: boolean }> =>
       http.delete(`/mail/domains/${domainId}/accounts/${accountId}`)
+  },
+
+  // 统一优惠码 API (/api/coupon/*)
+  coupon: {
+    // 校验优惠码合法性并获取折扣报价
+    validate: (code: string, packagePlanId: number, packageId?: number | null): Promise<{
+      valid: boolean
+      code?: string
+      discountType?: string
+      discountValue?: number
+      durationType?: string
+      durationCycles?: number | null
+      discountRate?: number
+      commissionRate?: number
+      estimatedDiscount?: number
+      finalPrice?: number
+      error?: string
+      errorCode?: string
+    }> => http.post('/coupon/validate', { code, packagePlanId, packageId }),
+
+    // 续费优惠预览
+    renewPreview: (instanceId: number, months?: number): Promise<{
+      instanceId: number
+      hasBinding: boolean
+      isPromoActive: boolean
+      bindingStatus: 'ACTIVE' | 'DISABLED' | 'EXPIRED' | null
+      binding: any
+      options: Array<{
+        months: number
+        originalPrice: number
+        discountAmount: number
+        finalPrice: number
+        discountedMonths: number
+        regularMonths: number
+        willUnbind: boolean
+      }>
+    }> => http.get(`/coupon/renew-preview/${instanceId}`, { params: months ? { months } : undefined }),
+
+    // 绑定优惠码至实例
+    apply: (instanceId: number, code: string): Promise<{
+      success: boolean
+      binding: any
+    }> => http.post(`/coupon/apply/${instanceId}`, { code })
   }
 }
 
@@ -3999,3 +4044,4 @@ export const authApi = api.auth
 export const usersApi = api.users
 export const instancesApi = api.instances
 export const transfersApi = api.transfers
+export const couponApi = api.coupon
