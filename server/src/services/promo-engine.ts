@@ -114,7 +114,10 @@ export class PromoCodeEngine {
       }
     }
 
-    const promo = await getPromoCodeByCode(code, params.tx)
+    let promo = await getPromoCodeByCode(code, params.tx)
+    if (!promo && code.toUpperCase() !== code) {
+      promo = await getPromoCodeByCode(code.toUpperCase(), params.tx)
+    }
     if (!promo) {
       return {
         valid: false,

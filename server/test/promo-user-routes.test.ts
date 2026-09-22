@@ -3,6 +3,7 @@ import Fastify from 'fastify'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../src/db/prisma.js'
 import promoCodesRoutes from '../src/routes/promo-codes.js'
+import affRoutes from '../src/routes/aff.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -31,7 +32,12 @@ async function buildTestApp() {
     }
   })
 
+  app.decorate('requireAdmin', async (request: any, reply: any) => {
+    // mock admin check
+  })
+
   await app.register(promoCodesRoutes, { prefix: '/api/promos' })
+  await app.register(affRoutes, { prefix: '/api/aff' })
   await app.ready()
   return app
 }
@@ -46,6 +52,7 @@ async function runTests() {
   const origInstancePromoBindingFindUnique = prisma.instancePromoBinding?.findUnique
   const origInstancePromoBindingUpsert = prisma.instancePromoBinding?.upsert
   const origRedemptionCount = prisma.promoRedemptionLog?.count
+  const origAffCode = prisma.affCode?.findUnique
 
   try {
     // ==================== 1. POST /api/promos/validate Tests ====================
@@ -595,8 +602,197 @@ async function runTests() {
       assert.equal(res.statusCode, 404)
     }
 
-    // ==================== 4. Instance Creation & Renewal Integration Check ====================
-    console.log('  4. Testing instances.ts & billing integration structure...')
+    // ==================== 4. POST /api/aff/validate Tests ====================
+    console.log('  4. Testing POST /api/aff/validate (Unified Promo Engine + Legacy Fallback)...')
+
+    // 4.1 Valid unified promo code
+    {
+      ;(prisma as any).packagePlan = {
+        findUnique: async (args: any) => {
+          if (args.where.id === 1) {
+            return { id: 1, packageId: 1, price: new Prisma.Decimal(1000), billingCycle: 1 } // 10.00 CNY
+          }
+          return null
+        }
+      }
+      ;(prisma as any).promoCode = {
+        findUnique: async (args: any) => {
+          if (args.where.code === 'CPVW768UQ2') {
+            return {
+              id: 1,
+              code: 'CPVW768UQ2',
+              name: '50% Promo',
+              type: 'ADMIN_PROMO',
+              userId: null,
+              adminId: 1,
+              isGlobal: true,
+              discountType: 'PERCENTAGE',
+              discountValue: new Prisma.Decimal(0.5),
+              commissionRate: new Prisma.Decimal(0),
+              durationType: 'ONCE',
+              durationCycles: null,
+              maxTotalUses: null,
+              usedTotalCount: 0,
+              maxUsesPerUser: 5,
+              startsAt: null,
+              expiresAt: null,
+              enabled: true,
+              totalDiscountAmount: new Prisma.Decimal(0),
+              totalEarnings: new Prisma.Decimal(0),
+              scopes: [],
+              _count: { bindings: 0, redemptionLogs: 0 }
+            }
+          }
+          return null
+        }
+      }
+      ;(prisma as any).promoRedemptionLog = { count: async () => 0 }
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/aff/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'CPVW768UQ2',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 200)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.valid, true)
+      assert.equal(body.discountRate, 0.5)
+      assert.equal(body.commissionRate, 0)
+      assert.equal(body.promoCode, 'CPVW768UQ2')
+    }
+
+    // 4.2 Case-insensitive matching: lowercase unified promo code 'cpvw768uq2'
+    {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/aff/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'cpvw768uq2',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 200)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.valid, true)
+      assert.equal(body.discountRate, 0.5)
+      assert.equal(body.promoCode, 'CPVW768UQ2')
+    }
+
+    // 4.3 Expired/disabled unified promo code -> returns 400 with promo error, does not fallback
+    {
+      ;(prisma as any).promoCode = {
+        findUnique: async (args: any) => {
+          if (args.where.code === 'DISABLED_PROMO') {
+            return {
+              id: 2,
+              code: 'DISABLED_PROMO',
+              enabled: false,
+              scopes: []
+            }
+          }
+          return null
+        }
+      }
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/aff/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'DISABLED_PROMO',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 400)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.error, '优惠码已被禁用')
+    }
+
+    // 4.4 Fallback to legacy aff code when not found in promoCode
+    {
+      ;(prisma as any).promoCode = { findUnique: async () => null }
+      ;(prisma as any).affCode = {
+        findUnique: async (args: any) => {
+          if (args.where.code === 'LEGACYAFF') {
+            return {
+              id: 99,
+              code: 'LEGACYAFF',
+              userId: 20, // Different from user 10
+              packagePlanId: null, // Global
+              discountRate: new Prisma.Decimal(0.15),
+              commissionRate: new Prisma.Decimal(0.08),
+              enabled: true
+            }
+          }
+          return null
+        }
+      }
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/aff/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'LEGACYAFF',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 200)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.valid, true)
+      assert.equal(body.discountRate, 0.15)
+      assert.equal(body.commissionRate, 0.08)
+      assert.equal(body.promoCode, 'LEGACYAFF')
+    }
+
+    // 4.5 Code not found in either system -> 400 '优惠码不存在'
+    {
+      ;(prisma as any).promoCode = { findUnique: async () => null }
+      ;(prisma as any).affCode = { findUnique: async () => null }
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/aff/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'NON_EXISTENT_ALL',
+          packagePlanId: 1
+        }
+      })
+
+      assert.equal(res.statusCode, 400)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.error, '优惠码不存在')
+    }
+
+    // 4.6 Package plan not found -> 400 '套餐方案不存在'
+    {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/aff/validate',
+        headers: { 'x-mock-user': JSON.stringify({ id: 10, role: 'user' }) },
+        payload: {
+          code: 'ANY_CODE',
+          packagePlanId: 99999
+        }
+      })
+
+      assert.equal(res.statusCode, 400)
+      const body = JSON.parse(res.payload)
+      assert.equal(body.error, '套餐方案不存在')
+    }
+
+    // ==================== 5. Instance Creation & Renewal Integration Check ====================
+    console.log('  5. Testing instances.ts & billing integration structure...')
     const instancesSource = readFileSync(resolve(process.cwd(), 'src/routes/instances.ts'), 'utf8')
 
     assert.ok(
@@ -632,6 +828,16 @@ async function runTests() {
       'billing-scheduler.ts must calculate promo renewal quote when checking auto-renew balance'
     )
 
+    const affRouteSource = readFileSync(resolve(process.cwd(), 'src/routes/aff.ts'), 'utf8')
+    assert.ok(
+      affRouteSource.includes('PromoCodeEngine.validate'),
+      'aff.ts /validate must call PromoCodeEngine.validate'
+    )
+    assert.ok(
+      affRouteSource.includes('db.validateAffCode'),
+      'aff.ts /validate must fallback to db.validateAffCode when PROMO_NOT_FOUND'
+    )
+
     console.log('All Promo User Routes and Integration tests passed!')
   } finally {
     // Restore original prisma methods
@@ -641,6 +847,7 @@ async function runTests() {
     if (origInstancePromoBindingFindUnique) (prisma as any).instancePromoBinding.findUnique = origInstancePromoBindingFindUnique
     if (origInstancePromoBindingUpsert) (prisma as any).instancePromoBinding.upsert = origInstancePromoBindingUpsert
     if (origRedemptionCount) (prisma as any).promoRedemptionLog.count = origRedemptionCount
+    if (origAffCode) (prisma as any).affCode.findUnique = origAffCode
   }
 }
 

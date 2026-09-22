@@ -5,6 +5,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { AffLogType, AffWithdrawalStatus } from '@prisma/client'
 import * as db from '../db/index.js'
+import { prisma } from '../db/prisma.js'
+import { PromoCodeEngine } from '../services/promo-engine.js'
+import { calculateCreateBilling } from '../db/billing-operations.js'
 import { createLog } from '../db/logs.js'
 import { createInboxMessage } from '../db/inbox.js'
 import { apiError, ErrorCode } from '../lib/errors.js'
@@ -289,25 +292,61 @@ export default async function affRoutes(fastify: FastifyInstance) {
     const { user } = request
     const { code, packagePlanId } = request.body
 
-    if (!code || !code.trim()) {
+    if (!code || typeof code !== 'string' || !code.trim()) {
       return reply.code(400).send({ error: '请输入优惠码' })
     }
 
-    if (!packagePlanId || typeof packagePlanId !== 'number') {
+    if (!packagePlanId || typeof packagePlanId !== 'number' || !Number.isSafeInteger(packagePlanId)) {
       return reply.code(400).send({ error: '方案 ID 无效' })
     }
 
-    const result = await db.validateAffCode(code.trim(), packagePlanId, user.id)
+    const plan = await prisma.packagePlan.findUnique({
+      where: { id: packagePlanId }
+    })
 
-    if (!result.valid) {
-      return reply.code(400).send({ error: result.error })
+    if (!plan) {
+      return reply.code(400).send({ error: '套餐方案不存在' })
     }
 
-    return {
-      valid: true,
-      discountRate: result.discountRate,
-      commissionRate: result.commissionRate
+    // 1. 优先尝试统一优惠码引擎
+    const promoVal = await PromoCodeEngine.validate({
+      code: code.trim(),
+      packageId: plan.packageId,
+      packagePlanId,
+      userId: user.id
+    })
+
+    if (promoVal.valid && promoVal.promoCode) {
+      const billing = calculateCreateBilling(plan)
+      const promoQuote = PromoCodeEngine.calculateCreationQuote(billing.totalPrice, promoVal.promoCode)
+      const discountRate = billing.totalPrice > 0 ? (promoQuote.discountAmount / billing.totalPrice) : 0
+      const commissionRate = Number(promoVal.promoCode.commissionRate || 0)
+
+      return {
+        valid: true,
+        discountRate,
+        commissionRate,
+        promoCode: promoVal.promoCode.code
+      }
     }
+
+    // 2. 如果统一优惠码未找到，降级尝试旧版 AFF 优惠码
+    if (promoVal.errorCode === 'PROMO_NOT_FOUND') {
+      const affResult = await db.validateAffCode(code.trim(), packagePlanId, user.id)
+      if (!affResult.valid) {
+        return reply.code(400).send({ error: affResult.error || promoVal.error || '优惠码不存在' })
+      }
+
+      return {
+        valid: true,
+        discountRate: affResult.discountRate,
+        commissionRate: affResult.commissionRate,
+        promoCode: affResult.affCode?.code
+      }
+    }
+
+    // 3. 统一优惠码校验失败（已过期、已禁用、超额、限制自用、范围不匹配等）
+    return reply.code(400).send({ error: promoVal.error || '优惠码无效' })
   })
 
   // ==================== 转化申请 API ====================
