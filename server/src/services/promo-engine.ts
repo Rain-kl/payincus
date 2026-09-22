@@ -260,6 +260,14 @@ export class PromoCodeEngine {
     // 1. 原子递增优惠码总核销数与减免总额（带行锁保护防并发超额）
     const updatedPromo = await incrementPromoUsageWithLock(tx, params.promoCodeId, discountAmount)
 
+    // 用户使用次数限制二次校验（行锁内防并发突破单个用户上限）
+    if (updatedPromo.maxUsesPerUser !== null && updatedPromo.maxUsesPerUser !== undefined) {
+      const userUses = await countUserPromoRedemptions(updatedPromo.id, params.userId, 'create', tx)
+      if (userUses >= updatedPromo.maxUsesPerUser) {
+        throw new Error('PROMO_USER_LIMIT_EXCEEDED')
+      }
+    }
+
     // 2. 记录流水日志
     const redemptionLog = await createPromoRedemptionLog(tx, {
       promoCodeId: params.promoCodeId,

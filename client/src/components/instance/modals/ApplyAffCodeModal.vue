@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useThemeStore } from '@/stores/theme'
 import api from '@/api'
 import { translateError } from '@/utils/errorHandler'
 
@@ -15,9 +14,10 @@ interface Props {
 
 interface ApplyAffResult {
   success: boolean
-  message: string
-  discountRate: number
-  discountPercent: number
+  message?: string
+  discountRate?: number
+  discountPercent?: number
+  binding?: any
 }
 
 const props = defineProps<Props>()
@@ -27,7 +27,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
 
 const affCode = ref('')
 const submitting = ref(false)
@@ -65,7 +64,7 @@ async function handleSubmit(): Promise<void> {
   error.value = ''
 
   try {
-    const result = await api.billing.applyAffCodeToInstance(props.instanceId, normalizedAffCode.value)
+    const result = await api.coupon.apply(props.instanceId, normalizedAffCode.value)
     emit('success', result)
     emit('update:show', false)
   } catch (err) {
@@ -89,8 +88,7 @@ async function handleSubmit(): Promise<void> {
             </h3>
             <button
               type="button"
-              class="rounded-lg p-1 transition-colors hover:bg-gray-500/10"
-              :class="themeStore.isDark ? 'text-gray-400 hover:text-gray-100' : 'text-gray-500 hover:text-gray-900'"
+              class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
               @click="handleClose"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,21 +98,18 @@ async function handleSubmit(): Promise<void> {
           </div>
 
           <div class="modal-body">
-            <div
-              class="rounded-lg border p-3"
-              :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/70' : 'border-gray-200 bg-gray-50'"
-            >
-              <div class="text-xs" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+            <div class="rounded-lg border border-themed bg-themed-secondary p-3">
+              <div class="text-xs text-themed-muted">
                 {{ t('instance.subscription.applyAffInstance') }}
               </div>
-              <div class="mt-1 truncate text-sm font-medium" :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'">
+              <div class="mt-1 truncate text-sm font-medium text-themed">
                 {{ instanceName }}
               </div>
               <div class="mt-3 flex items-end justify-between gap-3">
-                <span class="text-xs" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                <span class="text-xs text-themed-muted">
                   {{ t('instance.subscription.applyAffCurrentRenewPrice') }}
                 </span>
-                <span class="text-sm font-semibold" :class="themeStore.isDark ? 'text-gray-100' : 'text-gray-900'">
+                <span class="text-sm font-semibold text-themed">
                   ¥{{ formattedRenewPrice }}{{ billingCycleLabel }}
                 </span>
               </div>
@@ -123,8 +118,7 @@ async function handleSubmit(): Promise<void> {
             <div>
               <label
                 for="apply-aff-code-input"
-                class="mb-1.5 block text-sm font-medium"
-                :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-700'"
+                class="mb-1.5 block text-sm font-medium text-themed-secondary"
               >
                 {{ t('instance.subscription.applyAffCodeLabel') }}
               </label>
@@ -142,16 +136,12 @@ async function handleSubmit(): Promise<void> {
 
             <div
               v-if="error"
-              class="rounded-lg px-3 py-2 text-sm"
-              :class="themeStore.isDark ? 'bg-red-500/10 text-red-300' : 'bg-red-50 text-red-700'"
+              class="rounded-lg px-3 py-2 text-sm bg-error text-white"
             >
               {{ error }}
             </div>
 
-            <div
-              class="rounded-lg border px-3 py-2.5 text-xs leading-5"
-              :class="themeStore.isDark ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200' : 'border-emerald-200 bg-emerald-50 text-emerald-800'"
-            >
+            <div class="rounded-lg border border-themed bg-themed-tertiary px-3 py-2.5 text-xs leading-5 text-themed-secondary">
               <p>{{ t('instance.subscription.applyAffEffectHint') }}</p>
               <p class="mt-1">{{ t('instance.subscription.applyAffNoRefundHint') }}</p>
               <p class="mt-1">{{ t('instance.subscription.applyAffOwnCodeHint') }}</p>
@@ -163,10 +153,15 @@ async function handleSubmit(): Promise<void> {
               {{ t('common.cancel') }}
             </button>
             <button type="submit" class="btn-primary" :disabled="!canSubmit">
-              <span
+              <svg
                 v-if="submitting"
-                class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white align-[-2px]"
-              ></span>
+                class="mr-2 inline-block h-4 w-4 animate-spin text-white align-[-2px]"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
               {{ submitting ? t('instance.subscription.applyAffSubmitting') : t('instance.subscription.applyAffSubmit') }}
             </button>
           </div>

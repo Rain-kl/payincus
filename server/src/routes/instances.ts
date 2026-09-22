@@ -68,7 +68,7 @@ import type { CreateInstanceTaskData, InstanceTaskWithDetails } from '../db/inst
 import { closeInstanceSessions } from '../lib/terminal-proxy.js'
 import { validateCommandsOwnership, mergeCommandContents, getImageDistroFromAlias } from '../db/custom-init-commands.js'
 import { getPlanById, isPaidPackage } from '../db/package-plans.js'
-import { calculateCreateBilling } from '../db/billing-operations.js'
+import { calculateCreateBilling, calculateMonthlyPrice } from '../db/billing-operations.js'
 import { getUserBalance } from '../db/balance.js'
 import type { PublicIpv4Assignment } from '../db/public-ipv4.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
@@ -1385,6 +1385,10 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     let actualPrice = 0
     let pricingSource: 'base' | 'aff' | 'vip' = 'base'
 
+    if (!selectedPlan && promoCode && promoCode.trim()) {
+      return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '免费套餐不能使用优惠码'))
+    }
+
     if (selectedPlan) {
       billing = calculateCreateBilling(selectedPlan)
       // 1.4.1 如果提供了优惠码，验证并计算折扣
@@ -2047,6 +2051,35 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         return reply.code(400).send(apiError(ErrorCode.USER_NOT_FOUND, '用户不存在'))
       }
 
+      // 处理优惠码相关错误
+      if (errorMessage.includes('PROMO_QUOTA_EXCEEDED')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '优惠码使用次数已达上限'))
+      }
+      if (errorMessage.includes('PROMO_DISABLED')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '优惠码已被禁用'))
+      }
+      if (errorMessage.includes('PROMO_EXPIRED')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '优惠码已过期'))
+      }
+      if (errorMessage.includes('PROMO_NOT_STARTED')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '优惠码活动尚未开始'))
+      }
+      if (errorMessage.includes('PROMO_NOT_FOUND')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '优惠码不存在'))
+      }
+      if (errorMessage.includes('PROMO_USER_LIMIT_EXCEEDED')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '您已达到该优惠码的最大使用次数'))
+      }
+      if (errorMessage.includes('CANNOT_USE_OWN_AFF_CODE')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '不能使用自己的推广优惠码'))
+      }
+      if (errorMessage.includes('PROMO_SCOPE_MISMATCH')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '该优惠码不适用于当前套餐或方案'))
+      }
+      if (errorMessage.includes('PROMO_BINDING_ACTIVE')) {
+        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '该实例已绑定其他优惠码'))
+      }
+
       // 并发冲突错误
       if (err?.code === 'P2034') {
         return reply.code(409).send(apiError(ErrorCode.QUOTA_EXCEEDED,
@@ -2399,6 +2432,8 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     let affDiscountRate: number | null = null  // AFF优惠码折扣率
     let hasAffBinding = false
     let isHostedInstance = false
+    let nextRenewPrice: number | null = null
+    let activePromoBinding: any = null
     if ((instance as any).package_plan_id) {
       const plan = await prisma.packagePlan.findUnique({
         where: { id: (instance as any).package_plan_id },
@@ -2414,12 +2449,64 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         billingCycle = plan.billingCycle
       }
 
-      // 查询 AFF 绑定，获取折扣率
+      // 1. 查询统一优惠码绑定
+      const promoBinding = await db.getInstancePromoBinding(instanceId)
+      activePromoBinding = promoBinding
+      const now = new Date()
+      const isPromoActive = Boolean(
+        promoBinding &&
+        promoBinding.promoCode.enabled &&
+        (promoBinding.durationType === 'FOREVER' || (promoBinding.remainingCycles ?? 1) > 0 || !promoBinding.promoCode.expiresAt || promoBinding.promoCode.expiresAt > now)
+      )
+
+      // 2. 查询 AFF 绑定
       const affBinding = await db.getInstanceAffBinding(instanceId)
-      if (affBinding) {
+
+      let discountRate = 0
+      if (promoBinding && isPromoActive) {
         hasAffBinding = true
-        affDiscountRate = Number(affBinding.affCode.discountRate)
+        if (promoBinding.promoCode.discountType === 'PERCENTAGE') {
+          discountRate = Number(promoBinding.promoCode.discountValue)
+        }
+      } else if (affBinding && affBinding.affCode.enabled) {
+        hasAffBinding = true
+        discountRate = Number(affBinding.affCode.discountRate)
+      } else if (promoBinding || affBinding) {
+        hasAffBinding = true
       }
+
+      // 计算下期续费应付价格
+      const baseCyclePrice = (instance as any).billing_price !== null && (instance as any).billing_price !== undefined
+        ? Number((instance as any).billing_price)
+        : planPrice
+
+      if (baseCyclePrice !== null && baseCyclePrice !== undefined) {
+        const cycleMonths = billingCycle || 1
+        const monthlyPrice = calculateMonthlyPrice({
+          billingPrice: baseCyclePrice,
+          billingCycle: cycleMonths
+        })
+        let promoRenewalQuote: ReturnType<typeof PromoCodeEngine.calculateRenewalQuote> | null = null
+        if (isPromoActive && promoBinding) {
+          promoRenewalQuote = PromoCodeEngine.calculateRenewalQuote(monthlyPrice, cycleMonths, promoBinding)
+        }
+        const vip = await getUserContinuousVipBenefit((instance as any).userId ?? (instance as any).user_id)
+        const renewalPrice = arbitrateVipPrice({
+          basePrice: baseCyclePrice,
+          affDiscountRate: affBinding?.affCode.enabled ? Number(affBinding.affCode.discountRate) : 0,
+          vipDiscountPercent: vip.benefit.orderDiscountPercent
+        })
+        let finalCycleAmount = renewalPrice.finalPrice
+        if (promoRenewalQuote && promoRenewalQuote.finalAmount <= finalCycleAmount && promoRenewalQuote.discountAmount > 0) {
+          finalCycleAmount = promoRenewalQuote.finalAmount
+        }
+        nextRenewPrice = finalCycleAmount
+        if (baseCyclePrice > 0) {
+          discountRate = Number(((baseCyclePrice - finalCycleAmount) / baseCyclePrice).toFixed(4))
+        }
+      }
+
+      affDiscountRate = discountRate > 0 ? discountRate : null
     }
 
     isHostedInstance = Boolean(host?.name.toLowerCase().startsWith('peer'))
@@ -2492,6 +2579,15 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       billingPrice?: number | null  // 实例专属价格（管理员设置的价格，优先于方案价格）
       trafficResetPrice?: number
       billingCycle?: number | null  // 计费周期（月）
+      nextRenewPrice?: number | null  // 计算后的下期续费应付价格
+      promoBinding?: {
+        code: string
+        discountType: string
+        discountValue: number
+        durationType: string
+        remainingCycles: number | null
+        isActive: boolean
+      } | null
       affDiscountRate?: number | null  // AFF优惠码折扣率
       hasAffBinding?: boolean  // 是否已绑定 AFF 优惠码
       isHostedInstance?: boolean  // 是否为用户托管节点实例
@@ -2573,8 +2669,20 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       billingPrice: (instance as any).billing_price ?? null,  // 实例专属价格
       trafficResetPrice,
       billingCycle: billingCycle,
+      nextRenewPrice: nextRenewPrice,
       affDiscountRate: affDiscountRate,
       hasAffBinding,
+      promoBinding: activePromoBinding ? {
+        code: activePromoBinding.promoCode.code,
+        discountType: activePromoBinding.promoCode.discountType,
+        discountValue: Number(activePromoBinding.promoCode.discountValue),
+        durationType: activePromoBinding.durationType,
+        remainingCycles: activePromoBinding.remainingCycles,
+        isActive: Boolean(
+          activePromoBinding.promoCode.enabled &&
+          (activePromoBinding.durationType === 'FOREVER' || (activePromoBinding.remainingCycles ?? 1) > 0 || !activePromoBinding.promoCode.expiresAt || activePromoBinding.promoCode.expiresAt > new Date())
+        )
+      } : null,
       isHostedInstance,
       hostAnnouncement: host?.announcement || null,
       limitsIngress: (instance as any).limits_ingress ?? pkg?.limits_ingress ?? null,

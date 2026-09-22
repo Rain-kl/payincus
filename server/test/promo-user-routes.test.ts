@@ -963,6 +963,22 @@ async function runTests() {
       instancesSource.includes("validation.error || pVal.error || '优惠码无效'"),
       'instances.ts must prioritize specific legacy validation error over generic not found error'
     )
+    assert.ok(
+      instancesSource.includes("errorMessage.includes('PROMO_QUOTA_EXCEEDED')"),
+      'instances.ts must map PROMO_QUOTA_EXCEEDED to friendly error'
+    )
+    assert.ok(
+      instancesSource.includes("errorMessage.includes('PROMO_DISABLED')"),
+      'instances.ts must map PROMO_DISABLED to friendly error'
+    )
+    assert.ok(
+      instancesSource.includes("errorMessage.includes('PROMO_EXPIRED')"),
+      'instances.ts must map PROMO_EXPIRED to friendly error'
+    )
+    assert.ok(
+      instancesSource.includes("!selectedPlan && promoCode && promoCode.trim()"),
+      'instances.ts must block promo codes on free packages'
+    )
 
     const billingOpsSource = readFileSync(resolve(process.cwd(), 'src/db/billing-operations.ts'), 'utf8')
     assert.ok(

@@ -455,13 +455,59 @@ const canSubmit = computed<boolean>(() => {
   
   // 付费套餐需要选择方案
   if (isPaidPackage.value) {
-    return baseChecks && form.value.planId !== null && !!selectedPlan.value && !selectedPlan.value.isSoldOut
+    if (!baseChecks || form.value.planId === null || !selectedPlan.value || selectedPlan.value.isSoldOut) {
+      return false
+    }
+    // 如果用户输入了优惠码，必须处于验证通过状态，且不在验证中
+    if (form.value.promoCode.trim()) {
+      if (promoCodeVerifying.value || promoCodeValid.value !== true) {
+        return false
+      }
+    }
+    return true
   }
   
   return baseChecks
 })
 
 const submitDisabledReason = computed<string>(() => {
+  if (selectedPackage.value?.soldOut) {
+    return t('instance.createPage.packageSoldOut')
+  }
+  if (isOwnPaidPackage.value) {
+    return t('instance.createPage.cannotBuyOwn')
+  }
+  if (isPaidPackage.value) {
+    if (form.value.planId === null || !selectedPlan.value) {
+      return t('instance.createPage.selectPlanRequired')
+    }
+    if (selectedPlan.value.isSoldOut) {
+      return t('instance.createPage.planSoldOut')
+    }
+    if (form.value.promoCode.trim()) {
+      if (promoCodeVerifying.value) {
+        return t('aff.verifying')
+      }
+      if (promoCodeValid.value === false) {
+        return promoCodeError.value || t('aff.promoCodeInvalid')
+      }
+      if (promoCodeValid.value === null) {
+        return promoCodeError.value || t('aff.promoCodeInvalid')
+      }
+    }
+  }
+  if (form.value.hostId === null) {
+    return t('instance.createPage.selectHostRequired')
+  }
+  if (!form.value.image) {
+    return t('instance.createPage.selectImageRequired')
+  }
+  if (!quotaCheck.value.valid) {
+    return quotaCheck.value.errors[0] || ''
+  }
+  if (!resourceLimitCheck.value.valid) {
+    return resourceLimitCheck.value.errors[0] || ''
+  }
   return ''
 })
 
@@ -893,11 +939,7 @@ function selectPlan(plan: PackagePlan): void {
   loadAvailableHosts()
 }
 
-/**
- * 重置优惠码状态
- */
-function resetPromoCode(): void {
-  form.value.promoCode = ''
+function clearPromoStatus(): void {
   promoCodeValid.value = null
   promoCodeDiscount.value = 0
   promoCodeCommissionRate.value = 0
@@ -905,11 +947,24 @@ function resetPromoCode(): void {
 }
 
 /**
+ * 重置优惠码状态
+ */
+function resetPromoCode(): void {
+  form.value.promoCode = ''
+  clearPromoStatus()
+}
+
+// 监听优惠码输入变动，及时重置旧验证状态，防止篡改后沿用旧验证
+watch(() => form.value.promoCode, () => {
+  clearPromoStatus()
+})
+
+/**
  * 验证优惠码
  */
 async function verifyPromoCode(): Promise<void> {
   if (!form.value.promoCode.trim() || !form.value.planId) {
-    resetPromoCode()
+    clearPromoStatus()
     return
   }
   
@@ -1128,6 +1183,17 @@ async function handleSubmit(): Promise<void> {
       throw new Error(nameValidation.message)
     }
 
+    // 如果是付费套餐且填写了优惠码，确保先完成验证；若无效则强行拦截禁止创建
+    if (isPaidPackage.value && form.value.promoCode.trim()) {
+      if (promoCodeValid.value === null || promoCodeVerifying.value) {
+        await verifyPromoCode()
+      }
+      if (promoCodeValid.value !== true) {
+        const errMsg = promoCodeError.value || t('aff.promoCodeInvalid')
+        throw new Error(errMsg)
+      }
+    }
+
     const verificationToken = await getCreateTurnstileToken()
     if (verificationToken === null) return
     if (isPaidPackage.value && !createIntentIdempotencyKey.value) {
@@ -1145,7 +1211,7 @@ async function handleSubmit(): Promise<void> {
       sshKeyId: authType.value === 'ssh' ? (form.value.sshKeyId ?? undefined) : undefined,
       password: (authType.value === 'password' && passwordMode.value === 'custom') ? customPassword.value : undefined,
       customInitCommandIds: form.value.customInitCommandIds.length > 0 ? form.value.customInitCommandIds : undefined,
-      promoCode: (isPaidPackage.value && promoCodeValid.value && form.value.promoCode.trim()) ? form.value.promoCode.trim() : undefined,
+      promoCode: (isPaidPackage.value && form.value.promoCode.trim()) ? form.value.promoCode.trim() : undefined,
       idempotencyKey: isPaidPackage.value ? createIntentIdempotencyKey.value || undefined : undefined,
       turnstileToken: verificationToken,
       autoRemotePort: form.value.autoRemotePort
@@ -1162,7 +1228,20 @@ async function handleSubmit(): Promise<void> {
       query: response.instance?.id ? { created: String(response.instance.id) } : undefined
     })
   } catch (err: any) {
-    error.value = translateError(err)
+    const translated = translateError(err)
+    error.value = translated
+    toast.error(translated)
+
+    // 如果报错与优惠码相关，同步更新优惠码状态并提示
+    const errString = String(err?.response?.data?.error || err?.details || err?.message || '')
+    const isPromoError = errString.includes('优惠码') ||
+                         errString.includes('PROMO_') ||
+                         errString.includes('AFF_') ||
+                         errString.includes('CANNOT_USE_OWN_AFF_CODE')
+    if (isPromoError && form.value.promoCode.trim()) {
+      promoCodeValid.value = false
+      promoCodeError.value = translated
+    }
   } finally {
     if (submitting.value) {
       resetCreateTurnstile()
@@ -1542,22 +1621,12 @@ async function handleSubmit(): Promise<void> {
                     <p v-if="promoCodeValid === true" class="text-xs text-green-500 mt-1.5 flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>{{ configStore.freeSiteMode ? freeSiteCopy.createPromoValid.replace('{rate}', (promoCodeDiscount * 100).toFixed(0) + '%') : $t('aff.promoCodeValid', { rate: (promoCodeDiscount * 100).toFixed(0) + '%' }) }}</p>
                     <p v-else-if="promoCodeError" class="text-xs text-red-500 mt-1.5">{{ promoCodeError }}</p>
                   </div>
-                  <div v-if="promoCodeValid === true" class="p-3 rounded-xl border border-themed bg-themed-tertiary text-sm text-themed-secondary">
-                    <div class="flex items-start gap-2">
-                      <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                      <div>
-                        <p class="font-medium">{{ configStore.freeSiteMode ? freeSiteCopy.createPromoUsing : $t('aff.usingPromoCode') }}</p>
-                        <p class="text-xs mt-1 opacity-80">{{ configStore.freeSiteMode ? freeSiteCopy.createPromoBenefit : $t('aff.promoCodeBenefit', { discount: (promoCodeDiscount * 100).toFixed(0) + '%', commission: (promoCodeCommissionRate * 100).toFixed(0) }) }}</p>
-                        <p v-if="planPriceInfo && selectedPlan" class="text-xs mt-1 opacity-80">{{ configStore.freeSiteMode ? freeSiteCopy.createCommissionEstimate.replace('{amount}', (planPriceInfo.planPrice * promoCodeCommissionRate).toFixed(2)) : $t('aff.commissionEstimate', { amount: (planPriceInfo.planPrice * promoCodeCommissionRate).toFixed(2) }) }}</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 <!-- 价格明细 -->
                 <div v-if="planPriceInfo" class="space-y-3">
                   <div v-if="promoCodeValid && planPriceInfo.discountAmount > 0" class="p-4 rounded-xl space-y-2 bg-themed-tertiary">
                     <div class="flex justify-between text-sm"><span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.createPlanFee : $t('instance.createPage.planFee') }}</span><span class="font-mono tabular-nums font-medium text-themed">¥{{ planPriceInfo.planPrice.toFixed(2) }}</span></div>
-                    <div v-if="promoCodeValid && planPriceInfo.discountAmount > 0" class="flex justify-between text-sm pt-1 border-t border-themed/40">
+                    <div v-if="promoCodeValid && planPriceInfo.discountAmount > 0" class="flex justify-between text-sm pt-1 border-t border-themed">
                       <span class="text-green-500 flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clip-rule="evenodd" /></svg>{{ $t('aff.discountAmount') }} (-{{ (planPriceInfo.discountRate * 100).toFixed(0) }}%)</span>
                       <span class="font-mono tabular-nums font-medium text-green-600 dark:text-green-400">-¥{{ planPriceInfo.discountAmount.toFixed(2) }}</span>
                     </div>

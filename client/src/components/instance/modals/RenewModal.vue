@@ -42,11 +42,17 @@ const selectedRenewOption = computed<RenewPreview | null>(() => {
 
 // 是否有折扣
 const hasDiscount = computed(() => {
-  return billingInfo.value?.affDiscount && billingInfo.value.affDiscount.discountPercent > 0
+  if (selectedRenewOption.value && selectedRenewOption.value.price > selectedRenewOption.value.discountedPrice) {
+    return true
+  }
+  return Boolean(billingInfo.value?.affDiscount && billingInfo.value.affDiscount.discountPercent > 0)
 })
 
 // 折扣百分比
 const discountPercent = computed(() => {
+  if (selectedRenewOption.value && selectedRenewOption.value.price > selectedRenewOption.value.discountedPrice) {
+    return Math.round(((selectedRenewOption.value.price - selectedRenewOption.value.discountedPrice) / selectedRenewOption.value.price) * 100)
+  }
   return billingInfo.value?.affDiscount?.discountPercent || 0
 })
 

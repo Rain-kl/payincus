@@ -2269,43 +2269,71 @@ function getRemainingDaysDisplay(days: number, expiresAt: string | Date | null):
   }
 }
 
-// 获取续费价格（应用 AFF 折扣后的实际价格）
-// 优先使用实例专属价格 billingPrice，如果没有则使用方案价格 planPrice
+// 获取原续费价格（未折扣价）
+function getOriginalRenewPrice(inst: InstanceWithDetails | null): number {
+  if (!inst) return 0
+  const instAny = inst as any
+  const originalPrice = instAny.billingPrice ?? instAny.planPrice
+  return typeof originalPrice === 'number' ? originalPrice : 0
+}
+
+// 获取续费价格（计算后的下期应付价格）
+// 优先使用后端计算的 nextRenewPrice，如果没有则使用折扣计算兜底
 function getRenewPrice(inst: InstanceWithDetails | null): number {
   if (!inst) return 0
   const instAny = inst as any
+  if (typeof instAny.nextRenewPrice === 'number') {
+    return instAny.nextRenewPrice
+  }
   // 优先使用实例专属价格（管理员设置的价格）
   const originalPrice = instAny.billingPrice ?? instAny.planPrice
   if (originalPrice !== undefined && originalPrice !== null) {
-    // 如果有 AFF 折扣率，应用折扣
-    if (instAny.affDiscountRate && instAny.affDiscountRate > 0) {
-      const discountAmount = originalPrice * instAny.affDiscountRate
-      return Math.round((originalPrice - discountAmount) * 100) / 100
+    // 如果有优惠码/AFF 折扣率，应用折扣
+    const rate = instAny.affDiscountRate ?? 0
+    if (rate > 0) {
+      const discountAmount = originalPrice * rate
+      return Math.max(0, Math.round((originalPrice - discountAmount) * 100) / 100)
     }
     return originalPrice
   }
   return 0
 }
 
-// 检查实例是否有 AFF 折扣
+// 检查实例是否有优惠码折扣
 function hasAffDiscount(inst: InstanceWithDetails | null): boolean {
   if (!inst) return false
   const instAny = inst as any
-  return instAny.affDiscountRate && instAny.affDiscountRate > 0
+  if (instAny.promoBinding?.isActive && instAny.promoBinding.discountValue > 0) return true
+  if (instAny.affDiscountRate && instAny.affDiscountRate > 0) return true
+  const originalPrice = getOriginalRenewPrice(inst)
+  const renewPrice = getRenewPrice(inst)
+  return originalPrice > 0 && renewPrice < originalPrice
 }
 
 function hasAffBinding(inst: InstanceWithDetails | null): boolean {
   if (!inst) return false
   const instAny = inst as any
-  return instAny.hasAffBinding === true || hasAffDiscount(inst)
+  return instAny.hasPromoBinding === true || instAny.hasAffBinding === true || Boolean(instAny.promoBinding) || hasAffDiscount(inst)
 }
 
-// 获取 AFF 折扣百分比文本
+// 获取优惠码折扣百分比文本
 function getAffDiscountText(inst: InstanceWithDetails | null): string {
   if (!inst) return ''
   const instAny = inst as any
+  if (instAny.promoBinding?.code && instAny.promoBinding.discountType === 'PERCENTAGE') {
+    const rate = Number(instAny.promoBinding.discountValue)
+    return `${instAny.promoBinding.code} -${(rate * 100).toFixed(0)}%`
+  }
   if (instAny.affDiscountRate && instAny.affDiscountRate > 0) {
-    return `-${(instAny.affDiscountRate * 100).toFixed(0)}%`
+    const code = instAny.promoBinding?.code ? `${instAny.promoBinding.code} ` : ''
+    return `${code}-${(instAny.affDiscountRate * 100).toFixed(0)}%`
+  }
+  const orig = getOriginalRenewPrice(inst)
+  const actual = getRenewPrice(inst)
+  if (orig > 0 && actual < orig) {
+    const rate = ((orig - actual) / orig) * 100
+    const code = instAny.promoBinding?.code ? `${instAny.promoBinding.code} ` : ''
+    return `${code}-${rate.toFixed(0)}%`
   }
   return ''
 }
@@ -2985,22 +3013,21 @@ function formatShortDate(dateStr: string | null | undefined): string {
                             {{ getBillingCycleShort((instance as any).billingCycle) }}
                           </span>
                         </div>
+                        <div v-if="hasAffDiscount(instance) && getOriginalRenewPrice(instance) > getRenewPrice(instance)" class="mt-1 text-xs text-themed-muted">
+                          <span class="line-through">¥{{ getOriginalRenewPrice(instance).toFixed(2) }}</span>
+                        </div>
                       </div>
 
                       <span
                         v-if="hasAffDiscount(instance)"
-                        class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
-                        :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700'"
+                        class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-themed-tertiary text-success border border-themed"
                       >
                         {{ getAffDiscountText(instance) }}
                       </span>
                       <button
                         v-else-if="canApplyAffCode(instance)"
                         type="button"
-                        class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors"
-                        :class="themeStore.isDark
-                          ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
-                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'"
+                        class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors bg-themed-secondary text-themed hover:bg-themed-tertiary border border-themed"
                         @click="showApplyAffModal = true"
                       >
                         {{ $t('instance.subscription.applyAffShort') }}

@@ -1134,15 +1134,20 @@ export async function getInstanceBillingInfo(instanceId: number): Promise<{
       billingCycle: instance.billingCycle
     })
 
+    // 检查统一优惠码绑定
+    const promoBinding = await getInstancePromoBinding(instanceId)
+    const now = new Date()
+    const isPromoActive = Boolean(
+      promoBinding &&
+      promoBinding.promoCode.enabled &&
+      (!promoBinding.promoCode.expiresAt || promoBinding.promoCode.expiresAt > now)
+    )
+
     // 获取 AFF 绑定信息，计算折扣
     const affBinding = await getInstanceAffBinding(instanceId)
-    let discountRate = 0
-    if (affBinding) {
-      discountRate = Number(affBinding.affCode.discountRate)
-      affDiscount = {
-        discountRate,
-        affCodeId: affBinding.affCode.id
-      }
+    let legacyAffDiscountRate = 0
+    if (affBinding && affBinding.affCode.enabled) {
+      legacyAffDiscountRate = Number(affBinding.affCode.discountRate)
     }
     const vip = await getUserContinuousVipBenefit(instance.userId)
 
@@ -1158,16 +1163,47 @@ export async function getInstanceBillingInfo(instanceId: number): Promise<{
       ? originalPreview.filter(p => p.months === 1)
       : originalPreview
 
-    renewPreview = filteredPreview.map(p => ({
-      months: p.months,
-      amount: p.amount,  // 原价（元）
-      discountedAmount: arbitrateVipPrice({
+    let maxEffectiveDiscountRate = 0
+
+    renewPreview = filteredPreview.map(p => {
+      let promoRenewalQuote: ReturnType<typeof PromoCodeEngine.calculateRenewalQuote> | null = null
+      if (isPromoActive && promoBinding && monthlyPrice !== null) {
+        promoRenewalQuote = PromoCodeEngine.calculateRenewalQuote(monthlyPrice, p.months, promoBinding)
+      }
+
+      const vipPrice = arbitrateVipPrice({
         basePrice: p.amount,
-        affDiscountRate: discountRate,
+        affDiscountRate: legacyAffDiscountRate,
         vipDiscountPercent: vip.benefit.orderDiscountPercent
-      }).finalPrice,
-      expiresAt: p.expiresAt
-    }))
+      })
+
+      let finalPrice = vipPrice.finalPrice
+      let discountAmount = vipPrice.discountAmount
+
+      if (promoRenewalQuote && promoRenewalQuote.finalAmount <= finalPrice && promoRenewalQuote.discountAmount > 0) {
+        finalPrice = promoRenewalQuote.finalAmount
+        discountAmount = promoRenewalQuote.discountAmount
+      }
+
+      const itemRate = p.amount > 0 ? (discountAmount / p.amount) : 0
+      if (itemRate > maxEffectiveDiscountRate) {
+        maxEffectiveDiscountRate = itemRate
+      }
+
+      return {
+        months: p.months,
+        amount: p.amount,  // 原价（元）
+        discountedAmount: finalPrice,
+        expiresAt: p.expiresAt
+      }
+    })
+
+    if (maxEffectiveDiscountRate > 0 || isPromoActive || affBinding) {
+      affDiscount = {
+        discountRate: Number(maxEffectiveDiscountRate.toFixed(4)),
+        affCodeId: promoBinding?.promoCodeId || affBinding?.affCode.id || 0
+      }
+    }
   }
 
   return {
