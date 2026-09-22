@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import obfuscator from 'rollup-plugin-obfuscator'
 import { fileURLToPath, URL } from 'node:url'
 
 function findMatchingBrace(source: string, openIndex: number): number {
@@ -384,7 +383,7 @@ export default defineConfig(({ mode }) => {
         name: 'payincus-split-entry',
         transformIndexHtml: {
           order: 'pre',
-          handler(html) {
+          handler(html: string) {
             return html.replace('/src/main.ts', entryScript)
           }
         }
@@ -392,7 +391,7 @@ export default defineConfig(({ mode }) => {
       appEntry === 'admin' && {
         name: 'payincus-admin-locale-prune',
         enforce: 'pre',
-        transform(code, id) {
+        transform(code: string, id: string) {
           const normalizedId = id.replace(/\\/g, '/')
           if (!normalizedId.match(/\/src\/locales\/(zh-CN|zh-TW|en)\.ts(?:\?|$)/)) return null
           return {
@@ -404,7 +403,7 @@ export default defineConfig(({ mode }) => {
       appEntry === 'user' && {
         name: 'payincus-user-locale-prune',
         enforce: 'pre',
-        transform(code, id) {
+        transform(code: string, id: string) {
           const normalizedId = id.replace(/\\/g, '/')
           if (!normalizedId.match(/\/src\/locales\/(zh-CN|zh-TW|en)\.ts(?:\?|$)/)) return null
           return {
@@ -482,6 +481,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: devHost,
       port: devPort,
+      allowedHosts: true,
       proxy: {
         '/api': {
           target: devProxyTarget,
@@ -496,7 +496,7 @@ export default defineConfig(({ mode }) => {
               try {
                 const maybeRes = res as (NodeJS.WritableStream & { headersSent?: boolean; writeHead?: (...args: never[]) => void }) | undefined
                 if (maybeRes && typeof maybeRes.writeHead === 'function' && !maybeRes.headersSent) {
-                  maybeRes.writeHead(500, {
+                  maybeRes.writeHead( 500, {
                     'Content-Type': 'application/json'
                   } as never)
                   maybeRes.end(JSON.stringify({ error: 'Proxy error: Backend server may not be ready yet' }))
