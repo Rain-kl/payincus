@@ -190,6 +190,14 @@ async function runTests() {
         })
         assert.equal(resDelete.statusCode, 400, `Expected 400 for bad ID ${badId}`)
 
+        const resPut = await app.inject({
+          method: 'PUT',
+          url: `/api/admin/promos/${badId}`,
+          headers: adminHeaders,
+          payload: { name: 'new name' }
+        })
+        assert.equal(resPut.statusCode, 400, `Expected 400 for bad ID ${badId}`)
+
         const resInstances = await app.inject({
           method: 'GET',
           url: `/api/admin/promos/${badId}/instances`,
@@ -599,6 +607,198 @@ async function runTests() {
         billingOpsSource.includes('renewResult.unbound'),
         'billing-operations.ts must check renewResult.unbound before sending exhaustion notification'
       )
+    }
+
+    // ==================== Suite 10: PUT /api/admin/promos/:id (Edit Promo Code) ====================
+    console.log('  10. Testing PUT /api/admin/promos/:id (Edit Promo Code)...')
+    {
+      const existingPromo = {
+        id: 7,
+        code: 'IMMUTABLE20',
+        name: 'Old Name',
+        type: 'ADMIN_PROMO',
+        userId: null,
+        adminId: 1,
+        isGlobal: false,
+        discountType: 'PERCENTAGE',
+        discountValue: new Prisma.Decimal(0.2),
+        durationType: 'REPEATING',
+        durationCycles: 3,
+        maxTotalUses: 50,
+        usedTotalCount: 2,
+        maxUsesPerUser: 1,
+        startsAt: new Date('2026-06-01T00:00:00.000Z'),
+        expiresAt: new Date('2026-12-31T23:59:59.000Z'),
+        enabled: true,
+        totalDiscountAmount: new Prisma.Decimal(40),
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        scopes: [{ id: 1, packageId: 10, packagePlanId: null }],
+        _count: { bindings: 1 }
+      }
+
+      ;(prisma as any).promoCode = {
+        findUnique: async (args: any) => {
+          if (args.where.id === 7) return existingPromo
+          return null
+        },
+        update: async (args: any) => {
+          return {
+            ...existingPromo,
+            ...args.data,
+            discountValue: existingPromo.discountValue,
+            totalDiscountAmount: existingPromo.totalDiscountAmount,
+            scopes: existingPromo.scopes,
+            _count: existingPromo._count
+          }
+        }
+      }
+
+      // 10.1 Non-existent promo -> 404
+      const res404 = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/9999',
+        headers: adminHeaders,
+        payload: { name: 'Test' }
+      })
+      assert.equal(res404.statusCode, 404)
+
+      // 10.2 Immutability violations:
+      // (a) Attempting to modify code
+      const resBadCode = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { code: 'NEWCODE' }
+      })
+      assert.equal(resBadCode.statusCode, 400)
+      assert.equal(resBadCode.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // (b) Attempting to modify discountType
+      const resBadType = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { discountType: 'FIXED_AMOUNT' }
+      })
+      assert.equal(resBadType.statusCode, 400)
+      assert.equal(resBadType.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // (c) Attempting to modify discountValue
+      const resBadVal = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { discountValue: 0.3 }
+      })
+      assert.equal(resBadVal.statusCode, 400)
+      assert.equal(resBadVal.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // (d) Attempting to modify durationType
+      const resBadDur = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { durationType: 'FOREVER' }
+      })
+      assert.equal(resBadDur.statusCode, 400)
+      assert.equal(resBadDur.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // (e) Attempting to modify durationCycles
+      const resBadCycles = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { durationCycles: 6 }
+      })
+      assert.equal(resBadCycles.statusCode, 400)
+      assert.equal(resBadCycles.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // (f) Attempting to modify isGlobal
+      const resBadGlobal = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { isGlobal: true }
+      })
+      assert.equal(resBadGlobal.statusCode, 400)
+      assert.equal(resBadGlobal.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // (g) Attempting to modify scopes
+      const resBadScopes = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { scopes: [{ packageId: 20 }] }
+      })
+      assert.equal(resBadScopes.statusCode, 400)
+      assert.equal(resBadScopes.json().code, 'PROMO_FIELD_IMMUTABLE')
+
+      // 10.3 Mutable validation errors
+      // Bad maxTotalUses
+      const resBadMaxTotal = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: { maxTotalUses: -5 }
+      })
+      assert.equal(resBadMaxTotal.statusCode, 400)
+
+      // Bad date range (startsAt >= expiresAt)
+      const resBadDates = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: {
+          startsAt: '2026-12-31T23:59:59.000Z',
+          expiresAt: '2026-01-01T00:00:00.000Z'
+        }
+      })
+      assert.equal(resBadDates.statusCode, 400)
+
+      // 10.4 Successful update with same immutable fields and modified mutable fields
+      let capturedUpdateData: any = null
+      ;(prisma as any).promoCode.update = async (args: any) => {
+        capturedUpdateData = args.data
+        return {
+          ...existingPromo,
+          ...args.data,
+          discountValue: existingPromo.discountValue,
+          totalDiscountAmount: existingPromo.totalDiscountAmount,
+          scopes: existingPromo.scopes,
+          _count: existingPromo._count
+        }
+      }
+
+      const resSuccess = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/promos/7',
+        headers: adminHeaders,
+        payload: {
+          code: 'IMMUTABLE20', // passed unchanged
+          discountType: 'PERCENTAGE', // passed unchanged
+          discountValue: 0.2, // passed unchanged
+          durationType: 'REPEATING', // passed unchanged
+          durationCycles: 3, // passed unchanged
+          isGlobal: false, // passed unchanged
+          name: 'Updated Promo Campaign',
+          maxTotalUses: 200,
+          maxUsesPerUser: 2,
+          startsAt: '2026-07-01T00:00:00.000Z',
+          expiresAt: '2026-11-30T23:59:59.000Z',
+          enabled: false
+        }
+      })
+
+      assert.equal(resSuccess.statusCode, 200)
+      const updatedBody = resSuccess.json()
+      assert.equal(updatedBody.name, 'Updated Promo Campaign')
+      assert.equal(updatedBody.maxTotalUses, 200)
+      assert.equal(updatedBody.maxUsesPerUser, 2)
+      assert.equal(updatedBody.enabled, false)
+      assert.equal(capturedUpdateData.name, 'Updated Promo Campaign')
+      assert.equal(capturedUpdateData.maxTotalUses, 200)
+      assert.equal(capturedUpdateData.maxUsesPerUser, 2)
+      assert.equal(capturedUpdateData.enabled, false)
     }
 
     console.log('All Admin Promo Routes & In-Site Notification Tests Passed!')

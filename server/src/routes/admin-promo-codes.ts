@@ -50,6 +50,22 @@ interface CreatePromoBody {
   enabled?: boolean
 }
 
+interface UpdatePromoBody {
+  name?: string | null
+  maxTotalUses?: number | null
+  maxUsesPerUser?: number | null
+  startsAt?: string | null
+  expiresAt?: string | null
+  enabled?: boolean
+  code?: string
+  discountType?: string
+  discountValue?: number
+  durationType?: string
+  durationCycles?: number | null
+  isGlobal?: boolean
+  scopes?: Array<{ packageId: number; packagePlanId?: number | null }>
+}
+
 interface TogglePromoBody {
   enabled?: boolean
 }
@@ -309,7 +325,183 @@ export default async function adminPromoCodesRoutes(app: FastifyInstance): Promi
     })
   })
 
-  // ==================== 3. PATCH /:id/toggle ====================
+  // ==================== 3. PUT /:id (Edit Promo Code) ====================
+  app.put<{
+    Params: { id: string }
+    Body: UpdatePromoBody
+  }>('/:id', {
+    onRequest: [app.authenticate, app.requireAdmin]
+  }, async (request, reply) => {
+    const id = parsePositiveRouteId(request.params.id)
+    if (!id) {
+      return reply.code(400).send({ error: '无效的优惠码 ID', code: 'INVALID_ID' })
+    }
+
+    const existing = await prisma.promoCode.findUnique({
+      where: { id },
+      include: { scopes: true, _count: { select: { bindings: true } } }
+    })
+    if (!existing) {
+      return reply.code(404).send({ error: '优惠码不存在', code: 'PROMO_NOT_FOUND' })
+    }
+
+    const body = request.body || {}
+
+    // 1. 严格校验不可修改字段：折扣百分比/数值、折扣类型、有效周期模式、优惠券码、适用范围
+    if (body.code !== undefined && typeof body.code === 'string') {
+      const trimmed = body.code.trim().toUpperCase()
+      if (trimmed !== existing.code) {
+        return reply.code(400).send({ error: '优惠券码创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+      }
+    }
+
+    if (body.discountType !== undefined && body.discountType !== existing.discountType) {
+      return reply.code(400).send({ error: '折扣类型创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+    }
+
+    if (body.discountValue !== undefined && Number(body.discountValue) !== Number(existing.discountValue)) {
+      return reply.code(400).send({ error: '折扣百分比/数值创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+    }
+
+    if (body.durationType !== undefined && body.durationType !== existing.durationType) {
+      return reply.code(400).send({ error: '有效周期模式创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+    }
+
+    if (body.durationCycles !== undefined) {
+      const newCycles = body.durationCycles === null ? null : Number(body.durationCycles)
+      const oldCycles = existing.durationCycles === null ? null : Number(existing.durationCycles)
+      if (newCycles !== oldCycles) {
+        return reply.code(400).send({ error: '有效周期模式创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+      }
+    }
+
+    if (body.isGlobal !== undefined && Boolean(body.isGlobal) !== existing.isGlobal) {
+      return reply.code(400).send({ error: '适用范围创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+    }
+
+    if (body.scopes !== undefined) {
+      const existingScopesSorted = existing.scopes
+        .map(s => `${s.packageId}:${s.packagePlanId ?? ''}`)
+        .sort()
+      const newScopesSorted = body.scopes
+        .map(s => `${s.packageId}:${s.packagePlanId ?? ''}`)
+        .sort()
+      if (
+        existingScopesSorted.length !== newScopesSorted.length ||
+        existingScopesSorted.some((val, idx) => val !== newScopesSorted[idx])
+      ) {
+        return reply.code(400).send({ error: '适用范围创建后不允许修改', code: 'PROMO_FIELD_IMMUTABLE' })
+      }
+    }
+
+    // 2. 校验与处理允许修改的字段
+    const updateData: Prisma.PromoCodeUpdateInput = {}
+
+    if (body.name !== undefined) {
+      updateData.name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : null
+    }
+
+    if (body.maxTotalUses !== undefined) {
+      if (body.maxTotalUses === null) {
+        updateData.maxTotalUses = null
+      } else {
+        const parsed = Number(body.maxTotalUses)
+        if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+          return reply.code(400).send({ error: '总使用次数必须为正整数', code: 'INVALID_PARAMS' })
+        }
+        updateData.maxTotalUses = parsed
+      }
+    }
+
+    if (body.maxUsesPerUser !== undefined) {
+      if (body.maxUsesPerUser === null) {
+        updateData.maxUsesPerUser = null
+      } else {
+        const parsed = Number(body.maxUsesPerUser)
+        if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+          return reply.code(400).send({ error: '单用户最大使用次数必须为正整数', code: 'INVALID_PARAMS' })
+        }
+        updateData.maxUsesPerUser = parsed
+      }
+    }
+
+    let startsAt: Date | null | undefined = undefined
+    let expiresAt: Date | null | undefined = undefined
+
+    if (body.startsAt !== undefined) {
+      if (body.startsAt === null || body.startsAt === '') {
+        startsAt = null
+      } else {
+        const d = new Date(body.startsAt)
+        if (isNaN(d.getTime())) {
+          return reply.code(400).send({ error: '开始时间格式无效', code: 'INVALID_PARAMS' })
+        }
+        startsAt = d
+      }
+    }
+
+    if (body.expiresAt !== undefined) {
+      if (body.expiresAt === null || body.expiresAt === '') {
+        expiresAt = null
+      } else {
+        const d = new Date(body.expiresAt)
+        if (isNaN(d.getTime())) {
+          return reply.code(400).send({ error: '过期时间格式无效', code: 'INVALID_PARAMS' })
+        }
+        expiresAt = d
+      }
+    }
+
+    const effectiveStartsAt = startsAt !== undefined ? startsAt : existing.startsAt
+    const effectiveExpiresAt = expiresAt !== undefined ? expiresAt : existing.expiresAt
+    if (effectiveStartsAt && effectiveExpiresAt && effectiveStartsAt >= effectiveExpiresAt) {
+      return reply.code(400).send({ error: '开始时间必须早于过期时间', code: 'INVALID_PARAMS' })
+    }
+
+    if (startsAt !== undefined) updateData.startsAt = startsAt
+    if (expiresAt !== undefined) updateData.expiresAt = expiresAt
+
+    if (body.enabled !== undefined) {
+      updateData.enabled = Boolean(body.enabled)
+    }
+
+    const updated = await prisma.promoCode.update({
+      where: { id },
+      data: updateData,
+      include: {
+        scopes: true,
+        _count: { select: { bindings: true } }
+      }
+    })
+
+    return reply.code(200).send({
+      id: updated.id,
+      code: updated.code,
+      name: updated.name,
+      type: updated.type,
+      discountType: updated.discountType,
+      discountValue: Number(updated.discountValue),
+      durationType: updated.durationType,
+      durationCycles: updated.durationCycles,
+      isGlobal: updated.isGlobal,
+      scopes: updated.scopes.map(s => ({
+        id: s.id,
+        packageId: s.packageId,
+        packagePlanId: s.packagePlanId
+      })),
+      maxTotalUses: updated.maxTotalUses,
+      usedTotalCount: updated.usedTotalCount,
+      maxUsesPerUser: updated.maxUsesPerUser,
+      startsAt: updated.startsAt ? updated.startsAt.toISOString() : null,
+      expiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
+      enabled: updated.enabled,
+      createdAt: updated.createdAt.toISOString(),
+      totalDiscountAmount: Number(updated.totalDiscountAmount),
+      activeBindingsCount: updated._count?.bindings ?? 0
+    })
+  })
+
+  // ==================== 4. PATCH /:id/toggle ====================
   app.patch<{
     Params: { id: string }
     Body: TogglePromoBody

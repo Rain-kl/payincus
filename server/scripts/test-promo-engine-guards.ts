@@ -88,7 +88,7 @@ assert.ok(
 
 assert.equal(
   adminRouteSource.match(/const id = parsePositiveRouteId\(request\.params\.id\)/g)?.length ?? 0,
-  4,
+  5,
   'admin-promo-codes.ts must parse route id using parsePositiveRouteId on all parameterized id routes'
 )
 

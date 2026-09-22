@@ -40,9 +40,12 @@ const activeCount = computed(() => promos.value.filter(p => p.enabled).length)
 const totalBindings = computed(() => promos.value.reduce((acc, p) => acc + (p.activeBindingsCount || 0), 0))
 const totalDiscounted = computed(() => promos.value.reduce((acc, p) => acc + Number(p.totalDiscountAmount || 0), 0))
 
-// 创建抽屉状态与表单
+// 创建/编辑抽屉状态与表单
 const createDrawerOpen = ref(false)
 const creating = ref(false)
+const isEditing = ref(false)
+const editingPromoId = ref<number | null>(null)
+const saving = ref(false)
 const packagesList = ref<Package[]>([])
 const packagesLoading = ref(false)
 const expandedPackageIds = ref<Set<number>>(new Set())
@@ -145,8 +148,22 @@ async function loadPackagesForScope(): Promise<void> {
   }
 }
 
+function formatForDateTimeInput(dateStr?: string | null): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
 // 打开创建抽屉
 function openCreateDrawer(): void {
+  isEditing.value = false
+  editingPromoId.value = null
   form.value = {
     code: '',
     name: '',
@@ -164,6 +181,56 @@ function openCreateDrawer(): void {
     enabled: true
   }
   expandedPackageIds.value.clear()
+  createDrawerOpen.value = true
+}
+
+// 打开编辑抽屉
+async function openEditDrawer(promo: AdminPromoCode): Promise<void> {
+  isEditing.value = true
+  editingPromoId.value = promo.id
+
+  let percentageValue: number | null = null
+  let fixedAmountValue: number | null = null
+  if (promo.discountType === 'PERCENTAGE') {
+    percentageValue = Math.round(Number(promo.discountValue) * 100)
+  } else {
+    fixedAmountValue = Number(promo.discountValue)
+  }
+
+  form.value = {
+    code: promo.code,
+    name: promo.name || '',
+    discountType: promo.discountType,
+    percentageValue,
+    fixedAmountValue,
+    durationType: promo.durationType,
+    durationCycles: promo.durationCycles,
+    isGlobal: promo.isGlobal,
+    selectedScopes: (promo.scopes || [])
+      .filter((s): s is typeof s & { packageId: number } => typeof s.packageId === 'number')
+      .map(s => ({
+        packageId: s.packageId,
+        packagePlanId: s.packagePlanId ?? null
+      })),
+    maxTotalUses: promo.maxTotalUses,
+    maxUsesPerUser: promo.maxUsesPerUser,
+    startsAt: formatForDateTimeInput(promo.startsAt),
+    expiresAt: formatForDateTimeInput(promo.expiresAt),
+    enabled: promo.enabled
+  }
+
+  expandedPackageIds.value.clear()
+  if (!promo.isGlobal) {
+    await loadPackagesForScope()
+    for (const s of promo.scopes || []) {
+      if (typeof s.packageId === 'number') {
+        expandedPackageIds.value.add(s.packageId)
+        if (!packagePlansMap.value[s.packageId] && !loadingPlansMap.value[s.packageId]) {
+          void toggleExpandPackage(s.packageId)
+        }
+      }
+    }
+  }
   createDrawerOpen.value = true
 }
 
@@ -383,6 +450,57 @@ async function submitCreate(): Promise<void> {
   }
 }
 
+// 提交修改
+async function submitEdit(): Promise<void> {
+  if (!editingPromoId.value) return
+
+  let maxTotalUses: number | null = null
+  if (form.value.maxTotalUses !== null && (form.value.maxTotalUses as unknown as string) !== '') {
+    const parsed = Number(form.value.maxTotalUses)
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      toast.warning(t('promosAdmin.toast.invalidDiscount'))
+      return
+    }
+    maxTotalUses = parsed
+  }
+
+  let maxUsesPerUser: number | null = null
+  if (form.value.maxUsesPerUser !== null && (form.value.maxUsesPerUser as unknown as string) !== '') {
+    const parsed = Number(form.value.maxUsesPerUser)
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      toast.warning(t('promosAdmin.toast.invalidDiscount'))
+      return
+    }
+    maxUsesPerUser = parsed
+  }
+
+  const startsAt = form.value.startsAt ? new Date(form.value.startsAt).toISOString() : null
+  const expiresAt = form.value.expiresAt ? new Date(form.value.expiresAt).toISOString() : null
+  if (startsAt && expiresAt && new Date(startsAt) >= new Date(expiresAt)) {
+    toast.warning(t('promosAdmin.toast.loadFailed', { message: t('promosAdmin.drawer.startsAtLabel') + ' >= ' + t('promosAdmin.drawer.expiresAtLabel') }))
+    return
+  }
+
+  saving.value = true
+  try {
+    await api.promos.update(editingPromoId.value, {
+      name: form.value.name.trim() || null,
+      maxTotalUses,
+      maxUsesPerUser,
+      startsAt,
+      expiresAt,
+      enabled: form.value.enabled
+    })
+    toast.success(t('promosAdmin.toast.editSuccess'))
+    createDrawerOpen.value = false
+    await loadPromos()
+  } catch (err: any) {
+    toast.error(t('promosAdmin.toast.editFailed', { message: err?.response?.data?.error || err?.response?.data?.message || err?.message || String(err) }))
+  } finally {
+    saving.value = false
+  }
+}
+
 // 切换启用/停用状态
 async function togglePromo(promo: AdminPromoCode): Promise<void> {
   const targetState = !promo.enabled
@@ -592,12 +710,20 @@ onMounted(() => {
               </button>
             </td>
             <td class="px-4 py-3 text-right">
-              <button
-                class="text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline"
-                @click="deletePromo(promo)"
-              >
-                {{ t('promosAdmin.table.delete') }}
-              </button>
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  class="text-xs font-medium text-themed-primary hover:underline"
+                  @click="openEditDrawer(promo)"
+                >
+                  {{ t('promosAdmin.table.edit') }}
+                </button>
+                <button
+                  class="text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline"
+                  @click="deletePromo(promo)"
+                >
+                  {{ t('promosAdmin.table.delete') }}
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -651,6 +777,12 @@ onMounted(() => {
           <div class="flex items-center gap-2">
             <button
               class="btn btn-secondary text-xs px-2.5 py-1"
+              @click="openEditDrawer(promo)"
+            >
+              {{ t('promosAdmin.table.edit') }}
+            </button>
+            <button
+              class="btn btn-secondary text-xs px-2.5 py-1"
               @click="openInstancesDrawer(promo)"
             >
               {{ t('promosAdmin.table.viewInstances') }} ({{ promo.activeBindingsCount }})
@@ -666,27 +798,44 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 创建优惠码抽屉（DrawerModal） -->
+    <!-- 创建/编辑优惠码抽屉（DrawerModal） -->
     <DrawerModal
       v-model="createDrawerOpen"
-      :title="t('promosAdmin.drawer.createTitle')"
+      :title="isEditing ? t('promosAdmin.drawer.editTitle') : t('promosAdmin.drawer.createTitle')"
       maxWidth="max-w-xl"
     >
       <div class="space-y-4 text-sm">
+        <!-- 编辑模式下的不可修改字段提示 -->
+        <div v-if="isEditing" class="rounded border border-themed bg-themed-secondary p-3 text-xs text-themed-muted">
+          {{ t('promosAdmin.drawer.editImmutableNotice') }}
+        </div>
+
         <!-- 券码与随机生成 -->
         <div>
-          <label class="block mb-1 text-xs font-semibold text-themed-primary">
-            {{ t('promosAdmin.drawer.codeLabel') }} <span class="text-rose-600 dark:text-rose-400">*</span>
-          </label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-semibold text-themed-primary">
+              {{ t('promosAdmin.drawer.codeLabel') }} <span v-if="!isEditing" class="text-rose-600 dark:text-rose-400">*</span>
+            </label>
+            <span v-if="isEditing" class="text-xs text-themed-muted font-normal">
+              ({{ t('promosAdmin.drawer.immutableNotice') }})
+            </span>
+          </div>
           <div class="flex gap-2">
             <input
               v-model="form.code"
               type="text"
+              :disabled="isEditing"
               class="input font-mono uppercase flex-1"
+              :class="{ 'bg-themed-secondary text-themed-muted cursor-not-allowed': isEditing }"
               :placeholder="t('promosAdmin.drawer.codePlaceholder')"
               maxlength="32"
             />
-            <button class="btn btn-secondary text-xs shrink-0" type="button" @click="generateRandomCode">
+            <button
+              v-if="!isEditing"
+              class="btn btn-secondary text-xs shrink-0"
+              type="button"
+              @click="generateRandomCode"
+            >
               {{ t('promosAdmin.drawer.generateRandom') }}
             </button>
           </div>
@@ -709,18 +858,33 @@ onMounted(() => {
         <!-- 折扣类型与数值 -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block mb-1 text-xs font-semibold text-themed-primary">
-              {{ t('promosAdmin.drawer.discountTypeLabel') }}
-            </label>
-            <select v-model="form.discountType" class="input w-full">
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-semibold text-themed-primary">
+                {{ t('promosAdmin.drawer.discountTypeLabel') }}
+              </label>
+              <span v-if="isEditing" class="text-xs text-themed-muted font-normal">
+                ({{ t('promosAdmin.drawer.immutableNotice') }})
+              </span>
+            </div>
+            <select
+              v-model="form.discountType"
+              :disabled="isEditing"
+              class="input w-full"
+              :class="{ 'bg-themed-secondary text-themed-muted cursor-not-allowed': isEditing }"
+            >
               <option value="PERCENTAGE">{{ t('promosAdmin.discountType.percentage') }}</option>
               <option value="FIXED_AMOUNT">{{ t('promosAdmin.discountType.fixedAmount') }}</option>
             </select>
           </div>
           <div>
-            <label class="block mb-1 text-xs font-semibold text-themed-primary">
-              {{ form.discountType === 'PERCENTAGE' ? t('promosAdmin.drawer.discountPercentageLabel') : t('promosAdmin.drawer.discountFixedLabel') }} <span class="text-rose-600 dark:text-rose-400">*</span>
-            </label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-semibold text-themed-primary">
+                {{ form.discountType === 'PERCENTAGE' ? t('promosAdmin.drawer.discountPercentageLabel') : t('promosAdmin.drawer.discountFixedLabel') }} <span v-if="!isEditing" class="text-rose-600 dark:text-rose-400">*</span>
+              </label>
+              <span v-if="isEditing" class="text-xs text-themed-muted font-normal">
+                ({{ t('promosAdmin.drawer.immutableNotice') }})
+              </span>
+            </div>
             <input
               v-if="form.discountType === 'PERCENTAGE'"
               v-model.number="form.percentageValue"
@@ -728,7 +892,9 @@ onMounted(() => {
               min="0.01"
               max="100"
               step="0.1"
+              :disabled="isEditing"
               class="input w-full font-mono"
+              :class="{ 'bg-themed-secondary text-themed-muted cursor-not-allowed': isEditing }"
               :placeholder="t('promosAdmin.drawer.discountPercentagePlaceholder')"
             />
             <input
@@ -737,7 +903,9 @@ onMounted(() => {
               type="number"
               min="0.01"
               step="0.01"
+              :disabled="isEditing"
               class="input w-full font-mono"
+              :class="{ 'bg-themed-secondary text-themed-muted cursor-not-allowed': isEditing }"
               :placeholder="t('promosAdmin.drawer.discountFixedPlaceholder')"
             />
           </div>
@@ -768,28 +936,36 @@ onMounted(() => {
         <!-- 有效周期（支持用户手动填写数字） -->
         <div v-if="form.discountType === 'PERCENTAGE'" class="space-y-3">
           <div>
-            <label class="block mb-1.5 text-xs font-semibold text-themed-primary">
-              {{ t('promosAdmin.drawer.durationModeLabel') }}
-            </label>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-semibold text-themed-primary">
+                {{ t('promosAdmin.drawer.durationModeLabel') }}
+              </label>
+              <span v-if="isEditing" class="text-xs text-themed-muted font-normal">
+                ({{ t('promosAdmin.drawer.immutableNotice') }})
+              </span>
+            </div>
             <div class="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                :class="['btn text-xs py-1.5 px-2 text-center transition-colors', form.durationType === 'ONCE' ? 'btn-primary font-semibold' : 'btn-secondary text-themed-secondary']"
-                @click="setDurationType('ONCE')"
+                :disabled="isEditing"
+                :class="['btn text-xs py-1.5 px-2 text-center transition-colors', form.durationType === 'ONCE' ? 'btn-primary font-semibold' : 'btn-secondary text-themed-secondary', isEditing ? 'cursor-not-allowed' : '']"
+                @click="!isEditing && setDurationType('ONCE')"
               >
                 {{ t('promosAdmin.drawer.durationOnce') }}
               </button>
               <button
                 type="button"
-                :class="['btn text-xs py-1.5 px-2 text-center transition-colors', form.durationType === 'REPEATING' ? 'btn-primary font-semibold' : 'btn-secondary text-themed-secondary']"
-                @click="setDurationType('REPEATING')"
+                :disabled="isEditing"
+                :class="['btn text-xs py-1.5 px-2 text-center transition-colors', form.durationType === 'REPEATING' ? 'btn-primary font-semibold' : 'btn-secondary text-themed-secondary', isEditing ? 'cursor-not-allowed' : '']"
+                @click="!isEditing && setDurationType('REPEATING')"
               >
                 {{ t('promosAdmin.drawer.durationRepeating') }}
               </button>
               <button
                 type="button"
-                :class="['btn text-xs py-1.5 px-2 text-center transition-colors', form.durationType === 'FOREVER' ? 'btn-primary font-semibold' : 'btn-secondary text-themed-secondary']"
-                @click="setDurationType('FOREVER')"
+                :disabled="isEditing"
+                :class="['btn text-xs py-1.5 px-2 text-center transition-colors', form.durationType === 'FOREVER' ? 'btn-primary font-semibold' : 'btn-secondary text-themed-secondary', isEditing ? 'cursor-not-allowed' : '']"
+                @click="!isEditing && setDurationType('FOREVER')"
               >
                 {{ t('promosAdmin.drawer.durationForever') }}
               </button>
@@ -798,9 +974,14 @@ onMounted(() => {
 
           <!-- 手动输入期数数字 -->
           <div v-if="form.durationType === 'REPEATING'" class="rounded border border-themed bg-themed-secondary p-3 space-y-1.5">
-            <label class="block text-xs font-semibold text-themed-primary">
-              {{ t('promosAdmin.drawer.durationCyclesLabel') }} <span class="text-rose-600 dark:text-rose-400">*</span>
-            </label>
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-themed-primary">
+                {{ t('promosAdmin.drawer.durationCyclesLabel') }} <span v-if="!isEditing" class="text-rose-600 dark:text-rose-400">*</span>
+              </label>
+              <span v-if="isEditing" class="text-xs text-themed-muted font-normal">
+                ({{ t('promosAdmin.drawer.immutableNotice') }})
+              </span>
+            </div>
             <div class="flex items-center gap-2">
               <input
                 v-model.number="form.durationCycles"
@@ -808,7 +989,9 @@ onMounted(() => {
                 min="1"
                 max="120"
                 step="1"
+                :disabled="isEditing"
                 class="input w-full font-mono"
+                :class="{ 'bg-themed-secondary text-themed-muted cursor-not-allowed': isEditing }"
                 :placeholder="t('promosAdmin.drawer.durationCyclesPlaceholder')"
               />
               <span class="text-xs text-themed-muted shrink-0 font-medium">期 (月)</span>
@@ -822,9 +1005,14 @@ onMounted(() => {
         <!-- 适用范围配置 -->
         <div class="border-t border-themed pt-3 space-y-2">
           <div class="flex items-center justify-between">
-            <label class="text-xs font-semibold text-themed-primary">
-              {{ t('promosAdmin.drawer.scopeTypeLabel') }}
-            </label>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-semibold text-themed-primary">
+                {{ t('promosAdmin.drawer.scopeTypeLabel') }}
+              </label>
+              <span v-if="isEditing" class="text-xs text-themed-muted font-normal">
+                ({{ t('promosAdmin.drawer.immutableNotice') }})
+              </span>
+            </div>
             <div v-if="!form.isGlobal && packagesList.length > 0" class="flex items-center gap-2">
               <button
                 type="button"
@@ -845,12 +1033,12 @@ onMounted(() => {
           </div>
 
           <div class="flex items-center gap-4">
-            <label class="inline-flex items-center gap-2 text-xs text-themed-primary cursor-pointer">
-              <input v-model="form.isGlobal" type="radio" :value="true" />
+            <label class="inline-flex items-center gap-2 text-xs" :class="isEditing ? 'cursor-not-allowed text-themed-muted' : 'text-themed-primary cursor-pointer'">
+              <input v-model="form.isGlobal" type="radio" :value="true" :disabled="isEditing" />
               <span>{{ t('promosAdmin.drawer.scopeGlobal') }}</span>
             </label>
-            <label class="inline-flex items-center gap-2 text-xs text-themed-primary cursor-pointer">
-              <input v-model="form.isGlobal" type="radio" :value="false" />
+            <label class="inline-flex items-center gap-2 text-xs" :class="isEditing ? 'cursor-not-allowed text-themed-muted' : 'text-themed-primary cursor-pointer'">
+              <input v-model="form.isGlobal" type="radio" :value="false" :disabled="isEditing" />
               <span>{{ t('promosAdmin.drawer.scopeCustom') }}</span>
             </label>
           </div>
@@ -899,11 +1087,12 @@ onMounted(() => {
                   </button>
 
                   <!-- 整套餐勾选框 -->
-                  <label class="inline-flex items-center gap-2 text-xs text-themed-primary cursor-pointer truncate">
+                  <label class="inline-flex items-center gap-2 text-xs truncate" :class="isEditing ? 'cursor-not-allowed text-themed-muted' : 'text-themed-primary cursor-pointer'">
                     <input
                       type="checkbox"
                       :checked="isPackageSelected(pkg.id)"
-                      @change="togglePackageSelection(pkg.id)"
+                      :disabled="isEditing"
+                      @change="!isEditing && togglePackageSelection(pkg.id)"
                     />
                     <span class="font-medium truncate">{{ pkg.name }}</span>
                   </label>
@@ -958,15 +1147,15 @@ onMounted(() => {
                   :key="plan.id"
                   class="flex items-center justify-between py-1 border-b border-themed last:border-0"
                 >
-                  <label class="inline-flex items-center gap-2 text-xs cursor-pointer min-w-0 flex-1 truncate">
+                  <label class="inline-flex items-center gap-2 text-xs min-w-0 flex-1 truncate" :class="isEditing || isPackageSelected(pkg.id) ? 'cursor-not-allowed' : 'cursor-pointer'">
                     <!-- 如果整套餐已选中，子方案显示为选中且禁用，并提示已由整套餐覆盖 -->
                     <input
                       type="checkbox"
                       :checked="isPlanSelected(pkg.id, plan.id)"
-                      :disabled="isPackageSelected(pkg.id)"
-                      @change="togglePlanSelection(pkg.id, plan.id)"
+                      :disabled="isEditing || isPackageSelected(pkg.id)"
+                      @change="!isEditing && togglePlanSelection(pkg.id, plan.id)"
                     />
-                    <span :class="['truncate', isPackageSelected(pkg.id) ? 'text-themed-muted' : 'text-themed-primary font-medium']">
+                    <span :class="['truncate', isEditing || isPackageSelected(pkg.id) ? 'text-themed-muted' : 'text-themed-primary font-medium']">
                       {{ plan.name }}
                     </span>
                     <span v-if="isPackageSelected(pkg.id)" class="text-[10px] text-green-600 dark:text-green-400">
@@ -1040,11 +1229,14 @@ onMounted(() => {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <button class="btn btn-secondary text-xs" type="button" @click="createDrawerOpen = false">
+          <button class="btn btn-secondary text-xs" type="button" :disabled="creating || saving" @click="createDrawerOpen = false">
             {{ t('promosAdmin.drawer.cancelButton') }}
           </button>
-          <button class="btn btn-primary text-xs" :disabled="creating" type="button" @click="submitCreate">
-            {{ creating ? t('promosAdmin.drawer.submitting') : t('promosAdmin.drawer.submitButton') }}
+          <button class="btn btn-primary text-xs" :disabled="creating || saving" type="button" @click="isEditing ? submitEdit() : submitCreate()">
+            <svg v-if="creating || saving" class="h-4 w-4 animate-spin mr-1.5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.58m15.36 2A8 8 0 005.07 8.11M20 20v-5h-.58m0 0A8 8 0 014.06 12.03" />
+            </svg>
+            {{ isEditing ? (saving ? t('promosAdmin.drawer.saving') : t('promosAdmin.drawer.saveButton')) : (creating ? t('promosAdmin.drawer.submitting') : t('promosAdmin.drawer.submitButton')) }}
           </button>
         </div>
       </template>

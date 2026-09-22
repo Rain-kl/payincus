@@ -279,6 +279,23 @@ export interface CreatePromoCodeRequest {
   enabled?: boolean
 }
 
+export interface UpdatePromoCodeRequest {
+  name?: string | null
+  maxTotalUses?: number | null
+  maxUsesPerUser?: number | null
+  startsAt?: string | null
+  expiresAt?: string | null
+  enabled?: boolean
+  // Optional echoes for immutability verification
+  code?: string
+  discountType?: PromoDiscountType
+  discountValue?: number
+  durationType?: PromoDurationType
+  durationCycles?: number | null
+  isGlobal?: boolean
+  scopes?: Array<{ packageId: number; packagePlanId?: number | null }>
+}
+
 export interface AdminPromoBoundInstance {
   instanceId: number
   instanceName: string
@@ -4175,6 +4192,9 @@ const api = {
 
     create: (data: CreatePromoCodeRequest): Promise<AdminPromoCode> =>
       http.post('/admin/promos', data),
+
+    update: (id: number, data: UpdatePromoCodeRequest): Promise<AdminPromoCode> =>
+      http.put(`/admin/promos/${id}`, data),
 
     toggle: (id: number, enabled: boolean): Promise<{ success: boolean; enabled: boolean }> =>
       http.patch(`/admin/promos/${id}/toggle`, { enabled }),
