@@ -168,6 +168,21 @@ func TestIsolatedDatapath(t *testing.T) {
 		t.Logf("namespace %s target %s expectedSuccess=%v: %s", ns, target, wantSuccess, out)
 		return string(out)
 	}
+	// Reproduce the real host: namespace all=1 overrides interface=0. A source
+	// lookup with mark430000 hits the local catch-all and rejects incoming SYNs.
+	hostSourceValidation := command("sysctl", "-n", "net.ipv4.conf.all.src_valid_mark")
+	command("ip", "netns", "exec", namespace, "sysctl", "-qw", "net.ipv4.conf.all.src_valid_mark=1", "net.ipv4.conf.igw-ns.src_valid_mark=0")
+	if err := exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "ip", "-4", "route", "get", "198.19.0.2", "from", "169.254.242.1", "iif", "igw-ns", "mark", "0x430000").Run(); err == nil {
+		t.Fatal("fixture did not reproduce marked source-validation failure")
+	}
+	client("fixture-container", "http://198.19.0.2/", false)
+	if err := prepareNamespace(ctx, "1.1.1.1"); err != nil {
+		t.Fatal(err)
+	}
+	command("ip", "netns", "exec", namespace, "ip", "-4", "route", "get", "198.19.0.2", "from", "169.254.242.1", "iif", "igw-ns", "mark", "0x430000")
+	if command("sysctl", "-n", "net.ipv4.conf.all.src_valid_mark") != hostSourceValidation {
+		t.Fatal("gateway preparation changed host source validation")
+	}
 	client("fixture-container", "http://198.19.0.2/", true)
 	client("fixture-container", "https://198.19.0.2/", true)
 	client("fixture-container", "dns:1.1.1.1:53", true)

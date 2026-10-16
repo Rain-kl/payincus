@@ -1,6 +1,6 @@
 # Xray 出口与 Incus 防火墙
 
-Agent v1.2.11 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
+Agent v1.2.12 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
 
 ## 配置入口
 
@@ -102,3 +102,5 @@ bash agent/scripts/test-datapath-egress.sh
 ```
 
 Docker 运行时不增加 capabilities，不共享宿主网络、PID、设备或文件挂载；网络管理操作仅在无外部网卡的虚拟机内进行。回归先重现固定 DNS 不可达导致域名代理节点连接失败，再继承真实上游，覆盖首个上游失效后的恢复及三种代理策略的数据路径。systemd 回归另行验证替换 resolver 文件后原挂载保持旧内容、核心重启后使用新文件。
+
+网关命名空间显式关闭 `all/default/igw-ns.src_valid_mark`，同时关闭该命名空间的 `rp_filter`。TPROXY 的 `0x430000` 标记只用于目标地址的本地投递；若源地址校验也使用它，查询会命中 table 7421 的 `local default`，把对端源地址误判为本地并拒绝 SYN。Linux 取 all 与接口参数的较大值，因此只把接口设为 0 不够。不会修改宿主的 `src_valid_mark`，保留宿主 VPN 等现有路由行为。完整内核回归先注入 all=1/interface=0，验证带标记路由失败与容器连接超时，再调用实际网关初始化，验证恢复以及宿主参数保持原值。

@@ -386,7 +386,11 @@ func prepareNamespace(ctx context.Context, resolvers ...string) error {
 		{"ip", "netns", "exec", namespace, "ip", "link", "set", "lo", "up"}, {"ip", "netns", "exec", namespace, "ip", "link", "set", "igw-ns", "up"},
 		{"ip", "netns", "exec", namespace, "ip", "addr", "replace", "169.254.242.2/30", "dev", "igw-ns"}, {"ip", "netns", "exec", namespace, "ip", "-6", "addr", "replace", "fd42:696e:6375::2/126", "dev", "igw-ns", "nodad"},
 		{"ip", "netns", "exec", namespace, "ip", "route", "replace", "default", "via", "169.254.242.1"}, {"ip", "netns", "exec", namespace, "ip", "-6", "route", "replace", "default", "via", "fd42:696e:6375::1"},
-		{"ip", "netns", "exec", namespace, "sysctl", "-qw", "net.ipv4.conf.all.rp_filter=0", "net.ipv4.conf.default.rp_filter=0", "net.ipv4.conf.igw-ns.rp_filter=0"},
+		// The local catch-all table is only for TPROXY destination routing. Source
+		// validation must not use that mark, or it treats the remote source as a
+		// local address and rejects the SYN even when rp_filter is disabled. Both
+		// all and per-interface values matter; Linux uses their maximum.
+		{"ip", "netns", "exec", namespace, "sysctl", "-qw", "net.ipv4.conf.all.rp_filter=0", "net.ipv4.conf.default.rp_filter=0", "net.ipv4.conf.igw-ns.rp_filter=0", "net.ipv4.conf.all.src_valid_mark=0", "net.ipv4.conf.default.src_valid_mark=0", "net.ipv4.conf.igw-ns.src_valid_mark=0"},
 	}
 	for _, args := range commands {
 		if err := run(ctx, args[0], args[1:]...); err != nil {
