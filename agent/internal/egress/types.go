@@ -39,16 +39,19 @@ type ProbeJob struct {
 	Nodes    []Node `json:"nodes"`
 }
 type Instruction struct {
-	Revision int        `json:"revision"`
-	Egress   Policy     `json:"egress"`
-	Firewall Firewall   `json:"firewall"`
-	Nodes    []Node     `json:"nodes"`
-	Probes   []ProbeJob `json:"probes,omitempty"`
+	Revision              int        `json:"revision"`
+	Egress                Policy     `json:"egress"`
+	Firewall              Firewall   `json:"firewall"`
+	Nodes                 []Node     `json:"nodes"`
+	Probes                []ProbeJob `json:"probes,omitempty"`
+	AcknowledgedProbeJobs []string   `json:"acknowledgedProbeJobs,omitempty"`
 }
 type Status struct {
 	AppliedRevision int      `json:"appliedRevision"`
 	State           string   `json:"state"`
 	Error           string   `json:"error"`
+	ErrorStage      string   `json:"errorStage,omitempty"`
+	ErrorDetail     string   `json:"errorDetail,omitempty"`
 	XrayAvailable   bool     `json:"xrayAvailable"`
 	ActiveNodeID    int      `json:"activeNodeId,omitempty"`
 	HealthyNodeIDs  []int    `json:"healthyNodeIds"`
@@ -56,10 +59,11 @@ type Status struct {
 	RoutedFallback  bool     `json:"routedFallback"`
 }
 type ProbeResult struct {
-	NodeID    int    `json:"nodeId"`
-	Success   bool   `json:"success"`
-	LatencyMs int64  `json:"latencyMs"`
-	Error     string `json:"error"`
+	NodeID      int    `json:"nodeId"`
+	Success     bool   `json:"success"`
+	LatencyMs   int64  `json:"latencyMs"`
+	Error       string `json:"error"`
+	ErrorDetail string `json:"errorDetail,omitempty"`
 }
 type JobResult struct {
 	JobID string        `json:"jobId"`

@@ -294,6 +294,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.myHosts', title: '节点' }
   },
   {
+    path: '/admin/resources/proxies',
+    name: 'admin-proxy-nodes',
+    component: () => import('@/views/admin/ProxyNodesView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'egress.pageTitle', title: '代理' }
+  },
+  {
     path: '/admin/resources/hosts/create',
     redirect: '/admin/resources/hosts'
   },

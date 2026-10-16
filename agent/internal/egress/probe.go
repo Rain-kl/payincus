@@ -3,8 +3,10 @@ package egress
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -34,7 +36,8 @@ func ProbeURL(ctx context.Context, port int, target string) ProbeResult {
 	resp, err := client.Do(req)
 	result.LatencyMs = time.Since(start).Milliseconds()
 	if err != nil {
-		if ctx.Err() != nil {
+		var networkError net.Error
+		if ctx.Err() != nil || (errors.As(err, &networkError) && networkError.Timeout()) {
 			result.Error = "timeout"
 		}
 		return result
@@ -154,6 +157,18 @@ func executeJob(ctx context.Context, dir string, job ProbeJob) JobResult {
 	}
 	path := filepath.Join(tmp, "config.json")
 	if atomicFile(path, config, 0600) != nil {
+		return result
+	}
+	if err = validateCore(ctx, binaryPath, path); err != nil {
+		detail := "config_invalid"
+		var core *coreValidationError
+		if errors.As(err, &core) {
+			detail = core.reason
+		}
+		for i := range result.Items {
+			result.Items[i].ErrorDetail = detail
+		}
+		log.Printf("[egress] probe rejected job=%s stage=config reason=%s", job.JobID, detail)
 		return result
 	}
 	cmd := exec.CommandContext(ctx, binaryPath, "run", "-config", path)

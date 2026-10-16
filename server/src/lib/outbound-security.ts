@@ -172,9 +172,9 @@ export async function assertSafeHttpUrl(url: string, label = 'URL'): Promise<URL
  * （解析到内网/保留地址），也会在建立连接时被拒绝，从而消除 assertPublicHostname 之后的 TOCTOU 窗口。
  * 仅影响地址解析，不改变 TLS SNI（仍使用原始主机名），因此不破坏 HTTPS 证书校验。
  */
-const revalidatingLookup: LookupFunction = (hostname, options, callback) => {
+export const revalidatingLookup: LookupFunction = (hostname, options, callback) => {
   dnsLookupCb(hostname, { ...(options as object), all: true, verbatim: true }, (err, addresses) => {
-    const cb = callback as (err: NodeJS.ErrnoException | null, address?: string, family?: number) => void
+    const cb = callback as (err: NodeJS.ErrnoException | null, address?: string | PublicResolvedAddress[], family?: number) => void
     if (err) {
       cb(err)
       return
@@ -190,8 +190,14 @@ const revalidatingLookup: LookupFunction = (hostname, options, callback) => {
         return
       }
     }
-    const first = list[0]
-    cb(null, first.address, first.family)
+    // Node's automatic IPv4/IPv6 selection requests all addresses. Returning a
+    // single string in that mode causes ERR_INVALID_IP_ADDRESS before connecting.
+    if (options.all) {
+      cb(null, list)
+    } else {
+      const first = list[0]
+      cb(null, first.address, first.family)
+    }
   })
 }
 

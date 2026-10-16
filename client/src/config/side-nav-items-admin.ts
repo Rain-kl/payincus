@@ -9,6 +9,7 @@ export const navMenuItems: MenuItem[] = [
   { name: 'admin-users', path: '/admin/users', icon: 'users', label: 'nav.users' },
   { divider: true, label: 'nav.resources' },
   { name: 'admin-my-hosts', path: '/admin/resources/hosts', icon: 'database', label: 'nav.hosts' },
+  { name: 'admin-proxy-nodes', path: '/admin/resources/proxies', icon: 'transfer', label: 'egress.pageTitle' },
   { name: 'admin-my-packages', path: '/admin/resources/packages', icon: 'package', label: 'nav.packages' },
   { name: 'admin-images', path: '/admin/images', icon: 'image', label: 'nav.images' },
   { name: 'admin-instance-create', path: '/admin/instances/create', icon: 'gift', label: 'nav.create' },

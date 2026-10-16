@@ -136,7 +136,11 @@ function uri(input: string): ImportedProxy {
   const u = new URL(value), protocol = ({ 'socks5:': 'socks', 'socks:': 'socks', 'https:': 'http', 'ss:': 'shadowsocks' } as Record<string, string>)[u.protocol] ?? u.protocol.slice(0, -1)
   if (!supported.includes(protocol)) throw new NetworkInputError('Unsupported URI protocol')
   const q = u.searchParams
-  for (const key of q.keys()) if (!['type', 'security', 'sni', 'peer', 'fp', 'pbk', 'sid', 'spx', 'alpn', 'host', 'path', 'serviceName', 'mode', 'flow', 'encryption', 'allowInsecure'].includes(key)) throw new NetworkInputError(`Unsupported URI parameter: ${key.replace(/[^\w]/g, '').slice(0, 40)}`)
+  for (const key of q.keys()) if (!['type', 'security', 'sni', 'peer', 'fp', 'pbk', 'sid', 'spx', 'alpn', 'host', 'path', 'serviceName', 'mode', 'flow', 'encryption', 'allowInsecure', 'headerType', 'support-x25519mlkem768'].includes(key)) throw new NetworkInputError(`Unsupported URI parameter: ${key.replace(/[^\w-]/g, '').slice(0, 40)}`)
+  if (q.get('headerType') && q.get('headerType') !== 'none') throw new NetworkInputError('Unsupported TCP header type (only none is supported)')
+  // This subscription extension advertises server support. Modern Xray Reality
+  // negotiates X25519MLKEM768 itself and has no corresponding outbound option.
+  if (q.has('support-x25519mlkem768') && !['true', 'false', '1', '0'].includes(q.get('support-x25519mlkem768')!)) throw new NetworkInputError('Invalid Reality capability flag')
   const server: Record<string, any> = { address: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : protocol === 'http' ? 80 : 1080) }
   if (['vless', 'vmess'].includes(protocol)) server.users = [{ id: decodeURIComponent(u.username), encryption: q.get('encryption') ?? 'none', ...(q.get('flow') ? { flow: q.get('flow') } : {}) }]
   else if (protocol === 'trojan') server.password = decodeURIComponent(u.username)

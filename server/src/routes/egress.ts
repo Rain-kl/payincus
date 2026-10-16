@@ -18,14 +18,19 @@ async function importContent(body: { content?: string; subscriptionUrl?: string 
   for (let redirects = 0; redirects <= 3; redirects++) {
     let response: Response
     try { response = await safeFetch(url, { redirect: 'manual', signal: AbortSignal.timeout(15000) }, 'Proxy subscription') }
-    catch { throw new NetworkInputError('Unable to download subscription') }
+    catch (error: any) {
+      if (error?.name === 'TimeoutError' || error?.name === 'AbortError') throw new NetworkInputError('Subscription download timed out')
+      const code = error?.cause?.code ?? error?.code
+      const safeCodes = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'UND_ERR_CONNECT_TIMEOUT', 'ERR_INVALID_IP_ADDRESS', 'CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'DEPTH_ZERO_SELF_SIGNED_CERT']
+      throw new NetworkInputError(`Unable to download subscription${safeCodes.includes(code) ? ` (${code})` : ''}`)
+    }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('location'); await response.body?.cancel()
       if (!location || redirects === 3) throw new NetworkInputError('Subscription redirect limit exceeded')
       try { url = new URL(location, url).href } catch { throw new NetworkInputError('Invalid subscription redirect') }
       continue
     }
-    if (!response.ok || !response.body) { await response.body?.cancel(); throw new NetworkInputError('Unable to download subscription') }
+    if (!response.ok || !response.body) { await response.body?.cancel(); throw new NetworkInputError(`Unable to download subscription (HTTP ${response.status})`) }
     const reader = response.body.getReader(), chunks: Uint8Array[] = []; let size = 0
     try {
       while (true) {
@@ -124,6 +129,6 @@ export default async function egressRoutes(app: FastifyInstance) {
   })
   app.get('/admin/proxy-probes', { onRequest: admin }, async () => {
     await prisma.proxyProbeJob.updateMany({ where: { state: { in: ['pending', 'running'] }, expiresAt: { lte: new Date() } }, data: { state: 'expired', snapshotEncrypted: '', leaseUntil: null } })
-    return { jobs: await prisma.proxyProbeJob.findMany({ select: { id: true, hostId: true, nodeIds: true, probeUrl: true, state: true, result: true, createdAt: true, completedAt: true, expiresAt: true, host: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 50 }) }
+    return { jobs: await prisma.proxyProbeJob.findMany({ select: { id: true, hostId: true, nodeIds: true, probeUrl: true, state: true, result: true, createdAt: true, completedAt: true, expiresAt: true, host: { select: { name: true, agent: { select: { version: true, lastSeenAt: true } } } } }, orderBy: { createdAt: 'desc' }, take: 50 }) }
   })
 }

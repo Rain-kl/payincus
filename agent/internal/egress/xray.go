@@ -1,8 +1,11 @@
 package egress
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"strings"
 )
 
 const namespace = "incudal-egress"
@@ -10,6 +13,37 @@ const stateDir = "/var/lib/incudal-agent/network"
 const transparentPort = 15490
 const apiPort = 15491
 const socksBasePort = 21000
+
+type coreValidationError struct{ reason string }
+
+func (e *coreValidationError) Error() string { return e.reason }
+func validateCore(ctx context.Context, binary, path string) error {
+	output, err := exec.CommandContext(ctx, binary, "run", "-test", "-config", path).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	// Xray can include credentials in configuration errors. Report only known
+	// categories; never forward its raw stdout/stderr to the Panel or journal.
+	message := strings.ToLower(string(output))
+	reason := "config_invalid"
+	for _, item := range []struct{ pattern, reason string }{
+		{`invalid "publickey"`, "reality_key_invalid"},
+		{`invalid "password"`, "reality_key_invalid"},
+		{`invalid "shortid"`, "reality_id_invalid"},
+		{"fingerprint", "tls_config_invalid"},
+		{"permission denied", "permission_denied"},
+		{"unknown transport", "unsupported_transport"},
+	} {
+		if strings.Contains(message, item.pattern) {
+			reason = item.reason
+			break
+		}
+	}
+	return &coreValidationError{reason: reason}
+}
 
 func nodeTag(id int) string { return fmt.Sprintf("proxy-%d-", id) } // Delimiter prevents prefix matches with another ID.
 func xrayConfig(in Instruction, probePorts []int, transparent bool) ([]byte, error) {

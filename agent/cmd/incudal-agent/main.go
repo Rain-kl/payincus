@@ -88,16 +88,17 @@ func main() {
 			log.Printf("incudal-agent stopped")
 			return
 		case <-ticker.C:
-			if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds, networkWorker); err != nil {
-				heartbeatLogState.logFailure(err)
-			} else {
-				heartbeatLogState.logSuccess(result)
-				if result.Tunnel != nil {
-					tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
-				}
-				handleCaddyInstruction(ctx, result, &caddyOpInProgress)
-				scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
+		case <-networkWorker.ResultsReady():
+		}
+		if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds, networkWorker); err != nil {
+			heartbeatLogState.logFailure(err)
+		} else {
+			heartbeatLogState.logSuccess(result)
+			if result.Tunnel != nil {
+				tunnelWorker.SyncConfig(result.Tunnel.Enabled, result.Tunnel.TargetHost, result.Tunnel.TargetPort)
 			}
+			handleCaddyInstruction(ctx, result, &caddyOpInProgress)
+			scheduleAgentUpgrade(ctx, upgradeRunner, result, &upgradeInProgress)
 		}
 	}
 }
@@ -108,7 +109,9 @@ func handleCaddyInstruction(ctx context.Context, result panel.HeartbeatResult, i
 	if result.Caddy == nil {
 		return
 	}
-	log.Printf("[caddy] instruction: command=%q port=%d", result.Caddy.Command, result.Caddy.Port)
+	if result.Caddy.Command != "idle" {
+		log.Printf("[caddy] instruction: command=%q port=%d", result.Caddy.Command, result.Caddy.Port)
+	}
 	if inProgress.Load() {
 		return
 	}
@@ -160,6 +163,11 @@ func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalS
 	var sent []egress.JobResult
 	if len(workers) > 0 {
 		status, results := workers[0].Report()
+		// Both current and older Panels process at most three results per
+		// heartbeat. Never send a larger batch that an older Panel could lose.
+		if len(results) > 3 {
+			results = results[:3]
+		}
 		payload["networkStatus"] = status
 		payload["proxyProbeResults"] = results
 		sent = results
@@ -170,7 +178,17 @@ func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalS
 		return result, err
 	}
 	if len(workers) > 0 {
-		workers[0].AckResults(sent)
+		if result.Network != nil {
+			acknowledged := result.Network.AcknowledgedProbeJobs
+			if acknowledged == nil {
+				// Older Panels acknowledge the bounded batch through HTTP success.
+				// An explicit empty list from a current Panel never acknowledges it.
+				for _, item := range sent {
+					acknowledged = append(acknowledged, item.JobID)
+				}
+			}
+			workers[0].AckResults(sent, acknowledged)
+		}
 		workers[0].Sync(result.Network)
 	}
 	return result, nil

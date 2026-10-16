@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,38 +23,47 @@ type savedNetwork struct {
 	Rules       string      `json:"rules"`
 }
 type Manager struct {
-	mu         sync.Mutex
-	desired    *Instruction
-	status     Status
-	results    map[string]JobResult
-	running    map[string]bool
-	jobs       chan ProbeJob
-	lastHash   string
-	lastHealth time.Time
-	active     int
-	failures   map[int]int
-	successes  map[int]int
+	mu           sync.Mutex
+	dir          string
+	resultsReady chan struct{}
+	desired      *Instruction
+	status       Status
+	results      map[string]JobResult
+	running      map[string]bool
+	jobs         chan ProbeJob
+	lastHash     string
+	lastHealth   time.Time
+	active       int
+	failures     map[int]int
+	successes    map[int]int
 }
 
 func NewManager() *Manager {
-	m := &Manager{status: Status{State: "idle", Error: "none", XrayAvailable: Available(), ManagedNetworks: []string{}, HealthyNodeIDs: []int{}}, results: map[string]JobResult{}, running: map[string]bool{}, jobs: make(chan ProbeJob, 3), failures: map[int]int{}, successes: map[int]int{}}
+	return newManager(stateDir)
+}
+func newManager(dir string) *Manager {
+	m := &Manager{dir: dir, resultsReady: make(chan struct{}, 1), status: Status{State: "idle", Error: "none", XrayAvailable: Available(), ManagedNetworks: []string{}, HealthyNodeIDs: []int{}}, results: map[string]JobResult{}, running: map[string]bool{}, jobs: make(chan ProbeJob, 3), failures: map[int]int{}, successes: map[int]int{}}
 	var saved savedNetwork
-	if b, e := os.ReadFile(filepath.Join(stateDir, "applied.json")); e == nil && json.Unmarshal(b, &saved) == nil {
+	if b, e := os.ReadFile(filepath.Join(dir, "applied.json")); e == nil && json.Unmarshal(b, &saved) == nil {
 		m.desired = &saved.Instruction
 		m.status.AppliedRevision = saved.Instruction.Revision
 	}
 	var pendingTarget Instruction
-	if b, e := os.ReadFile(filepath.Join(stateDir, "desired.json")); e == nil && json.Unmarshal(b, &pendingTarget) == nil && pendingTarget.Revision > 0 && (m.desired == nil || pendingTarget.Revision >= m.desired.Revision) {
+	if b, e := os.ReadFile(filepath.Join(dir, "desired.json")); e == nil && json.Unmarshal(b, &pendingTarget) == nil && pendingTarget.Revision > 0 && (m.desired == nil || pendingTarget.Revision >= m.desired.Revision) {
 		m.desired = &pendingTarget
 	}
 	var pending []JobResult
-	if b, e := os.ReadFile(filepath.Join(stateDir, "probe-results.json")); e == nil && json.Unmarshal(b, &pending) == nil {
+	if b, e := os.ReadFile(filepath.Join(dir, "probe-results.json")); e == nil && json.Unmarshal(b, &pending) == nil {
 		for _, r := range pending {
 			m.results[r.JobID] = r
 		}
 	}
 	return m
 }
+
+// ResultsReady wakes the heartbeat loop after a manual probe finishes. Results
+// remain persisted until a successful heartbeat acknowledges them.
+func (m *Manager) ResultsReady() <-chan struct{} { return m.resultsReady }
 func (m *Manager) Report() (Status, []JobResult) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -62,13 +73,25 @@ func (m *Manager) Report() (Status, []JobResult) {
 	}
 	return m.status, results
 }
-func (m *Manager) AckResults(sent []JobResult) {
+func (m *Manager) AckResults(sent []JobResult, acknowledged []string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	accepted := map[string]bool{}
+	for _, id := range acknowledged {
+		accepted[id] = true
+	}
 	for _, r := range sent {
-		delete(m.results, r.JobID)
+		if accepted[r.JobID] {
+			delete(m.results, r.JobID)
+		}
 	}
 	m.saveResults()
+	if len(acknowledged) > 0 && len(m.results) > 0 {
+		select {
+		case m.resultsReady <- struct{}{}:
+		default:
+		}
+	}
 }
 func (m *Manager) saveResults() {
 	list := []JobResult{}
@@ -76,7 +99,7 @@ func (m *Manager) saveResults() {
 		list = append(list, r)
 	}
 	b, _ := json.Marshal(list)
-	_ = atomicFile(filepath.Join(stateDir, "probe-results.json"), b, 0600)
+	_ = atomicFile(filepath.Join(m.dir, "probe-results.json"), b, 0600)
 }
 func (m *Manager) Sync(in *Instruction) {
 	if in == nil {
@@ -87,12 +110,13 @@ func (m *Manager) Sync(in *Instruction) {
 	if m.desired == nil || in.Revision >= m.desired.Revision {
 		copy := *in
 		copy.Probes = nil
+		copy.AcknowledgedProbeJobs = nil
 		// Persist the target before any host mutation. An Agent restart midway
 		// through applying a proxy must not revert to an earlier unmanaged mode.
 		if copy.Revision > 0 && (m.desired == nil || copy.Revision != m.desired.Revision) {
 			body, err := json.Marshal(copy)
 			if err == nil {
-				err = atomicFile(filepath.Join(stateDir, "desired.json"), body, 0600)
+				err = atomicFile(filepath.Join(m.dir, "desired.json"), body, 0600)
 			}
 			if err != nil {
 				m.status.State = "error"
@@ -126,14 +150,26 @@ func (m *Manager) Run(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case job := <-m.jobs:
+				log.Printf("[egress] probe started job=%s nodes=%d", job.JobID, len(job.Nodes))
 				jctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-				result := executeJob(jctx, stateDir, job)
+				result := executeJob(jctx, m.dir, job)
 				cancel()
 				m.mu.Lock()
 				m.results[job.JobID] = result
 				delete(m.running, job.JobID)
 				m.saveResults()
 				m.mu.Unlock()
+				successes := 0
+				for _, item := range result.Items {
+					if item.Success {
+						successes++
+					}
+				}
+				log.Printf("[egress] probe finished job=%s successes=%d total=%d", job.JobID, successes, len(result.Items))
+				select {
+				case m.resultsReady <- struct{}{}:
+				default:
+				}
 			}
 		}
 	}()
@@ -149,10 +185,37 @@ func (m *Manager) Run(ctx context.Context) {
 	}
 }
 func (m *Manager) setError(code string) {
+	m.setErrorAt(code, code, nil)
+}
+func (m *Manager) setErrorAt(code, stage string, err error) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	detail := ""
+	if err != nil {
+		detail = "command_failed"
+		var core *coreValidationError
+		switch {
+		case errors.As(err, &core):
+			detail = core.reason
+		case errors.Is(err, context.DeadlineExceeded):
+			detail = "timeout"
+		case os.IsPermission(err):
+			detail = "permission_denied"
+		case os.IsNotExist(err):
+			detail = "missing_file"
+		}
+	}
+	if m.status.State != "error" || m.status.Error != code || m.status.ErrorStage != stage || m.status.ErrorDetail != detail {
+		revision := 0
+		if m.desired != nil {
+			revision = m.desired.Revision
+		}
+		log.Printf("[egress] apply failed revision=%d stage=%s error=%s reason=%s", revision, stage, code, detail)
+	}
 	m.status.State = "error"
 	m.status.Error = code
-	m.mu.Unlock()
+	m.status.ErrorStage = stage
+	m.status.ErrorDetail = detail
 }
 func (m *Manager) reconcile(parent context.Context) {
 	m.mu.Lock()
@@ -202,6 +265,7 @@ func (m *Manager) reconcile(parent context.Context) {
 	sum := sha256.Sum256(encoded)
 	hash := hex.EncodeToString(sum[:])
 	if hash != m.lastHash {
+		log.Printf("[egress] applying revision=%d mode=%s proxyNodes=%d", in.Revision, in.Egress.Mode, len(in.Nodes))
 		m.mu.Lock()
 		m.status.State = "applying"
 		m.status.Error = "none"
@@ -218,29 +282,29 @@ func (m *Manager) reconcile(parent context.Context) {
 			return
 		}
 		binaryPath := ""
-		configPath := filepath.Join(stateDir, "xray.json")
+		configPath := filepath.Join(m.dir, "xray.json")
 		coreChanged := false
 		coreActive := exec.CommandContext(ctx, "systemctl", "is-active", "--quiet", "incudal-xray.service").Run() == nil
 		if in.Egress.Mode != "off" {
-			binaryPath, e = extractBinary(stateDir)
+			binaryPath, e = extractBinary(m.dir)
 			if e != nil {
-				m.setError("xray")
+				m.setErrorAt("xray", "extract", e)
 				return
 			}
 			config, e := xrayConfig(in, nil, true)
 			if e != nil {
-				m.setError("xray")
+				m.setErrorAt("xray", "config", e)
 				return
 			}
 			previous, _ := os.ReadFile(configPath)
 			unit, _ := os.ReadFile("/etc/systemd/system/incudal-xray.service")
 			coreChanged = !bytes.Equal(previous, config) || !bytes.Equal(unit, []byte(gatewayUnit(binaryPath, configPath, in.Egress.Mode == "proxy" && in.Egress.Strategy == "failover"))) || !coreActive
 			if e = atomicFile(configPath+".next", config, 0600); e != nil {
-				m.setError("xray")
+				m.setErrorAt("xray", "config", e)
 				return
 			}
-			if e = run(ctx, binaryPath, "run", "-test", "-config", configPath+".next"); e != nil {
-				m.setError("xray")
+			if e = validateCore(ctx, binaryPath, configPath+".next"); e != nil {
+				m.setErrorAt("xray", "config", e)
 				return
 			}
 		}
@@ -285,7 +349,7 @@ func (m *Manager) reconcile(parent context.Context) {
 					e = run(ctx, "systemctl", "restart", "incudal-xray.service")
 				}
 				if e != nil {
-					m.setError("xray")
+					m.setErrorAt("xray", "start", e)
 					return
 				}
 				m.active = 0
@@ -294,7 +358,7 @@ func (m *Manager) reconcile(parent context.Context) {
 		}
 		saved := savedNetwork{Instruction: in, Inventory: inv, Rules: rules}
 		body, _ := json.Marshal(saved)
-		if e = atomicFile(filepath.Join(stateDir, "applied.json"), body, 0600); e != nil {
+		if e = atomicFile(filepath.Join(m.dir, "applied.json"), body, 0600); e != nil {
 			m.setError("restore")
 			return
 		}
@@ -316,12 +380,15 @@ func (m *Manager) reconcile(parent context.Context) {
 		m.status.AppliedRevision = in.Revision
 		m.status.State = "applied"
 		m.status.Error = "none"
+		m.status.ErrorStage = ""
+		m.status.ErrorDetail = ""
 		m.status.ManagedNetworks = inv.Bridges
 		m.status.RoutedFallback = len(inv.Routed) > 0 || len(inv.RoutedSources) > 0
 		m.mu.Unlock()
+		log.Printf("[egress] applied revision=%d networks=%d", in.Revision, len(inv.Bridges))
 	}
 	if in.Egress.Mode != "off" && exec.CommandContext(ctx, "systemctl", "is-active", "--quiet", "incudal-xray.service").Run() != nil {
-		m.setError("xray")
+		m.setErrorAt("xray", "start", nil)
 		m.lastHash = ""
 		return
 	}
@@ -375,7 +442,7 @@ func (m *Manager) health(ctx context.Context, in Instruction) {
 		selected := chooseFailover(in.Nodes, m.active, m.successes, m.failures)
 		// Re-assert each round: systemd may have restarted Xray since the last
 		// probe. Existing healthy connections stay on their original outbound.
-		binaryPath, e := extractBinary(stateDir)
+		binaryPath, e := extractBinary(m.dir)
 		target := "blocked"
 		if selected != 0 {
 			target = nodeTag(selected)
@@ -384,7 +451,7 @@ func (m *Manager) health(ctx context.Context, in Instruction) {
 			e = run(ctx, "ip", "netns", "exec", namespace, binaryPath, "api", "bo", fmt.Sprintf("--server=127.0.0.1:%d", apiPort), "-b", "egress", target)
 		}
 		if e != nil {
-			m.setError("xray")
+			m.setErrorAt("xray", "health", e)
 			return
 		}
 		m.active = selected
@@ -395,6 +462,8 @@ func (m *Manager) health(ctx context.Context, in Instruction) {
 	if m.status.AppliedRevision == in.Revision {
 		m.status.State = "applied"
 		m.status.Error = "none"
+		m.status.ErrorStage = ""
+		m.status.ErrorDetail = ""
 	}
 	m.mu.Unlock()
 }

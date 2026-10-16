@@ -1,12 +1,12 @@
 # Xray 出口与 Incus 防火墙
 
-Agent v1.2.3 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
+Agent v1.2.5 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
 
 ## 配置入口
 
-- 管理员：宿主节点 → 配置 → 网络连接 → 出口代理。
+- 管理员：宿主节点 → 配置 → 网络连接下方的「出口代理」独立卡片。
 - 模式：不接管、Xray 直连、代理节点出站。现有节点默认不接管；已配置节点上的新增实例继承节点策略。
-- 管理代理节点：订阅 URL、Xray JSON、可转换的 sing-box outbound、逐行分享链接。先解析预览，再确认添加；重复节点按连接配置指纹去重。
+- 侧边栏「节点」下方的「代理」独立页面统一管理代理节点；出口代理卡片中的管理入口也可跳转到该页面。支持订阅 URL、Xray JSON、可转换的 sing-box outbound、逐行分享链接。先解析预览，再确认添加；重复节点按连接配置指纹去重。
 - 分享链接支持 SOCKS5、HTTP/HTTPS、VLESS、VMess、Trojan、Shadowsocks。传输支持 TCP、WebSocket、gRPC、HTTPUpgrade、XHTTP。无法等价转换的协议、链式依赖、本地文件或 socket 覆盖选项明确报错，不执行导入配置的入站和全局路由。
 - 选择多个代理节点后，故障转移按选择顺序执行，第一项为主节点；轮询模式均衡分配新连接，也可选择最低延迟。
 - 管理员：宿主节点 → 防火墙，位于配置与镜像之间。默认允许，按需添加拒绝项；规则也可使用默认拒绝的白名单模式。代理关闭后防火墙继续有效。
@@ -38,9 +38,9 @@ Agent 使用本地 Incus Unix socket，定期核对网络与实例。新增实�
 
 故障转移默认连续三次失败切换，优先节点连续两次成功后回切；未知健康状态不会直接提升为主节点。轮询/最低延迟使用 Xray 原生 balancer 与 observatory，所有候选失效时 `fallbackTag` 指向 blackhole；默认 outbound 同样为 blackhole。
 
-检测任务具有租约、过期时间和幂等结果回报；通过独立 Xray 配置逐个验证 HTTPS，避免切换生产出口。成功不代表 UDP、ICMP 或所有站点均可用。完成/过期后清除任务中的凭据快照。
+代理页面每 3 秒自动刷新检测结果，并提供手动刷新、最近心跳和回报截止时间。检测完成后 Agent 立即触发心跳回报，不再等下一个常规心跳。检测任务具有租约、过期时间和幂等结果回报；通过独立 Xray 配置逐个验证 HTTPS，避免切换生产出口。成功不代表 UDP、ICMP 或所有站点均可用。完成/过期后清除任务中的凭据快照。服务端逐条确认已落库结果；Agent 保留尚未确认的结果并重试，避免批量结果因单次心跳处理上限而丢失。每次最多发送三条结果；连接旧版 Panel 时兼容其 HTTP 成功确认，收到新版显式确认列表时则严格逐条处理。
 
-实际应用成功才回报 appliedRevision；失败保留失败状态。代理应用失败或进程退出时，选中连接保持阻断，不打开直出作为补偿。Panel 的目标版本、已生效版本和最近回报分别显示。
+实际应用成功才回报 appliedRevision；失败保留失败状态。失败步骤和脱敏原因同步显示在 Panel，并写入 Agent 日志；不记录原始配置或核心可能包含凭据的输出。故障转移启动时等待 RoutingService 就绪并设为 blackhole 后再放行接管流量。代理应用失败或进程退出时，选中连接保持阻断，不打开直出作为补偿。Panel 的目标版本、已生效版本和最近回报分别显示。
 
 Xray 服务与 Agent 分开运行。保存的规则和网关由独立恢复服务在 Incus 启动前恢复；Agent 重启/自升级不直接停止核心。完全关闭出口接管与防火墙后移除 Incus 的恢复依赖。只管理专用 nft 表、路由表 7420/命名空间表 7421、优先级 17420/17421，以及 mark 的 `0xff0000` 位；首次使用检查资源冲突。
 
@@ -65,3 +65,12 @@ make check
 当前开发环境已通过真实 Xray HTTPS 出站、RoutingService 的代理/blackhole 切换、导入与权限、配置并发、任务租约和前后端构建检查。宿主侧 nft 规则通过隔离检查；开发环境内核缺少可用的 nft TPROXY 表达式，命名空间规则不能在这里完成内核验证。
 
 部署验收仍需一台获授权的非生产 Incus 节点，覆盖：存量/新增/停止后启动、IPv4/IPv6、TCP/UDP、DNAT 和公网路由入站回程、同桥/跨桥内网、ACL 的 IP/端口限制、所有代理失效、Agent/核心重启和宿主重启恢复。在完成这些验证之前，不应将本地构建视为生产验收。
+
+排障命令：
+
+```sh
+journalctl -u incudal-agent -n 100 --no-pager
+systemctl status incudal-xray --no-pager
+```
+
+新版日志使用 `[egress] applying / applied / apply failed / probe started / probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.5。

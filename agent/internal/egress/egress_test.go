@@ -22,6 +22,41 @@ import (
 func testInstruction() Instruction {
 	return Instruction{Revision: 1, Egress: Policy{Mode: "proxy", Strategy: "balance", ProxyNodeIDs: []int{1, 10}, ProbeURL: "https://www.gstatic.com/generate_204", ProbeIntervalSeconds: 30}, Firewall: Firewall{Enabled: true, IngressAction: "allow", EgressAction: "allow", Rules: []Rule{{Direction: "egress", Action: "drop", Protocol: "tcp", DestinationPort: "25", Enabled: true}}}, Nodes: []Node{{ID: 1, Outbound: json.RawMessage(`{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":1080}]}}`)}, {ID: 10, Outbound: json.RawMessage(`{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":1081}]}}`)}}}
 }
+
+func TestProbeResultWakesHeartbeatWithoutNetworkPolicy(t *testing.T) {
+	dir := t.TempDir()
+	m := newManager(dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { m.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	// Invalid configuration finishes with a bounded failure and never connects
+	// to an external proxy. Revision zero also leaves host networking untouched.
+	m.Sync(&Instruction{Probes: []ProbeJob{{JobID: "wake-heartbeat", ProbeURL: "https://example.com", Nodes: []Node{{ID: 7, Outbound: json.RawMessage(`invalid`)}}}}})
+	select {
+	case <-m.ResultsReady():
+	case <-time.After(10 * time.Second):
+		t.Fatal("completed probe did not wake the heartbeat loop")
+	}
+	_, results := m.Report()
+	if len(results) != 1 || results[0].JobID != "wake-heartbeat" || len(results[0].Items) != 1 || results[0].Items[0].NodeID != 7 || results[0].Items[0].Error != "xray" {
+		t.Fatalf("probe failure was not retained for reporting: %+v", results)
+	}
+	_, restored := newManager(dir).Report()
+	if len(restored) != 1 {
+		t.Fatal("unacknowledged probe result was not persisted")
+	}
+	m.AckResults(results, nil)
+	_, unconfirmed := newManager(dir).Report()
+	if len(unconfirmed) != 1 {
+		t.Fatal("HTTP success without per-job acknowledgement lost the result")
+	}
+	m.AckResults(results, []string{"wake-heartbeat"})
+	_, remaining := newManager(dir).Report()
+	if len(remaining) != 0 {
+		t.Fatal("acknowledged probe result was not cleared")
+	}
+}
 func TestXrayConfiguration(t *testing.T) {
 	in := testInstruction()
 	data, err := xrayConfig(in, nil, true)
@@ -63,6 +98,50 @@ func TestXrayConfiguration(t *testing.T) {
 				t.Fatalf("core rejected %s/%s: %s", mode, strategy, output)
 			}
 		}
+	}
+}
+func TestImportedXrayConfiguration(t *testing.T) {
+	fixture := os.Getenv("EGRESS_OUTBOUND_FIXTURE")
+	if fixture == "" || !Available() {
+		t.Skip("optional private import fixture and embedded Xray required")
+	}
+	body, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := testInstruction()
+	if err = json.Unmarshal(body, &in.Nodes); err != nil {
+		t.Fatal("invalid private import fixture")
+	}
+	dir := t.TempDir()
+	binary, err := extractBinary(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, strategy := range []string{"balance", "failover", "leastPing"} {
+		in.Egress.Strategy = strategy
+		body, err = xrayConfig(in, nil, true)
+		if err != nil {
+			t.Fatal("cannot generate imported configuration")
+		}
+		path := filepath.Join(dir, "imported.json")
+		if err = os.WriteFile(path, body, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err = validateCore(context.Background(), binary, path); err != nil {
+			t.Fatalf("imported configuration rejected (%s): %v", strategy, err)
+		}
+	}
+}
+func TestCoreValidationRedactsCredentials(t *testing.T) {
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "rejected-core")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf 'invalid \"password\": private-fixture-credential' >&2\nexit 1\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	err := validateCore(context.Background(), binary, "config.json")
+	if err == nil || err.Error() != "reality_key_invalid" {
+		t.Fatalf("core diagnostic must expose only its category: %v", err)
 	}
 }
 func TestConnectionAndACLBoundaries(t *testing.T) {
@@ -305,13 +384,27 @@ func TestRealXrayHTTPSProbe(t *testing.T) {
 			t.Fatal(e)
 		}
 		defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
-		for attempt := 0; attempt < 30; attempt++ {
-			c, e := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", controlPort), 100*time.Millisecond)
-			if e == nil {
-				c.Close()
-				break
+		// Exercise the real service readiness command. The wrapper injects one
+		// unavailable API attempt and then runs the pinned Xray API locally.
+		wrapper := filepath.Join(dir, "ip-wrapper")
+		marker := filepath.Join(dir, "first-api-attempt")
+		wrapperBody := fmt.Sprintf("#!/bin/sh\nif [ ! -f '%s' ]; then touch '%s'; exit 1; fi\nshift 3\nexec \"$@\"\n", marker, marker)
+		if e = os.WriteFile(wrapper, []byte(wrapperBody), 0700); e != nil {
+			t.Fatal(e)
+		}
+		activation := ""
+		for _, line := range strings.Split(gatewayUnit(binary, path, true), "\n") {
+			if strings.HasPrefix(line, "ExecStartPost=/bin/sh -ec '") {
+				activation = strings.TrimSuffix(strings.TrimPrefix(line, "ExecStartPost=/bin/sh -ec '"), "'")
 			}
-			time.Sleep(50 * time.Millisecond)
+		}
+		activation = strings.ReplaceAll(activation, "/usr/sbin/ip", wrapper)
+		activation = strings.ReplaceAll(activation, fmt.Sprintf("127.0.0.1:%d", apiPort), fmt.Sprintf("127.0.0.1:%d", controlPort))
+		if activation == "" {
+			t.Fatal("service readiness retry is missing")
+		}
+		if e = exec.CommandContext(ctx, "/bin/sh", "-ec", activation).Run(); e != nil {
+			t.Fatal("service failed to wait for the Xray API")
 		}
 		override := func(tag string) {
 			t.Helper()
