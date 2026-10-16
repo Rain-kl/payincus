@@ -45,6 +45,12 @@ check(() => {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 for (const path of ['server/src/routes/instances.ts', 'server/src/routes/admin-billing.ts', 'server/src/routes/hosts.ts']) check(() => assert.ok(readFileSync(resolve(root, path), 'utf8').includes('await reserveInstanceGpu(tx,'), `Missing purchase reservation: ${path}`))
 check(() => assert.ok(readFileSync(resolve(root, 'server/src/workers/instanceTaskWorker.ts'), 'utf8').includes('const gpuPciAddresses = await getInstanceGpuPcis(task.instanceId, host.id)')))
+check(() => {
+  const createView = readFileSync(resolve(root, 'client/src/views/InstanceCreateView.vue'), 'utf8')
+  const zhCn = readFileSync(resolve(root, 'client/src/locales/zh-CN.ts'), 'utf8')
+  assert.ok(createView.includes("v-if=\"selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared\""), 'OS guidance must only show when the selected plan/package includes shared GPUs')
+  assert.ok(zhCn.includes('使用 GPU 必须选择 Debian 或 Ubuntu 系统。'), 'GPU create guidance must name supported guest operating systems')
+})
 console.log(`GPU unit and provisioner guards passed (${checks} checks)`)
 
 if (process.env.RUN_GPU_DB_TESTS === '1') {
@@ -72,7 +78,6 @@ if (process.env.RUN_GPU_DB_TESTS === '1') {
   const { prisma } = await import('../src/db/prisma.js')
   const { syncHostGpuReport, reserveInstanceGpu, findAvailableGpus, countGpuReservations, getGpuPolicy, getInstanceGpuPcis, assertGpuPlanChange, assertGpuMigration, validateGpuSelection } = await import('../src/db/gpus.js')
   const { deleteInstance, startInstance } = await import('../src/lib/incus/incus-instances.js')
-  const { verifyGpuRuntime } = await import('../src/lib/incus/incus-gpu.js')
   const { default: Fastify } = await import('fastify')
   const { default: gpuRoutes } = await import('../src/routes/gpus.js')
   const prefix = `gpu-test-${randomUUID()}`
@@ -122,7 +127,6 @@ if (process.env.RUN_GPU_DB_TESTS === '1') {
     assert.equal(await prisma.instance.count({ where: { hostId: host.id } }), beforeCount)
     const calls: Array<{ method: string; body: any }> = []
     const mockClient = { options: { hostId: host.id }, request: async (method: string, path: string, body: unknown) => { calls.push({ method, body }); return method === 'GET' ? { name: second.incusId, type: 'container', profiles: ['unsafe-default'], devices: { other: { type: 'gpu' } }, config: {} } : method === 'POST' ? { return: 0, output: { '1': '/gpu-stdout' } } : {} } }
-    Object.assign(mockClient, { readFile: async () => ({ content: Object.values(calls.find(call => call.method === 'PUT' && call.body?.devices)?.body.devices || {}).filter((device: any) => device.type === 'gpu').map((device: any) => gpus.find(gpu => gpu.pciAddress === device.pci)?.uuid).join('\n'), statusCode: 200 }) })
     await startInstance(mockClient as any, second.incusId)
     assert.deepEqual(calls.find(call => call.method === 'PUT')?.body.devices.gpu0, { type: 'gpu', gputype: 'physical', pci: '0000:b3:00.0' })
     assert.equal(calls.find(call => call.method === 'PUT')?.body.devices.other, undefined)
@@ -145,6 +149,7 @@ if (process.env.RUN_GPU_DB_TESTS === '1') {
     await startInstance(mockClient as any, bundle.incusId)
     assert.equal(calls.find(call => call.method === 'PUT')?.body.devices.gpu0.pci, '0000:65:00.0')
     assert.equal(calls.find(call => call.method === 'PUT')?.body.devices.gpu1.pci, '0000:b3:00.0')
+    assert.equal(calls.some(call => call.method === 'POST' && call.body?.command?.[0] === '/usr/bin/nvidia-smi'), false, 'GPU delivery must not run an nvidia-smi preflight')
     // Package edits cannot silently remove a delivered card on restart or upgrade.
     const partialPlan = await prisma.packagePlan.create({ data: { ...plan, id: undefined, packageId: bundle.packageId!, name: 'Partial GPU', gpuShared: true, gpuDeviceIds: [gpus[0].id] } })
     await assert.rejects(assertGpuPlanChange(prisma, bundle.id, partialPlan.id), /改变 GPU 绑定/)
@@ -158,11 +163,6 @@ if (process.env.RUN_GPU_DB_TESTS === '1') {
     await assert.rejects(create(gpus.map(gpu => gpu.id)), /GPU_RESOURCES_INSUFFICIENT/)
     assert.equal(await prisma.instanceGpuAllocation.count(), beforeAllocations)
     await prisma.hostGpu.update({ where: { id: gpus[1].id }, data: { maxInstances: 2 } })
-    const runtimeClient = { request: async () => ({ return: 0, output: { '1': '/gpu-stdout' } }), readFile: async () => ({ content: gpus[0].uuid, statusCode: 200 }) }
-    await verifyGpuRuntime(runtimeClient as any, 'runtime-check', 1)
-    await assert.rejects(verifyGpuRuntime(runtimeClient as any, 'runtime-check', 2), /可见 GPU 数量/)
-    await assert.rejects(verifyGpuRuntime({ ...runtimeClient, request: async () => ({ return: 127 }) } as any, 'runtime-check', 1), /glibc/)
-    await assert.rejects(verifyGpuRuntime({ ...runtimeClient, request: async () => { throw new Error('no such file or directory') } } as any, 'runtime-check', 1), /glibc/)
     // API authorization and per-device config checks use the actual route plugin.
     app = Fastify()
     app.decorate('authenticate', async (request: any) => { request.user = { id: request.headers['x-outsider'] ? owner.id + 10000 : owner.id, role: 'user' } })

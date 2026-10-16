@@ -22,9 +22,6 @@ const cert = join(folder, 'cert.pem'), key = join(folder, 'key.pem')
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=localhost'], { stdio: 'ignore' })
 const guests = new Map<string, any>()
 let failNextCreate = false
-let failNextGpuCheck = false
-const gpuUuidsByPci = new Map<string, string>()
-const execLogs = new Map<string, string>()
 const incus = createServer({ cert: readFileSync(cert), key: readFileSync(key) }, async (req, res) => {
   let raw = ''; for await (const chunk of req) raw += chunk
   const body = raw ? JSON.parse(raw) : {}
@@ -32,10 +29,9 @@ const incus = createServer({ cert: readFileSync(cert), key: readFileSync(key) },
   const reply = (metadata: any, status = 200) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(status >= 400 ? { type: 'error', error: metadata, error_code: status } : { type: 'sync', status: 'Success', status_code: 200, metadata })) }
   if (path === '/1.0') return reply({ environment: { server_name: 'GPU smoke fixture' }, api_extensions: ['gpu', 'container_nvidia'] })
   if (path === '/1.0/instances' && req.method === 'POST') {
-    if (failNextCreate) { failNextCreate = false; return reply('simulated NVIDIA runtime failure', 500) }
+    if (failNextCreate) { failNextCreate = false; return reply('simulated instance creation failure', 500) }
     guests.set(body.name, { ...body, status: 'Stopped', status_code: 102 }); return reply({})
   }
-  if (execLogs.has(path)) { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end(execLogs.get(path)) }
   const match = path.match(/^\/1.0\/instances\/([^/]+)(\/state|\/exec)?$/)
   if (match) {
     const guest = guests.get(match[1])
@@ -44,17 +40,7 @@ const incus = createServer({ cert: readFileSync(cert), key: readFileSync(key) },
       if (req.method === 'PUT') { guest.status = body.action === 'stop' ? 'Stopped' : 'Running'; guest.status_code = body.action === 'stop' ? 102 : 103 }
       return reply({ status: guest.status, status_code: guest.status_code, network: {}, cpu: { usage: 0 }, memory: { usage: 0 }, disk: {} })
     }
-    if (match[2] === '/exec') {
-      if (body.command?.[0] === '/usr/bin/nvidia-smi') {
-        const stdout = `/1.0/instances/${match[1]}/logs/gpu-stdout`
-        const stderr = `/1.0/instances/${match[1]}/logs/gpu-stderr`
-        const fail = failNextGpuCheck; failNextGpuCheck = false
-        execLogs.set(stdout, fail ? '' : Object.values(guest.devices).filter((device: any) => device.type === 'gpu').map((device: any) => gpuUuidsByPci.get(device.pci)).join('\n'))
-        execLogs.set(stderr, fail ? 'Error relocating nvidia-smi: gnu_get_libc_version: symbol not found' : '')
-        return reply({ return: fail ? 127 : 0, output: { '1': stdout, '2': stderr } })
-      }
-      return reply({ return: 0, output: {} })
-    }
+    if (match[2] === '/exec') return reply({ return: 0, output: {} })
     if (req.method === 'DELETE') { guests.delete(match[1]); return reply({}) }
     if (req.method === 'PUT') { guests.set(match[1], { ...guest, ...body }); return reply({}) }
     return reply(guest)
@@ -80,7 +66,6 @@ try {
   const image = await prisma.systemImage.create({ data: { name: 'GPU smoke Linux', remoteAlias: `${prefix}-image`, icon: 'ubuntu', instanceType: 'container' } }); imageId = image.id
   await syncHostGpuReport(hostId, { status: 'ready', runtimeReady: true, cards: [1, 2].map(n => ({ uuid: `GPU-${String(n).repeat(8)}-2222-2222-2222-222222222222`, pciAddress: n === 1 ? '0000:65:00.0' : '0000:b3:00.0', name: 'NVIDIA A10', memoryTotalMiB: 23028, computeMode: 'Default' })) })
   const cards = await prisma.hostGpu.findMany({ where: { hostId }, orderBy: { id: 'asc' } })
-  for (const card of cards) gpuUuidsByPci.set(card.pciAddress, card.uuid)
   const authenticate = async (request: any) => { request.user = request.headers['x-seller'] ? seller : buyer }
   app.decorate('authenticate', authenticate); app.decorate('authenticateUser', authenticate)
   await app.register(gpuRoutes, { prefix: '/api' })
@@ -168,14 +153,7 @@ try {
   assert.equal(gpuInfo.json().gpu.devices[0].count, 2)
   await waitFor(() => prisma.log.count({ where: { instanceId: bundleInstance.id, action: 'instance.create' } }), count => count > 0, 'bundle provisioner completion')
   assert.equal(Number((await prisma.user.findUniqueOrThrow({ where: { id: buyer.id } })).balance), 93)
-  failNextGpuCheck = true
-  const incompatible = await purchase(plans[1]); assert.equal(incompatible.statusCode, 202, incompatible.body)
-  const incompatibleInstance = await waitFor(() => prisma.instance.findFirst({ where: { userId: buyer.id, packagePlanId: plans[1] }, orderBy: { id: 'desc' } }), value => value?.status === 'error' && value.gpuReleasedAt !== null, 'glibc-incompatible GPU image rejection')
-  assert.ok(incompatibleInstance)
-  await waitFor(() => prisma.user.findUniqueOrThrow({ where: { id: buyer.id } }), user => Number(user.balance) === 93, 'GPU ABI failure refund')
-  assert.equal(guests.has(incompatibleInstance.incusId), false)
-  assert.equal(await prisma.instanceBillingRecord.count({ where: { instanceId: incompatibleInstance.id, type: 'refund' } }), 1)
-  console.log('GPU business smoke passed: package edit round-trip; inherited/CPU/dual-GPU catalogue; exact dual PCI delivery and billing; capacity rollback and refunds; musl/glibc failure detection; CPU-only coexistence')
+  console.log('GPU business smoke passed: package edit round-trip; inherited/CPU/dual-GPU catalogue; exact dual PCI delivery and billing; capacity rollback and creation-failure refunds; CPU-only coexistence')
 } finally {
   await app.close(); await closeAllClients()
   await new Promise<void>(resolve => incus.close(() => resolve()))

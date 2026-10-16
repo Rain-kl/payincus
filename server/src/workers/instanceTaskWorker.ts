@@ -1548,7 +1548,7 @@ async function executeRecreateTask(
   // 13. 启动新实例
   await updateInstanceTaskProgress(task.id, 'starting')
   console.log(`[Recreate] 启动新实例 ${newIncusId}...`)
-  await startInstance(client, newIncusId, { gpuExpectedCount: gpuPciAddresses?.length })
+  await startInstance(client, newIncusId)
 
   // 14. 等待网络初始化
   let actualIpv6: string | null = null
