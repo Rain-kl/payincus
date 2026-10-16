@@ -16,7 +16,7 @@ async function load(reset = false) {
   try {
     const [response, catalog] = await Promise.all([api.network.policy(props.hostId), api.network.nodes()])
     if (current !== generation) return
-    policy.value = response.policy; nodes.value = catalog.nodes; agentReady.value = Array.isArray(response.agent?.capabilities) && response.agent.capabilities.includes('xray-egress')
+    policy.value = response.policy; nodes.value = catalog.nodes; agentReady.value = Array.isArray(response.agent?.capabilities) && response.agent.capabilities.includes('network-control')
     if (!form.value || reset) { form.value = structuredClone(response.policy.egress); formRevision.value = response.policy.revision; cidrs.value = form.value.internalCidrs.join('\n'); dirty.value = false }
   } catch (e: any) { if (current === generation) error.value = e.message }
 }
@@ -34,7 +34,7 @@ async function save() {
   if (!form.value || !policy.value) return
   busy.value = true; error.value = ''
   try { form.value.internalCidrs = cidrs.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean); await api.network.updateEgress(props.hostId, formRevision.value, form.value); await load(true) }
-  catch (e: any) { error.value = e.message }
+  catch (e: any) { error.value = e.message; await load(Number.isSafeInteger(e.revision)) }
   finally { busy.value = false }
 }
 watch(() => props.hostId, () => { generation++; form.value = null; policy.value = null; error.value = ''; void load() }, { immediate: true })
@@ -63,7 +63,7 @@ onUnmounted(() => { generation++; clearInterval(timer) })
         </template>
         <label class="block text-sm text-themed">{{ t('egress.internalCidrs') }}<textarea v-model="cidrs" rows="3" class="input mt-1 font-mono text-xs" /></label>
         <p class="text-xs text-themed-muted">{{ t('egress.behaviorHint') }}</p>
-        <button type="button" class="btn-primary" :disabled="busy || !dirty" @click="save">{{ t('egress.saveEgress') }}</button>
+        <button type="button" class="btn-primary" :disabled="busy || !dirty" @click="save">{{ t(busy ? 'egress.applying' : 'egress.saveEgress') }}</button>
       </div>
     </div>
   </section>

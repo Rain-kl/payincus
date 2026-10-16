@@ -16,6 +16,18 @@ export interface TunnelTargetConfig {
 }
 
 const WS_OPEN = 1
+export type ControlMethod = 'network.apply' | 'proxy.probe'
+export class TunnelControlError extends Error {
+  constructor(public readonly code: 'OFFLINE' | 'UPGRADE_REQUIRED' | 'BUSY' | 'TIMEOUT' | 'DISCONNECTED' | 'CANCELLED' | 'INVALID_RESPONSE' | 'REMOTE_ERROR') {
+    super(code)
+    this.name = 'TunnelControlError'
+  }
+}
+interface PendingControl {
+  hostId: number
+  socket: WebSocketLike
+  finish(error?: TunnelControlError, value?: unknown): void
+}
 
 /**
  * 宿主机反向 WebSocket 隧道管理器（单例）
@@ -27,6 +39,8 @@ export class HostTunnelManager extends EventEmitter {
   private activeTunnels = new Map<number, WebSocketLike>()
   private streamMap = new Map<string, Duplex>()
   private nextStreamId = 0
+  private controlCapabilities = new Map<number, Set<string>>()
+  private pendingControls = new Map<string, PendingControl>()
 
   /**
    * 注册在线隧道的 WebSocket 连接
@@ -34,6 +48,7 @@ export class HostTunnelManager extends EventEmitter {
   registerTunnel(hostId: number, ws: WebSocketLike): void {
     const existing = this.activeTunnels.get(hostId)
     if (existing && existing !== ws) {
+      this.cleanupHostControls(hostId)
       try {
         existing.close(1000, 'Replaced by newer agent tunnel connection')
       } catch {
@@ -42,9 +57,11 @@ export class HostTunnelManager extends EventEmitter {
     }
 
     this.activeTunnels.set(hostId, ws)
+    this.controlCapabilities.delete(hostId)
     this.emit('tunnel_connected', hostId)
 
     const onMessage = (data: any) => {
+      if (this.activeTunnels.get(hostId) !== ws) return
       let buf: Buffer
       if (Buffer.isBuffer(data)) {
         buf = data
@@ -69,6 +86,7 @@ export class HostTunnelManager extends EventEmitter {
     const onClose = () => {
       if (this.activeTunnels.get(hostId) === ws) {
         this.activeTunnels.delete(hostId)
+        this.cleanupHostControls(hostId)
         this.cleanupHostStreams(hostId, new Error(`Host ${hostId} tunnel closed`))
         this.emit('tunnel_disconnected', hostId)
       }
@@ -79,6 +97,9 @@ export class HostTunnelManager extends EventEmitter {
     ws.on('error', (err) => {
       console.warn(`[HostTunnelManager] Tunnel socket error for host ${hostId}:`, err?.message || err)
     })
+    // Ask after authentication/listener installation; an Agent's initial hello
+    // could otherwise arrive while the websocket route is still authenticating.
+    try { ws.send(encodeFrame(TunnelFrameType.CONTROL_HELLO, 0)) } catch { /* close handler cleans up */ }
   }
 
   /**
@@ -88,6 +109,7 @@ export class HostTunnelManager extends EventEmitter {
     const current = this.activeTunnels.get(hostId)
     if (!ws || current === ws) {
       this.activeTunnels.delete(hostId)
+      this.cleanupHostControls(hostId)
       if (current) {
         try {
           current.close(1000, 'Unregistered')
@@ -113,6 +135,43 @@ export class HostTunnelManager extends EventEmitter {
    */
   getTunnel(hostId: number): WebSocketLike | undefined {
     return this.activeTunnels.get(hostId)
+  }
+
+  supportsControl(hostId: number, method: ControlMethod): boolean {
+    return this.isTunnelOnline(hostId) && this.controlCapabilities.get(hostId)?.has(method) === true
+  }
+
+  async requestControl<T>(hostId: number, method: ControlMethod, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<T> {
+    const ws = this.activeTunnels.get(hostId)
+    if (!ws || ws.readyState !== WS_OPEN) throw new TunnelControlError('OFFLINE')
+    if (!this.supportsControl(hostId, method)) throw new TunnelControlError('UPGRADE_REQUIRED')
+    if (signal?.aborted) throw new TunnelControlError('CANCELLED')
+    if ([...this.pendingControls.values()].filter(p => p.hostId === hostId).length >= 4) throw new TunnelControlError('BUSY')
+    const payload = Buffer.from(JSON.stringify({ method, params }))
+    if (payload.length > 1024 * 1024) throw new TunnelControlError('INVALID_RESPONSE')
+    this.nextStreamId = (this.nextStreamId + 1) & 0x7fffffff || 1
+    const id = this.nextStreamId, key = `${hostId}:${id}`
+    return new Promise<T>((resolve, reject) => {
+      let settled = false
+      const cancelRemote = () => { try { if (ws.readyState === WS_OPEN) ws.send(encodeFrame(TunnelFrameType.CONTROL_CANCEL, id)) } catch { /* no payload logging */ } }
+      const abort = () => { cancelRemote(); finish(new TunnelControlError('CANCELLED')) }
+      const timer = setTimeout(() => { cancelRemote(); finish(new TunnelControlError('TIMEOUT')) }, timeoutMs)
+      const finish = (error?: TunnelControlError, value?: unknown) => {
+        if (settled) return
+        settled = true; clearTimeout(timer); signal?.removeEventListener('abort', abort); this.pendingControls.delete(key)
+        if (error) reject(error); else resolve(value as T)
+      }
+      this.pendingControls.set(key, { hostId, socket: ws, finish })
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) { abort(); return }
+      try { ws.send(encodeFrame(TunnelFrameType.CONTROL_REQUEST, id, payload), error => { if (error) finish(new TunnelControlError('DISCONNECTED')) }) }
+      catch { finish(new TunnelControlError('DISCONNECTED')) }
+    })
+  }
+
+  private cleanupHostControls(hostId: number): void {
+    this.controlCapabilities.delete(hostId)
+    for (const pending of [...this.pendingControls.values()]) if (pending.hostId === hostId) pending.finish(new TunnelControlError('DISCONNECTED'))
   }
 
   /**
@@ -246,6 +305,28 @@ export class HostTunnelManager extends EventEmitter {
     const stream = this.streamMap.get(streamKey)
 
     switch (type) {
+      case TunnelFrameType.CONTROL_HELLO: {
+        if (streamId !== 0 || payload.length > 4096) break
+        try {
+          const hello = JSON.parse(payload.toString('utf8'))
+          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'network.apply' || v === 'proxy.probe') : [])
+          const firstHello = !this.controlCapabilities.has(hostId)
+          this.controlCapabilities.set(hostId, capabilities)
+          if (firstHello && capabilities.has('network.apply')) this.emit('control_ready', hostId)
+        } catch { /* never log control payloads */ }
+        break
+      }
+      case TunnelFrameType.CONTROL_RESPONSE: {
+        const pending = this.pendingControls.get(streamKey)
+        if (!pending || pending.socket !== this.activeTunnels.get(hostId)) break
+        if (payload.length > 128 * 1024) { pending.finish(new TunnelControlError('INVALID_RESPONSE')); break }
+        try {
+          const response = JSON.parse(payload.toString('utf8'))
+          if (response.ok === true && Object.hasOwn(response, 'result')) pending.finish(undefined, response.result)
+          else pending.finish(new TunnelControlError(response.error === 'busy' ? 'BUSY' : response.error === 'timeout' ? 'TIMEOUT' : response.error === 'cancelled' ? 'CANCELLED' : 'REMOTE_ERROR'))
+        } catch { pending.finish(new TunnelControlError('INVALID_RESPONSE')) }
+        break
+      }
       case TunnelFrameType.DATA:
         if (stream && !stream.destroyed) {
           stream.push(payload)

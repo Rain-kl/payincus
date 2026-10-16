@@ -55,16 +55,17 @@ func main() {
 		return
 	}
 
+	networkWorker := egress.NewManager()
+	go networkWorker.Run(ctx)
 	tunnelWorker := tunnel.NewWorker(tunnel.WorkerConfig{
-		PanelURL:    cfg.PanelURL,
-		AgentID:     cfg.AgentID,
-		AgentSecret: cfg.AgentSecret,
+		PanelURL:       cfg.PanelURL,
+		AgentID:        cfg.AgentID,
+		AgentSecret:    cfg.AgentSecret,
+		ControlHandler: networkWorker.HandleControl,
 	})
 	defer tunnelWorker.SyncConfig(false, "", 0)
 
 	log.Printf("incudal-agent started: panel=%s interval=%s", cfg.PanelURL, cfg.HeartbeatInterval)
-	networkWorker := egress.NewManager()
-	go networkWorker.Run(ctx)
 	upgradeRunner := upgrade.DefaultRunner(cfg)
 	var upgradeInProgress atomic.Bool
 	var caddyOpInProgress atomic.Bool
@@ -88,7 +89,6 @@ func main() {
 			log.Printf("incudal-agent stopped")
 			return
 		case <-ticker.C:
-		case <-networkWorker.ResultsReady():
 		}
 		if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds, networkWorker); err != nil {
 			heartbeatLogState.logFailure(err)
@@ -160,36 +160,13 @@ func handleCaddyInstruction(ctx context.Context, result panel.HeartbeatResult, i
 
 func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalSeconds int, workers ...*egress.Manager) (panel.HeartbeatResult, error) {
 	payload := report.HeartbeatPayload(version, heartbeatIntervalSeconds)
-	var sent []egress.JobResult
 	if len(workers) > 0 {
-		status, results := workers[0].Report()
-		// Both current and older Panels process at most three results per
-		// heartbeat. Never send a larger batch that an older Panel could lose.
-		if len(results) > 3 {
-			results = results[:3]
-		}
-		payload["networkStatus"] = status
-		payload["proxyProbeResults"] = results
-		sent = results
-		payload["capabilities"] = append(payload["capabilities"].([]any), "xray-egress")
+		payload["networkStatus"] = workers[0].Report()
+		payload["capabilities"] = append(payload["capabilities"].([]any), "xray-egress", "network-control")
 	}
 	result, err := client.Heartbeat(ctx, payload)
 	if err != nil {
 		return result, err
-	}
-	if len(workers) > 0 {
-		if result.Network != nil {
-			acknowledged := result.Network.AcknowledgedProbeJobs
-			if acknowledged == nil {
-				// Older Panels acknowledge the bounded batch through HTTP success.
-				// An explicit empty list from a current Panel never acknowledges it.
-				for _, item := range sent {
-					acknowledged = append(acknowledged, item.JobID)
-				}
-			}
-			workers[0].AckResults(sent, acknowledged)
-		}
-		workers[0].Sync(result.Network)
 	}
 	return result, nil
 }

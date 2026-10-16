@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -57,6 +58,8 @@ func socksDial(ctx context.Context, port int, address string) (net.Conn, error) 
 	if err != nil {
 		return nil, err
 	}
+	stopCancel := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancel()
 	failed := true
 	defer func() {
 		if failed {
@@ -121,10 +124,10 @@ func ProbeCLI(port int, target string) {
 	defer cancel()
 	_ = json.NewEncoder(os.Stdout).Encode(ProbeURL(ctx, port, target))
 }
-func executeJob(ctx context.Context, dir string, job ProbeJob) JobResult {
-	result := JobResult{JobID: job.JobID, Items: []ProbeResult{}}
+func executeProbe(ctx context.Context, dir string, job ProbeRequest) []ProbeResult {
+	result := []ProbeResult{}
 	for _, n := range job.Nodes {
-		result.Items = append(result.Items, ProbeResult{NodeID: n.ID, Error: "xray"})
+		result = append(result, ProbeResult{NodeID: n.ID, Error: "xray"})
 	}
 	binaryPath, err := extractBinary(dir)
 	if err != nil {
@@ -165,10 +168,10 @@ func executeJob(ctx context.Context, dir string, job ProbeJob) JobResult {
 		if errors.As(err, &core) {
 			detail = core.reason
 		}
-		for i := range result.Items {
-			result.Items[i].ErrorDetail = detail
+		for i := range result {
+			result[i].ErrorDetail = detail
 		}
-		log.Printf("[egress] probe rejected job=%s stage=config reason=%s", job.JobID, detail)
+		log.Printf("[egress] realtime probe rejected stage=config reason=%s", detail)
 		return result
 	}
 	cmd := exec.CommandContext(ctx, binaryPath, "run", "-config", path)
@@ -176,29 +179,42 @@ func executeJob(ctx context.Context, dir string, job ProbeJob) JobResult {
 		return result
 	}
 	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	var probes sync.WaitGroup
+	limit := make(chan struct{}, 4)
 	for i, node := range job.Nodes {
-		ready := false
-		for attempt := 0; attempt < 30; attempt++ {
-			c, e := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(ports[i])), 100*time.Millisecond)
-			if e == nil {
-				c.Close()
-				ready = true
-				break
-			}
+		probes.Add(1)
+		go func(i int, node Node) {
+			defer probes.Done()
 			select {
+			case limit <- struct{}{}:
 			case <-ctx.Done():
-				return result
-			case <-time.After(100 * time.Millisecond):
+				return
 			}
-		}
-		if !ready {
-			continue
-		}
-		pctx, cancel := context.WithTimeout(ctx, 12*time.Second)
-		probe := ProbeURL(pctx, ports[i], job.ProbeURL)
-		cancel()
-		probe.NodeID = node.ID
-		result.Items[i] = probe
+			defer func() { <-limit }()
+			ready := false
+			for attempt := 0; attempt < 30; attempt++ {
+				c, e := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(ports[i])), 100*time.Millisecond)
+				if e == nil {
+					c.Close()
+					ready = true
+					break
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(100 * time.Millisecond):
+				}
+			}
+			if !ready {
+				return
+			}
+			pctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+			probe := ProbeURL(pctx, ports[i], job.ProbeURL)
+			cancel()
+			probe.NodeID = node.ID
+			result[i] = probe
+		}(i, node)
 	}
+	probes.Wait()
 	return result
 }

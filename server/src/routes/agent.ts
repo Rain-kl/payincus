@@ -1,5 +1,6 @@
 import { syncHostGpuReport } from '../db/gpus.js'
-import { networkHeartbeat } from '../lib/egress/sync.js'
+import { recordNetworkStatus } from '../lib/egress/sync.js'
+import { pushNetworkPolicy } from '../lib/egress/realtime.js'
 /**
  * 宿主机 Agent 路由
  * 负责 Agent 凭据签发、HMAC 鉴权和心跳上报。
@@ -58,7 +59,6 @@ interface AgentHeartbeatBody {
   resources?: Record<string, unknown>
   metrics?: Record<string, unknown>
   networkStatus?: Record<string, unknown>
-  proxyProbeResults?: unknown[]
 }
 
 interface AgentBinaryParams {
@@ -1046,6 +1046,11 @@ async function authenticateAgentRequest(
 }
 
 export default async function agentRoutes(fastify: FastifyInstance) {
+  const onControlReady = (hostId: number) => {
+    void pushNetworkPolicy(hostId).catch(() => fastify.log.warn({ hostId }, 'Realtime network synchronization failed'))
+  }
+  hostTunnelManager.on('control_ready', onControlReady)
+  fastify.addHook('onClose', async () => { hostTunnelManager.off('control_ready', onControlReady) })
   fastify.get('/install.sh', async (_request: FastifyRequest, reply: FastifyReply) => {
     const scriptPath = join(__dirname, '../../templates/agent-install.sh')
     const script = readFileSync(scriptPath, 'utf8')
@@ -1601,22 +1606,20 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       caddyCommand = 'install'
     }
 
+    if (request.body.networkStatus) await recordNetworkStatus(agent.hostId, request.body.networkStatus)
     return {
       ok: true,
       serverTime: now.toISOString(),
       taskPollIntervalSeconds: 15,
       instanceReport,
-      network: request.body.capabilities?.includes('xray-egress')
-        ? await networkHeartbeat(agent.hostId, request.body.networkStatus, request.body.proxyProbeResults)
-        : undefined,
       upgrade: await buildAgentUpgradeInstruction(request, request.body),
       caddy: {
         command: caddyCommand,
         port: caddyCommand === 'install' ? caddyPort : 0
       },
       tunnel: {
-        // 隧道默认建立：Agent 连上面板即建 WebSocket 通道；tunnelEnabled=false 才显式禁用。
-        enabled: host?.tunnelEnabled ?? true,
+        // 实时控制复用此通道；Incus 的直连/穿透模式仍由宿主设置决定。
+        enabled: request.body.capabilities?.includes('network-control') === true || (host?.tunnelEnabled ?? true),
         targetHost: host?.targetHost ?? '127.0.0.1',
         targetPort: host?.targetPort ?? 8443
       }
@@ -1642,8 +1645,8 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       select: { id: true, tunnelEnabled: true, targetHost: true, targetPort: true }
     })
 
-    // 隧道默认建立（与心跳响应一致）：仅显式 tunnelEnabled=false 时禁用。
-    if (!host || host.tunnelEnabled === false) {
+    // 直连 Incus 的宿主也可建立经过 HMAC 认证的实时控制通道。
+    if (!host || (host.tunnelEnabled === false && !(Array.isArray(agent.capabilities) && agent.capabilities.includes('network-control')))) {
       try {
         socket.close(4003, 'Tunnel mode is disabled for this host')
       } catch {

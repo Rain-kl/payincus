@@ -22,7 +22,7 @@ function remove(index: number) { form.value?.rules.splice(index, 1); dirty.value
 async function save() {
   if (!form.value) return
   busy.value = true; error.value = ''
-  try { await api.network.updateFirewall(props.hostId, formRevision.value, form.value); await load(true) } catch (e: any) { error.value = e.message }
+  try { await api.network.updateFirewall(props.hostId, formRevision.value, form.value); await load(true) } catch (e: any) { error.value = e.message; await load(Number.isSafeInteger(e.revision)) }
   finally { busy.value = false }
 }
 watch(() => props.hostId, () => { generation++; policy.value = null; form.value = null; error.value = ''; showRule.value = false; void load() }, { immediate: true })
@@ -48,7 +48,7 @@ onUnmounted(() => { generation++; clearInterval(timer) })
           <button class="btn-ghost" @click="edit(index)">{{ t('egress.editRule') }}</button><button class="btn-ghost text-error" @click="remove(index)">{{ t('common.delete') }}</button>
         </article>
       </div>
-      <div class="flex flex-wrap gap-2"><button class="btn-secondary" :disabled="form.rules.length >= 200" @click="edit()">{{ t('egress.addRule') }}</button><button class="btn-primary" :disabled="busy || !dirty" @click="save">{{ t('egress.saveFirewall') }}</button><button class="btn-secondary" :disabled="busy" @click="load(true)">{{ t('egress.reload') }}</button></div>
+      <div class="flex flex-wrap gap-2"><button class="btn-secondary" :disabled="form.rules.length >= 200" @click="edit()">{{ t('egress.addRule') }}</button><button class="btn-primary" :disabled="busy || !dirty" @click="save">{{ t(busy ? 'egress.applying' : 'egress.saveFirewall') }}</button><button class="btn-secondary" :disabled="busy" @click="load(true)">{{ t('egress.reload') }}</button></div>
     </div>
     <DrawerModal :show="showRule" :title="t('egress.editRule')" @close="showRule = false">
       <form class="space-y-4" @submit.prevent="acceptRule">

@@ -1,6 +1,6 @@
 # Xray 出口与 Incus 防火墙
 
-Agent v1.2.5 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
+Agent v1.2.6 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
 
 ## 配置入口
 
@@ -32,13 +32,13 @@ ACL 使用原始容器连接目标和容器端口。例如公网 2222 映射到�
 
 ## 同步与运行
 
-Panel 保存目标版本；Agent 在已鉴权心跳响应中获得策略、被授权使用的代理凭据和检测任务。未引用节点的凭据不会广播到所有宿主机。凭据、检测快照在 PostgreSQL 中加密，管理列表与日志不输出明文。
+Panel 保存目标版本，通过现有 HMAC 鉴权的反向 WebSocket 隧道立即调用 Agent 应用配置，并等待实际应用状态返回；失败直接显示错误。心跳只回报状态，不再交付配置或检测。隧道重连后立即补发最新目标版本。离线、旧版 Agent 在保存前明确报错；保存后断线的目标保留，重连恢复。Incus 使用直连的宿主也建立同一控制通道，不改变其 Incus 网络连接方式。仅下发被该宿主选中的代理凭据，数据库加密存储，列表与日志不输出明文。
 
 Agent 使用本地 Incus Unix socket，定期核对网络与实例。新增实例只更新规则，不因实例数量变化重启 Xray；修改 Xray 核心配置或升级核心可能重启代理进程，已有代理连接可能重连。故障转移使用原生 RoutingService 覆盖目标，切换影响新连接。
 
 故障转移默认连续三次失败切换，优先节点连续两次成功后回切；未知健康状态不会直接提升为主节点。轮询/最低延迟使用 Xray 原生 balancer 与 observatory，所有候选失效时 `fallbackTag` 指向 blackhole；默认 outbound 同样为 blackhole。
 
-代理页面每 3 秒自动刷新检测结果，并提供手动刷新、最近心跳和回报截止时间。检测完成后 Agent 立即触发心跳回报，不再等下一个常规心跳。检测任务具有租约、过期时间和幂等结果回报；通过独立 Xray 配置逐个验证 HTTPS，避免切换生产出口。成功不代表 UDP、ICMP 或所有站点均可用。完成/过期后清除任务中的凭据快照。服务端逐条确认已落库结果；Agent 保留尚未确认的结果并重试，避免批量结果因单次心跳处理上限而丢失。每次最多发送三条结果；连接旧版 Panel 时兼容其 HTTP 成功确认，收到新版显式确认列表时则严格逐条处理。
+代理页面点击检测后，通过隧道即时请求 Agent，前端等待本次结果；没有排队、心跳交付、历史查询或结果落库。最多 10 个节点并发 4 路，每台 Agent 同时只执行一组手动检测。检测使用独立临时 Xray 配置，不切换生产出口；结束后清理配置与临时进程。页面离开、HTTP 断开、隧道断开或超时会取消请求。HTTPS 成功不代表 UDP、ICMP 或所有站点可用。隧道请求限定方法与消息大小、关联请求与宿主/连接、设置超时与并发上限，旧版 Agent 必须升级后使用。
 
 实际应用成功才回报 appliedRevision；失败保留失败状态。失败步骤和脱敏原因同步显示在 Panel，并写入 Agent 日志；不记录原始配置或核心可能包含凭据的输出。故障转移启动时等待 RoutingService 就绪并设为 blackhole 后再放行接管流量。代理应用失败或进程退出时，选中连接保持阻断，不打开直出作为补偿。Panel 的目标版本、已生效版本和最近回报分别显示。
 
@@ -62,7 +62,7 @@ make check
 
 `server/scripts/smoke-egress.ts` 只接受 `127.0.0.1:55432/egress_test` 专用数据库，验证真实 HTTP/数据库交互，不连接生产。新迁移也应在独立数据库验证。
 
-当前开发环境已通过真实 Xray HTTPS 出站、RoutingService 的代理/blackhole 切换、导入与权限、配置并发、任务租约和前后端构建检查。宿主侧 nft 规则通过隔离检查；开发环境内核缺少可用的 nft TPROXY 表达式，命名空间规则不能在这里完成内核验证。
+当前开发环境已通过真实 Xray HTTPS 出站、RoutingService 的代理/blackhole 切换、导入与权限、配置并发、实时隧道请求与取消和前后端构建检查。宿主侧 nft 规则通过隔离检查；开发环境内核缺少可用的 nft TPROXY 表达式，命名空间规则不能在这里完成内核验证。
 
 部署验收仍需一台获授权的非生产 Incus 节点，覆盖：存量/新增/停止后启动、IPv4/IPv6、TCP/UDP、DNAT 和公网路由入站回程、同桥/跨桥内网、ACL 的 IP/端口限制、所有代理失效、Agent/核心重启和宿主重启恢复。在完成这些验证之前，不应将本地构建视为生产验收。
 
@@ -73,4 +73,6 @@ journalctl -u incudal-agent -n 100 --no-pager
 systemctl status incudal-xray --no-pager
 ```
 
-新版日志使用 `[egress] applying / applied / apply failed / probe started / probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.5。
+新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.6。
+
+配置校验显式传入 `-format json`。原子应用的暂存文件名为 `xray.json.next`，Xray 默认无法从 `.next` 推断 JSON 格式；回归覆盖零节点直连与真实暂存路径。

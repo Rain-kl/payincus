@@ -4,4 +4,5 @@ export interface FirewallRule { direction: 'ingress' | 'egress'; action: 'allow'
 export interface FirewallPolicy { enabled: boolean; ingressAction: 'allow' | 'drop' | 'reject'; egressAction: 'allow' | 'drop' | 'reject'; rules: FirewallRule[] }
 export interface NetworkPolicy { hostId: number; revision: number; appliedRevision: number; egress: EgressPolicy; firewall: FirewallPolicy; reportedAt: string | null; status: { state?: string; error?: string; errorStage?: string; errorDetail?: string; xrayAvailable?: boolean; activeNodeId?: number; healthyNodeIds?: number[]; managedNetworks?: string[]; routedFallback?: boolean } }
 export interface ProxyImportResult { nodes?: Array<Omit<ProxyNode, 'id'>>; errors: Array<{ index: number; error: string }>; added?: number; duplicates?: number }
-export interface ProbeJob { id: string; hostId: number; host: { name: string; agent?: { version: string | null; lastSeenAt: string | null } | null }; state: string; createdAt: string; expiresAt: string; result: Array<{ nodeId: number; success: boolean; latencyMs: number | null; error: string; errorDetail?: string }> }
+export interface ProxyProbeResult { nodeId: number; success: boolean; latencyMs: number | null; error: string; errorDetail?: string }
+export interface ProxyProbeResponse { host: { id: number; name: string }; items: ProxyProbeResult[] }

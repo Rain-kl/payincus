@@ -21,12 +21,13 @@ import (
 )
 
 type WorkerConfig struct {
-	PanelURL    string
-	AgentID     string
-	AgentSecret string
-	TargetHost  string
-	TargetPort  int
-	InsecureTLS bool
+	PanelURL       string
+	AgentID        string
+	AgentSecret    string
+	TargetHost     string
+	TargetPort     int
+	InsecureTLS    bool
+	ControlHandler ControlHandler
 }
 
 type Worker struct {
@@ -204,9 +205,12 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 	// 日志流绑定本次连接生命周期：连接断开即取消 journalctl 推送
 	connCtx, connCancel := context.WithCancel(ctx)
 	defer connCancel()
+	conn.SetReadLimit(2 << 20)
+	go func() { <-connCtx.Done(); _ = conn.Close() }()
 
 	writeChan := make(chan []byte, 128)
 	writeErrChan := make(chan error, 1)
+	controls := newControlSession(connCtx, w.cfg.ControlHandler, writeChan)
 
 	var logsMu sync.Mutex
 	var logStreamCancel context.CancelFunc
@@ -229,7 +233,7 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 
 		for {
 			select {
-			case <-ctx.Done():
+			case <-connCtx.Done():
 				return
 			case <-pingTicker.C:
 				conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
@@ -282,6 +286,8 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 		}
 
 		switch frameType {
+		case FrameTypeControlRequest, FrameTypeControlHello, FrameTypeControlCancel:
+			controls.handle(frameType, streamID, payload)
 		case FrameTypeOpen:
 			var openCfg TargetConfig
 			if len(payload) > 0 {

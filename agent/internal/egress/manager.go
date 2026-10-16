@@ -25,12 +25,12 @@ type savedNetwork struct {
 type Manager struct {
 	mu           sync.Mutex
 	dir          string
-	resultsReady chan struct{}
 	desired      *Instruction
 	status       Status
-	results      map[string]JobResult
-	running      map[string]bool
-	jobs         chan ProbeJob
+	applyGate    chan struct{}
+	probeGate    chan struct{}
+	wake         chan struct{}
+	healthCancel context.CancelFunc
 	lastHash     string
 	lastHealth   time.Time
 	active       int
@@ -38,149 +38,119 @@ type Manager struct {
 	successes    map[int]int
 }
 
-func NewManager() *Manager {
-	return newManager(stateDir)
-}
+func NewManager() *Manager { return newManager(stateDir) }
 func newManager(dir string) *Manager {
-	m := &Manager{dir: dir, resultsReady: make(chan struct{}, 1), status: Status{State: "idle", Error: "none", XrayAvailable: Available(), ManagedNetworks: []string{}, HealthyNodeIDs: []int{}}, results: map[string]JobResult{}, running: map[string]bool{}, jobs: make(chan ProbeJob, 3), failures: map[int]int{}, successes: map[int]int{}}
+	m := &Manager{dir: dir, status: Status{State: "idle", Error: "none", XrayAvailable: Available(), ManagedNetworks: []string{}, HealthyNodeIDs: []int{}}, applyGate: make(chan struct{}, 1), probeGate: make(chan struct{}, 1), wake: make(chan struct{}, 1), failures: map[int]int{}, successes: map[int]int{}}
 	var saved savedNetwork
 	if b, e := os.ReadFile(filepath.Join(dir, "applied.json")); e == nil && json.Unmarshal(b, &saved) == nil {
 		m.desired = &saved.Instruction
 		m.status.AppliedRevision = saved.Instruction.Revision
 	}
-	var pendingTarget Instruction
-	if b, e := os.ReadFile(filepath.Join(dir, "desired.json")); e == nil && json.Unmarshal(b, &pendingTarget) == nil && pendingTarget.Revision > 0 && (m.desired == nil || pendingTarget.Revision >= m.desired.Revision) {
-		m.desired = &pendingTarget
+	var pending Instruction
+	if b, e := os.ReadFile(filepath.Join(dir, "desired.json")); e == nil && json.Unmarshal(b, &pending) == nil && pending.Revision > 0 && (m.desired == nil || pending.Revision >= m.desired.Revision) {
+		m.desired = &pending
 	}
-	var pending []JobResult
-	if b, e := os.ReadFile(filepath.Join(dir, "probe-results.json")); e == nil && json.Unmarshal(b, &pending) == nil {
-		for _, r := range pending {
-			m.results[r.JobID] = r
-		}
-	}
+	// Manual tests are request-scoped; discard the retired worker's result cache.
+	_ = os.Remove(filepath.Join(dir, "probe-results.json"))
 	return m
 }
-
-// ResultsReady wakes the heartbeat loop after a manual probe finishes. Results
-// remain persisted until a successful heartbeat acknowledges them.
-func (m *Manager) ResultsReady() <-chan struct{} { return m.resultsReady }
-func (m *Manager) Report() (Status, []JobResult) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	results := []JobResult{}
-	for _, r := range m.results {
-		results = append(results, r)
-	}
-	return m.status, results
-}
-func (m *Manager) AckResults(sent []JobResult, acknowledged []string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	accepted := map[string]bool{}
-	for _, id := range acknowledged {
-		accepted[id] = true
-	}
-	for _, r := range sent {
-		if accepted[r.JobID] {
-			delete(m.results, r.JobID)
-		}
-	}
-	m.saveResults()
-	if len(acknowledged) > 0 && len(m.results) > 0 {
-		select {
-		case m.resultsReady <- struct{}{}:
-		default:
-		}
-	}
-}
-func (m *Manager) saveResults() {
-	list := []JobResult{}
-	for _, r := range m.results {
-		list = append(list, r)
-	}
-	b, _ := json.Marshal(list)
-	_ = atomicFile(filepath.Join(m.dir, "probe-results.json"), b, 0600)
-}
-func (m *Manager) Sync(in *Instruction) {
-	if in == nil {
-		return
+func (m *Manager) Report() Status { m.mu.Lock(); defer m.mu.Unlock(); return m.status }
+func (m *Manager) Sync(in *Instruction) error {
+	if in == nil || in.Revision <= 0 {
+		return fmt.Errorf("invalid_request")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.desired == nil || in.Revision >= m.desired.Revision {
-		copy := *in
-		copy.Probes = nil
-		copy.AcknowledgedProbeJobs = nil
-		// Persist the target before any host mutation. An Agent restart midway
-		// through applying a proxy must not revert to an earlier unmanaged mode.
-		if copy.Revision > 0 && (m.desired == nil || copy.Revision != m.desired.Revision) {
-			body, err := json.Marshal(copy)
-			if err == nil {
-				err = atomicFile(filepath.Join(m.dir, "desired.json"), body, 0600)
-			}
-			if err != nil {
-				m.status.State = "error"
-				m.status.Error = "restore"
-				return
-			}
-		}
-		m.desired = &copy
+	if m.desired != nil && in.Revision < m.desired.Revision {
+		return nil
 	}
-	for _, job := range in.Probes {
-		if m.running[job.JobID] {
-			continue
+	copy := *in
+	body, err := json.Marshal(copy)
+	if err != nil {
+		return err
+	}
+	if m.desired == nil || in.Revision != m.desired.Revision {
+		if err = atomicFile(filepath.Join(m.dir, "desired.json"), body, 0600); err != nil {
+			return err
 		}
-		if _, done := m.results[job.JobID]; done {
-			continue
+	}
+	m.desired = &copy
+	if m.healthCancel != nil {
+		m.healthCancel()
+	}
+	return nil
+}
+func (m *Manager) Apply(ctx context.Context, in Instruction) (Status, error) {
+	if err := ctx.Err(); err != nil {
+		return m.Report(), err
+	}
+	if err := m.Sync(&in); err != nil {
+		m.setErrorAt("restore", "restore", err)
+		return m.Report(), nil
+	}
+	if err := m.reconcile(ctx, false); err != nil {
+		return m.Report(), err
+	}
+	status := m.Report()
+	select {
+	case m.wake <- struct{}{}:
+	default:
+	}
+	return status, nil
+}
+func (m *Manager) Probe(ctx context.Context, request ProbeRequest) ([]ProbeResult, error) {
+	if len(request.Nodes) == 0 || len(request.Nodes) > 10 {
+		return nil, fmt.Errorf("invalid_request")
+	}
+	select {
+	case m.probeGate <- struct{}{}:
+		defer func() { <-m.probeGate }()
+	default:
+		return nil, fmt.Errorf("busy")
+	}
+	log.Printf("[egress] realtime probe started nodes=%d", len(request.Nodes))
+	result := executeProbe(ctx, m.dir, request)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	successes := 0
+	for _, item := range result {
+		if item.Success {
+			successes++
 		}
-		if len(job.Nodes) == 0 || len(job.Nodes) > 10 || len(m.results) >= 20 {
-			continue
+	}
+	log.Printf("[egress] realtime probe finished successes=%d total=%d", successes, len(result))
+	return result, nil
+}
+func (m *Manager) HandleControl(ctx context.Context, method string, params json.RawMessage) (any, error) {
+	switch method {
+	case "network.apply":
+		var in Instruction
+		if json.Unmarshal(params, &in) != nil || in.Revision <= 0 || (in.Egress.Mode != "off" && in.Egress.Mode != "direct" && in.Egress.Mode != "proxy") || len(in.Nodes) > 16 || len(in.Firewall.Rules) > 200 {
+			return nil, fmt.Errorf("invalid_request")
 		}
-		select {
-		case m.jobs <- job:
-			m.running[job.JobID] = true
-		default:
+		return m.Apply(ctx, in)
+	case "proxy.probe":
+		var in ProbeRequest
+		if json.Unmarshal(params, &in) != nil || len(in.ProbeURL) > 2048 {
+			return nil, fmt.Errorf("invalid_request")
 		}
+		items, err := m.Probe(ctx, in)
+		return map[string]any{"items": items}, err
+	default:
+		return nil, fmt.Errorf("invalid_request")
 	}
 }
 func (m *Manager) Run(ctx context.Context) {
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case job := <-m.jobs:
-				log.Printf("[egress] probe started job=%s nodes=%d", job.JobID, len(job.Nodes))
-				jctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-				result := executeJob(jctx, m.dir, job)
-				cancel()
-				m.mu.Lock()
-				m.results[job.JobID] = result
-				delete(m.running, job.JobID)
-				m.saveResults()
-				m.mu.Unlock()
-				successes := 0
-				for _, item := range result.Items {
-					if item.Success {
-						successes++
-					}
-				}
-				log.Printf("[egress] probe finished job=%s successes=%d total=%d", job.JobID, successes, len(result.Items))
-				select {
-				case m.resultsReady <- struct{}{}:
-				default:
-				}
-			}
-		}
-	}()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for {
-		m.reconcile(ctx)
+		_ = m.reconcile(ctx, true)
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		case <-m.wake:
 		}
 	}
 }
@@ -217,7 +187,17 @@ func (m *Manager) setErrorAt(code, stage string, err error) {
 	m.status.ErrorStage = stage
 	m.status.ErrorDetail = detail
 }
-func (m *Manager) reconcile(parent context.Context) {
+func (m *Manager) reconcile(parent context.Context, withHealth bool) error {
+	select {
+	case m.applyGate <- struct{}{}:
+	case <-parent.Done():
+		return parent.Err()
+	}
+	defer func() { <-m.applyGate }()
+	m.reconcileLocked(parent, withHealth)
+	return nil
+}
+func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 	m.mu.Lock()
 	if m.desired == nil {
 		m.mu.Unlock()
@@ -392,8 +372,21 @@ func (m *Manager) reconcile(parent context.Context) {
 		m.lastHash = ""
 		return
 	}
-	if in.Egress.Mode == "proxy" && time.Since(m.lastHealth) >= time.Duration(in.Egress.ProbeIntervalSeconds)*time.Second {
-		m.health(ctx, in)
+	if withHealth && in.Egress.Mode == "proxy" && time.Since(m.lastHealth) >= time.Duration(in.Egress.ProbeIntervalSeconds)*time.Second {
+		healthCtx, stopHealth := context.WithCancel(ctx)
+		m.mu.Lock()
+		if m.desired.Revision != in.Revision {
+			m.mu.Unlock()
+			stopHealth()
+			return
+		}
+		m.healthCancel = stopHealth
+		m.mu.Unlock()
+		m.health(healthCtx, in)
+		stopHealth()
+		m.mu.Lock()
+		m.healthCancel = nil
+		m.mu.Unlock()
 		m.lastHealth = time.Now()
 	}
 }
@@ -424,6 +417,9 @@ func (m *Manager) health(ctx context.Context, in Instruction) {
 		}(i)
 	}
 	probes.Wait()
+	if ctx.Err() != nil {
+		return
+	}
 	for i, n := range in.Nodes {
 		if available[i] {
 			m.failures[n.ID] = 0

@@ -23,38 +23,21 @@ func testInstruction() Instruction {
 	return Instruction{Revision: 1, Egress: Policy{Mode: "proxy", Strategy: "balance", ProxyNodeIDs: []int{1, 10}, ProbeURL: "https://www.gstatic.com/generate_204", ProbeIntervalSeconds: 30}, Firewall: Firewall{Enabled: true, IngressAction: "allow", EgressAction: "allow", Rules: []Rule{{Direction: "egress", Action: "drop", Protocol: "tcp", DestinationPort: "25", Enabled: true}}}, Nodes: []Node{{ID: 1, Outbound: json.RawMessage(`{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":1080}]}}`)}, {ID: 10, Outbound: json.RawMessage(`{"protocol":"socks","settings":{"servers":[{"address":"127.0.0.1","port":1081}]}}`)}}}
 }
 
-func TestProbeResultWakesHeartbeatWithoutNetworkPolicy(t *testing.T) {
+func TestRealtimeProbeHasNoPersistentResults(t *testing.T) {
 	dir := t.TempDir()
 	m := newManager(dir)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { m.Run(ctx); close(done) }()
-	defer func() { cancel(); <-done }()
-	// Invalid configuration finishes with a bounded failure and never connects
-	// to an external proxy. Revision zero also leaves host networking untouched.
-	m.Sync(&Instruction{Probes: []ProbeJob{{JobID: "wake-heartbeat", ProbeURL: "https://example.com", Nodes: []Node{{ID: 7, Outbound: json.RawMessage(`invalid`)}}}}})
-	select {
-	case <-m.ResultsReady():
-	case <-time.After(10 * time.Second):
-		t.Fatal("completed probe did not wake the heartbeat loop")
+	result, err := m.Probe(context.Background(), ProbeRequest{ProbeURL: "https://example.com", Nodes: []Node{{ID: 7, Outbound: json.RawMessage(`invalid`)}}})
+	if err != nil || len(result) != 1 || result[0].NodeID != 7 || result[0].Success || result[0].Error != "xray" {
+		t.Fatalf("unexpected immediate result: %+v %v", result, err)
 	}
-	_, results := m.Report()
-	if len(results) != 1 || results[0].JobID != "wake-heartbeat" || len(results[0].Items) != 1 || results[0].Items[0].NodeID != 7 || results[0].Items[0].Error != "xray" {
-		t.Fatalf("probe failure was not retained for reporting: %+v", results)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
 	}
-	_, restored := newManager(dir).Report()
-	if len(restored) != 1 {
-		t.Fatal("unacknowledged probe result was not persisted")
-	}
-	m.AckResults(results, nil)
-	_, unconfirmed := newManager(dir).Report()
-	if len(unconfirmed) != 1 {
-		t.Fatal("HTTP success without per-job acknowledgement lost the result")
-	}
-	m.AckResults(results, []string{"wake-heartbeat"})
-	_, remaining := newManager(dir).Report()
-	if len(remaining) != 0 {
-		t.Fatal("acknowledged probe result was not cleared")
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), "xray-") && !strings.HasPrefix(entry.Name(), "XRAY-") {
+			t.Fatalf("probe left persistent data: %s", entry.Name())
+		}
 	}
 }
 func TestXrayConfiguration(t *testing.T) {
@@ -98,6 +81,22 @@ func TestXrayConfiguration(t *testing.T) {
 				t.Fatalf("core rejected %s/%s: %s", mode, strategy, output)
 			}
 		}
+	}
+	// Production validates an atomic staging file ending in .json.next. Xray
+	// cannot infer that extension; exercise the exact validator and zero-node
+	// direct mode instead of relying only on ordinary .json fixtures.
+	in.Egress.Mode = "direct"
+	in.Nodes = nil
+	body, e := xrayConfig(in, nil, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	path := filepath.Join(dir, "xray.json.next")
+	if e = os.WriteFile(path, body, 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e = validateCore(context.Background(), binary, path); e != nil {
+		t.Fatalf("production staging path rejected zero-node direct configuration: %v", e)
 	}
 }
 func TestImportedXrayConfiguration(t *testing.T) {
@@ -332,8 +331,8 @@ func TestRealXrayHTTPSProbe(t *testing.T) {
 	outbound, _ := json.Marshal(map[string]any{"protocol": "socks", "settings": map[string]any{"servers": []any{map[string]any{"address": "127.0.0.1", "port": port}}}})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	result := executeJob(ctx, dir, ProbeJob{JobID: "integration", ProbeURL: server.URL, Nodes: []Node{{ID: 7, Outbound: outbound}}})
-	if len(result.Items) != 1 || !result.Items[0].Success || count.Load() == 0 {
+	result := executeProbe(ctx, dir, ProbeRequest{ProbeURL: server.URL, Nodes: []Node{{ID: 7, Outbound: outbound}}})
+	if len(result) != 1 || !result[0].Success || count.Load() == 0 {
 		t.Fatalf("HTTPS through real Xray and SOCKS outbound failed: %+v", result)
 	}
 	t.Run("native-balancer-override", func(t *testing.T) {
@@ -422,8 +421,8 @@ func TestRealXrayHTTPSProbe(t *testing.T) {
 		}
 	})
 	proxy.Close()
-	result = executeJob(ctx, dir, ProbeJob{JobID: "failure", ProbeURL: server.URL, Nodes: []Node{{ID: 7, Outbound: outbound}}})
-	if result.Items[0].Success {
+	result = executeProbe(ctx, dir, ProbeRequest{ProbeURL: server.URL, Nodes: []Node{{ID: 7, Outbound: outbound}}})
+	if result[0].Success {
 		t.Fatal("dead proxy incorrectly reported healthy")
 	}
 }

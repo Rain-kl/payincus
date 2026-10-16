@@ -18,7 +18,7 @@ type coreValidationError struct{ reason string }
 
 func (e *coreValidationError) Error() string { return e.reason }
 func validateCore(ctx context.Context, binary, path string) error {
-	output, err := exec.CommandContext(ctx, binary, "run", "-test", "-config", path).CombinedOutput()
+	output, err := exec.CommandContext(ctx, binary, "run", "-test", "-format", "json", "-config", path).CombinedOutput()
 	if err == nil {
 		return nil
 	}

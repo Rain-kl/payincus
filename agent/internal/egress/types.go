@@ -33,18 +33,15 @@ type Node struct {
 	ID       int             `json:"id"`
 	Outbound json.RawMessage `json:"outbound"`
 }
-type ProbeJob struct {
-	JobID    string `json:"jobId"`
+type ProbeRequest struct {
 	ProbeURL string `json:"probeUrl"`
 	Nodes    []Node `json:"nodes"`
 }
 type Instruction struct {
-	Revision              int        `json:"revision"`
-	Egress                Policy     `json:"egress"`
-	Firewall              Firewall   `json:"firewall"`
-	Nodes                 []Node     `json:"nodes"`
-	Probes                []ProbeJob `json:"probes,omitempty"`
-	AcknowledgedProbeJobs []string   `json:"acknowledgedProbeJobs,omitempty"`
+	Revision int      `json:"revision"`
+	Egress   Policy   `json:"egress"`
+	Firewall Firewall `json:"firewall"`
+	Nodes    []Node   `json:"nodes"`
 }
 type Status struct {
 	AppliedRevision int      `json:"appliedRevision"`
@@ -64,8 +61,4 @@ type ProbeResult struct {
 	LatencyMs   int64  `json:"latencyMs"`
 	Error       string `json:"error"`
 	ErrorDetail string `json:"errorDetail,omitempty"`
-}
-type JobResult struct {
-	JobID string        `json:"jobId"`
-	Items []ProbeResult `json:"items"`
 }

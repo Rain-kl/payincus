@@ -15,6 +15,10 @@ export enum TunnelFrameType {
   CONFIG = 0x05, // 控制指令（Server -> Agent），StreamID = 0，Payload 为 JSON 配置
   LOG_CTL = 0x06,  // 日志流控制（Server -> Agent），StreamID = 0，Payload 为 JSON { action: 'start' | 'stop', lines?: number }
   LOG_DATA = 0x07, // 日志流数据（Agent -> Server），StreamID = 0，Payload 为一行 UTF-8 文本；空 Payload 表示流结束
+  CONTROL_REQUEST = 0x08,
+  CONTROL_RESPONSE = 0x09,
+  CONTROL_HELLO = 0x0a,
+  CONTROL_CANCEL = 0x0b,
 }
 
 export interface DecodedFrame {

@@ -6,6 +6,8 @@ import { encryptSensitiveData } from '../lib/security.js'
 import { safeFetch, assertSafeHttpUrl } from '../lib/outbound-security.js'
 import { parseProxyImport } from '../lib/egress/import.js'
 import { decodeProxyConfig } from '../lib/egress/sync.js'
+import { requireNetworkControl, pushNetworkPolicy, controlFailure, sanitizeProbeResults } from '../lib/egress/realtime.js'
+import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { defaultEgress, defaultFirewall, validateEgress, validateFirewall, ids, probeUrl, NetworkInputError } from '../lib/egress/policy.js'
 
 const idSchema = { type: 'integer', minimum: 1, maximum: 2147483647 }
@@ -49,7 +51,7 @@ async function importContent(body: { content?: string; subscriptionUrl?: string 
 }
 export default async function egressRoutes(app: FastifyInstance) {
   const admin = [app.authenticate, app.requireAdmin]
-  app.get('/admin/proxy-probe-hosts', { onRequest: admin }, async () => ({ hosts: await prisma.host.findMany({ where: { agent: { enabled: true, capabilities: { array_contains: ['xray-egress'] } } }, select: { id: true, name: true }, orderBy: { id: 'asc' }, take: 1000 }) }))
+  app.get('/admin/proxy-probe-hosts', { onRequest: admin }, async () => ({ hosts: (await prisma.host.findMany({ where: { agent: { enabled: true, capabilities: { array_contains: ['network-control'] } } }, select: { id: true, name: true }, orderBy: { id: 'asc' }, take: 1000 })).filter(host => hostTunnelManager.supportsControl(host.id, 'proxy.probe')) }))
   app.get('/admin/proxy-nodes', { onRequest: admin }, async () => ({ nodes: await prisma.proxyNode.findMany({ select: safeNodeSelect, orderBy: { id: 'asc' }, take: 1000 }) }))
   app.post<{ Body: { content?: string; subscriptionUrl?: string; confirm: boolean } }>('/admin/proxy-nodes/import', {
     onRequest: admin, bodyLimit: 600 * 1024, schema: { body: { type: 'object', additionalProperties: false, required: ['confirm'], properties: { content: { type: 'string', maxLength: 524288 }, subscriptionUrl: { type: 'string', maxLength: 2048 }, confirm: { type: 'boolean' } } } }
@@ -88,6 +90,11 @@ export default async function egressRoutes(app: FastifyInstance) {
       try { await assertSafeHttpUrl((value as ReturnType<typeof validateEgress>).probeUrl, 'Probe URL') }
       catch { throw new NetworkInputError('Probe URL must resolve to a public HTTP target') }
     }
+    const host = await prisma.host.findUnique({ where: { id: request.params.id }, select: { agent: { select: { enabled: true } } } })
+    if (!host) return reply.code(404).send({ error: '宿主节点不存在' })
+    if (!host.agent?.enabled) return reply.code(409).send({ error: '请先启用宿主 Agent' })
+    try { requireNetworkControl(request.params.id, 'network.apply') }
+    catch (error) { const failure = controlFailure(error); return reply.code(failure.status).send({ error: failure.error }) }
     const state = await prisma.$transaction(async tx => {
       const hosts = await tx.$queryRaw<Array<{ id: number }>>`SELECT id FROM hosts WHERE id = ${request.params.id} FOR UPDATE`
       if (!hosts.length) return 'missing'
@@ -107,7 +114,14 @@ export default async function egressRoutes(app: FastifyInstance) {
     if (state === 'conflict') return reply.code(409).send({ error: '配置已更新，请刷新后重试' })
     if (state === 'nodes') return reply.code(400).send({ error: '所选代理节点不存在' })
     await createLog(request.user.id, 'host', `host.network.${section}`, `Updated host ${request.params.id} ${section} policy`, 'success')
-    return { success: true, pending: true }
+    try {
+      const applied = await pushNetworkPolicy(request.params.id)
+      if (!applied?.success) return reply.code(422).send({ error: '节点配置应用失败，请查看下方应用状态', ...applied })
+      return applied
+    } catch (error) {
+      const failure = controlFailure(error)
+      return reply.code(failure.status).send({ error: failure.error, revision: request.body.revision + 1 })
+    }
   })
   app.post<{ Body: { hostId: number; nodeIds: number[]; probeUrl: string } }>('/admin/proxy-probes', {
     onRequest: admin, schema: { body: { type: 'object', additionalProperties: false, required: ['hostId', 'nodeIds', 'probeUrl'], properties: { hostId: idSchema, nodeIds: { type: 'array', minItems: 1, maxItems: 10, uniqueItems: true, items: idSchema }, probeUrl: { type: 'string', maxLength: 2048 } } } }
@@ -115,20 +129,24 @@ export default async function egressRoutes(app: FastifyInstance) {
     const nodeIds = ids(request.body.nodeIds, 10), url = probeUrl(request.body.probeUrl)
     await assertSafeHttpUrl(url, 'Probe URL')
     const agent = await prisma.hostAgent.findUnique({ where: { hostId: request.body.hostId } })
-    if (!agent?.enabled || !Array.isArray(agent.capabilities) || !agent.capabilities.includes('xray-egress')) return reply.code(400).send({ error: '请选择已安装新版 Xray Agent 的宿主节点' })
+    if (!agent?.enabled || !Array.isArray(agent.capabilities) || !agent.capabilities.includes('network-control')) return reply.code(400).send({ error: '请选择已安装新版 Xray Agent 的宿主节点' })
     const nodes = await prisma.proxyNode.findMany({ where: { id: { in: nodeIds } } })
     if (nodes.length !== nodeIds.length) return reply.code(400).send({ error: '代理节点不存在' })
     const byId = new Map(nodes.map(n => [n.id, n]))
-    const job = await prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT id FROM hosts WHERE id = ${request.body.hostId} FOR UPDATE`
-      const outstanding = await tx.proxyProbeJob.count({ where: { hostId: request.body.hostId, state: { in: ['pending', 'running'] }, expiresAt: { gt: new Date() } } })
-      if (outstanding >= 10) throw new NetworkInputError('Too many pending probe jobs on this host')
-      return tx.proxyProbeJob.create({ data: { hostId: request.body.hostId, nodeIds, probeUrl: url, snapshotEncrypted: encryptSensitiveData(JSON.stringify(nodeIds.map(id => ({ id, outbound: decodeProxyConfig(byId.get(id)!.configEncrypted) })))), expiresAt: new Date(Date.now() + 20 * 60_000) }, select: { id: true, state: true } })
-    })
-    return { job }
-  })
-  app.get('/admin/proxy-probes', { onRequest: admin }, async () => {
-    await prisma.proxyProbeJob.updateMany({ where: { state: { in: ['pending', 'running'] }, expiresAt: { lte: new Date() } }, data: { state: 'expired', snapshotEncrypted: '', leaseUntil: null } })
-    return { jobs: await prisma.proxyProbeJob.findMany({ select: { id: true, hostId: true, nodeIds: true, probeUrl: true, state: true, result: true, createdAt: true, completedAt: true, expiresAt: true, host: { select: { name: true, agent: { select: { version: true, lastSeenAt: true } } } } }, orderBy: { createdAt: 'desc' }, take: 50 }) }
+    const controller = new AbortController()
+    const onClose = () => { if (!reply.raw.writableEnded) controller.abort() }
+    reply.raw.once('close', onClose)
+    if (reply.raw.destroyed) controller.abort()
+    reply.header('Cache-Control', 'no-store')
+    try {
+      requireNetworkControl(request.body.hostId, 'proxy.probe')
+      const result = await hostTunnelManager.requestControl(request.body.hostId, 'proxy.probe', { probeUrl: url, nodes: nodeIds.map(id => ({ id, outbound: decodeProxyConfig(byId.get(id)!.configEncrypted) })) }, 45_000, controller.signal)
+      const items = sanitizeProbeResults(result, nodeIds)
+      const host = await prisma.host.findUnique({ where: { id: request.body.hostId }, select: { id: true, name: true } })
+      return { items, host }
+    } catch (error) {
+      const failure = controlFailure(error)
+      return reply.code(failure.status).send({ error: failure.error })
+    } finally { reply.raw.removeListener('close', onClose) }
   })
 }

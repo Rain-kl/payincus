@@ -1,4 +1,4 @@
-import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProbeJob } from './egress-types'
+import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
 import type { GpuConfiguration } from '@/types/api'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
@@ -727,10 +727,9 @@ const api = {
     importNodes: (data: { content?: string; subscriptionUrl?: string; confirm: boolean }): Promise<ProxyImportResult> => http.post('/admin/proxy-nodes/import', data),
     deleteNode: (id: number): Promise<{ success: boolean }> => http.delete(`/admin/proxy-nodes/${id}`),
     policy: (hostId: number): Promise<{ policy: NetworkPolicy; agent: { enabled: boolean; capabilities: string[]; lastSeenAt: string | null } | null }> => http.get(`/hosts/${hostId}/network-policy`),
-    updateEgress: (hostId: number, revision: number, value: EgressPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/egress`, { revision, value }),
-    updateFirewall: (hostId: number, revision: number, value: FirewallPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/firewall`, { revision, value }),
-    probe: (hostId: number, nodeIds: number[], probeUrl: string): Promise<{ job: { id: string } }> => http.post('/admin/proxy-probes', { hostId, nodeIds, probeUrl }),
-    probes: (): Promise<{ jobs: ProbeJob[] }> => http.get('/admin/proxy-probes')
+    updateEgress: (hostId: number, revision: number, value: EgressPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/egress`, { revision, value }, { timeout: 110_000 }),
+    updateFirewall: (hostId: number, revision: number, value: FirewallPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/firewall`, { revision, value }, { timeout: 110_000 }),
+    probe: (hostId: number, nodeIds: number[], probeUrl: string, signal?: AbortSignal): Promise<ProxyProbeResponse> => http.post('/admin/proxy-probes', { hostId, nodeIds, probeUrl }, { timeout: 60_000, signal })
   },
 
   // 认证

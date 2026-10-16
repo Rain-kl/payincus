@@ -1,4 +1,3 @@
-import { Prisma } from '@prisma/client'
 import { prisma } from '../../db/prisma.js'
 import { decryptSensitiveData } from '../security.js'
 import { defaultEgress, defaultFirewall, type EgressPolicy } from './policy.js'
@@ -11,13 +10,11 @@ export function decodeProxyConfig(encrypted: string): any {
   return JSON.parse(plain)
 }
 
-export async function networkHeartbeat(hostId: number, status: unknown, results: unknown) {
-  const acknowledgedProbeJobs: string[] = []
-  const policy = await prisma.hostNetworkPolicy.findUnique({ where: { hostId } })
-  if (policy && status && typeof status === 'object') {
-    const report = status as Record<string, unknown>
-    const applied = Number.isSafeInteger(report.appliedRevision) && Number(report.appliedRevision) >= 0 && Number(report.appliedRevision) <= policy.revision ? Number(report.appliedRevision) : policy.appliedRevision
-    const safe = {
+export function sanitizeNetworkStatus(status: unknown) {
+  if (!status || typeof status !== 'object') throw new Error('Invalid network status')
+  const report = status as Record<string, unknown>
+  if (!Number.isSafeInteger(report.appliedRevision) || Number(report.appliedRevision) < 0) throw new Error('Invalid network revision')
+  return {
       state: ['applied', 'applying', 'error', 'unsupported', 'idle'].includes(String(report.state)) ? String(report.state) : 'error',
       error: ['none', 'preflight', 'incus', 'acl', 'xray', 'network', 'unsupported-nic', 'unsupported-platform', 'restore'].includes(String(report.error)) ? String(report.error) : 'network',
       errorStage: ['extract', 'config', 'start', 'health', 'preflight', 'incus', 'acl', 'xray', 'network', 'unsupported-nic', 'unsupported-platform', 'restore'].includes(String(report.errorStage)) ? String(report.errorStage) : '',
@@ -28,31 +25,19 @@ export async function networkHeartbeat(hostId: number, status: unknown, results:
       routedFallback: report.routedFallback === true,
       healthyNodeIds: Array.isArray(report.healthyNodeIds) ? report.healthyNodeIds.filter(x => Number.isSafeInteger(x) && Number(x) > 0).slice(0, 16) : []
     }
-    await prisma.hostNetworkPolicy.updateMany({ where: { hostId, revision: policy.revision }, data: { appliedRevision: applied, status: safe, reportedAt: new Date() } })
-  }
-  if (Array.isArray(results)) for (const raw of results.slice(0, 3)) {
-    if (!raw || typeof raw !== 'object') continue
-    const value = raw as Record<string, unknown>
-    if (typeof value.jobId !== 'string' || !Array.isArray(value.items)) continue
-    const job = await prisma.proxyProbeJob.findFirst({ where: { id: value.jobId, hostId } })
-    if (!job) continue
-    if (job.state === 'completed' || job.state === 'expired') { acknowledgedProbeJobs.push(job.id); continue }
-    if (job.state !== 'running' || job.expiresAt <= new Date()) continue
-    const nodeIds = job.nodeIds as number[]
-    const items = value.items as Array<Record<string, unknown>>
-    if (items.length !== nodeIds.length || new Set(items.map(i => i?.nodeId)).size !== nodeIds.length || items.some(i => !i || !nodeIds.includes(Number(i.nodeId)))) continue
-    const safe = items.map(i => ({ nodeId: Number(i.nodeId), success: i.success === true, latencyMs: typeof i.latencyMs === 'number' && Number.isFinite(i.latencyMs) ? Math.max(0, Math.min(120000, Math.round(i.latencyMs))) : null, error: i.success === true ? '' : ['timeout', 'handshake', 'http', 'xray', 'unsupported', 'network'].includes(String(i.error)) ? String(i.error) : 'network', errorDetail: i.success !== true && failureReasons.includes(String(i.errorDetail)) ? String(i.errorDetail) : '' }))
-    const completed = await prisma.proxyProbeJob.updateMany({ where: { id: job.id, hostId, state: 'running' }, data: { state: 'completed', result: safe, completedAt: new Date(), leaseUntil: null, snapshotEncrypted: '' } })
-    if (completed.count) acknowledgedProbeJobs.push(job.id)
-  }
-  const now = new Date()
-  await prisma.proxyProbeJob.updateMany({ where: { hostId, state: { in: ['pending', 'running'] }, expiresAt: { lte: now } }, data: { state: 'expired', snapshotEncrypted: '', leaseUntil: null } })
-  const candidate = await prisma.proxyProbeJob.findFirst({ where: { hostId, expiresAt: { gt: now }, OR: [{ state: 'pending' }, { state: 'running', leaseUntil: { lte: now } }] }, orderBy: { createdAt: 'asc' } })
-  const probes: Array<Record<string, unknown>> = []
-  if (candidate) {
-    const claimed = await prisma.proxyProbeJob.updateMany({ where: { id: candidate.id, state: candidate.state, leaseUntil: candidate.leaseUntil }, data: { state: 'running', leaseUntil: new Date(now.getTime() + 5 * 60_000) } })
-    if (claimed.count) probes.push({ jobId: candidate.id, probeUrl: candidate.probeUrl, nodes: decodeProxyConfig(candidate.snapshotEncrypted) })
-  }
+}
+export async function recordNetworkStatus(hostId: number, report: unknown, expectedRevision?: number) {
+  const policy = await prisma.hostNetworkPolicy.findUnique({ where: { hostId } })
+  if (!policy || !report || typeof report !== 'object' || (expectedRevision !== undefined && policy.revision !== expectedRevision)) return
+  const raw = report as Record<string, unknown>
+  let status: ReturnType<typeof sanitizeNetworkStatus>
+  try { status = sanitizeNetworkStatus(raw) } catch { return }
+  const applied = Number(raw.appliedRevision)
+  if (applied > policy.revision || applied < policy.appliedRevision) return
+  await prisma.hostNetworkPolicy.updateMany({ where: { hostId, revision: policy.revision }, data: { appliedRevision: applied, status, reportedAt: new Date() } })
+}
+export async function networkInstruction(hostId: number) {
+  const policy = await prisma.hostNetworkPolicy.findUnique({ where: { hostId } })
   const egress = (policy?.egress ?? defaultEgress) as unknown as EgressPolicy
   const ids = egress.mode === 'proxy' ? egress.proxyNodeIds : []
   const nodes = ids.length ? await prisma.proxyNode.findMany({ where: { id: { in: ids } } }) : []
@@ -61,8 +46,6 @@ export async function networkHeartbeat(hostId: number, status: unknown, results:
     revision: policy?.revision ?? 0,
     egress,
     firewall: policy?.firewall ?? defaultFirewall,
-    nodes: ids.map(id => { const node = byId.get(id); if (!node) throw new Error('Referenced proxy node is missing'); return { id, outbound: decodeProxyConfig(node.configEncrypted) } }),
-    probes,
-    acknowledgedProbeJobs
-  } as unknown as Prisma.InputJsonObject
+    nodes: ids.map(id => { const node = byId.get(id); if (!node) throw new Error('Referenced proxy node is missing'); return { id, outbound: decodeProxyConfig(node.configEncrypted) } })
+  }
 }
