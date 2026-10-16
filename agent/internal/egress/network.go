@@ -365,7 +365,14 @@ func replaceHostRules(ctx context.Context, rules string) error {
 	}
 	return nft(ctx, prefix+rules, false)
 }
-func prepareNamespace(ctx context.Context) error {
+func prepareNamespace(ctx context.Context, resolvers ...string) error {
+	if len(resolvers) == 0 {
+		var err error
+		resolvers, err = hostBootstrapResolvers(inventory{})
+		if err != nil {
+			return err
+		}
+	}
 	if err := ensureHostNamespace(ctx); err != nil {
 		return err
 	}
@@ -418,8 +425,9 @@ func prepareNamespace(ctx context.Context) error {
 			}
 		}
 	}
-	// Avoid silently using a host-resolver stub unreachable in this namespace.
-	if err := atomicFile("/etc/netns/"+namespace+"/resolv.conf", []byte("nameserver 1.1.1.1\nnameserver 2606:4700:4700::1111\n"), 0600); err != nil {
+	// Bootstrap proxy hostnames through the host's real upstreams. Container DNS
+	// still uses its selected Xray outbound; this resolver is for core bootstrap.
+	if err := atomicFile(namespaceResolverPath, namespaceResolverConfig(resolvers), 0600); err != nil {
 		return err
 	}
 	script := namespaceRules()

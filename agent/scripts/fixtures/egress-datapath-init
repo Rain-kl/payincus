@@ -1,0 +1,22 @@
+#!/bin/sh
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+ln -sf /proc/self/fd /dev/fd
+ln -sf /proc/self/fd/0 /dev/stdin
+ln -sf /proc/self/fd/1 /dev/stdout
+ln -sf /proc/self/fd/2 /dev/stderr
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+mkdir -p /run/netns
+modprobe nft_tproxy
+modprobe nf_tproxy_ipv4
+modprobe nf_tproxy_ipv6
+ip link set lo up
+touch /run/incudal-datapath-test-authorized
+INCUDAL_DATAPATH_TEST=1 /egress.test -test.run '^TestIsolatedDatapath$' -test.v
+result=$?
+echo "INCUDAL_DATAPATH_EXIT=$result"
+mount -o remount,ro / 2>/dev/null || true
+/bin/busybox poweroff -f

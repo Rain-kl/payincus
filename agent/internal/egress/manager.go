@@ -240,10 +240,20 @@ func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 		m.setError("preflight")
 		return
 	}
+	var resolvers []string
+	if in.Egress.Mode != "off" {
+		resolvers, err = hostBootstrapResolvers(inv)
+		if err != nil {
+			log.Printf("[egress] preflight failed: host DNS upstreams unavailable")
+			m.setError("preflight")
+			return
+		}
+	}
 	encoded, _ := json.Marshal(struct {
 		In        Instruction
 		Inventory inventory
-	}{in, inv})
+		Resolvers []string
+	}{in, inv, resolvers})
 	sum := sha256.Sum256(encoded)
 	hash := hex.EncodeToString(sum[:])
 	if hash != m.lastHash {
@@ -279,8 +289,11 @@ func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 				return
 			}
 			previous, _ := os.ReadFile(configPath)
+			previousResolver, _ := os.ReadFile(namespaceResolverPath)
 			unit, _ := os.ReadFile("/etc/systemd/system/incudal-xray.service")
-			coreChanged = !bytes.Equal(previous, config) || !bytes.Equal(unit, []byte(gatewayUnit(binaryPath, configPath, in.Egress.Mode == "proxy" && in.Egress.Strategy == "failover"))) || !coreActive
+			// ip netns exec bind-mounts resolv.conf. Atomic replacement cannot update
+			// that existing mount; restart the core when bootstrap upstreams change.
+			coreChanged = !bytes.Equal(previousResolver, namespaceResolverConfig(resolvers)) || !bytes.Equal(previous, config) || !bytes.Equal(unit, []byte(gatewayUnit(binaryPath, configPath, in.Egress.Mode == "proxy" && in.Egress.Strategy == "failover"))) || !coreActive
 			if e = atomicFile(configPath+".next", config, 0600); e != nil {
 				m.setErrorAt("xray", "config", e)
 				return
@@ -290,12 +303,14 @@ func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 				return
 			}
 		}
-		if e = c.applyACL(ctx, inv, in.Firewall, in.Egress.Mode != "off"); e != nil {
+		// In direct mode preserve Incus's native host DNS upstreams. Only proxy
+		// mode forwards bridge DNS over the selected remote proxy outbound.
+		if e = c.applyACL(ctx, inv, in.Firewall, in.Egress.Mode == "proxy"); e != nil {
 			m.setError("acl")
 			return
 		}
 		if in.Egress.Mode != "off" {
-			if e = prepareNamespace(ctx); e != nil {
+			if e = prepareNamespace(ctx, resolvers...); e != nil {
 				m.setError("network")
 				return
 			}
@@ -455,6 +470,12 @@ func (m *Manager) health(ctx context.Context, in Instruction) {
 		m.active = selected
 	}
 	m.mu.Lock()
+	if m.lastHealth.IsZero() || m.status.ActiveNodeID != m.active || len(m.status.HealthyNodeIDs) != len(healthy) {
+		log.Printf("[egress] proxy health healthy=%d total=%d activeNode=%d", len(healthy), len(in.Nodes), m.active)
+		if len(healthy) == 0 {
+			log.Printf("[egress] no healthy proxy outbounds; new proxied connections remain blocked")
+		}
+	}
 	m.status.ActiveNodeID = m.active
 	m.status.HealthyNodeIDs = healthy
 	if m.status.AppliedRevision == in.Revision {
@@ -495,10 +516,21 @@ func RestoreCLI() error {
 		return err
 	}
 	if saved.Instruction.Egress.Mode != "off" {
-		if err = prepareNamespace(ctx); err != nil {
+		resolvers, resolverErr := hostBootstrapResolvers(saved.Inventory)
+		if resolverErr != nil {
+			return resolverErr
+		}
+		previousResolver, _ := os.ReadFile(namespaceResolverPath)
+		if err = prepareNamespace(ctx, resolvers...); err != nil {
 			return err
 		}
 		if exec.CommandContext(ctx, "systemctl", "is-active", "--quiet", "incudal-xray.service").Run() == nil {
+			if !bytes.Equal(previousResolver, namespaceResolverConfig(resolvers)) {
+				// Restore's unit is ordered Before=Xray. Waiting for a restart here
+				// would make both jobs wait on each other. Keep readiness empty until
+				// the queued core restart completes its own ExecStartPost hook.
+				return run(ctx, "systemctl", "--no-block", "restart", "incudal-xray.service")
+			}
 			return nft(ctx, "add element inet incudal_egress ready { 0x420000 }", false)
 		}
 	}

@@ -1,6 +1,6 @@
 # Xray 出口与 Incus 防火墙
 
-Agent v1.2.9 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
+Agent v1.2.11 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
 
 ## 配置入口
 
@@ -22,7 +22,7 @@ Agent v1.2.9 内置固定版本 Xray-core v26.3.27。发布构建下载官方归
 - 受管桥按接口匹配，覆盖后续新容器；routed 网卡同时按分配地址/前缀匹配，避免停止、宿主重启、接口名称变化造成遗漏。新建 routed 网卡还使用稳定的 `iceg` 宿主接口前缀。
 - 执行实例创建前检查网络策略已生效，并预先附加 NIC ACL 或接口标识。未知或不支持的网卡类型报告失败，不显示为完整覆盖。
 - Xray 只代理 TCP/UDP。接管模式阻断新的外网 ICMP/ping 和其他未代理协议；保留内网与连接相关的 ICMP、IPv6 邻居发现。
-- 网桥 DNS 仍由 Incus/dnsmasq 提供内部解析，公共上游查询经命名空间中的 Xray DNS 转发入口。Xray 代理服务器域名的引导解析由命名空间的独立 resolver 完成。
+- 网桥 DNS 由 Incus/dnsmasq 提供内部解析。代理模式的公共上游查询经 Xray 的代理出站；直连和不接管模式保留 Incus 原生上游，避免把直连 DNS 固定到当前网络无法访问的地址。Xray 代理服务器域名的引导解析继承宿主的真实 DNS 上游，不经过尚未建立的代理。
 
 ## ACL 语义
 
@@ -62,7 +62,7 @@ make check
 
 `server/scripts/smoke-egress.ts` 只接受 `127.0.0.1:55432/egress_test` 专用数据库，验证真实 HTTP/数据库交互，不连接生产。新迁移也应在独立数据库验证。
 
-当前开发环境已通过真实 Xray HTTPS 出站、RoutingService 的代理/blackhole 切换、导入与权限、配置并发、实时隧道请求与取消和前后端构建检查。宿主侧 nft 规则通过隔离检查；开发环境内核缺少可用的 nft TPROXY 表达式，命名空间规则不能在这里完成内核验证。
+当前开发环境已通过真实 Xray HTTPS 出站、RoutingService 的代理/blackhole 切换、导入与权限、配置并发、实时隧道请求与取消和前后端构建检查。开发容器的宿主内核缺少 nft TPROXY，因此新增独立 QEMU 完整内核回归：虚拟机没有外部网卡，在内部命名空间构造受管网桥、容器及模拟外网，使用真实 nftables、策略路由和内置 Xray 验证 IPv4 TCP/HTTPS、UDP DNS、三种代理策略、ACL 拦截、内网绕过、DNAT 回程、关闭接管和核心故障阻断。该回归不替代真实 Incus、IPv6 和宿主重启验收。
 
 部署验收仍需一台获授权的非生产 Incus 节点，覆盖：存量/新增/停止后启动、IPv4/IPv6、TCP/UDP、DNAT 和公网路由入站回程、同桥/跨桥内网、ACL 的 IP/端口限制、所有代理失效、Agent/核心重启和宿主重启恢复。在完成这些验证之前，不应将本地构建视为生产验收。
 
@@ -73,7 +73,7 @@ journalctl -u incudal-agent -n 100 --no-pager
 systemctl status incudal-xray --no-pager
 ```
 
-新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.9。
+新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.9 或更高版本。
 
 配置校验显式传入 `-format json`。原子应用的暂存文件名为 `xray.json.next`，Xray 默认无法从 `.next` 推断 JSON 格式；回归覆盖零节点直连与真实暂存路径。
 
@@ -90,3 +90,15 @@ bash agent/scripts/test-systemd-egress.sh
 该脚本在独立 Ubuntu 24.04 容器中以安装器同样的 `NoNewPrivileges`、`PrivateTmp`、`ProtectHome`、CPU 和内存限额运行测试，使用实际 systemd、nftables 就绪集合与固定版本 Xray。覆盖旧问题的 255 复现、已有命名空间接续、零节点直连、三种代理策略启动、独立 Agent 挂载视图、核心重启、私有目录遮蔽下创建 veth/按名称操作网卡、新建及残留空占位文件恢复。此启动回归不等于容器流量的 TPROXY 验收；完整数据路径仍要求测试节点内核具备 nft_tproxy。
 
 Agent 的能力列表由二进制统一声明，安装器 `-once` 自检与常规心跳一致，避免自检覆盖网络能力标记。出口卡片等待能力数据加载完成，并接受已鉴权活动隧道的能力确认，防止旧版本自检造成误报升级。
+
+## 引导 DNS 与完整数据路径回归
+
+引导 DNS 先读取 `/etc/resolv.conf`；若只有本机 stub 或受管网桥 DNS，则读取 systemd-resolved 或 NetworkManager 的真实上游。跳过 loopback、无效地址和会形成回环的网关地址；保留宿主上游顺序并去重，最多三个，上游失败后尽快重试其他服务器。未找到可用配置时明确记录 preflight 失败，不擅自换成公共 DNS。宿主 DNS 配置变化参与应用比较；更换 DNS 时重启 Xray，使 `ip netns exec` 的 resolver bind mount 同步更新。Agent 日志会记录代理健康数量与主出口变化；无健康节点时继续阻断被接管的新连接。
+
+完整内核回归命令（Linux amd64、Docker、Go、Python，首次构建需下载 Ubuntu 内核/QEMU）：
+
+```sh
+bash agent/scripts/test-datapath-egress.sh
+```
+
+Docker 运行时不增加 capabilities，不共享宿主网络、PID、设备或文件挂载；网络管理操作仅在无外部网卡的虚拟机内进行。回归先重现固定 DNS 不可达导致域名代理节点连接失败，再继承真实上游，覆盖首个上游失效后的恢复及三种代理策略的数据路径。systemd 回归另行验证替换 resolver 文件后原挂载保持旧内容、核心重启后使用新文件。

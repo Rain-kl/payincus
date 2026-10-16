@@ -185,6 +185,56 @@ func TestSystemdNamespaceStartup(t *testing.T) {
 	if mode != "legacy" {
 		return
 	}
+	// Exercise the actual ip-netns bind mount: replacing its source file does
+	// not update a running core's resolver. A restart must pick up the new file.
+	oldResolver := []byte("nameserver 192.0.2.53\n")
+	newResolver := []byte("nameserver 203.0.113.53\n")
+	if err := atomicFile(namespaceResolverPath, oldResolver, 0600); err != nil {
+		t.Fatal(err)
+	}
+	command("systemctl", "reset-failed", "incudal-xray.service")
+	command("systemctl", "restart", "incudal-xray.service")
+	resolverInsideCore := func() string {
+		t.Helper()
+		pid := strings.TrimSpace(command("systemctl", "show", "--value", "-p", "MainPID", "incudal-xray.service"))
+		body, err := os.ReadFile("/proc/" + pid + "/root/etc/resolv.conf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(body)
+	}
+	if err := atomicFile(namespaceResolverPath, newResolver, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if resolverInsideCore() != string(oldResolver) {
+		t.Fatal("fixture did not reproduce a stale resolver bind mount")
+	}
+	command("systemctl", "reset-failed", "incudal-xray.service")
+	command("systemctl", "restart", "incudal-xray.service")
+	if resolverInsideCore() != string(newResolver) {
+		t.Fatal("core restart did not pick up new bootstrap DNS")
+	}
+	// A restore job is ordered before Xray. Its restart must be queued, since
+	// waiting synchronously would deadlock both systemd jobs. Use the real core
+	// and readiness hooks to verify the queued job finishes after restore exits.
+	const orderUnit = "incudal-restore-order-fixture.service"
+	orderBody := "[Unit]\nBefore=incudal-xray.service\n[Service]\nType=oneshot\nExecStartPre=/usr/sbin/nft flush set inet incudal_egress ready\nExecStart=/usr/bin/systemctl --no-block restart incudal-xray.service\n"
+	if err := os.WriteFile("/etc/systemd/system/"+orderUnit, []byte(orderBody), 0644); err != nil {
+		t.Fatal(err)
+	}
+	command("systemctl", "daemon-reload")
+	command("systemctl", "reset-failed", "incudal-xray.service")
+	command("systemctl", "start", orderUnit)
+	for attempt := 0; attempt < 20; attempt++ {
+		ready := command("nft", "list", "set", "inet", "incudal_egress", "ready")
+		if strings.Contains(ready, "0x00420000") || strings.Contains(ready, "0x420000") {
+			break
+		}
+		if attempt == 19 {
+			t.Fatal("queued core restart never restored readiness")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	// Exercise the actual service/API startup for every offered proxy strategy.
 	// Closed local upstreams keep the fixture offline and must never enable direct
 	// fallback. These tests leave the unit restored to zero-node direct mode.
