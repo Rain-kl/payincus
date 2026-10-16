@@ -16,10 +16,23 @@ import (
 // CanonicalJSON 使用 Go 标准库的 JSON 编码。
 // map key 会按字典序输出，且不能 HTML 转义，必须与面板端 stableStringify 规则保持一致。
 func CanonicalJSON(value any) ([]byte, error) {
+	// Struct field order is declaration order, unlike map keys. Normalize all
+	// nested values first so new typed heartbeat reports match the panel's
+	// recursively sorted JSON. UseNumber preserves uint64 traffic counters.
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var normalized any
+	if err := decoder.Decode(&normalized); err != nil {
+		return nil, err
+	}
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(value); err != nil {
+	if err := encoder.Encode(normalized); err != nil {
 		return nil, err
 	}
 	return bytes.TrimSuffix(buffer.Bytes(), []byte("\n")), nil

@@ -112,4 +112,5 @@ SDK/
 !docs-site/docs/public/sdk/
 !docs-site/docs/public/sdk/**
 SDKNEW/
+agent/internal/egress/assets/*.gz
 namecrane_modules/

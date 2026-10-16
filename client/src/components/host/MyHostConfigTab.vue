@@ -9,6 +9,7 @@ import { buildHostApiUrl, extractHostAddressFromUrl, validateIdentifier, validat
 import api from '@/api'
 import { useToast } from '@/stores/toast'
 import FlagIcon from '@/components/FlagIcon.vue'
+import HostEgressSettings from './HostEgressSettings.vue'
 
 const { t, locale } = useI18n()
 const themeStore = useThemeStore()
@@ -472,6 +473,7 @@ async function saveConfig() {
 
       <div class="space-y-5 px-5 py-5 sm:px-6">
         <!-- 连接方式选择 -->
+        <HostEgressSettings v-if="isAdmin" :host-id="host.id" />
         <div>
           <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.connectionMode') }}</label>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

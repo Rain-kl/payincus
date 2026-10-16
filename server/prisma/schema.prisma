@@ -778,6 +778,8 @@ model Host {
   addressConflictsA      HostAddressConflict[]      @relation("HostAddressConflictA")
   addressConflictsB      HostAddressConflict[]      @relation("HostAddressConflictB")
   agent                  HostAgent?
+  networkPolicy          HostNetworkPolicy?
+  proxyProbeJobs         ProxyProbeJob[]
   gpus                   HostGpu[]
   instanceAuditRules     InstanceAuditRule[]
   instanceAuditBuiltinRuleOverrides InstanceAuditBuiltinRuleOverride[]
@@ -788,6 +790,52 @@ model Host {
   @@unique([userId, name]) // 同一用户下名称唯一
   @@index([userId])
   @@map("hosts")
+}
+
+model ProxyNode {
+  id              Int      @id @default(autoincrement())
+  name            String
+  protocol        String
+  server          String
+  port            Int
+  configEncrypted String   @map("config_encrypted") @db.Text
+  fingerprint     String   @unique
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("proxy_nodes")
+}
+
+model HostNetworkPolicy {
+  hostId          Int      @id @map("host_id")
+  revision        Int      @default(1)
+  egress          Json
+  firewall        Json
+  appliedRevision Int      @default(0) @map("applied_revision")
+  status          Json     @default("{}")
+  reportedAt      DateTime? @map("reported_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  host            Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@map("host_network_policies")
+}
+
+model ProxyProbeJob {
+  id                String    @id @default(uuid())
+  hostId            Int       @map("host_id")
+  nodeIds           Json      @map("node_ids")
+  snapshotEncrypted String    @map("snapshot_encrypted") @db.Text
+  probeUrl          String    @map("probe_url")
+  state             String    @default("pending")
+  result            Json      @default("[]")
+  leaseUntil        DateTime? @map("lease_until")
+  expiresAt         DateTime  @map("expires_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  completedAt       DateTime? @map("completed_at")
+  host              Host      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([hostId, state, createdAt])
+  @@map("proxy_probe_jobs")
 }
 
 model HostAgent {

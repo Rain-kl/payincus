@@ -47,6 +47,7 @@ import userRoutes from './routes/users.js'
 import instanceRoutes from './routes/instances.js'
 import hostRoutes from './routes/hosts.js'
 import gpuRoutes from './routes/gpus.js'
+import egressRoutes from './routes/egress.js'
 import packageRoutes from './routes/packages.js'
 import snapshotRoutes from './routes/snapshots.js'
 import backupRoutes from './routes/backups.js'
@@ -505,6 +506,7 @@ await fastify.register(userRoutes, { prefix: '/api/users' })
 await fastify.register(instanceRoutes, { prefix: '/api/instances' })
 await fastify.register(hostRoutes, { prefix: '/api/hosts' })
 await fastify.register(gpuRoutes, { prefix: '/api' })
+await fastify.register(egressRoutes, { prefix: '/api' })
 await fastify.register(packageRoutes, { prefix: '/api/packages' })
 await fastify.register(snapshotRoutes, { prefix: '/api/instances' })
 await fastify.register(backupRoutes, { prefix: '/api/instances' })

@@ -1,3 +1,4 @@
+import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProbeJob } from './egress-types'
 import type { GpuConfiguration } from '@/types/api'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
@@ -720,6 +721,18 @@ http.interceptors.response.use(
 
 // API 模块
 const api = {
+  network: {
+    probeHosts: (): Promise<{ hosts: Array<{ id: number; name: string }> }> => http.get('/admin/proxy-probe-hosts'),
+    nodes: (): Promise<{ nodes: ProxyNode[] }> => http.get('/admin/proxy-nodes'),
+    importNodes: (data: { content?: string; subscriptionUrl?: string; confirm: boolean }): Promise<ProxyImportResult> => http.post('/admin/proxy-nodes/import', data),
+    deleteNode: (id: number): Promise<{ success: boolean }> => http.delete(`/admin/proxy-nodes/${id}`),
+    policy: (hostId: number): Promise<{ policy: NetworkPolicy; agent: { enabled: boolean; capabilities: string[]; lastSeenAt: string | null } | null }> => http.get(`/hosts/${hostId}/network-policy`),
+    updateEgress: (hostId: number, revision: number, value: EgressPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/egress`, { revision, value }),
+    updateFirewall: (hostId: number, revision: number, value: FirewallPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/firewall`, { revision, value }),
+    probe: (hostId: number, nodeIds: number[], probeUrl: string): Promise<{ job: { id: string } }> => http.post('/admin/proxy-probes', { hostId, nodeIds, probeUrl }),
+    probes: (): Promise<{ jobs: ProbeJob[] }> => http.get('/admin/proxy-probes')
+  },
+
   // 认证
   auth: {
     check2FA: (username: string): Promise<{ requires2FA: boolean }> =>

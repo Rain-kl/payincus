@@ -6,6 +6,8 @@
   "main": "dist/app.js",
   "types": "dist/app.d.ts",
   "scripts": {
+    "test:egress": "node --import tsx scripts/test-egress.ts",
+    "smoke:egress": "node --import tsx scripts/smoke-egress.ts",
     "postinstall": "prisma generate",
     "dev": "cross-env NODE_ENV=development JWT_SECRET=dev-secret-12345678 PORT=3001 tsx watch src/app.ts",
     "start": "node dist/app.js",

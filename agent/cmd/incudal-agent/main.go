@@ -12,6 +12,7 @@ import (
 
 	"incudal-agent/internal/caddy"
 	"incudal-agent/internal/config"
+	"incudal-agent/internal/egress"
 	"incudal-agent/internal/panel"
 	"incudal-agent/internal/report"
 	"incudal-agent/internal/tunnel"
@@ -23,7 +24,20 @@ var version = "dev"
 func main() {
 	configPath := flag.String("config", "/etc/incudal-agent/config.yaml", "agent config file")
 	once := flag.Bool("once", false, "send one heartbeat and exit")
+	restore := flag.Bool("network-restore", false, "restore the last applied container network before Incus starts")
+	probePort := flag.Int("network-probe-port", 0, "probe a local Xray SOCKS listener")
+	probeURL := flag.String("network-probe-url", "", "HTTPS connectivity probe URL")
 	flag.Parse()
+	if *restore {
+		if err := egress.RestoreCLI(); err != nil {
+			log.Fatal("network restore failed; container startup remains blocked")
+		}
+		return
+	}
+	if *probePort > 0 {
+		egress.ProbeCLI(*probePort, *probeURL)
+		return
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -49,11 +63,13 @@ func main() {
 	defer tunnelWorker.SyncConfig(false, "", 0)
 
 	log.Printf("incudal-agent started: panel=%s interval=%s", cfg.PanelURL, cfg.HeartbeatInterval)
+	networkWorker := egress.NewManager()
+	go networkWorker.Run(ctx)
 	upgradeRunner := upgrade.DefaultRunner(cfg)
 	var upgradeInProgress atomic.Bool
 	var caddyOpInProgress atomic.Bool
 	heartbeatLogState := newHeartbeatLogState()
-	if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds); err != nil {
+	if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds, networkWorker); err != nil {
 		heartbeatLogState.logFailure(err)
 	} else {
 		heartbeatLogState.logSuccess(result)
@@ -72,7 +88,7 @@ func main() {
 			log.Printf("incudal-agent stopped")
 			return
 		case <-ticker.C:
-			if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds); err != nil {
+			if result, err := sendHeartbeat(ctx, client, cfg.HeartbeatIntervalSeconds, networkWorker); err != nil {
 				heartbeatLogState.logFailure(err)
 			} else {
 				heartbeatLogState.logSuccess(result)
@@ -139,10 +155,23 @@ func handleCaddyInstruction(ctx context.Context, result panel.HeartbeatResult, i
 	}
 }
 
-func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalSeconds int) (panel.HeartbeatResult, error) {
-	result, err := client.Heartbeat(ctx, report.HeartbeatPayload(version, heartbeatIntervalSeconds))
+func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalSeconds int, workers ...*egress.Manager) (panel.HeartbeatResult, error) {
+	payload := report.HeartbeatPayload(version, heartbeatIntervalSeconds)
+	var sent []egress.JobResult
+	if len(workers) > 0 {
+		status, results := workers[0].Report()
+		payload["networkStatus"] = status
+		payload["proxyProbeResults"] = results
+		sent = results
+		payload["capabilities"] = append(payload["capabilities"].([]any), "xray-egress")
+	}
+	result, err := client.Heartbeat(ctx, payload)
 	if err != nil {
 		return result, err
+	}
+	if len(workers) > 0 {
+		workers[0].AckResults(sent)
+		workers[0].Sync(result.Network)
 	}
 	return result, nil
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"incudal-agent/internal/config"
+	"incudal-agent/internal/egress"
 	"incudal-agent/internal/protocol"
 )
 
@@ -30,6 +31,7 @@ type HeartbeatResult struct {
 	Upgrade    *UpgradeInstruction
 	Tunnel     *TunnelInstruction
 	Caddy      *CaddyInstruction
+	Network    *egress.Instruction
 	LatencyMs  int64
 }
 
@@ -54,6 +56,7 @@ type UpgradeInstruction struct {
 }
 
 type heartbeatResponse struct {
+	Network *egress.Instruction `json:"network"`
 	Upgrade *UpgradeInstruction `json:"upgrade"`
 	Tunnel  *TunnelInstruction  `json:"tunnel"`
 	Caddy   *CaddyInstruction   `json:"caddy"`
@@ -123,6 +126,7 @@ func (client *Client) Heartbeat(ctx context.Context, payload map[string]any) (He
 		result.Upgrade = parsedResponse.Upgrade
 		result.Tunnel = parsedResponse.Tunnel
 		result.Caddy = parsedResponse.Caddy
+		result.Network = parsedResponse.Network
 	}
 
 	var parsed map[string]any

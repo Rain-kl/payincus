@@ -2,6 +2,27 @@ package protocol
 
 import "testing"
 
+func TestCanonicalJSONSortsNestedStructReportsWithoutRoundingCounters(t *testing.T) {
+	type item struct {
+		Success   bool  `json:"success"`
+		NodeID    int   `json:"nodeId"`
+		LatencyMs int64 `json:"latencyMs"`
+	}
+	type status struct {
+		State           string `json:"state"`
+		AppliedRevision int    `json:"appliedRevision"`
+	}
+	value := map[string]any{"networkStatus": status{"applied", 2}, "proxyProbeResults": []item{{true, 7, 12}}, "counter": uint64(18446744073709551615)}
+	data, err := CanonicalJSON(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"counter":18446744073709551615,"networkStatus":{"appliedRevision":2,"state":"applied"},"proxyProbeResults":[{"latencyMs":12,"nodeId":7,"success":true}]}`
+	if string(data) != want {
+		t.Fatalf("noncanonical typed report: %s", data)
+	}
+}
+
 func TestCanonicalJSONIsStableForMapOrder(t *testing.T) {
 	bodyA := map[string]any{
 		"version": "0.1.0",

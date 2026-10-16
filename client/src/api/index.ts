@@ -1,4 +1,5 @@
 import type { GpuConfiguration } from '@/types/api'
+import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProbeJob } from './egress-types'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
 import { useAuthStore } from '@/stores/auth'
@@ -585,6 +586,17 @@ http.interceptors.response.use(
 
 // API 模块
 const api = {
+  network: {
+    probeHosts: (): Promise<{ hosts: Array<{ id: number; name: string }> }> => Promise.reject(new Error('Unavailable in this application')),
+    nodes: (): Promise<{ nodes: ProxyNode[] }> => Promise.reject(new Error('Unavailable in this application')),
+    importNodes: (_data: { content?: string; subscriptionUrl?: string; confirm: boolean }): Promise<ProxyImportResult> => Promise.reject(new Error('Unavailable in this application')),
+    deleteNode: (_id: number): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
+    policy: (_hostId: number): Promise<{ policy: NetworkPolicy; agent: { enabled: boolean; capabilities: string[]; lastSeenAt: string | null } | null }> => Promise.reject(new Error('Unavailable in this application')),
+    updateEgress: (_hostId: number, _revision: number, _value: EgressPolicy): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
+    updateFirewall: (_hostId: number, _revision: number, _value: FirewallPolicy): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
+    probe: (_hostId: number, _nodeIds: number[], _probeUrl: string): Promise<{ job: { id: string } }> => Promise.reject(new Error('Unavailable in this application')),
+    probes: (): Promise<{ jobs: ProbeJob[] }> => Promise.reject(new Error('Unavailable in this application'))
+  },
   // 认证
   auth: {
     check2FA: (username: string): Promise<{ requires2FA: boolean }> =>

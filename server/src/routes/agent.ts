@@ -1,4 +1,5 @@
 import { syncHostGpuReport } from '../db/gpus.js'
+import { networkHeartbeat } from '../lib/egress/sync.js'
 /**
  * 宿主机 Agent 路由
  * 负责 Agent 凭据签发、HMAC 鉴权和心跳上报。
@@ -56,6 +57,8 @@ interface AgentHeartbeatBody {
   instances?: Record<string, unknown>
   resources?: Record<string, unknown>
   metrics?: Record<string, unknown>
+  networkStatus?: Record<string, unknown>
+  proxyProbeResults?: unknown[]
 }
 
 interface AgentBinaryParams {
@@ -1603,6 +1606,9 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       serverTime: now.toISOString(),
       taskPollIntervalSeconds: 15,
       instanceReport,
+      network: request.body.capabilities?.includes('xray-egress')
+        ? await networkHeartbeat(agent.hostId, request.body.networkStatus, request.body.proxyProbeResults)
+        : undefined,
       upgrade: await buildAgentUpgradeInstruction(request, request.body),
       caddy: {
         command: caddyCommand,

@@ -8,6 +8,7 @@ import { useToast } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import HostGpuTab from '@/components/host/HostGpuTab.vue'
+import HostFirewallTab from '@/components/host/HostFirewallTab.vue'
 import HostInfoTab from '@/components/host/HostInfoTab.vue'
 import HostImagesTab from '@/components/host/HostImagesTab.vue'
 import MyHostConfigTab from '@/components/host/MyHostConfigTab.vue'
@@ -37,7 +38,7 @@ const authStore = useAuthStore()
 // 是否是管理员
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-type TabType = 'gpu' | 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'agentLogs' | 'redeemCodes' | 'ops' | 'create'
+type TabType = 'firewall' | 'gpu' | 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'agentLogs' | 'redeemCodes' | 'ops' | 'create'
 const activeTab = ref<TabType>('info')
 
 interface Host {
@@ -364,7 +365,7 @@ function closeReinstallModal() {
   loadHost()
 }
 
-const tabs = [
+const tabs = computed(() => [
   { key: 'info', labelKey: 'admin.hosts.tabInfo', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { key: 'gpu', labelKey: 'gpu.title', icon: 'M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m14 0h3M2 15h3m14 0h3' },
   { key: 'config', labelKey: 'admin.hosts.tabConfig', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
@@ -377,7 +378,7 @@ const tabs = [
   { key: 'instances', labelKey: 'admin.hosts.tabInstances', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
   { key: 'ops', labelKey: 'admin.hosts.tabOps', icon: 'M5 13l4 4L19 7M12 6v6l4 2' },
   { key: 'create', labelKey: 'admin.hosts.tabCreate', icon: 'M12 4v16m8-8H4' }
-]
+].flatMap(tab => tab.key === 'config' && isAdmin.value ? [tab, { key: 'firewall', labelKey: 'egress.firewall', icon: 'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7l8-4z' }] : [tab]))
 </script>
 
 <template>
@@ -504,6 +505,7 @@ const tabs = [
         <HostGpuTab v-if="activeTab === 'gpu'" :host-id="host.id" />
         <HostInfoTab v-if="activeTab === 'info'" :host="host" @refresh="loadHost" />
         <MyHostConfigTab v-if="activeTab === 'config'" :host="host" @saved="onConfigSaved" />
+        <HostFirewallTab v-if="activeTab === 'firewall' && isAdmin" :host-id="host.id" />
         <HostImagesTab v-if="activeTab === 'images'" :host-id="host.id" :host-name="host.name" />
         <HostStorageTab v-if="activeTab === 'storage'" :host-id="host.id" />
         <HostPublicIpv4Tab v-if="activeTab === 'publicIpv4'" :host-id="host.id" />

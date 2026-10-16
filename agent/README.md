@@ -1,5 +1,7 @@
 # Incudal Host Agent
 
+Xray 出口代理与 Incus ACL 的配置、运行边界和验收说明见 [NETWORK.md](NETWORK.md)。
+
 宿主机 Agent 客户端实现。
 
 当前阶段负责读取配置、向面板上报 HMAC 签名心跳，并按面板心跳响应执行自动升级。

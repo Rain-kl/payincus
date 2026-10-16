@@ -29,6 +29,7 @@ build_one() {
   local output="${DIST_DIR}/incudal-agent-linux-${goarch}"
 
   echo "Building ${output} (version=${VERSION})"
+  python3 "${ROOT_DIR}/scripts/prepare-xray.py" "${goarch}"
   (
     cd "${ROOT_DIR}"
     CGO_ENABLED=0 GOOS=linux GOARCH="${goarch}" \

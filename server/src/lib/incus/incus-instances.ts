@@ -1,4 +1,5 @@
 import { prisma } from '../../db/prisma.js'
+import { protectProvisionedNetwork } from '../egress/provision.js'
 import { getInstanceGpuPcis } from '../../db/gpus.js'
 import { applyGpuDevice } from '../gpu.js'
 /**
@@ -259,7 +260,8 @@ export async function getInstanceState(client: IncusClient, name: string): Promi
  * 创建实例
  */
 export async function createInstance(client: IncusClient, config: unknown): Promise<unknown> {
-  return client.request('POST', '/1.0/instances', config)
+  const protectedConfig = await protectProvisionedNetwork(client, config)
+  return client.request('POST', '/1.0/instances', protectedConfig)
 }
 
 /**
