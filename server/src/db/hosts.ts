@@ -1,3 +1,4 @@
+import { getGpuPolicy, findAvailableGpu } from './gpus.js'
 /**
  * 主机相关数据库操作
  * 使用 Prisma ORM
@@ -1021,11 +1022,14 @@ export async function selectAndReserveHostWithLock(
     hostId?: number | null
     ownerId?: number
     portCount?: number
+    packagePlanId?: number | null
     packageId?: number | null
     networkMode?: NetworkMode | string | null
   }
 ): Promise<(Host & { cpu_allowance_max?: number; memory_max?: number }) | null> {
   const { packageHostIds, nodeSelectors = [], cpu, memory, disk, hostId, ownerId, portCount = 0, packageId, networkMode } = options
+
+  const gpuPolicy = await getGpuPolicy(tx, packageId, options.packagePlanId)
 
   // 构建候选宿主机查询条件
   const whereConditions: string[] = ["status = 'online'"]
@@ -1097,6 +1101,7 @@ export async function selectAndReserveHostWithLock(
 
   // 遍历候选宿主机，检查资源并预占
   for (const host of hosts) {
+    if (gpuPolicy.gpuShared && !await findAvailableGpu(tx, host.id, gpuPolicy)) continue
     // 检查标签选择器
     if (nodeSelectors.length > 0) {
       const hostTags = (host.tags as string[]) || []

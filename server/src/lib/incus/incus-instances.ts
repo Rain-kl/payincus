@@ -1,3 +1,6 @@
+import { prisma } from '../../db/prisma.js'
+import { getInstanceGpuPci } from '../../db/gpus.js'
+import { applyGpuDevice } from '../gpu.js'
 /**
  * Incus 实例管理
  */
@@ -263,13 +266,30 @@ export async function createInstance(client: IncusClient, config: unknown): Prom
  * 删除实例
  */
 export async function deleteInstance(client: IncusClient, name: string): Promise<unknown> {
-  return client.request('DELETE', `/1.0/instances/${name}`)
+  try {
+    const result = await client.request('DELETE', `/1.0/instances/${name}`)
+    await releaseFailedGpuByName(client, name)
+    return result
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode !== 404) throw error
+    await releaseFailedGpuByName(client, name)
+    return null
+  }
 }
 
 /**
  * 启动实例
  */
 export async function startInstance(client: IncusClient, name: string): Promise<unknown> {
+  if (client.options?.hostId) {
+    const record = await prisma.instance.findFirst({ where: { incusId: name, hostId: client.options.hostId, status: { not: 'deleted' }, gpuDeviceId: { not: null } }, select: { id: true } })
+    if (record) {
+      const pci = await getInstanceGpuPci(record.id, client.options.hostId)
+      const live = await getInstance(client, name)
+      applyGpuDevice(live, pci!)
+      await client.request('PUT', `/1.0/instances/${name}`, live)
+    }
+  }
   return client.request('PUT', `/1.0/instances/${name}/state`, {
     action: 'start',
     timeout: 60  // 60秒
@@ -872,6 +892,7 @@ export function buildInstanceConfig(options: BuildInstanceConfigOptions): Record
     })
   }
 
+  if (options.gpuPciAddress) applyGpuDevice(config, options.gpuPciAddress)
   return config
 }
 
@@ -979,4 +1000,9 @@ export async function ensureBridgeIpv6(
     // 校验失败不阻断实例创建，仅记录警告
     console.warn(`[ensureBridgeIpv6] 网桥 IPv6 校验失败（${bridgeName}）:`, err)
   }
+}
+
+async function releaseFailedGpuByName(client: IncusClient, name: string): Promise<void> {
+  if (!client.options?.hostId) return
+  await prisma.instance.updateMany({ where: { incusId: name, hostId: client.options.hostId, status: { in: ['error', 'deleted'] }, gpuDeviceId: { not: null }, gpuReleasedAt: null }, data: { gpuReleasedAt: new Date() } })
 }

@@ -49,6 +49,8 @@ interface ImageOption {
 }
 
 interface PackagePlan {
+  gpuShared?: boolean | null
+  gpuDeviceIds?: number[]
   id: number
   name: string
   description: string | null
@@ -1341,9 +1343,13 @@ async function handleSubmit(): Promise<void> {
             @select="selectPackage"
             @show-owner-info="(packageId) => loadHostOwnerInfo(packageId)"
           />
-          <PlanSelector
+          <div v-if="selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared" class="card mb-4 p-4">
+              <p class="font-semibold text-themed">{{ t('gpu.shared') }}</p><p class="mt-1 text-sm text-themed-muted">{{ t('gpu.notice') }}</p>
+            </div>
+            <PlanSelector
             v-if="isPaidPackage"
             :plans="packagePlans"
+            :package-gpu-shared="selectedPackage?.gpu_shared"
             :selected-plan-id="form.planId"
             :instance-type="(selectedPackage?.instance_type === 'vm' ? 'vm' : 'container')"
             :loading="plansLoading"

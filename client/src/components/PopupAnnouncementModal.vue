@@ -213,7 +213,7 @@ watch(visible, (isVisible) => {
         <div class="absolute inset-0 bg-black/45 backdrop-blur-sm"></div>
 
         <div
-          class="modal-content relative w-full max-w-[min(92vw,720px)] overflow-hidden rounded-2xl border md:w-auto md:max-w-[min(92vw,980px)]"
+          class="popup-announcement-panel relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(92vw,720px)] flex-col overflow-hidden rounded-2xl border md:w-auto md:max-w-[min(92vw,980px)]"
           :class="themeStore.isDark
             ? 'border-gray-800 bg-gray-950 text-gray-100'
             : 'border-gray-200 bg-white text-gray-900'"

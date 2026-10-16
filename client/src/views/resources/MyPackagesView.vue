@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GpuSharingFields from '@/components/GpuSharingFields.vue'
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
@@ -378,6 +379,8 @@ function formatDisk(mb: number): string {
 
 // 方案管理相关
 interface PackagePlan {
+  gpuShared?: boolean | null
+  gpuDeviceIds?: number[]
   id: number
   name: string
   description: string | null
@@ -412,6 +415,8 @@ const editingPlan = ref<PackagePlan | null>(null)
 const planFormLoading = ref<boolean>(false)
 
 const planForm = ref({
+  gpuShared: null as boolean | null,
+  gpuDeviceIds: [] as number[],
   name: '',
   description: '',
   cpu: 100,
@@ -563,6 +568,8 @@ async function loadPlans(packageId: number): Promise<void> {
 function openCreatePlanModal(): void {
   editingPlan.value = null
   planForm.value = {
+    gpuShared: null,
+    gpuDeviceIds: [],
     name: '',
     description: '',
     cpu: plansPackage.value?.cpu_max || 100,
@@ -587,6 +594,8 @@ function openCreatePlanModal(): void {
 function openEditPlanModal(plan: PackagePlan): void {
   editingPlan.value = plan
   planForm.value = {
+    gpuShared: plan.gpuShared ?? null,
+    gpuDeviceIds: plan.gpuDeviceIds ?? [],
     name: plan.name,
     description: plan.description || '',
     cpu: plan.cpu,
@@ -656,6 +665,8 @@ async function savePlan(): Promise<void> {
   planFormLoading.value = true
   try {
     const data = {
+      gpuShared: planForm.value.gpuShared,
+      gpuDeviceIds: planForm.value.gpuDeviceIds,
       name: planForm.value.name.trim(),
       description: planForm.value.description.trim() || undefined,
       cpu: planForm.value.cpu,
@@ -1284,6 +1295,7 @@ function getBillingCycleLabel(months: number): string {
             <div class="modal-body space-y-4 max-h-[70vh] overflow-y-auto">
               <!-- 基本信息 -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <GpuSharingFields class="sm:col-span-2" v-if="plansPackage" v-model="planForm.gpuShared" v-model:device-ids="planForm.gpuDeviceIds" :host-ids="plansPackage.host_ids || []" :allowed="plansPackage.instance_type !== 'vm' && !plansPackage.privileged" nullable />
                 <div>
                   <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.name') }} *</label>
                   <input v-model="planForm.name" type="text" class="input" :placeholder="t('resources.plans.namePlaceholder')" />

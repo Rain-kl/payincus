@@ -1,3 +1,4 @@
+import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { buildApiUrl } from '@/utils/api-url'
@@ -870,6 +871,7 @@ const api = {
 
   // 实例管理
   instances: {
+    getGpu: (id: number): Promise<{ gpu: InstanceGpuInfo | null }> => http.get(`/instances/${id}/gpu`),
     list: (params: Record<string, unknown> = {}): Promise<PaginatedResponse<InstanceWithDetails> & { availableCountries?: string[] }> =>
       http.get('/instances', { params }),
     get: (id: number): Promise<InstanceWithDetails> => http.get(`/instances/${id}`),
@@ -1312,6 +1314,8 @@ const api = {
 
   // 主机管理
   hosts: {
+    getGpus: (id: number): Promise<{ gpus: HostGpu[] }> => http.get(`/hosts/${id}/gpus`),
+    updateGpu: (hostId: number, gpuId: number, data: { sharingEnabled: boolean; maxInstances: number }): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/gpus/${gpuId}`, data),
     list: (params: Record<string, unknown> = {}): Promise<{ hosts: HostWithDetails[]; total: number; page: number; pageSize: number; totalPages: number }> =>
       http.get('/hosts', { params }),
     // 管理员专用：获取托管节点列表
@@ -1935,6 +1939,8 @@ const api = {
     // 套餐方案管理
     getPlans: (packageId: number, options?: { activeOnly?: boolean }): Promise<{
       plans: Array<{
+        gpuShared?: boolean | null
+        gpuDeviceIds?: number[]
         id: number
         name: string
         description: string | null
@@ -1961,6 +1967,8 @@ const api = {
     }> => http.get(`/packages/${packageId}/plans`, { params: options }),
 
     createPlan: (packageId: number, data: {
+      gpuShared?: boolean | null
+      gpuDeviceIds?: number[]
       name: string
       description?: string
       cpu: number
@@ -1985,6 +1993,8 @@ const api = {
       http.post(`/packages/${packageId}/plans`, data),
 
     updatePlan: (packageId: number, planId: number, data: {
+      gpuShared?: boolean | null
+      gpuDeviceIds?: number[]
       name?: string
       description?: string
       cpu?: number

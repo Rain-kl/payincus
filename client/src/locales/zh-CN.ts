@@ -1,4 +1,5 @@
 export default {
+    gpu: {"title": "GPU", "description": "NVIDIA 物理显卡监控与共享池", "empty": "未发现 NVIDIA GPU。请安装或升级宿主 Agent，并确认 NVIDIA 驱动正常。", "notice": "共享池内的实例共同使用显存和算力，不提供独立显存或算力保证。", "enabled": "开放共享 GPU", "limit": "最大共享实例数", "seats": "已分配 / 总名额", "memory": "显存使用 / 总量", "utilization": "GPU 利用率", "memoryUtilization": "显存控制器利用率", "temperature": "温度", "power": "功耗 / 功耗上限", "driver": "驱动版本", "ready": "可用", "unavailable": "不可用或数据已过期", "runtimeMissing": "请检查宿主 NVIDIA 驱动和 nvidia-container-cli；GPU 计算模式须为 Default。", "updated": "最后上报", "saved": "GPU 共享设置已保存", "select": "选择共享显卡", "none": "所选宿主机没有可配置的共享 GPU", "inherit": "继承套餐 GPU 设置", "disabled": "不使用 GPU", "containerOnly": "共享 GPU 仅支持非特权 LXC 容器", "shared": "共享 NVIDIA GPU", "hostMemory": "所共享物理显卡的总显存", "released": "GPU 名额已释放，重建时需重新申请", "loading": "正在读取 GPU", "save": "保存", "refresh": "刷新", "unknown": "暂无数据"},
     hostPublicIpv4: {
         title: '独立 IPv4 地址池',
         description: '为独立 IPv4 套餐提供 routed 公网 IPv4 分配、回收和容量校验。',

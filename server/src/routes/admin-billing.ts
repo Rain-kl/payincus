@@ -1,3 +1,5 @@
+import { GpuError } from '../lib/gpu.js'
+import { compensateGpuPreparationFailure, releaseFailedGpu, assertGpuPlanChange, reserveInstanceGpu, getInstanceGpuPci } from '../db/gpus.js'
 /**
  * 管理员计费相关路由
  */
@@ -3576,6 +3578,8 @@ if (provider.type === 'yipay') {
 
     const { username, name, packageId, planId, chargeFirstMonth = true, image, cpu, memory, disk, hostId, customInitCommandIds } = body
 
+    let gpuPreparingInstanceId: number | null = null
+    let gpuProvisionerStarted = false
     try {
       // 1. 验证必填参数
       if (!username || !name || !packageId || !image || !hostId || hostId <= 0) {
@@ -3769,6 +3773,7 @@ if (provider.type === 'yipay') {
       const result = await prisma.$transaction(async (tx) => {
         // 使用行锁选择并预占宿主机资源
         const lockedHost = await db.selectAndReserveHostWithLock(tx, {
+          packagePlanId: selectedPlan?.id,
           packageHostIds: packageHostIds.length > 0 ? packageHostIds : undefined,
           nodeSelectors: JSON.parse(pkgWithExtras.node_selectors || '[]'),
           cpu: requestedCpu,
@@ -3898,6 +3903,7 @@ if (provider.type === 'yipay') {
         // 创建实例记录
         const instance = await tx.instance.create({
           data: {
+            ...(await reserveInstanceGpu(tx, { hostId: lockedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             name,
             userId: targetUser.id,
@@ -3964,6 +3970,7 @@ if (provider.type === 'yipay') {
       })
 
       instanceId = result.instanceId
+      gpuPreparingInstanceId = instanceId
       host = result.host
 
       if (!host) {
@@ -3998,6 +4005,7 @@ if (provider.type === 'yipay') {
           await db.compensateFailedInstancePurchase(instanceId, targetUser.id, host.id).catch((err) => {
             console.error('[Admin Create Instance] 独立 IPv4 分配失败后计费补偿失败:', err)
           })
+          await releaseFailedGpu(instanceId)
           return reply.status(503).send({ error: `宿主机 ${host.name} 没有可用独立 IPv4 地址` })
         }
         staticIPv4 = publicIpv4Assignment.address
@@ -4112,6 +4120,7 @@ if (provider.type === 'yipay') {
       // 根据 ioLimitMode 选择性传入 IO 限制参数
       const ioMode = pkgConfig.io_limit_mode || 'throughput'
 
+      gpuProvisionerStarted = true
       createInstanceAsync(instanceId, host, {
         name: incusId,
         image,
@@ -4260,6 +4269,8 @@ if (provider.type === 'yipay') {
       })
 
     } catch (error: any) {
+      if (gpuPreparingInstanceId && !gpuProvisionerStarted) await compensateGpuPreparationFailure(gpuPreparingInstanceId)
+      if (error instanceof GpuError) return reply.code(409).send({ error: error.message, code: error.code })
       console.error('[Admin Create Instance] 创建失败:', error)
 
       if (error.message?.includes('HOST_RESOURCES_INSUFFICIENT')) {
@@ -4513,6 +4524,7 @@ if (provider.type === 'yipay') {
 
       // 10. 执行事务：扣款 + 更新数据库
       await prisma.$transaction(async (tx) => {
+        await assertGpuPlanChange(tx, instanceId, newPlanId)
         let balanceBefore = userBalance
         let balanceAfter = balanceBefore
         const monthlyTrafficLimit = await resolveInstanceTrafficLimitForHost(tx as any, {
@@ -4666,6 +4678,7 @@ if (provider.type === 'yipay') {
       if (errorMessage.includes('BALANCE_INSUFFICIENT')) {
         return reply.status(400).send({ error: '用户余额不足' })
       }
+      if (error instanceof GpuError) return reply.code(409).send({ error: error.message, code: error.code })
       if (errorMessage.includes('HOST_RESOURCES_INSUFFICIENT')) {
         const reason = errorMessage.split(':')[1]
         return reply.status(400).send({
@@ -4735,6 +4748,7 @@ async function createInstanceAsync(
     const ipv6Config = config.ipv6Address ? { primaryIp: config.ipv6Address } : null
 
     const incusConfig = buildInstanceConfig({
+      gpuPciAddress: await getInstanceGpuPci(instanceId, host.id),
       name: config.name,
       image: config.image,
       cpu: config.cpu,

@@ -1,3 +1,5 @@
+import { GpuError } from '../lib/gpu.js'
+import { compensateGpuPreparationFailure, releaseFailedGpu, reserveInstanceGpu, assertGpuMigration } from '../db/gpus.js'
 /**
  * 宿主机管理路由 (管理员)
  */
@@ -5718,6 +5720,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       const originalInstanceStatus = instance.status as InstanceStatus
 
       try {
+        await assertGpuMigration(instance.id)
         // 1. 检查转移锁定、恢复任务和上传任务
         const hasPendingTransfer = await db.hasPendingTransfer(instance.id)
         if (hasPendingTransfer) {
@@ -6452,6 +6455,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     const incusId = `u${targetUser.id}-${randomUUID().replace(/-/g, '').slice(0, 8)}`
     const packageTrafficLimit = pkgWithExtras.monthly_traffic_limit ? BigInt(pkgWithExtras.monthly_traffic_limit) : null
 
+    let gpuProvisionerStarted = false
     let instanceId = 0
     let lockedHost: Awaited<ReturnType<typeof db.selectAndReserveHostWithLock>> | null = null
 
@@ -6463,6 +6467,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
       const txResult = await prisma.$transaction(async (tx) => {
         const reservedHost = await db.selectAndReserveHostWithLock(tx, {
+          packagePlanId: selectedPlan?.id,
           packageHostIds: packageHostIds.length > 0 ? packageHostIds : undefined,
           nodeSelectors: JSON.parse(pkgWithExtras.node_selectors || '[]'),
           cpu: requestedCpu,
@@ -6531,6 +6536,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
         const instance = await tx.instance.create({
           data: {
+            ...(await reserveInstanceGpu(tx, { hostId: reservedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             name,
             userId: targetUser.id,
@@ -6620,6 +6626,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           await db.compensateFailedInstancePurchase(instanceId, targetUser.id, lockedHost!.id).catch((err) => {
             fastify.log.error(err, '[Host Create For User] failed to compensate purchase after public IPv4 allocation miss')
           })
+          await releaseFailedGpu(instanceId)
           return reply.status(503).send({ error: `宿主机 ${lockedHost!.name} 没有可用独立 IPv4 地址` })
         }
         staticIPv4 = publicIpv4Assignment.address
@@ -6706,6 +6713,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
       const ioMode = pkgWithExtras.io_limit_mode || 'throughput'
 
+      gpuProvisionerStarted = true
       provisionManagedInstanceAsync(instanceId, lockedHost as unknown as Host, {
         name: incusId,
         image,
@@ -6843,6 +6851,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         }
       })
     } catch (error: any) {
+      if (instanceId && !gpuProvisionerStarted) await compensateGpuPreparationFailure(instanceId)
+      if (error instanceof GpuError) return reply.code(409).send({ error: error.message, code: error.code })
       fastify.log.error(error, '[Host Create For User] failed')
 
       if (error.message?.includes('HOST_RESOURCES_INSUFFICIENT')) {

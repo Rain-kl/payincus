@@ -1,3 +1,4 @@
+import { assertGpuPlanChange } from '../db/gpus.js'
 /**
  * 实例计费相关路由
  * 处理续费、升降级、自动续费等计费操作
@@ -726,6 +727,7 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     const statusCanChange = ['running', 'stopped'].includes(instance.status)
 
     try {
+      await assertGpuPlanChange(prisma, instance.id, newPlan.id)
       const preview = await db.calculatePlanChange(instance, newPlan)
 
       // 只允许升级，不允许降级

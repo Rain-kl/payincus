@@ -778,6 +778,7 @@ model Host {
   addressConflictsA      HostAddressConflict[]      @relation("HostAddressConflictA")
   addressConflictsB      HostAddressConflict[]      @relation("HostAddressConflictB")
   agent                  HostAgent?
+  gpus                   HostGpu[]
   instanceAuditRules     InstanceAuditRule[]
   instanceAuditBuiltinRuleOverrides InstanceAuditBuiltinRuleOverride[]
   instanceAuditIgnores   InstanceAuditIgnore[]
@@ -816,6 +817,28 @@ model HostAgent {
   @@index([lastSeenAt])
   @@index([installTokenExpiresAt])
   @@map("host_agents")
+}
+
+// One physical NVIDIA GPU is one independent sharing pool. Metrics are host-wide,
+// not per-tenant guarantees; leases remain reserved while an instance is stopped.
+model HostGpu {
+  id             Int      @id @default(autoincrement())
+  hostId         Int      @map("host_id")
+  uuid           String
+  pciAddress     String   @map("pci_address")
+  name           String
+  memoryTotalMiB Int      @map("memory_total_mib")
+  metrics        Json     @default("{}")
+  available      Boolean  @default(false)
+  runtimeReady   Boolean  @default(false) @map("runtime_ready")
+  sharingEnabled Boolean  @default(false) @map("sharing_enabled")
+  maxInstances   Int      @default(10) @map("max_instances")
+  lastSeenAt     DateTime @map("last_seen_at")
+  host           Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  instances      Instance[]
+
+  @@unique([hostId, uuid])
+  @@map("host_gpus")
 }
 
 model HostAgentNonce {
@@ -941,6 +964,8 @@ model Package {
   instanceType        InstanceType @default(container) @map("instance_type") // 实例类型: 容器/虚拟机
   nodeSelectors       Json?        @default("[]") @map("node_selectors")
   privileged          Boolean      @default(false)
+  gpuShared           Boolean      @default(false) @map("gpu_shared")
+  gpuDeviceIds        Int[]        @default([]) @map("gpu_device_ids")
   nested              Boolean      @default(false)
   active              Boolean      @default(true)
   // 套餐资源限制
@@ -1016,6 +1041,9 @@ model Instance {
   hostId           Int            @map("host_id")
   packageId        Int?           @map("package_id")
   packagePlanId    Int?           @map("package_plan_id")  // 套餐方案 ID：null 表示免费实例
+  gpuDeviceId      Int?           @map("gpu_device_id")
+  gpuReleasedAt    DateTime?      @map("gpu_released_at")
+  gpuDevice        HostGpu?       @relation(fields: [gpuDeviceId], references: [id], onDelete: Restrict)
   storagePoolName  String?        @map("storage_pool_name")
   image            String
   status           InstanceStatus @default(creating)
@@ -1139,6 +1167,7 @@ model Instance {
   @@index([hostId, status]) // 高可用优化：状态同步调度器使用
   @@index([expiresAt])      // 计费调度器使用：查找即将到期的实例
   @@index([userId, displayOrder, createdAt(sort: Desc)])
+  @@index([gpuDeviceId])
   @@map("instances")
 }
 
@@ -2792,6 +2821,8 @@ model PackagePlan {
   // 基本信息
   name        String  // 方案名称，如"低配"、"高配"、"标准版"
   description String? // 方案描述
+  gpuShared   Boolean? @map("gpu_shared") // null inherits the package policy
+  gpuDeviceIds Int[] @default([]) @map("gpu_device_ids")
 
   // ========== 资源配置（预设固定值） ==========
   cpu    Int // CPU 额度 (%)，如 50, 100, 200

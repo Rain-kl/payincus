@@ -366,7 +366,7 @@ export async function updateInstanceStatus(
   if (status === 'deleted') {
     await prisma.instance.update({
       where: { id },
-      data: updateData
+      data: { ...updateData, gpuReleasedAt: new Date() }
     })
     return
   }

@@ -1,3 +1,5 @@
+import { getGpuOffersForPackages, gpuOffersAvailableOnHost, validateGpuSelection } from './gpus.js'
+import { resolveGpuPolicy } from '../lib/gpu.js'
 /**
  * 套餐相关数据库操作
  * 使用 Prisma ORM
@@ -286,6 +288,8 @@ export async function getAllPackages(
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    gpu_shared: pkg.gpuShared,
+    gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
     nested: pkg.nested ? 1 : 0,
     active: pkg.active ? 1 : 0,
@@ -367,6 +371,8 @@ export async function getPackageById(id: number): Promise<(Package & { host_ids?
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    gpu_shared: pkg.gpuShared,
+    gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
     nested: pkg.nested ? 1 : 0,
     active: pkg.active ? 1 : 0,
@@ -428,6 +434,8 @@ export async function getPackageByName(name: string): Promise<Package | null> {
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    gpu_shared: pkg.gpuShared,
+    gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
     nested: pkg.nested ? 1 : 0,
     active: pkg.active ? 1 : 0,
@@ -481,6 +489,8 @@ export async function getPackageByUserAndName(userId: number, name: string): Pro
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    gpu_shared: pkg.gpuShared,
+    gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
     nested: pkg.nested ? 1 : 0,
     active: pkg.active ? 1 : 0,
@@ -529,6 +539,8 @@ export async function createPackage(data: {
   hostIds: number[]  // 必须至少绑定一个宿主机
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   privileged?: boolean
   nested?: boolean
   active?: boolean
@@ -600,6 +612,8 @@ async function createPackageUnchecked(data: {
   hostIds: number[]
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   privileged?: boolean
   nested?: boolean
   active?: boolean
@@ -653,6 +667,8 @@ async function createPackageUnchecked(data: {
   }, client)
   validateHostTrafficMultipliers(data.hostIds, normalizedHostTrafficMultipliers)
 
+  await validateGpuSelection(client, { gpuShared: data.gpuShared ?? false, gpuDeviceIds: data.gpuDeviceIds ?? [], instanceType: data.instanceType ?? 'container', privileged: data.privileged ?? false, hostIds: data.hostIds })
+
   const pkg = await client.package.create({
     data: {
       userId: data.userId,
@@ -664,6 +680,8 @@ async function createPackageUnchecked(data: {
       bandwidthMax: data.bandwidthMax ?? null,
       networkMode: data.networkMode ?? 'nat',
       instanceType: data.instanceType ?? 'container',
+      gpuShared: data.gpuShared ?? false,
+      gpuDeviceIds: data.gpuDeviceIds ?? [],
       privileged: data.privileged ?? false,
       nested: data.nested ?? false,
       active: data.active !== false,
@@ -728,6 +746,8 @@ export async function updatePackage(id: number, data: {
   hostIds?: number[]  // 如果提供，将更新绑定的宿主机
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   privileged?: boolean
   nested?: boolean
   active?: boolean
@@ -807,6 +827,8 @@ async function updatePackageUnchecked(id: number, data: {
   hostIds?: number[]
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   privileged?: boolean
   nested?: boolean
   active?: boolean
@@ -835,6 +857,21 @@ async function updatePackageUnchecked(id: number, data: {
   requiredPackageId?: number | null
   allowInstanceDeletion?: boolean
 }, isAdmin: boolean | undefined, client: Prisma.TransactionClient | typeof prisma): Promise<void> {
+  const currentGpuPackage = await client.package.findUnique({ where: { id }, include: { plans: true, packageHosts: true } })
+  if (!currentGpuPackage) throw new Error('Package not found')
+  const nextGpuPackage = {
+    ...currentGpuPackage,
+    gpuShared: data.gpuShared ?? currentGpuPackage.gpuShared,
+    gpuDeviceIds: data.gpuDeviceIds ?? currentGpuPackage.gpuDeviceIds,
+    instanceType: data.instanceType ?? currentGpuPackage.instanceType,
+    privileged: data.privileged ?? currentGpuPackage.privileged
+  }
+  const gpuHostIds = data.hostIds ?? currentGpuPackage.packageHosts.map(binding => binding.hostId)
+  await validateGpuSelection(client, { ...nextGpuPackage, hostIds: gpuHostIds })
+  for (const plan of currentGpuPackage.plans) {
+    await validateGpuSelection(client, { ...nextGpuPackage, ...resolveGpuPolicy(nextGpuPackage, plan), hostIds: gpuHostIds })
+  }
+
   const updateData: {
     name?: string
     description?: string | null
@@ -844,6 +881,8 @@ async function updatePackageUnchecked(id: number, data: {
     bandwidthMax?: number | null
     networkMode?: 'nat' | 'nat_ipv6' | 'nat_ipv6_nat' | 'ipv6_only' | 'ipv6_nat' | 'public_ipv4' | 'public_ipv4_ipv6'
     instanceType?: 'container' | 'vm'
+    gpuShared?: boolean
+    gpuDeviceIds?: number[]
     privileged?: boolean
     nested?: boolean
     active?: boolean
@@ -887,6 +926,8 @@ async function updatePackageUnchecked(id: number, data: {
   if (data.bandwidthMax !== undefined) updateData.bandwidthMax = data.bandwidthMax ?? null
   if (data.networkMode !== undefined) updateData.networkMode = data.networkMode
   if (data.instanceType !== undefined) updateData.instanceType = data.instanceType
+  if (data.gpuShared !== undefined) updateData.gpuShared = data.gpuShared
+  if (data.gpuDeviceIds !== undefined) updateData.gpuDeviceIds = data.gpuDeviceIds
   if (data.privileged !== undefined) updateData.privileged = data.privileged
   if (data.nested !== undefined) updateData.nested = data.nested
   if (data.active !== undefined) updateData.active = data.active
@@ -1353,6 +1394,7 @@ export async function increaseHostQuota(hostId: number, cpuAdd: number, memoryAd
  * - 付费套餐：最低配置为最低可售方案的 CPU/内存/磁盘
  */
 export async function checkPackageSoldOut(packageId: number): Promise<boolean> {
+  const gpuOffers = (await getGpuOffersForPackages([packageId])).get(packageId) ?? []
   // 1. 获取套餐绑定的宿主机以及其资源使用情况
   const packageHosts = await prisma.packageHost.findMany({
     where: { packageId },
@@ -1409,6 +1451,7 @@ export async function checkPackageSoldOut(packageId: number): Promise<boolean> {
   // 3. 检查是否有任何一个在线宿主机可以满足最低配置
   for (const ph of packageHosts) {
     const host = ph.host
+    if (!await gpuOffersAvailableOnHost(host.id, gpuOffers)) continue
     
     // 跳过离线节点
     if (host.status !== 'online') {
@@ -1453,6 +1496,7 @@ export async function checkPackagesSoldOut(packageIds: number[]): Promise<Map<nu
     return new Map()
   }
 
+  const gpuOffersByPackage = await getGpuOffersForPackages(packageIds)
   // 1. 一次性获取所有套餐的宿主机绑定和资源信息
   const allPackageHosts = await prisma.packageHost.findMany({
     where: { packageId: { in: packageIds } },
@@ -1531,6 +1575,7 @@ export async function checkPackagesSoldOut(packageIds: number[]): Promise<Map<nu
     let hasAvailableHost = false
     for (const ph of packageHosts) {
       const host = ph.host
+      if (!await gpuOffersAvailableOnHost(host.id, gpuOffersByPackage.get(packageId) ?? [])) continue
       
       if (host.status !== 'online' || !host.cpuAllowanceMax || !host.memoryMax) {
         continue

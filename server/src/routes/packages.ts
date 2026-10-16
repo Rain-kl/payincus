@@ -1,3 +1,5 @@
+import { gpuPlanAvailable } from '../db/gpus.js'
+import { normalizeGpuInput, GpuError } from '../lib/gpu.js'
 /**
  * 套餐管理路由
  */
@@ -32,6 +34,8 @@ const MAX_PACKAGE_LIMIT_STRING_LENGTH = 64
 const MAX_PACKAGE_STORAGE_POOL_NAME_LENGTH = 64
 
 type NormalizedPackagePlanInput = {
+  gpuShared?: boolean | null
+  gpuDeviceIds?: number[]
   name?: string
   description?: string
   cpu?: number
@@ -54,6 +58,8 @@ type NormalizedPackagePlanInput = {
 }
 
 type NormalizedPackageInput = {
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   name?: string
   description?: string
   cpuMax?: number
@@ -336,7 +342,7 @@ function normalizePackagePlanInput(input: unknown, options: {
     throw apiError(ErrorCode.VALIDATION_ERROR, '请求参数无效')
   }
 
-  const normalized: NormalizedPackagePlanInput = {}
+  const normalized: NormalizedPackagePlanInput = { ...normalizeGpuInput(input, true) }
 
   if (options.requireAll) {
     for (const field of ['name', 'cpu', 'memory', 'disk', 'portLimit', 'snapshotLimit', 'backupLimit', 'siteLimit', 'trafficLimit', 'price'] as const) {
@@ -569,7 +575,8 @@ function normalizePackageInput(input: unknown, options: { requireAll: boolean })
     }
   }
 
-  const normalized: NormalizedPackageInput = {}
+  const gpuInput = normalizeGpuInput(input)
+  const normalized: NormalizedPackageInput = { ...gpuInput, gpuShared: gpuInput.gpuShared ?? undefined }
 
   if (input.name !== undefined) {
     const nameValidation = validateName(input.name as string, 'Package name', 2, 64)
@@ -688,8 +695,10 @@ function normalizePublicPackageMaxInstances(value: unknown): number {
   return validatePublicPackageMaxInstances(value) ? value : PUBLIC_PACKAGE_MAX_INSTANCES_MIN
 }
 
-function getPackagePrerequisiteFields(pkg: { requiredPackageId?: number | null; requiredPackageName?: string | null; required_package_id?: number | null; required_package_name?: string | null }) {
+function getPackagePrerequisiteFields(pkg: { gpuShared?: boolean; gpuDeviceIds?: number[]; gpu_shared?: boolean; gpu_device_ids?: number[]; requiredPackageId?: number | null; requiredPackageName?: string | null; required_package_id?: number | null; required_package_name?: string | null }) {
   return {
+    gpu_shared: pkg.gpuShared ?? pkg.gpu_shared ?? false,
+    gpu_device_ids: pkg.gpuDeviceIds ?? pkg.gpu_device_ids ?? [],
     required_package_id: pkg.requiredPackageId ?? pkg.required_package_id ?? null,
     required_package_name: pkg.requiredPackageName ?? pkg.required_package_name ?? null
   }
@@ -1667,6 +1676,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
             type: 'object',
             additionalProperties: { type: ['number', 'string', 'null'] }
           },
+          gpuShared: { type: 'boolean' },
+          gpuDeviceIds: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } },
           privileged: { type: 'boolean' },
           nested: { type: 'boolean' },
           active: { type: 'boolean' },
@@ -1708,6 +1719,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     try {
       packageInput = normalizePackageInput(request.body, { requireAll: true })
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(400).send(error)
     }
     const {
@@ -1766,6 +1778,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     let id: number
     try {
       id = await db.createPackage({
+        gpuShared: packageInput.gpuShared,
+        gpuDeviceIds: packageInput.gpuDeviceIds,
         userId: request.user.id,  // 所有者为当前用户
         name: name!,
         description,
@@ -1813,6 +1827,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         allowInstanceDeletion: true
       }, request.user.role === 'admin')  // 管理员可以绑定任何节点
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       const prerequisiteError = getPackagePrerequisiteError(error)
       if (prerequisiteError) {
         return reply.code(400).send({ error: prerequisiteError.message, code: prerequisiteError.code })
@@ -1859,6 +1874,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
             type: 'object',
             additionalProperties: { type: ['number', 'string', 'null'] }
           },
+          gpuShared: { type: 'boolean' },
+          gpuDeviceIds: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } },
           privileged: { type: 'boolean' },
           nested: { type: 'boolean' },
           active: { type: 'boolean' },
@@ -1920,6 +1937,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     try {
       packageInput = normalizePackageInput(request.body, { requireAll: false })
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(400).send(error)
     }
 
@@ -2069,6 +2087,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         hostIds,
         hostTrafficMultipliers
       })
+      Object.assign(updateData, normalizeGpuInput(request.body as unknown as Record<string, unknown>))
       await db.updatePackage(packageId, updateData, request.user.role === 'admin')  // 管理员可以绑定任何节点
       if (shouldSyncTrafficLimits) {
         const syncResult = await db.syncPackageTrafficLimitsToInstances(packageId)
@@ -2082,6 +2101,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         }
       }
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       const prerequisiteError = getPackagePrerequisiteError(error)
       if (prerequisiteError) {
         return reply.code(400).send({ error: prerequisiteError.message, code: prerequisiteError.code })
@@ -2171,6 +2191,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     try {
       shareInput = normalizePackageShareInput(request.body, { requireFriendId: true })
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(400).send(error)
     }
     const { friendId, quotaMultiplier, maxInstances } = shareInput
@@ -2249,6 +2270,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     try {
       shareInput = normalizePackageShareInput(request.body, { requireFriendId: false })
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(400).send(error)
     }
     const { quotaMultiplier, maxInstances } = shareInput
@@ -2603,11 +2625,15 @@ export default async function packageRoutes(fastify: FastifyInstance) {
 
     const plans = await db.getPlansByPackageId(packageId, { activeOnly })
 
+    const gpuAvailability = new Map<number, boolean>()
+    if (activeOnly) await Promise.all(plans.map(async plan => gpuAvailability.set(plan.id, await gpuPlanAvailable(packageId, plan.id))))
     return {
       plans: plans.map(plan => ({
         id: plan.id,
         name: plan.name,
         description: plan.description,
+        gpuShared: plan.gpuShared,
+        gpuDeviceIds: plan.gpuDeviceIds,
         cpu: plan.cpu,
         memory: plan.memory,
         disk: plan.disk,
@@ -2624,7 +2650,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         setupFee: Number(plan.setupFee),
         monthlyPrice: db.calculateMonthlyPrice(plan),
         isActive: plan.isActive,
-        isSoldOut: plan.isSoldOut,
+        isSoldOut: plan.isSoldOut || gpuAvailability.get(plan.id) === false,
         sortOrder: plan.sortOrder,
         slaGuarantee: plan.slaGuarantee ? Number(plan.slaGuarantee) : null
       }))
@@ -2684,6 +2710,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         isVm: pkg.instance_type === 'vm'
       })
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(400).send(error)
     }
     const planName = planInput.name!
@@ -2720,6 +2747,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       }
 
       const plan = await db.createPlan({
+        gpuShared: planInput.gpuShared,
+        gpuDeviceIds: planInput.gpuDeviceIds,
         packageId,
         name: planName,
         description: planInput.description,
@@ -2757,6 +2786,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         message: '方案创建成功'
       }
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(500).send({ error: '创建方案失败' })
     }
   })
@@ -2821,6 +2851,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         isVm: pkg.instance_type === 'vm'
       })
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(400).send(error)
     }
     const planName = planInput.name
@@ -2880,6 +2911,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       if (planInput.sortOrder !== undefined) updateData.sortOrder = planInput.sortOrder
       if (planInput.slaGuarantee !== undefined) updateData.slaGuarantee = planInput.slaGuarantee
 
+      Object.assign(updateData, normalizeGpuInput(request.body as unknown as Record<string, unknown>, true))
       const updatedPlan = await db.updatePlan(planIdNum, updateData)
 
       // 如果修改了配额相关字段，同步到所有关联实例
@@ -2920,6 +2952,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         message: '方案更新成功'
       }
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(500).send({ error: '更新方案失败' })
     }
   })
@@ -2972,6 +3005,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
 
       return { message: '方案删除成功' }
     } catch (error) {
+      if (error instanceof GpuError) return reply.code(400).send({ error: error.message, code: error.code })
       return reply.code(500).send({ error: '删除方案失败' })
     }
   })

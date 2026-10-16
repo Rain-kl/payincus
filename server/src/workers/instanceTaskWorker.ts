@@ -1,3 +1,4 @@
+import { assertGpuMigration, getInstanceGpuPci } from '../db/gpus.js'
 /**
  * 实例操作任务队列调度器
  * 确保同一台宿主机同一时间只有一个实例操作任务在执行
@@ -559,6 +560,8 @@ async function executeTask(taskId: number): Promise<void> {
 
     // 记录连接池响应时间
     updateClientResponseTime(host.id, clientDuration)
+
+    if (task.taskType === 'change_host' || task.taskType === 'clone') await assertGpuMigration(task.instanceId)
 
     switch (task.taskType) {
       case 'start':
@@ -1475,6 +1478,7 @@ async function executeRecreateTask(
   const ioMode = (pkg as any)?.io_limit_mode || (pkg as any)?.ioLimitMode || 'throughput'
 
   const incusConfig = buildInstanceConfig({
+    gpuPciAddress: await getInstanceGpuPci(task.instanceId, host.id),
     name: newIncusId,
     image: imageAlias,
     cpu: instance.cpu,

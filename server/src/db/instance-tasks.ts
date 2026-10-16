@@ -1,3 +1,4 @@
+import { assertGpuMigration } from './gpus.js'
 /**
  * 实例操作任务数据库操作
  */
@@ -83,6 +84,7 @@ function normalizeInstanceTaskStatuses(status?: InstanceTaskStatus[]): InstanceT
  * 创建实例操作任务
  */
 export async function createInstanceTask(data: CreateInstanceTaskData): Promise<InstanceTaskWithDetails> {
+  if (data.taskType === 'change_host' || data.taskType === 'clone') await assertGpuMigration(data.instanceId)
   const result = await prisma.$transaction(async tx => {
     const locked = await tryAdvisoryTransactionLock(tx, INSTANCE_OPERATION_LOCK_NAMESPACE, data.instanceId)
     if (!locked) {

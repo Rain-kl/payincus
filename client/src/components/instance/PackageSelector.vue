@@ -264,6 +264,7 @@ onBeforeUnmount(() => {
               >
                 {{ pkg.name }}
               </div>
+            <span v-if="pkg.gpu_shared" class="badge-default">{{ t('gpu.shared') }}</span>
             </div>
             <div class="flex shrink-0 items-center gap-1">
               <button

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GpuSharingFields from '@/components/GpuSharingFields.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -112,6 +113,8 @@ const storagePoolsLoadingByHost = ref<Record<number, boolean>>({})
 
 // Form data
 interface PackageForm {
+  gpuShared: boolean
+  gpuDeviceIds: number[]
   name: string
   description: string
   cpuMax: number
@@ -245,6 +248,8 @@ watch(() => form.value.globalShared, (globalShared) => {
 
 function getDefaultForm(): PackageForm {
   return {
+    gpuShared: false,
+    gpuDeviceIds: [],
     name: '',
     description: '',
     cpuMax: 100,
@@ -604,6 +609,8 @@ async function loadPackage(id: number): Promise<void> {
     const egressParsed = parseNetworkValue(pkg.limits_egress)
     
     form.value = {
+      gpuShared: pkg.gpu_shared ?? false,
+      gpuDeviceIds: pkg.gpu_device_ids ?? [],
       name: pkg.name || '',
       description: pkg.description || '',
       cpuMax: Number(pkg.cpu_max) || 100,
@@ -780,6 +787,8 @@ async function savePackage(): Promise<void> {
     )
     
     const data: CreatePackageRequest | UpdatePackageRequest = {
+      gpuShared: form.value.gpuShared,
+      gpuDeviceIds: form.value.gpuDeviceIds,
       name: form.value.name,
       description: form.value.description || undefined,
       cpuMax: form.value.cpuMax,
@@ -1620,6 +1629,11 @@ const goBack = closeDrawer
         </div>
       </section>
 
+          <GpuSharingFields
+            :model-value="form.gpuShared" :device-ids="form.gpuDeviceIds" :host-ids="form.hostIds"
+            :allowed="form.instanceType === 'container' && !form.privileged"
+            @update:model-value="form.gpuShared = $event === true" @update:device-ids="form.gpuDeviceIds = $event"
+          />
         </form>
       </div>
 

@@ -1,3 +1,5 @@
+import { validateGpuSelection } from './gpus.js'
+import { resolveGpuPolicy } from '../lib/gpu.js'
 /**
  * 套餐方案相关数据库操作
  * 使用 Prisma ORM
@@ -80,6 +82,8 @@ export async function isPlanNameUnique(
 // ==================== 创建操作 ====================
 
 export interface CreatePlanInput {
+  gpuShared?: boolean | null
+  gpuDeviceIds?: number[]
   packageId: number
   name: string
   description?: string
@@ -131,8 +135,11 @@ export async function createPlan(input: CreatePlanInput): Promise<PackagePlan> {
     slaGuarantee = null
   } = input
 
+  await validatePlanGpu(input.packageId, { gpuShared: input.gpuShared ?? null, gpuDeviceIds: input.gpuDeviceIds ?? [] })
   return prisma.packagePlan.create({
     data: {
+      gpuShared: input.gpuShared ?? null,
+      gpuDeviceIds: input.gpuDeviceIds ?? [],
       packageId,
       name,
       description,
@@ -161,6 +168,8 @@ export async function createPlan(input: CreatePlanInput): Promise<PackagePlan> {
 // ==================== 更新操作 ====================
 
 export interface UpdatePlanInput {
+  gpuShared?: boolean | null
+  gpuDeviceIds?: number[]
   name?: string
   description?: string
   cpu?: number
@@ -190,6 +199,8 @@ export async function updatePlan(
   id: number,
   input: UpdatePlanInput
 ): Promise<PackagePlan> {
+  const current = await prisma.packagePlan.findUniqueOrThrow({ where: { id } })
+  await validatePlanGpu(current.packageId, { ...current, ...input })
   return prisma.packagePlan.update({
     where: { id },
     data: input
@@ -390,4 +401,9 @@ export function getPlanBilling(plan: PackagePlan) {
     setupFee: Number(plan.setupFee),
     monthlyPrice: calculateMonthlyPrice(plan)
   }
+}
+
+async function validatePlanGpu(packageId: number, plan: { gpuShared: boolean | null; gpuDeviceIds: number[] }) {
+  const pkg = await prisma.package.findUniqueOrThrow({ where: { id: packageId }, include: { packageHosts: true } })
+  await validateGpuSelection(prisma, { ...pkg, ...resolveGpuPolicy(pkg, plan), hostIds: pkg.packageHosts.map(binding => binding.hostId) })
 }

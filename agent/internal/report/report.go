@@ -19,7 +19,7 @@ var incusSocketCandidates = []string{
 func HeartbeatPayload(version string, heartbeatIntervalSeconds int) map[string]any {
 	return map[string]any{
 		"version":      version,
-		"capabilities": []any{"heartbeat", "report", "host-metrics", "instance-status", "traffic-counters"},
+		"capabilities": []any{"heartbeat", "report", "host-metrics", "instance-status", "traffic-counters", "nvidia-gpu"},
 		"runtime": map[string]any{
 			"goos":   runtime.GOOS,
 			"goarch": runtime.GOARCH,
@@ -69,7 +69,8 @@ func serviceActive(unit string) bool {
 
 func collectResources() map[string]any {
 	resources := map[string]any{
-		"cpuTotal": runtime.NumCPU(),
+		"cpuTotal":  runtime.NumCPU(),
+		"nvidiaGpu": collectNvidiaGPUs(),
 	}
 	if cpuUsagePercent := readCPUUsagePercent(); cpuUsagePercent >= 0 {
 		resources["cpuUsagePercent"] = cpuUsagePercent

@@ -13,6 +13,7 @@ import { useThemeStore } from '@/stores/theme'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import { useToast } from '@/stores/toast'
 import { useConfigStore } from '@/stores/config'
+import InstanceGpuInfo from '@/components/instance/InstanceGpuInfo.vue'
 import InstanceInfoTab from '@/components/instance/InstanceInfoTab.vue'
 import InstanceNetworkTab from '@/components/instance/InstanceNetworkTab.vue'
 import InstanceQuotaTab from '@/components/instance/InstanceQuotaTab.vue'
@@ -3141,6 +3142,7 @@ function formatShortDate(dateStr: string | null | undefined): string {
             </div>
 
             <!-- Original Info Tab Content -->
+            <InstanceGpuInfo :instance-id="instance.id" />
             <InstanceInfoTab
               :instance="instance"
               :stats="stats"

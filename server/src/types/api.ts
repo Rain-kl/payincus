@@ -157,6 +157,8 @@ export interface UpdateHostRequest {
 // ==================== 套餐相关 ====================
 
 export interface CreatePackageRequest {
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   name: string
   description?: string
   cpuMax: number
@@ -203,6 +205,8 @@ export interface CreatePackageRequest {
 }
 
 export interface UpdatePackageRequest {
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   name?: string
   description?: string
   cpuMax?: number

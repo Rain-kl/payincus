@@ -9,6 +9,7 @@ import { useThemeStore } from '@/stores/theme'
 import { getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 
 interface PackagePlan {
+  gpuShared?: boolean | null
   id: number
   name: string
   description: string | null
@@ -33,6 +34,7 @@ interface PackagePlan {
 }
 
 interface Props {
+  packageGpuShared?: boolean
   plans: PackagePlan[]
   selectedPlanId: number | null
   instanceType?: 'container' | 'vm'
@@ -240,6 +242,7 @@ function handleSelect(plan: PackagePlan): void {
               >
                 {{ plan.name }}
               </h3>
+            <span v-if="plan.gpuShared ?? packageGpuShared" class="badge-default">{{ t('gpu.shared') }}</span>
               <span
                 v-if="plan.isSoldOut"
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"

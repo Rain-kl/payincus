@@ -1,3 +1,4 @@
+import { assertGpuPlanChange } from './gpus.js'
 /**
  * 计费业务逻辑操作
  * 处理付费实例开通、续费、升降级等核心计费业务
@@ -847,6 +848,8 @@ export async function performPlanChange(
     throw new Error('不能切换到相同方案')
   }
 
+  await assertGpuPlanChange(prisma, instance.id, newPlan.id)
+
   // 计算升级差价
   const changeResult = await calculatePlanChange(instance, newPlan)
   const normalizedPlanTrafficLimitSpeed = normalizePlanTrafficLimitSpeed(newPlan.trafficLimitSpeed)
@@ -866,6 +869,7 @@ export async function performPlanChange(
 
   // 执行事务（带乐观锁）
   const txResult = await prisma.$transaction(async (tx) => {
+    await assertGpuPlanChange(tx, instance.id, newPlan.id)
     if (changeResult.priceDiff !== 0) {
       const balanceLocked = await tryAdvisoryTransactionLock(tx, USER_BALANCE_LOCK_NAMESPACE, userId)
       if (!balanceLocked) {

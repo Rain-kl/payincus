@@ -7,6 +7,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
+import HostGpuTab from '@/components/host/HostGpuTab.vue'
 import HostInfoTab from '@/components/host/HostInfoTab.vue'
 import HostImagesTab from '@/components/host/HostImagesTab.vue'
 import MyHostConfigTab from '@/components/host/MyHostConfigTab.vue'
@@ -36,7 +37,7 @@ const authStore = useAuthStore()
 // 是否是管理员
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
-type TabType = 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'agentLogs' | 'redeemCodes' | 'ops' | 'create'
+type TabType = 'gpu' | 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'agentLogs' | 'redeemCodes' | 'ops' | 'create'
 const activeTab = ref<TabType>('info')
 
 interface Host {
@@ -364,6 +365,7 @@ function closeReinstallModal() {
 }
 
 const tabs = [
+  { key: 'gpu', labelKey: 'gpu.title', icon: 'M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m14 0h3M2 15h3m14 0h3' },
   { key: 'info', labelKey: 'admin.hosts.tabInfo', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { key: 'config', labelKey: 'admin.hosts.tabConfig', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
   { key: 'images', labelKey: 'admin.hosts.tabImages', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
@@ -499,6 +501,7 @@ const tabs = [
 
       <!-- Tab Content -->
       <div>
+        <HostGpuTab v-if="activeTab === 'gpu'" :host-id="host.id" />
         <HostInfoTab v-if="activeTab === 'info'" :host="host" @refresh="loadHost" />
         <MyHostConfigTab v-if="activeTab === 'config'" :host="host" @saved="onConfigSaved" />
         <HostImagesTab v-if="activeTab === 'images'" :host-id="host.id" :host-name="host.name" />

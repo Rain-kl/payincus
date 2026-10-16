@@ -182,6 +182,7 @@ export interface IPv6Config {
 }
 
 export interface BuildInstanceConfigOptions {
+  gpuPciAddress?: string
   name: string
   image: string
   cpu: number

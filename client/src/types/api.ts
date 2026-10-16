@@ -1352,6 +1352,8 @@ export interface ChangeHostOptionsResponse {
 // ==================== 套餐相关 ====================
 
 export interface Package {
+  gpu_shared?: boolean
+  gpu_device_ids?: number[]
   id: number
   name: string
   description: string | null
@@ -1436,6 +1438,8 @@ export interface Package {
 }
 
 export interface CreatePackageRequest {
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   name: string
   description?: string
   cpuMax: number
@@ -1484,6 +1488,8 @@ export interface CreatePackageRequest {
 }
 
 export interface UpdatePackageRequest {
+  gpuShared?: boolean
+  gpuDeviceIds?: number[]
   name?: string
   description?: string
   cpuMax?: number
@@ -2168,6 +2174,8 @@ export interface PaginatedTicketMessages {
 
 // 套餐方案
 export interface PackagePlan {
+  gpuShared?: boolean | null
+  gpuDeviceIds?: number[]
   id: number
   packageId: number
   name: string
@@ -2365,4 +2373,29 @@ export interface PaginatedResponse<T> {
   page: number
   pageSize: number
   totalPages: number
+}
+
+export interface HostGpu {
+  id: number
+  hostId: number
+  uuid: string
+  pciAddress: string
+  name: string
+  memoryTotalMiB: number
+  metrics: { memoryUsedMiB: number | null; gpuUtilization: number | null; memoryUtilization: number | null; temperature: number | null; powerDrawWatts: number | null; powerLimitWatts: number | null; driverVersion: string; computeMode: string }
+  available: boolean
+  runtimeReady: boolean
+  ready: boolean
+  sharingEnabled: boolean
+  maxInstances: number
+  usedInstances: number
+  availableSlots: number
+  lastSeenAt: string
+}
+export interface InstanceGpuInfo {
+  name: string
+  memoryTotalMiB: number
+  shared: boolean
+  reservationReleased: boolean
+  sharingNotice: string
 }

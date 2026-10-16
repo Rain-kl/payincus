@@ -1,3 +1,4 @@
+import { syncHostGpuReport } from '../db/gpus.js'
 /**
  * 宿主机 Agent 路由
  * 负责 Agent 凭据签发、HMAC 鉴权和心跳上报。
@@ -1545,6 +1546,10 @@ export default async function agentRoutes(fastify: FastifyInstance) {
         lastSeenAt: now,
         lastHeartbeatIp: sanitizeShortString(getAgentHeartbeatIp(request), 128)
       }
+    })
+
+    await syncHostGpuReport(agent.hostId, request.body.resources?.nvidiaGpu).catch(error => {
+      request.log.warn({ error, hostId: agent.hostId }, 'Failed to update NVIDIA GPU inventory')
     })
 
     const host = await prisma.host.findUnique({

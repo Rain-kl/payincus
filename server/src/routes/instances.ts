@@ -1,3 +1,5 @@
+import { GpuError } from '../lib/gpu.js'
+import { reserveInstanceGpu, getInstanceGpuPci, releaseFailedGpu } from '../db/gpus.js'
 /**
  * 实例管理路由
  */
@@ -1685,6 +1687,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
         // →→→ 第一步：在事务中使用行锁选择并预占宿主机资源 ←←←
         const lockedHost = await db.selectAndReserveHostWithLock(tx, {
+          packagePlanId: selectedPlan?.id,
           packageHostIds: packageHostIds.length > 0 ? packageHostIds : undefined,
           nodeSelectors: JSON.parse(pkgWithExtras.node_selectors || '[]'),
           cpu: requestedCpu,
@@ -1776,6 +1779,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
         const instance = await tx.instance.create({
           data: {
+            ...(await reserveInstanceGpu(tx, { hostId: lockedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             idempotencyKey: selectedPlan ? normalPaidIdempotencyKey : null,
             name,
@@ -1999,6 +2003,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         })()
       }
     } catch (err: any) {
+      if (err instanceof GpuError) return reply.code(409).send({ error: err.message, code: err.code })
       const errorMessage = err?.message || String(err)
 
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' && normalPaidIdempotencyKey) {
@@ -2247,6 +2252,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
         instanceName: incusId,
         errorMessage
       })
+      await releaseFailedGpu(instanceId)
       return reply.code(503).send(apiError(ErrorCode.HOST_RESOURCES_INSUFFICIENT, errorMessage))
     }
 
@@ -6752,6 +6758,7 @@ async function createInstanceAsync(
     } : null
 
     const incusConfig = buildInstanceConfig({
+      gpuPciAddress: await getInstanceGpuPci(instanceId, host.id),
       name: config.name,
       image: config.image,
       cpu: config.cpu,

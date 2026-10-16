@@ -136,6 +136,8 @@ export type NetworkMode =
   | 'public_ipv4_ipv6'
 
 export interface Package {
+  gpu_shared?: boolean
+  gpu_device_ids?: number[]
   id: number
   user_id?: number  // 套餐所有者
   name: string

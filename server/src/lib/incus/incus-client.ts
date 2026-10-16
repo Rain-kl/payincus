@@ -196,7 +196,7 @@ export class IncusClient {
         url,
         error: data.error || 'Incus API 错误'
       })
-      throw new Error(data.error || 'Incus API 错误')
+      throw Object.assign(new Error(data.error || 'Incus API 错误'), { statusCode: response.statusCode })
     }
 
     // 异步操作需要等待完成
