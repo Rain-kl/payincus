@@ -1,5 +1,5 @@
 import { GpuError } from '../lib/gpu.js'
-import { reserveInstanceGpu, getInstanceGpuPci, releaseFailedGpu } from '../db/gpus.js'
+import { reserveInstanceGpu, getInstanceGpuPcis, releaseFailedGpu } from '../db/gpus.js'
 /**
  * 实例管理路由
  */
@@ -6758,7 +6758,7 @@ async function createInstanceAsync(
     } : null
 
     const incusConfig = buildInstanceConfig({
-      gpuPciAddress: await getInstanceGpuPci(instanceId, host.id),
+      gpuPciAddresses: await getInstanceGpuPcis(instanceId, host.id),
       name: config.name,
       image: config.image,
       cpu: config.cpu,

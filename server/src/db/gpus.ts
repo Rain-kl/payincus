@@ -22,41 +22,56 @@ export async function validateGpuSelection(client: Client, input: GpuPolicy & { 
   if (devices.length !== input.gpuDeviceIds.length) throw new GpuError('GPU 不属于套餐绑定的宿主机，或尚未开放共享')
 }
 
-export async function findAvailableGpu(client: Client, hostId: number, policy: GpuPolicy, excludeInstanceId?: number) {
-  if (!policy.gpuShared) return null
-  const devices = await client.hostGpu.findMany({ where: { hostId, id: { in: policy.gpuDeviceIds }, sharingEnabled: true }, orderBy: { id: 'asc' } })
-  for (const device of devices) {
-    if (!isGpuFresh(device)) continue
-    const used = await client.instance.count({ where: { gpuDeviceId: device.id, gpuReleasedAt: null, ...(excludeInstanceId ? { id: { not: excludeInstanceId } } : {}) } })
-    if (used < device.maxInstances) return device
-  }
-  return null
+export async function countGpuReservations(client: Client, gpuDeviceId: number, excludeInstanceId?: number): Promise<number> {
+  return client.instance.count({ where: {
+    gpuReleasedAt: null,
+    OR: [{ gpuDeviceId }, { gpuAllocations: { some: { gpuDeviceId } } }],
+    ...(excludeInstanceId ? { id: { not: excludeInstanceId } } : {})
+  } })
 }
 
-export async function reserveInstanceGpu(client: Client, input: { hostId: number; packageId?: number | null; planId?: number | null }): Promise<{ gpuDeviceId?: number }> {
+export async function findAvailableGpus(client: Client, hostId: number, policy: GpuPolicy, excludeInstanceId?: number) {
+  if (!policy.gpuShared) return null
+  const devices = await client.hostGpu.findMany({ where: { hostId, id: { in: policy.gpuDeviceIds } }, orderBy: { id: 'asc' } })
+  if (!devices.length) return null
+  for (const device of devices) {
+    if (!device.sharingEnabled || !isGpuFresh(device)) return null
+    if (await countGpuReservations(client, device.id, excludeInstanceId) >= device.maxInstances) return null
+  }
+  return devices
+}
+
+export async function reserveInstanceGpu(client: Client, input: { hostId: number; packageId?: number | null; planId?: number | null }): Promise<{ gpuDeviceId?: number; gpuAllocations?: Prisma.InstanceGpuAllocationUncheckedCreateNestedManyWithoutInstanceInput }> {
   const policy = await getGpuPolicy(client, input.packageId, input.planId)
   if (!policy.gpuShared) return {}
   await client.$queryRaw`SELECT id FROM host_gpus WHERE host_id = ${input.hostId} ORDER BY id FOR UPDATE`
-  const gpu = await findAvailableGpu(client, input.hostId, policy)
-  if (!gpu) throw new GpuError('GPU_RESOURCES_INSUFFICIENT: 所选 GPU 不可用、监控已过期或共享名额已满')
-  return { gpuDeviceId: gpu.id }
+  const devices = await findAvailableGpus(client, input.hostId, policy)
+  if (!devices) throw new GpuError('GPU_RESOURCES_INSUFFICIENT: 所选 GPU 组不可用、监控已过期或其中一张卡共享名额已满')
+  return { gpuDeviceId: devices[0].id, gpuAllocations: { create: devices.map(gpu => ({ gpuDeviceId: gpu.id })) } }
 }
 
-// A stopped/suspended/expired instance still owns its seat. Recreate uses its
-// original board, never silently changes to the other card or falls back to CPU.
-export async function getInstanceGpuPci(instanceId: number, hostId: number): Promise<string | undefined> {
+function allocatedGpuIds(instance: { gpuDeviceId: number | null; gpuAllocations: Array<{ gpuDeviceId: number }> }): number[] {
+  return [...new Set([...(instance.gpuDeviceId ? [instance.gpuDeviceId] : []), ...instance.gpuAllocations.map(allocation => allocation.gpuDeviceId)])].sort((a, b) => a - b)
+}
+
+// Stopped/suspended instances keep all seats. Restore/recreate always use the
+// saved bundle, even after the merchant edits the package's selected cards.
+export async function getInstanceGpuPcis(instanceId: number, hostId: number): Promise<string[] | undefined> {
   return prisma.$transaction(async tx => {
-    const instance = await tx.instance.findUnique({ where: { id: instanceId } })
-    if (!instance?.gpuDeviceId) return undefined
-    await tx.$queryRaw`SELECT id FROM host_gpus WHERE id = ${instance.gpuDeviceId} FOR UPDATE`
-    const gpu = await tx.hostGpu.findUnique({ where: { id: instance.gpuDeviceId } })
-    if (!gpu || gpu.hostId !== hostId || !isGpuFresh(gpu)) throw new GpuError('绑定的 GPU 已离线或不在目标宿主机上，请检查宿主 GPU 状态')
+    const instance = await tx.instance.findUnique({ where: { id: instanceId }, include: { gpuAllocations: true } })
+    if (!instance) return undefined
+    const ids = allocatedGpuIds(instance)
+    if (!ids.length) return undefined
+    await tx.$queryRaw`SELECT id FROM host_gpus WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`
+    const devices = await tx.hostGpu.findMany({ where: { id: { in: ids } }, orderBy: { id: 'asc' } })
+    if (devices.length !== ids.length || devices.some(gpu => gpu.hostId !== hostId || !isGpuFresh(gpu))) throw new GpuError('绑定的 GPU 组已离线或不在目标宿主机上，请检查宿主 GPU 状态')
     if (instance.gpuReleasedAt) {
-      const used = await tx.instance.count({ where: { gpuDeviceId: gpu.id, gpuReleasedAt: null, id: { not: instanceId } } })
-      if (!gpu.sharingEnabled || used >= gpu.maxInstances) throw new GpuError('GPU 共享名额不足，无法重新创建实例')
+      for (const gpu of devices) {
+        if (!gpu.sharingEnabled || await countGpuReservations(tx, gpu.id, instanceId) >= gpu.maxInstances) throw new GpuError('GPU 共享名额不足，无法重新创建实例')
+      }
       await tx.instance.update({ where: { id: instanceId }, data: { gpuReleasedAt: null } })
     }
-    return gpu.pciAddress
+    return devices.map(gpu => gpu.pciAddress)
   })
 }
 
@@ -65,10 +80,12 @@ export async function releaseFailedGpu(instanceId: number): Promise<void> {
 }
 
 export async function assertGpuPlanChange(client: Client, instanceId: number, planId: number): Promise<void> {
-  const instance = await client.instance.findUnique({ where: { id: instanceId } })
+  const instance = await client.instance.findUnique({ where: { id: instanceId }, include: { gpuAllocations: true } })
   if (!instance) return
   const policy = await getGpuPolicy(client, instance.packageId, planId)
-  if (policy.gpuShared !== Boolean(instance.gpuDeviceId) || (instance.gpuDeviceId && !policy.gpuDeviceIds.includes(instance.gpuDeviceId))) throw new GpuError('该方案会改变 GPU 绑定，请新购所需 GPU 方案；已有实例仅支持保留原显卡的方案变更')
+  const currentIds = allocatedGpuIds(instance)
+  const targetIds = policy.gpuShared ? (await client.hostGpu.findMany({ where: { hostId: instance.hostId, id: { in: policy.gpuDeviceIds } }, orderBy: { id: 'asc' }, select: { id: true } })).map(gpu => gpu.id) : []
+  if (policy.gpuShared !== Boolean(currentIds.length) || (policy.gpuShared && !targetIds.length) || JSON.stringify(currentIds) !== JSON.stringify(targetIds)) throw new GpuError('该方案会改变 GPU 绑定，请新购所需 GPU 方案；已有实例仅支持保留原显卡的方案变更')
 }
 
 export async function assertGpuMigration(instanceId: number): Promise<void> {
@@ -108,7 +125,7 @@ export async function syncHostGpuReport(hostId: number, input: unknown): Promise
 export async function listHostGpus(hostId: number) {
   const devices = await prisma.hostGpu.findMany({ where: { hostId }, orderBy: { id: 'asc' } })
   return Promise.all(devices.map(async gpu => {
-    const usedInstances = await prisma.instance.count({ where: { gpuDeviceId: gpu.id, gpuReleasedAt: null } })
+    const usedInstances = await countGpuReservations(prisma, gpu.id)
     return { ...gpu, ready: isGpuFresh(gpu), usedInstances, availableSlots: Math.max(0, gpu.maxInstances - usedInstances), sharingNotice: GPU_SHARING_NOTICE }
   }))
 }
@@ -118,14 +135,14 @@ export async function getGpuOffersForPackages(packageIds: number[]): Promise<Map
   return new Map(packages.map(pkg => [pkg.id, pkg.plans.length ? pkg.plans.filter(plan => !plan.isSoldOut).map(plan => resolveGpuPolicy(pkg, plan)) : [pkg]]))
 }
 export async function gpuOffersAvailableOnHost(hostId: number, offers: GpuPolicy[]): Promise<boolean> {
-  for (const policy of offers) if (!policy.gpuShared || await findAvailableGpu(prisma, hostId, policy)) return true
+  for (const policy of offers) if (!policy.gpuShared || await findAvailableGpus(prisma, hostId, policy)) return true
   return false
 }
 export async function gpuPlanAvailable(packageId: number, planId: number): Promise<boolean> {
   const policy = await getGpuPolicy(prisma, packageId, planId)
   if (!policy.gpuShared) return true
   const bindings = await prisma.packageHost.findMany({ where: { packageId, host: { status: 'online' } }, select: { hostId: true } })
-  for (const binding of bindings) if (await findAvailableGpu(prisma, binding.hostId, policy)) return true
+  for (const binding of bindings) if (await findAvailableGpus(prisma, binding.hostId, policy)) return true
   return false
 }
 

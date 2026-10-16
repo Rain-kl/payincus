@@ -1,4 +1,4 @@
-import { getInstanceGpuPci } from '../db/gpus.js'
+import { getInstanceGpuPcis } from '../db/gpus.js'
 import { prisma } from '../db/prisma.js'
 import * as db from '../db/index.js'
 import { buildInstanceConfig, createInstance, deleteInstance, getIncusClient, getInstanceState, startInstance, stopInstance } from '../lib/incus/index.js'
@@ -54,7 +54,7 @@ export async function provisionManagedInstanceAsync(
     const ipv6Config = config.ipv6Address ? { primaryIp: config.ipv6Address } : null
 
     const incusConfig = buildInstanceConfig({
-      gpuPciAddress: await getInstanceGpuPci(instanceId, host.id),
+      gpuPciAddresses: await getInstanceGpuPcis(instanceId, host.id),
       name: config.name,
       image: config.image,
       cpu: config.cpu,

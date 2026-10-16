@@ -1,3 +1,4 @@
+import type { GpuConfiguration } from '@/types/api'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
 import { useAuthStore } from '@/stores/auth'
@@ -1814,6 +1815,7 @@ const api = {
       plans: Array<{
         gpuShared?: boolean | null
         gpuDeviceIds?: number[]
+        gpuConfigurations?: GpuConfiguration[]
         id: number
         name: string
         description: string | null

@@ -1,4 +1,4 @@
-import { assertGpuMigration, getInstanceGpuPci } from '../db/gpus.js'
+import { assertGpuMigration, getInstanceGpuPcis } from '../db/gpus.js'
 /**
  * 实例操作任务队列调度器
  * 确保同一台宿主机同一时间只有一个实例操作任务在执行
@@ -1477,8 +1477,9 @@ async function executeRecreateTask(
   // 根据 ioLimitMode 选择性传入 IO 限制参数
   const ioMode = (pkg as any)?.io_limit_mode || (pkg as any)?.ioLimitMode || 'throughput'
 
+  const gpuPciAddresses = await getInstanceGpuPcis(task.instanceId, host.id)
   const incusConfig = buildInstanceConfig({
-    gpuPciAddress: await getInstanceGpuPci(task.instanceId, host.id),
+    gpuPciAddresses,
     name: newIncusId,
     image: imageAlias,
     cpu: instance.cpu,
@@ -1547,7 +1548,7 @@ async function executeRecreateTask(
   // 13. 启动新实例
   await updateInstanceTaskProgress(task.id, 'starting')
   console.log(`[Recreate] 启动新实例 ${newIncusId}...`)
-  await startInstance(client, newIncusId)
+  await startInstance(client, newIncusId, { gpuExpectedCount: gpuPciAddresses?.length })
 
   // 14. 等待网络初始化
   let actualIpv6: string | null = null

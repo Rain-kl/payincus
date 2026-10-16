@@ -29,14 +29,45 @@ export function resolveGpuPolicy(pkg: GpuPolicy, plan?: { gpuShared: boolean | n
 export function isGpuFresh(gpu: { available: boolean; runtimeReady: boolean; lastSeenAt: Date }, now = Date.now()): boolean {
   return gpu.available && gpu.runtimeReady && now - gpu.lastSeenAt.getTime() <= GPU_REPORT_MAX_AGE_MS && gpu.lastSeenAt.getTime() <= now + 30_000
 }
-export function applyGpuDevice(config: Record<string, any>, pciAddress: string): void {
+export interface GpuModelSummary { name: string; memoryTotalMiB: number; count: number }
+export interface GpuConfiguration { hostIds: number[]; devices: GpuModelSummary[]; count: number }
+
+export function summarizeGpuModels(devices: Array<{ name: string; memoryTotalMiB: number }>): GpuModelSummary[] {
+  const groups = new Map<string, GpuModelSummary>()
+  for (const device of devices) {
+    const key = JSON.stringify([device.name, device.memoryTotalMiB])
+    const group = groups.get(key)
+    if (group) group.count++
+    else groups.set(key, { name: device.name, memoryTotalMiB: device.memoryTotalMiB, count: 1 })
+  }
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name) || a.memoryTotalMiB - b.memoryTotalMiB)
+}
+
+// Each host provides its entire selected bundle. Equal bundles across hosts are
+// alternatives for scheduling, not additional GPUs in the same container.
+export function summarizeGpuConfigurations(devices: Array<{ hostId: number; name: string; memoryTotalMiB: number }>): GpuConfiguration[] {
+  const byHost = new Map<number, typeof devices>()
+  for (const device of devices) byHost.set(device.hostId, [...(byHost.get(device.hostId) || []), device])
+  const groups = new Map<string, GpuConfiguration>()
+  for (const [hostId, cards] of byHost) {
+    const models = summarizeGpuModels(cards)
+    const key = JSON.stringify(models)
+    const group = groups.get(key)
+    if (group) group.hostIds.push(hostId)
+    else groups.set(key, { hostIds: [hostId], devices: models, count: cards.length })
+  }
+  return [...groups.values()]
+}
+
+export function applyGpuDevice(config: Record<string, any>, pci: string | string[]): void {
+  const addresses = typeof pci === 'string' ? [pci] : pci
   if (config.type === 'virtual-machine' || config.config?.['security.privileged'] === 'true') throw new GpuError('共享 GPU 仅支持非特权 LXC 容器')
-  if (!/^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$/.test(pciAddress)) throw new GpuError('Invalid GPU PCI address')
+  if (!addresses.length || new Set(addresses).size !== addresses.length || addresses.some(address => !/^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$/.test(address))) throw new GpuError('Invalid GPU PCI address')
   // Do not inherit a default profile that might expose every GPU on the host.
   config.profiles = []
   config.config = { ...config.config, 'nvidia.runtime': 'true', 'nvidia.driver.capabilities': 'compute,utility' }
   const devices = { ...config.devices }
   for (const [name, device] of Object.entries(devices)) if ((device as any)?.type === 'gpu') delete devices[name]
-  devices.gpu0 = { type: 'gpu', gputype: 'physical', pci: pciAddress }
+  addresses.forEach((pciAddress, index) => { devices[`gpu${index}`] = { type: 'gpu', gputype: 'physical', pci: pciAddress } })
   config.devices = devices
 }

@@ -1,5 +1,5 @@
 import { GpuError } from '../lib/gpu.js'
-import { compensateGpuPreparationFailure, releaseFailedGpu, assertGpuPlanChange, reserveInstanceGpu, getInstanceGpuPci } from '../db/gpus.js'
+import { compensateGpuPreparationFailure, releaseFailedGpu, assertGpuPlanChange, reserveInstanceGpu, getInstanceGpuPcis } from '../db/gpus.js'
 /**
  * 管理员计费相关路由
  */
@@ -4748,7 +4748,7 @@ async function createInstanceAsync(
     const ipv6Config = config.ipv6Address ? { primaryIp: config.ipv6Address } : null
 
     const incusConfig = buildInstanceConfig({
-      gpuPciAddress: await getInstanceGpuPci(instanceId, host.id),
+      gpuPciAddresses: await getInstanceGpuPcis(instanceId, host.id),
       name: config.name,
       image: config.image,
       cpu: config.cpu,

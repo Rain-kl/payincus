@@ -1,4 +1,4 @@
-import { getGpuPolicy, findAvailableGpu } from './gpus.js'
+import { getGpuPolicy, findAvailableGpus } from './gpus.js'
 /**
  * 主机相关数据库操作
  * 使用 Prisma ORM
@@ -1101,7 +1101,7 @@ export async function selectAndReserveHostWithLock(
 
   // 遍历候选宿主机，检查资源并预占
   for (const host of hosts) {
-    if (gpuPolicy.gpuShared && !await findAvailableGpu(tx, host.id, gpuPolicy)) continue
+    if (gpuPolicy.gpuShared && !await findAvailableGpus(tx, host.id, gpuPolicy)) continue
     // 检查标签选择器
     if (nodeSelectors.length > 0) {
       const hostTags = (host.tags as string[]) || []

@@ -4,12 +4,15 @@
  * 用于付费套餐，显示可选的付费方案列表
  * 现代化卡片式布局，清晰的参数分组
  */
+import GpuSpecification from './GpuSpecification.vue'
+import type { GpuConfiguration } from '@/types/api'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 
 interface PackagePlan {
   gpuShared?: boolean | null
+  gpuConfigurations?: GpuConfiguration[]
   id: number
   name: string
   description: string | null
@@ -35,6 +38,7 @@ interface PackagePlan {
 
 interface Props {
   packageGpuShared?: boolean
+  hostId?: number | null
   plans: PackagePlan[]
   selectedPlanId: number | null
   instanceType?: 'container' | 'vm'
@@ -242,7 +246,6 @@ function handleSelect(plan: PackagePlan): void {
               >
                 {{ plan.name }}
               </h3>
-            <span v-if="plan.gpuShared ?? packageGpuShared" class="badge-default">{{ t('gpu.shared') }}</span>
               <span
                 v-if="plan.isSoldOut"
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
@@ -288,7 +291,7 @@ function handleSelect(plan: PackagePlan): void {
         </div>
 
         <!-- 资源配置区域 - 分组展示（透明，跟随卡片单一背景） -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg">
+        <div class="grid grid-cols-2 gap-3 p-3 rounded-lg" :class="(plan.gpuShared ?? packageGpuShared) ? 'sm:grid-cols-5' : 'sm:grid-cols-4'">
           <!-- CPU -->
           <div class="text-center">
             <div class="text-xs text-themed-muted mb-0.5">CPU</div>
@@ -322,6 +325,7 @@ function handleSelect(plan: PackagePlan): void {
               {{ formatDisk(plan.disk) }}
             </div>
           </div>
+          <GpuSpecification v-if="plan.gpuShared ?? packageGpuShared" :configurations="plan.gpuConfigurations" :host-id="hostId" />
           <!-- 流量 -->
           <div class="text-center">
             <div class="text-xs text-themed-muted mb-0.5">
@@ -337,6 +341,7 @@ function handleSelect(plan: PackagePlan): void {
           </div>
         </div>
 
+        <p v-if="plan.gpuShared ?? packageGpuShared" class="mt-2 text-xs text-themed-muted">{{ t('gpu.notice') }}</p>
         <!-- 配额信息 - 横向紧凑排列 -->
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs">
           <div class="flex items-center gap-1">

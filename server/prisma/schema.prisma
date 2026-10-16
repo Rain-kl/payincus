@@ -836,9 +836,21 @@ model HostGpu {
   lastSeenAt     DateTime @map("last_seen_at")
   host           Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
   instances      Instance[]
+  allocations    InstanceGpuAllocation[]
 
   @@unique([hostId, uuid])
   @@map("host_gpus")
+}
+
+model InstanceGpuAllocation {
+  instanceId  Int @map("instance_id")
+  gpuDeviceId Int @map("gpu_device_id")
+  instance    Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  gpuDevice   HostGpu @relation(fields: [gpuDeviceId], references: [id], onDelete: Restrict)
+
+  @@id([instanceId, gpuDeviceId])
+  @@index([gpuDeviceId])
+  @@map("instance_gpu_allocations")
 }
 
 model HostAgentNonce {
@@ -1044,6 +1056,7 @@ model Instance {
   gpuDeviceId      Int?           @map("gpu_device_id")
   gpuReleasedAt    DateTime?      @map("gpu_released_at")
   gpuDevice        HostGpu?       @relation(fields: [gpuDeviceId], references: [id], onDelete: Restrict)
+  gpuAllocations   InstanceGpuAllocation[]
   storagePoolName  String?        @map("storage_pool_name")
   image            String
   status           InstanceStatus @default(creating)

@@ -1,5 +1,5 @@
 import { gpuPlanAvailable } from '../db/gpus.js'
-import { normalizeGpuInput, GpuError } from '../lib/gpu.js'
+import { normalizeGpuInput, GpuError, resolveGpuPolicy, summarizeGpuConfigurations } from '../lib/gpu.js'
 /**
  * 套餐管理路由
  */
@@ -1602,6 +1602,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         bandwidth_max: pkg.bandwidth_max,
         network_mode: pkg.network_mode,
         instance_type: pkg.instance_type,  // 实例类型
+        gpu_shared: pkg.gpu_shared ?? false,
+        gpu_device_ids: pkg.gpu_device_ids ?? [],
         host_ids: (pkg as { host_ids?: number[] }).host_ids || [],
         host_storage_pools: isOwn || isAdmin ? ((pkg as any).host_storage_pools || {}) : undefined,
         host_traffic_multipliers: isOwn || isAdmin ? ((pkg as any).host_traffic_multipliers || {}) : undefined,
@@ -2625,6 +2627,10 @@ export default async function packageRoutes(fastify: FastifyInstance) {
 
     const plans = await db.getPlansByPackageId(packageId, { activeOnly })
 
+    const gpuPolicies = new Map(plans.map(plan => [plan.id, resolveGpuPolicy({ gpuShared: pkg.gpu_shared ?? false, gpuDeviceIds: pkg.gpu_device_ids ?? [] }, plan)]))
+    const gpuIds = [...new Set([...gpuPolicies.values()].filter(policy => policy.gpuShared).flatMap(policy => policy.gpuDeviceIds))]
+    const gpuDevices = gpuIds.length ? await prisma.hostGpu.findMany({ where: { id: { in: gpuIds } }, select: { id: true, hostId: true, name: true, memoryTotalMiB: true } }) : []
+
     const gpuAvailability = new Map<number, boolean>()
     if (activeOnly) await Promise.all(plans.map(async plan => gpuAvailability.set(plan.id, await gpuPlanAvailable(packageId, plan.id))))
     return {
@@ -2634,6 +2640,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         description: plan.description,
         gpuShared: plan.gpuShared,
         gpuDeviceIds: plan.gpuDeviceIds,
+        gpuConfigurations: summarizeGpuConfigurations(gpuDevices.filter(gpu => gpuPolicies.get(plan.id)?.gpuShared && gpuPolicies.get(plan.id)!.gpuDeviceIds.includes(gpu.id))),
         cpu: plan.cpu,
         memory: plan.memory,
         disk: plan.disk,

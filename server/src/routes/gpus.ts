@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { createLog } from '../db/logs.js'
 import { prisma } from '../db/prisma.js'
-import { listHostGpus } from '../db/gpus.js'
-import { GPU_SHARING_NOTICE } from '../lib/gpu.js'
+import { countGpuReservations, listHostGpus } from '../db/gpus.js'
+import { GPU_SHARING_NOTICE, summarizeGpuModels } from '../lib/gpu.js'
 
 const idSchema = { type: 'integer', minimum: 1, maximum: 2147483647 }
 export default async function gpuRoutes(fastify: FastifyInstance) {
@@ -28,7 +28,7 @@ export default async function gpuRoutes(fastify: FastifyInstance) {
       await tx.$queryRaw`SELECT id FROM host_gpus WHERE id = ${request.params.gpuId} AND host_id = ${request.params.id} FOR UPDATE`
       const gpu = await tx.hostGpu.findFirst({ where: { id: request.params.gpuId, hostId: request.params.id } })
       if (!gpu) return 'not_found'
-      const used = await tx.instance.count({ where: { gpuDeviceId: gpu.id, gpuReleasedAt: null } })
+      const used = await countGpuReservations(tx, gpu.id)
       if (used > request.body.maxInstances) return 'in_use'
       await tx.hostGpu.update({ where: { id: gpu.id }, data: request.body })
       return 'ok'
@@ -41,9 +41,10 @@ export default async function gpuRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: number } }>('/instances/:id/gpu', {
     onRequest: [fastify.authenticate], schema: { params: { type: 'object', required: ['id'], properties: { id: idSchema } } }
   }, async (request, reply) => {
-    const instance = await prisma.instance.findUnique({ where: { id: request.params.id }, include: { gpuDevice: true, host: { select: { userId: true } } } })
+    const instance = await prisma.instance.findUnique({ where: { id: request.params.id }, include: { gpuDevice: true, gpuAllocations: { include: { gpuDevice: true }, orderBy: { gpuDeviceId: 'asc' } }, host: { select: { userId: true } } } })
     if (!instance || instance.status === 'deleted') return reply.code(404).send({ error: '实例不存在' })
     if (request.user.role !== 'admin' && request.user.id !== instance.userId && request.user.id !== instance.host.userId) return reply.code(403).send({ error: '无权访问该实例' })
-    return { gpu: instance.gpuDevice ? { name: instance.gpuDevice.name, memoryTotalMiB: instance.gpuDevice.memoryTotalMiB, shared: true, reservationReleased: Boolean(instance.gpuReleasedAt), sharingNotice: GPU_SHARING_NOTICE } : null }
+    const devices = instance.gpuAllocations.length ? instance.gpuAllocations.map(allocation => allocation.gpuDevice) : instance.gpuDevice ? [instance.gpuDevice] : []
+    return { gpu: devices.length ? { name: devices[0].name, memoryTotalMiB: devices[0].memoryTotalMiB, devices: summarizeGpuModels(devices), count: devices.length, shared: true, reservationReleased: Boolean(instance.gpuReleasedAt), sharingNotice: GPU_SHARING_NOTICE } : null }
   })
 }

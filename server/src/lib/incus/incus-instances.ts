@@ -1,6 +1,7 @@
 import { prisma } from '../../db/prisma.js'
-import { getInstanceGpuPci } from '../../db/gpus.js'
+import { getInstanceGpuPcis } from '../../db/gpus.js'
 import { applyGpuDevice } from '../gpu.js'
+import { verifyGpuRuntime } from './incus-gpu.js'
 /**
  * Incus 实例管理
  */
@@ -280,20 +281,24 @@ export async function deleteInstance(client: IncusClient, name: string): Promise
 /**
  * 启动实例
  */
-export async function startInstance(client: IncusClient, name: string): Promise<unknown> {
+export async function startInstance(client: IncusClient, name: string, options: { gpuExpectedCount?: number } = {}): Promise<unknown> {
+  let expectedCount = options.gpuExpectedCount
   if (client.options?.hostId) {
     const record = await prisma.instance.findFirst({ where: { incusId: name, hostId: client.options.hostId, status: { not: 'deleted' }, gpuDeviceId: { not: null } }, select: { id: true } })
     if (record) {
-      const pci = await getInstanceGpuPci(record.id, client.options.hostId)
+      const pci = await getInstanceGpuPcis(record.id, client.options.hostId)
+      expectedCount = pci?.length
       const live = await getInstance(client, name)
       applyGpuDevice(live, pci!)
       await client.request('PUT', `/1.0/instances/${name}`, live)
     }
   }
-  return client.request('PUT', `/1.0/instances/${name}/state`, {
+  const result = await client.request('PUT', `/1.0/instances/${name}/state`, {
     action: 'start',
     timeout: 60  // 60秒
   })
+  if (expectedCount) await verifyGpuRuntime(client, name, expectedCount)
+  return result
 }
 
 /**
@@ -892,7 +897,7 @@ export function buildInstanceConfig(options: BuildInstanceConfigOptions): Record
     })
   }
 
-  if (options.gpuPciAddress) applyGpuDevice(config, options.gpuPciAddress)
+  if (options.gpuPciAddresses) applyGpuDevice(config, options.gpuPciAddresses)
   return config
 }
 

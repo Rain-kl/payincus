@@ -27,6 +27,8 @@ import RegionSelector from '@/components/instance/RegionSelector.vue'
 import type { Region } from '@/components/instance/RegionSelector.vue'
 import PackageSelector from '@/components/instance/PackageSelector.vue'
 import PlanSelector from '@/components/instance/PlanSelector.vue'
+import GpuSpecification from '@/components/instance/GpuSpecification.vue'
+import type { GpuConfiguration } from '@/types/api'
 import ResourceSliders from '@/components/instance/ResourceSliders.vue'
 import HostSelector from '@/components/instance/HostSelector.vue'
 import ImageSelector from '@/components/instance/ImageSelector.vue'
@@ -51,6 +53,7 @@ interface ImageOption {
 interface PackagePlan {
   gpuShared?: boolean | null
   gpuDeviceIds?: number[]
+  gpuConfigurations?: GpuConfiguration[]
   id: number
   name: string
   description: string | null
@@ -1343,13 +1346,11 @@ async function handleSubmit(): Promise<void> {
             @select="selectPackage"
             @show-owner-info="(packageId) => loadHostOwnerInfo(packageId)"
           />
-          <div v-if="selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared" class="card mb-4 p-4">
-              <p class="font-semibold text-themed">{{ t('gpu.shared') }}</p><p class="mt-1 text-sm text-themed-muted">{{ t('gpu.notice') }}</p>
-            </div>
             <PlanSelector
             v-if="isPaidPackage"
             :plans="packagePlans"
             :package-gpu-shared="selectedPackage?.gpu_shared"
+            :host-id="form.hostId"
             :selected-plan-id="form.planId"
             :instance-type="(selectedPackage?.instance_type === 'vm' ? 'vm' : 'container')"
             :loading="plansLoading"
@@ -1398,6 +1399,7 @@ async function handleSubmit(): Promise<void> {
               :auto-selected-label="getCreatePageText('hostAutoSelected')"
               @update:selected-host-id="form.hostId = $event"
             />
+            <p v-if="selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared" class="px-1 text-sm text-themed-secondary">{{ t('gpu.imageRequirement') }}</p>
             <ImageSelector
               :available-images="availableImages"
               :selected-image="form.image"
@@ -1594,7 +1596,7 @@ async function handleSubmit(): Promise<void> {
                       SLA {{ selectedPlan.slaGuarantee }}%
                     </span>
                   </div>
-                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div class="grid grid-cols-2 gap-3 text-center" :class="(selectedPlan.gpuShared ?? selectedPackage?.gpu_shared) ? 'sm:grid-cols-5' : 'sm:grid-cols-4'">
                     <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatCpu(selectedPlan.cpu) }}</div><div class="text-xs text-themed-muted">CPU</div></div>
                     <div>
                       <div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatMemory(selectedPlan.memory) }}</div>
@@ -1607,6 +1609,7 @@ async function handleSubmit(): Promise<void> {
                       </div>
                     </div>
                     <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatDisk(selectedPlan.disk) }}</div><div class="text-xs text-themed-muted">{{ $t('instance.disk') }}</div></div>
+                    <GpuSpecification v-if="selectedPlan.gpuShared ?? selectedPackage?.gpu_shared" :configurations="selectedPlan.gpuConfigurations" :host-id="form.hostId" />
                     <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatTraffic(selectedPlan.trafficLimit) }}</div><div class="text-xs text-themed-muted">{{ $t('billing.traffic') }} <span class="opacity-60">({{ $t('billing.trafficBidirectional') }})</span></div></div>
                   </div>
                   <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-themed text-xs">

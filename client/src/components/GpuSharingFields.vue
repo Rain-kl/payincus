@@ -31,6 +31,7 @@ function toggle(id: number, event: Event) { emit('update:deviceIds', (event.targ
     <label v-else class="flex items-center gap-2 text-sm text-themed"><input type="checkbox" :checked="modelValue === true" :disabled="allowed === false" @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)" />{{ t('gpu.enabled') }}</label>
     <p v-if="allowed === false" class="text-xs text-warning">{{ t('gpu.containerOnly') }}</p>
     <p class="text-xs text-themed-muted">{{ t('gpu.notice') }}</p>
+    <p class="text-xs text-themed-muted">{{ t('gpu.bundleNotice') }}</p>
     <template v-if="modelValue === true">
       <p class="text-sm font-medium text-themed">{{ t('gpu.select') }}</p>
       <p v-if="loading" class="text-sm text-themed-muted">{{ t('gpu.loading') }}</p>

@@ -2176,6 +2176,7 @@ export interface PaginatedTicketMessages {
 export interface PackagePlan {
   gpuShared?: boolean | null
   gpuDeviceIds?: number[]
+  gpuConfigurations?: GpuConfiguration[]
   id: number
   packageId: number
   name: string
@@ -2393,9 +2394,23 @@ export interface HostGpu {
   lastSeenAt: string
 }
 export interface InstanceGpuInfo {
+  devices?: GpuModelSummary[]
+  count?: number
   name: string
   memoryTotalMiB: number
   shared: boolean
   reservationReleased: boolean
   sharingNotice: string
+}
+
+export interface GpuModelSummary {
+  name: string
+  memoryTotalMiB: number
+  count: number
+}
+
+export interface GpuConfiguration {
+  hostIds: number[]
+  devices: GpuModelSummary[]
+  count: number
 }
