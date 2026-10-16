@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -26,7 +25,7 @@ func ensureOwnership(ctx context.Context) error {
 		}
 		return fmt.Errorf("reserved network ownership conflict")
 	}
-	if exec.CommandContext(ctx, "ip", "link", "show", "igw-host").Run() == nil || exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "true").Run() == nil || exec.CommandContext(ctx, "nft", "list", "table", "inet", "incudal_egress").Run() == nil {
+	if networkCommand(ctx, "ip", "link", "show", "igw-host").Run() == nil || networkCommand(ctx, "ip", "netns", "exec", namespace, "true").Run() == nil || networkCommand(ctx, "nft", "list", "table", "inet", "incudal_egress").Run() == nil {
 		return fmt.Errorf("reserved network resources already exist")
 	}
 	for _, path := range []string{"/etc/systemd/system/incudal-network.service", "/etc/systemd/system/incudal-xray.service", "/etc/systemd/system/incus.service.d/incudal-network.conf"} {
@@ -35,11 +34,11 @@ func ensureOwnership(ctx context.Context) error {
 		}
 	}
 	for _, family := range []string{"-4", "-6"} {
-		routes, err := exec.CommandContext(ctx, "ip", family, "route", "show", "table", "7420").Output()
+		routes, err := networkCommand(ctx, "ip", family, "route", "show", "table", "7420").Output()
 		if err == nil && len(bytes.TrimSpace(routes)) > 0 {
 			return fmt.Errorf("reserved routing table already in use")
 		}
-		rules, _ := exec.CommandContext(ctx, "ip", family, "rule", "show").Output()
+		rules, _ := networkCommand(ctx, "ip", family, "rule", "show").Output()
 		if strings.Contains(string(rules), "17420:") {
 			return fmt.Errorf("reserved routing priority already in use")
 		}
@@ -84,7 +83,7 @@ func compactNetworks(values []string) []string {
 
 func run(ctx context.Context, name string, args ...string) error {
 	// Never include command output in an error: Xray/Incus may echo credentials.
-	if err := exec.CommandContext(ctx, name, args...).Run(); err != nil {
+	if err := networkCommand(ctx, name, args...).Run(); err != nil {
 		return fmt.Errorf("%s failed", filepath.Base(name))
 	}
 	return nil
@@ -96,7 +95,7 @@ func nft(ctx context.Context, script string, netns bool) error {
 		name = "ip"
 		args = append([]string{"netns", "exec", namespace, "nft"}, args...)
 	}
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := networkCommand(ctx, name, args...)
 	cmd.Stdin = strings.NewReader(script)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("nft transaction failed")
@@ -107,7 +106,7 @@ func nft(ctx context.Context, script string, netns bool) error {
 func checkTransparentProxy(ctx context.Context) error {
 	// --check validates the running kernel's nft_tproxy support without
 	// changing any firewall tables. Fail before modifying Incus ACLs or DNS.
-	cmd := exec.CommandContext(ctx, "nft", "--check", "-f", "-")
+	cmd := networkCommand(ctx, "nft", "--check", "-f", "-")
 	cmd.Stdin = strings.NewReader(strings.Replace(namespaceRules(), "incudal_gateway", "incudal_tproxy_preflight", 1))
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("kernel transparent proxy support unavailable")
@@ -361,18 +360,16 @@ chain masquerade_gateway { type nat hook postrouting priority 99; policy accept;
 }
 func replaceHostRules(ctx context.Context, rules string) error {
 	prefix := ""
-	if exec.CommandContext(ctx, "nft", "list", "table", "inet", "incudal_egress").Run() == nil {
+	if networkCommand(ctx, "nft", "list", "table", "inet", "incudal_egress").Run() == nil {
 		prefix = "delete table inet incudal_egress\n"
 	}
 	return nft(ctx, prefix+rules, false)
 }
 func prepareNamespace(ctx context.Context) error {
-	if exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "true").Run() != nil {
-		if err := run(ctx, "ip", "netns", "add", namespace); err != nil {
-			return err
-		}
+	if err := ensureHostNamespace(ctx); err != nil {
+		return err
 	}
-	if exec.CommandContext(ctx, "ip", "link", "show", "igw-host").Run() != nil {
+	if networkCommand(ctx, "ip", "link", "show", "igw-host").Run() != nil {
 		if err := run(ctx, "ip", "link", "add", "igw-host", "type", "veth", "peer", "name", "igw-ns", "netns", namespace); err != nil {
 			return err
 		}
@@ -405,7 +402,7 @@ func prepareNamespace(ctx context.Context) error {
 			return err
 		}
 		// Adding only if absent avoids accumulating duplicate rules on every sync.
-		out, _ := exec.CommandContext(ctx, "ip", family, "rule", "show").Output()
+		out, _ := networkCommand(ctx, "ip", family, "rule", "show").Output()
 		if !strings.Contains(string(out), "fwmark "+mark+"/"+mask+" lookup 7420") {
 			if err := run(ctx, "ip", family, "rule", "add", "pref", "17420", "fwmark", mark+"/"+mask, "lookup", "7420"); err != nil {
 				return err
@@ -414,7 +411,7 @@ func prepareNamespace(ctx context.Context) error {
 		if err := run(ctx, "ip", "netns", "exec", namespace, "ip", family, "route", "replace", "local", "default", "dev", "lo", "table", "7421"); err != nil {
 			return err
 		}
-		out, _ = exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "ip", family, "rule", "show").Output()
+		out, _ = networkCommand(ctx, "ip", "netns", "exec", namespace, "ip", family, "rule", "show").Output()
 		if !strings.Contains(string(out), "lookup 7421") {
 			if err := run(ctx, "ip", "netns", "exec", namespace, "ip", family, "rule", "add", "pref", "17421", "fwmark", "0x430000/0xff0000", "lookup", "7421"); err != nil {
 				return err
@@ -427,7 +424,7 @@ func prepareNamespace(ctx context.Context) error {
 	}
 	script := namespaceRules()
 	prefix := ""
-	if exec.CommandContext(ctx, "ip", "netns", "exec", namespace, "nft", "list", "table", "inet", "incudal_gateway").Run() == nil {
+	if networkCommand(ctx, "ip", "netns", "exec", namespace, "nft", "list", "table", "inet", "incudal_gateway").Run() == nil {
 		prefix = "delete table inet incudal_gateway\n"
 	}
 	return nft(ctx, prefix+script, true)
@@ -480,7 +477,7 @@ func cleanGateway(ctx context.Context) error {
 	// ordinary route; no unrelated conntrack entries or firewall tables are reset.
 	_ = run(ctx, "systemctl", "disable", "--now", "incudal-xray.service")
 	for _, family := range []string{"-4", "-6"} {
-		out, _ := exec.CommandContext(ctx, "ip", family, "rule", "show").Output()
+		out, _ := networkCommand(ctx, "ip", family, "rule", "show").Output()
 		if strings.Contains(string(out), "fwmark "+mark+"/"+mask+" lookup 7420") {
 			if err := run(ctx, "ip", family, "rule", "del", "pref", "17420", "fwmark", mark+"/"+mask, "lookup", "7420"); err != nil {
 				return err

@@ -1,6 +1,6 @@
 # Xray 出口与 Incus 防火墙
 
-Agent v1.2.6 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
+Agent v1.2.8 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
 
 ## 配置入口
 
@@ -46,7 +46,7 @@ Xray 服务与 Agent 分开运行。保存的规则和网关由独立恢复服�
 
 ## 前置条件与验收
 
-宿主需要 Linux、systemd、iproute2、nftables，具备 IPv4/IPv6 TPROXY 与策略路由能力，以及支持 bridge/NIC ACL 的 Incus 版本。Agent 在修改 ACL/DNS 前通过 `nft --check` 检查 TPROXY；不支持时返回 preflight 失败。不会自动修改内核、绕过检查或启用直接出口。
+宿主需要 Linux、systemd、iproute2、nftables，具备 IPv4/IPv6 TPROXY 与策略路由能力，util-linux（nsenter/mount），以及支持 bridge/NIC ACL 的 Incus 版本。Agent 在修改 ACL/DNS 前通过 `nft --check` 检查 TPROXY；不支持时返回 preflight 失败。不会自动修改内核、绕过检查或启用直接出口。
 
 本地验证命令：
 
@@ -73,6 +73,18 @@ journalctl -u incudal-agent -n 100 --no-pager
 systemctl status incudal-xray --no-pager
 ```
 
-新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.6。
+新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.8。
 
 配置校验显式传入 `-format json`。原子应用的暂存文件名为 `xray.json.next`，Xray 默认无法从 `.next` 推断 JSON 格式；回归覆盖零节点直连与真实暂存路径。
+
+## systemd 挂载视图回归
+
+Agent 的 `PrivateTmp=true` / `ProtectHome=true` 保持启用。它们会隔离挂载视图；在其中直接 `ip netns add`，其他 systemd 服务可能只看到普通占位文件，`ip netns exec` 报 `Invalid argument` / 退出 255。命名空间的创建、查询、探测、健康切换和恢复统一经过 PID 1 的挂载视图。升级时通过打开的 nsfs 句柄接续旧视图中的网络命名空间；保留原有虚拟网卡和路由。Agent 重启后若旧句柄已消失，只回收该受管名称下的空占位文件，再创建宿主可见的命名空间。
+
+新增真实 systemd 启动回归（需要支持私有 cgroup namespace 的本地 Docker 与 Go）：
+
+```sh
+bash agent/scripts/test-systemd-egress.sh
+```
+
+该脚本在独立 Ubuntu 24.04 容器中以安装器同样的 `NoNewPrivileges`、`PrivateTmp`、`ProtectHome`、CPU 和内存限额运行测试，使用实际 systemd、nftables 就绪集合与固定版本 Xray。覆盖旧问题的 255 复现、已有命名空间接续、零节点直连、三种代理策略启动、独立 Agent 挂载视图、核心重启、私有目录遮蔽下创建 veth/按名称操作网卡、新建及残留空占位文件恢复。此启动回归不等于容器流量的 TPROXY 验收；完整数据路径仍要求测试节点内核具备 nft_tproxy。

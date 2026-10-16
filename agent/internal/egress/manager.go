@@ -92,9 +92,11 @@ func (m *Manager) Apply(ctx context.Context, in Instruction) (Status, error) {
 		return m.Report(), err
 	}
 	status := m.Report()
-	select {
-	case m.wake <- struct{}{}:
-	default:
+	if status.State == "applied" && in.Egress.Mode == "proxy" {
+		select {
+		case m.wake <- struct{}{}:
+		default:
+		}
 	}
 	return status, nil
 }
@@ -218,7 +220,7 @@ func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 		m.setError("xray")
 		return
 	}
-	for _, name := range []string{"ip", "nft", "systemctl", "sysctl"} {
+	for _, name := range []string{"ip", "nft", "systemctl", "sysctl", "nsenter", "mount"} {
 		if _, e := exec.LookPath(name); e != nil {
 			m.setError("preflight")
 			return
@@ -411,7 +413,7 @@ func (m *Manager) health(ctx context.Context, in Instruction) {
 			defer func() { <-limit }()
 			probeCtx, cancel := context.WithTimeout(ctx, 14*time.Second)
 			defer cancel()
-			out, e := exec.CommandContext(probeCtx, "ip", "netns", "exec", namespace, exe, "-network-probe-port", strconv.Itoa(socksBasePort+index), "-network-probe-url", in.Egress.ProbeURL).Output()
+			out, e := networkCommand(probeCtx, "ip", "netns", "exec", namespace, exe, "-network-probe-port", strconv.Itoa(socksBasePort+index), "-network-probe-url", in.Egress.ProbeURL).Output()
 			var result ProbeResult
 			available[index] = e == nil && json.Unmarshal(out, &result) == nil && result.Success
 		}(i)
