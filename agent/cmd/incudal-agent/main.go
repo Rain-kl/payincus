@@ -162,7 +162,6 @@ func sendHeartbeat(ctx context.Context, client *panel.Client, heartbeatIntervalS
 	payload := report.HeartbeatPayload(version, heartbeatIntervalSeconds)
 	if len(workers) > 0 {
 		payload["networkStatus"] = workers[0].Report()
-		payload["capabilities"] = append(payload["capabilities"].([]any), "xray-egress", "network-control")
 	}
 	result, err := client.Heartbeat(ctx, payload)
 	if err != nil {

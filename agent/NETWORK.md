@@ -1,6 +1,6 @@
 # Xray 出口与 Incus 防火墙
 
-Agent v1.2.8 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
+Agent v1.2.9 内置固定版本 Xray-core v26.3.27。发布构建下载官方归档，分别校验归档和可执行文件 SHA-256，然后将对应架构的核心打包进 Agent。普通源码构建没有下载核心时仍可编译，但会报告 Xray 不可用。Xray 使用 MPL-2.0，固定版本源代码与许可证见 `internal/egress/assets/README.txt`。
 
 ## 配置入口
 
@@ -73,7 +73,7 @@ journalctl -u incudal-agent -n 100 --no-pager
 systemctl status incudal-xray --no-pager
 ```
 
-新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.8。
+新版日志使用 `[egress] applying / applied / apply failed / realtime probe started / realtime probe finished` 标记；`stage=config` 表示核心配置校验，`stage=start` 表示服务启动，`stage=health` 表示出口选择。新诊断与检测即时回报需要升级 Panel 和 Agent v1.2.9。
 
 配置校验显式传入 `-format json`。原子应用的暂存文件名为 `xray.json.next`，Xray 默认无法从 `.next` 推断 JSON 格式；回归覆盖零节点直连与真实暂存路径。
 
@@ -88,3 +88,5 @@ bash agent/scripts/test-systemd-egress.sh
 ```
 
 该脚本在独立 Ubuntu 24.04 容器中以安装器同样的 `NoNewPrivileges`、`PrivateTmp`、`ProtectHome`、CPU 和内存限额运行测试，使用实际 systemd、nftables 就绪集合与固定版本 Xray。覆盖旧问题的 255 复现、已有命名空间接续、零节点直连、三种代理策略启动、独立 Agent 挂载视图、核心重启、私有目录遮蔽下创建 veth/按名称操作网卡、新建及残留空占位文件恢复。此启动回归不等于容器流量的 TPROXY 验收；完整数据路径仍要求测试节点内核具备 nft_tproxy。
+
+Agent 的能力列表由二进制统一声明，安装器 `-once` 自检与常规心跳一致，避免自检覆盖网络能力标记。出口卡片等待能力数据加载完成，并接受已鉴权活动隧道的能力确认，防止旧版本自检造成误报升级。

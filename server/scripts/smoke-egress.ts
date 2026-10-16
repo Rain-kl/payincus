@@ -38,7 +38,7 @@ try {
     const response = await app.inject({ method: 'POST', url: '/api/agent/heartbeat', payload: body, headers: { 'x-incudal-agent-id': agentId, 'x-incudal-timestamp': timestamp, 'x-incudal-nonce': nonce, 'x-incudal-body-sha256': bodyHash, 'x-incudal-signature': signature } })
     assert.equal(response.statusCode, 200, response.body)
     assert.equal(response.json().network, undefined, 'Heartbeats must not deliver configuration or test tasks')
-    assert.equal(response.json().tunnel.enabled, true, 'Direct Incus hosts still need realtime control')
+    assert.equal(response.json().tunnel.enabled, body.capabilities.includes('network-control'), 'Direct Incus hosts need control connections when supported')
     return response.json()
   }
   const request = (method: any, url: string, payload?: any, role = 'admin') => app.inject({ method, url: `/api${url}`, headers: { 'x-test-role': role }, ...(payload ? { payload } : {}) })
@@ -83,6 +83,13 @@ try {
     }
   })
   await Promise.race([helloReady, new Promise((_, reject) => setTimeout(() => reject(new Error('authenticated control handshake timed out')), 3000).unref())])
+  // Reproduce an older binary's -once probe overwriting capability metadata.
+  // The authenticated live tunnel remains authoritative for the warning UI.
+  await heartbeat({ capabilities: ['heartbeat', 'report', 'host-metrics', 'instance-status', 'traffic-counters', 'nvidia-gpu'] })
+  const staleCapabilities = (await request('GET', `/hosts/${host.id}/network-policy`)).json()
+  assert.equal(staleCapabilities.agent.capabilities.includes('network-control'), false)
+  assert.equal(staleCapabilities.networkControlReady, true)
+  await heartbeat()
   const saved = await request('PUT', `/hosts/${host.id}/network-policy/egress`, { revision: 0, value: egress }); assert.equal(saved.statusCode, 200, saved.body)
   assert.equal((await request('PUT', `/hosts/${host.id}/network-policy/firewall`, { revision: 0, value: defaultFirewall })).statusCode, 409)
   const firewall = { ...defaultFirewall, enabled: true, rules: [{ direction: 'egress', action: 'drop', protocol: 'tcp', source: '', destination: '', sourcePort: '', destinationPort: '25', description: 'SMTP', enabled: true }] }
@@ -132,6 +139,7 @@ try {
   await assert.rejects(() => protectProvisionedNetwork(client, { name: 'pending', devices: {} }))
   socket.close()
   await new Promise<void>(resolve => socket.once('close', () => resolve()))
+  assert.equal((await request('GET', `/hosts/${host.id}/network-policy`)).json().networkControlReady, false)
   // Reconnect must recover the latest persisted configuration without a heartbeat.
   const reconnectTimestamp = String(Date.now()), reconnectNonce = randomUUID()
   const reconnectSignature = createAgentSignature(agentSecret, { method: 'GET', path: '/api/agent/tunnel', timestamp: reconnectTimestamp, nonce: reconnectNonce, bodyHash })

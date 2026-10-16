@@ -80,7 +80,7 @@ export default async function egressRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: number } }>('/hosts/:id/network-policy', { onRequest: admin, schema: { params: hostParams } }, async (request, reply) => {
     const host = await prisma.host.findUnique({ where: { id: request.params.id }, select: { id: true, agent: { select: { enabled: true, version: true, capabilities: true, lastSeenAt: true } } } })
     if (!host) return reply.code(404).send({ error: '宿主节点不存在' })
-    return { policy: await prisma.hostNetworkPolicy.findUnique({ where: { hostId: host.id } }) ?? { hostId: host.id, revision: 0, appliedRevision: 0, egress: defaultEgress, firewall: defaultFirewall, status: {}, reportedAt: null }, agent: host.agent }
+    return { policy: await prisma.hostNetworkPolicy.findUnique({ where: { hostId: host.id } }) ?? { hostId: host.id, revision: 0, appliedRevision: 0, egress: defaultEgress, firewall: defaultFirewall, status: {}, reportedAt: null }, agent: host.agent, networkControlReady: host.agent?.enabled === true && hostTunnelManager.supportsControl(host.id, 'network.apply') }
   })
   for (const section of ['egress', 'firewall'] as const) app.put<{ Params: { id: number }; Body: { revision: number; value: unknown } }>(`/hosts/:id/network-policy/${section}`, {
     onRequest: admin, schema: { params: hostParams, body: { type: 'object', additionalProperties: false, required: ['revision', 'value'], properties: { revision: { type: 'integer', minimum: 0, maximum: 2147483646 }, value: { type: 'object', additionalProperties: true } } } }

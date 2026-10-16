@@ -8,7 +8,7 @@ import NetworkPolicyStatus from './NetworkPolicyStatus.vue'
 const props = defineProps<{ hostId: number }>()
 const { t } = useI18n()
 const policy = ref<NetworkPolicy | null>(null), form = ref<EgressPolicy | null>(null), nodes = ref<ProxyNode[]>([])
-const cidrs = ref(''), error = ref(''), busy = ref(false), dirty = ref(false), agentReady = ref(false)
+const cidrs = ref(''), error = ref(''), busy = ref(false), dirty = ref(false), agentReady = ref<boolean | null>(null)
 const formRevision = ref(0)
 let generation = 0
 async function load(reset = false) {
@@ -16,7 +16,7 @@ async function load(reset = false) {
   try {
     const [response, catalog] = await Promise.all([api.network.policy(props.hostId), api.network.nodes()])
     if (current !== generation) return
-    policy.value = response.policy; nodes.value = catalog.nodes; agentReady.value = Array.isArray(response.agent?.capabilities) && response.agent.capabilities.includes('network-control')
+    policy.value = response.policy; nodes.value = catalog.nodes; agentReady.value = response.networkControlReady === true || (Array.isArray(response.agent?.capabilities) && response.agent.capabilities.includes('network-control'))
     if (!form.value || reset) { form.value = structuredClone(response.policy.egress); formRevision.value = response.policy.revision; cidrs.value = form.value.internalCidrs.join('\n'); dirty.value = false }
   } catch (e: any) { if (current === generation) error.value = e.message }
 }
@@ -37,7 +37,7 @@ async function save() {
   catch (e: any) { error.value = e.message; await load(Number.isSafeInteger(e.revision)) }
   finally { busy.value = false }
 }
-watch(() => props.hostId, () => { generation++; form.value = null; policy.value = null; error.value = ''; void load() }, { immediate: true })
+watch(() => props.hostId, () => { generation++; agentReady.value = null; form.value = null; policy.value = null; error.value = ''; void load() }, { immediate: true })
 const timer = setInterval(() => { void load() }, 15_000)
 onUnmounted(() => { generation++; clearInterval(timer) })
 </script>
@@ -50,7 +50,7 @@ onUnmounted(() => { generation++; clearInterval(timer) })
     <div class="space-y-5 px-5 py-5 sm:px-6">
       <NetworkPolicyStatus :policy="policy" />
       <p v-if="error" class="text-error" role="alert">{{ error }}</p>
-      <p v-if="!agentReady" class="text-sm text-warning">{{ t('egress.agentRequired') }}</p>
+      <p v-if="agentReady === false" class="text-sm text-warning">{{ t('egress.agentRequired') }}</p>
       <div v-if="form" class="space-y-4" @input="dirty = true" @change="dirty = true">
         <label class="block text-sm text-themed">{{ t('egress.mode') }}<select v-model="form.mode" class="input mt-1"><option value="off">{{ t('egress.off') }}</option><option value="direct">{{ t('egress.direct') }}</option><option value="proxy">{{ t('egress.proxy') }}</option></select></label>
         <template v-if="form.mode === 'proxy'">
