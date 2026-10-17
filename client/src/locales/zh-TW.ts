@@ -3,6 +3,19 @@
 import en from './en'
 
 const zhTW = {
+    spice: {
+        title: '圖形控制台',
+        connecting: '連線中…',
+        connected: '已連線',
+        error: '連線已中斷',
+        reconnect: '重新連線',
+        fullscreen: '全螢幕',
+        hint: '點擊畫面後可使用鍵盤。關閉此面板會中斷控制台連線。',
+        connectionFailed: '連線失敗，請確認虛擬機正在執行、宿主機連線正常後重試。',
+        limit: '此實例已有控制台連線，或已達連線上限。請關閉其他控制台後重試。',
+        forbidden: '需要擁有執行中 KVM 虛擬機的存取權限。',
+        fullscreenFailed: '目前瀏覽器無法進入全螢幕。',
+    },
     storageCapacity: {
         allocated: '實例已分配 / 儲存池總容量',
         available: '單池最大可分配容量',

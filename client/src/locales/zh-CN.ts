@@ -1,4 +1,17 @@
 export default {
+    spice: {
+        title: '图形控制台',
+        connecting: '连接中…',
+        connected: '已连接',
+        error: '连接已断开',
+        reconnect: '重新连接',
+        fullscreen: '全屏',
+        hint: '点击画面后可使用键盘。关闭此面板会断开控制台连接。',
+        connectionFailed: '连接失败，请确认虚拟机正在运行、宿主机连接正常后重试。',
+        limit: '此实例已有控制台连接，或已达到连接上限。请关闭其他控制台后重试。',
+        forbidden: '需要拥有运行中 KVM 虚拟机的访问权限。',
+        fullscreenFailed: '当前浏览器无法进入全屏。',
+    },
     storageCapacity: {
         allocated: '实例已分配 / 存储池总容量',
         available: '单池最大可分配容量',

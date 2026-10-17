@@ -12,6 +12,7 @@ import { readFileSync } from 'fs'
 import type { Host } from '../types/database.js'
 import { resolveCertificatePair } from './incus/certificate-paths.js'
 import { hostTunnelManager } from './incus/tunnel-manager.js'
+import { spiceSessions } from './spice-sessions.js'
 
 // 证书缓存（避免每次连接都读取文件）
 interface CertCache {
@@ -865,6 +866,7 @@ export function closeTerminalSession(sessionId: string, reason: string = 'Sessio
  * 关闭实例的所有终端会话
  */
 export function closeInstanceSessions(instanceId: number, reason: string = 'Instance session closed'): number {
+    const closedGraphics = spiceSessions.closeMatching(session => session.instanceId === instanceId)
     // 先收集要关闭的会话 ID，避免在遍历时修改 Map
     const sessionsToClose: string[] = []
     for (const [sessionId, session] of activeSessions) {
@@ -876,7 +878,7 @@ export function closeInstanceSessions(instanceId: number, reason: string = 'Inst
     for (const sessionId of sessionsToClose) {
         closeTerminalSession(sessionId, reason)
     }
-    return sessionsToClose.length
+    return sessionsToClose.length + closedGraphics
 }
 
 /**
@@ -932,6 +934,7 @@ export function stopSessionCleanup(): void {
  * 关闭用户的所有终端会话
  */
 export function closeUserSessions(userId: number, reason: string = 'User session closed'): number {
+    const closedGraphics = spiceSessions.closeMatching(session => session.userId === userId)
     // 先收集要关闭的会话 ID，避免在遍历时修改 Map
     const sessionsToClose: string[] = []
     for (const [sessionId, session] of activeSessions) {
@@ -943,10 +946,11 @@ export function closeUserSessions(userId: number, reason: string = 'User session
     for (const sessionId of sessionsToClose) {
         closeTerminalSession(sessionId, reason)
     }
-    return sessionsToClose.length
+    return sessionsToClose.length + closedGraphics
 }
 
 export function closeSessionTerminalSessions(sessionId: string, reason: string = 'Session closed'): number {
+    const closedGraphics = spiceSessions.closeMatching(session => session.sessionId === sessionId)
     const sessionsToClose: string[] = []
 
     for (const [currentSessionId, session] of activeSessions) {
@@ -959,16 +963,17 @@ export function closeSessionTerminalSessions(sessionId: string, reason: string =
         closeTerminalSession(currentSessionId, reason)
     }
 
-    return sessionsToClose.length
+    return sessionsToClose.length + closedGraphics
 }
 
 /**
  * 关闭所有终端会话（用于服务器优雅关闭）
  */
 export function closeAllSessions(reason: string = 'Server shutdown'): number {
+    const closedGraphics = spiceSessions.closeMatching(() => true)
     const sessionIds = Array.from(activeSessions.keys())
     for (const sessionId of sessionIds) {
         closeTerminalSession(sessionId, reason)
     }
-    return sessionIds.length
+    return sessionIds.length + closedGraphics
 }

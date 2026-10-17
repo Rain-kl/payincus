@@ -67,6 +67,7 @@ import verificationRoutes from './routes/verification.js'
 import proxySitesRoutes from './routes/proxy-sites.js'
 import inboxRoutes from './routes/inbox.js'
 import terminalRoutes from './routes/terminal.js'
+import spiceRoutes from './routes/spice.js'
 import terminalSavedCommandRoutes from './routes/terminal-saved-commands.js'
 import announcementsRoutes from './routes/announcements.js'
 import ticketsRoutes from './routes/tickets.js'
@@ -526,6 +527,7 @@ await fastify.register(verificationRoutes, { prefix: '/api/verification' })
 await fastify.register(proxySitesRoutes, { prefix: '/api' })
 await fastify.register(inboxRoutes, { prefix: '/api/inbox' })
 await fastify.register(terminalRoutes, { prefix: '/api/ws/instances' })
+await fastify.register(spiceRoutes, { prefix: '/api/ws/instances' })
 await fastify.register(terminalSavedCommandRoutes, { prefix: '/api/terminal-saved-commands' })
 await fastify.register(announcementsRoutes, { prefix: '/api/announcements' })
 await fastify.register(ticketsRoutes, { prefix: '/api/tickets' })

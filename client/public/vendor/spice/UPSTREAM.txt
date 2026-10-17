@@ -1,0 +1,5 @@
+spice-html5, vendored from the Incus web UI
+Source: https://github.com/zabbly/incus-ui-canonical/tree/77ac63bf385b7c78b8fcdb9bfab35109ebab1eb6/src/lib/spice
+Commit: 77ac63bf385b7c78b8fcdb9bfab35109ebab1eb6
+License: LGPL-3.0-or-later (COPYING, COPYING.LESSER and per-file notices retained).
+Local changes: inherit WebSocket protocol headers for capability authentication; remove connection URLs from error logs; clean all channels on stop; keep playback separate from cursor.

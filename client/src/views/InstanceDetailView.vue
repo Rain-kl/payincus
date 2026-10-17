@@ -33,6 +33,7 @@ import ApplyAffCodeModal from '@/components/instance/modals/ApplyAffCodeModal.vu
 import ChangePlanModal from '@/components/instance/modals/ChangePlanModal.vue'
 import DestroyInstanceModal from '@/components/instance/modals/DestroyInstanceModal.vue'
 import TerminalModal from '@/components/instance/TerminalModal.vue'
+import SpiceConsole from '@/components/instance/SpiceConsole.vue'
 import InstanceDisplayIcon from '@/components/InstanceDisplayIcon.vue'
 import InstanceBadgeModal from '@/components/instance/InstanceBadgeModal.vue'
 import AnnouncementIcon from '@/components/icons/AnnouncementIcon.vue'
@@ -310,6 +311,7 @@ const canDeleteInstance = computed<boolean>(() => {
 
 // 终端模态框
 const showTerminalModal = ref<boolean>(false)
+const showSpiceConsole = ref(false)
 const terminalConnected = ref<boolean>(false)
 const terminalSessionActive = ref<boolean>(false)  // 终端会话是否存在（无论连接状态）
 const terminalForceDisconnect = ref<boolean>(false)
@@ -440,6 +442,7 @@ onUnmounted(() => {
 
 // 路由离开守卫 - 确保离开页面时断开终端连接
 onBeforeRouteLeave(() => {
+  showSpiceConsole.value = false
   // 关闭终端模态框，触发其内部的断开逻辑
   showTerminalModal.value = false
   terminalConnected.value = false
@@ -626,6 +629,7 @@ watch(() => route.params.id, async (newId, oldId) => {
       showCloneModal.value = false
       showSuspendModal.value = false
       showTerminalModal.value = false
+      showSpiceConsole.value = false
       showConfigEditModal.value = false
 
       // 加载新实例数据
@@ -2493,6 +2497,18 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     <span class="truncate">{{ $t('terminal.title') }}</span>
                   </button>
 
+                  <button
+                    v-if="isRunning && instance.instanceType === 'vm'"
+                    type="button"
+                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                    @click="showSpiceConsole = true; closeActionMenu()"
+                  >
+                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18v13H3zM8 21h8m-4-4v4" />
+                    </svg>
+                    <span class="truncate">{{ $t('spice.title') }}</span>
+                  </button>
+
                   <!-- 重启 (运行中可见) -->
                   <button
                     v-if="isRunning"
@@ -3558,6 +3574,14 @@ function formatShortDate(dateStr: string | null | undefined): string {
         </div>
       </Transition>
     </Teleport>
+
+    <SpiceConsole
+      v-if="instance?.instanceType === 'vm'"
+      :visible="showSpiceConsole && isRunning"
+      :instance-id="instance?.id || null"
+      :instance-name="instance?.name"
+      @update:visible="showSpiceConsole = $event"
+    />
 
     <!-- Terminal Modal -->
     <TerminalModal

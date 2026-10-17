@@ -1,4 +1,17 @@
 export default {
+    spice: {
+        title: 'Graphical console',
+        connecting: 'Connecting…',
+        connected: 'Connected',
+        error: 'Disconnected',
+        reconnect: 'Reconnect',
+        fullscreen: 'Full screen',
+        hint: 'Click the display to use the keyboard. Closing this panel disconnects the console.',
+        connectionFailed: 'Unable to connect. Check that the VM is running and the host is reachable, then reconnect.',
+        limit: 'A console is already open, or the connection limit has been reached. Close the other console and retry.',
+        forbidden: 'You need permission to access a running KVM virtual machine.',
+        fullscreenFailed: 'Full screen is unavailable in this browser.',
+    },
     storageCapacity: {
         allocated: 'Instance allocation / pool capacity',
         available: 'Largest single-pool allocation available',

@@ -19,6 +19,8 @@ const SENSITIVE_FIELDS = [
     'currentPassword',
     'confirmPassword',
     'token',
+    'ticket',
+    'sec-websocket-protocol',
     'assetToken',
     'agentSecret',
     'pat',
@@ -97,7 +99,7 @@ const TOKEN_PATTERNS = [
     { pattern: /Basic\s+[A-Za-z0-9+/=]{8,}/gi, replacement: REDACTED_JWT },  // Basic auth
     { pattern: /Bearer\s+[A-Za-z0-9._~+/=:-]+/gi, replacement: REDACTED_JWT },  // Bearer token
     {
-        pattern: /([?&](?:token|secret|key|sign|signature|access_token|refresh_token|api_key|apikey|apiKey|password|pwd|assetToken|agentSecret|code)=)[^&#\s]+/gi,
+        pattern: /([?&](?:ticket|token|secret|key|sign|signature|access_token|refresh_token|api_key|apikey|apiKey|password|pwd|assetToken|agentSecret|code)=)[^&#\s]+/gi,
         replacement: `$1${REDACTED}`
     },  // URL query secrets
 ]
@@ -174,7 +176,7 @@ export const logSerializers = {
     req: (req: any) => {
         const sanitized: Record<string, unknown> = {
             method: req.method,
-            url: req.url,
+            url: sanitizeTokensInString(String(req.url || '')),
             hostname: req.hostname,
             remoteAddress: req.ip || req.remoteAddress,
         }
