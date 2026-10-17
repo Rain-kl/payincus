@@ -131,7 +131,7 @@ assert.ok(
   adminAsyncSection.includes('await stopInstance(client, config.name, true)') &&
     adminAsyncSection.includes('await deleteInstance(client, config.name)') &&
     adminAsyncSection.indexOf("where: { id: instanceId, status: 'creating' }") <
-      adminAsyncSection.indexOf('console.log(`[Admin Provisioning] 实例 ${instanceId} 创建成功`)'),
+      adminAsyncSection.indexOf("taskLog('info', `[Admin Provisioning] 实例 ${instanceId} 创建成功`)"),
   'admin async success must use conditional creating->running update and clean Incus if timeout cleanup won the race'
 )
 

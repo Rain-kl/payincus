@@ -137,6 +137,15 @@ export class HostTunnelManager extends EventEmitter {
   /**
    * 向指定宿主机下发日志流控制帧（启停 Agent 的 journalctl 推送）
    */
+  sendTaskLogControl(hostId: number, taskId: number, name: string, action: 'start' | 'stop'): boolean {
+    const tunnel = this.activeTunnels.get(hostId)
+    if (!tunnel || tunnel.readyState !== 1) return false
+    try {
+      tunnel.send(encodeFrame(TunnelFrameType.TASK_LOG_CTL, 0, Buffer.from(JSON.stringify({ taskId, name, action }))))
+      return true
+    } catch { return false }
+  }
+
   sendLogControl(hostId: number, action: 'start' | 'stop', lines?: number): boolean {
     const ws = this.activeTunnels.get(hostId)
     if (!ws || ws.readyState !== WS_OPEN) {
@@ -270,6 +279,13 @@ export class HostTunnelManager extends EventEmitter {
         // 服务端目前仅发出 OPEN / CONFIG / LOG_CTL，忽略 Agent 错误发来的此类控制帧
         break
 
+      case TunnelFrameType.TASK_LOG_DATA:
+        if (payload.length > 10000) return
+        try {
+          const data = JSON.parse(payload.toString('utf8'))
+          if (Number.isSafeInteger(data.taskId) && typeof data.line === 'string') this.emit('task_log', hostId, data.taskId, data.line.slice(0, 8000))
+        } catch { /* malformed node frame */ }
+        break
       case TunnelFrameType.LOG_DATA:
         // Agent 推送的日志行（空 Payload 表示日志流结束）
         this.emit('log_data', hostId, payload.length > 0 ? payload.toString('utf8') : null)

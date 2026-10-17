@@ -1,3 +1,4 @@
+import { runOperationTask, taskLog } from '../operation-task-log.js'
 /**
  * Incus 实例管理
  */
@@ -256,14 +257,25 @@ export async function getInstanceState(client: IncusClient, name: string): Promi
  * 创建实例
  */
 export async function createInstance(client: IncusClient, config: unknown): Promise<unknown> {
-  return client.request('POST', '/1.0/instances', config)
+  const name = (config as { name: string }).name
+  return runOperationTask(client.options.hostId || 0, name, 'create', () => client.request('POST', '/1.0/instances', config))
 }
 
 /**
  * 删除实例
  */
 export async function deleteInstance(client: IncusClient, name: string): Promise<unknown> {
-  return client.request('DELETE', `/1.0/instances/${name}`)
+  return runOperationTask(client.options.hostId || 0, name, 'destroy', async () => {
+    // Capture the final QEMU error before Incus removes the instance's log directory.
+    try {
+      const log = await client.readFile(`/1.0/instances/${encodeURIComponent(name)}/logs/qemu.log`, 65536)
+      if ((log.statusCode === 200 || log.statusCode === 206) && log.content.trim()) {
+        for (const line of log.content.split('\n')) if (line.trim()) taskLog('info', `[节点 QEMU 删除前日志] ${line}`)
+      }
+    } catch { taskLog('warn', '删除前节点 QEMU 日志不可读，继续删除流程') }
+    taskLog('info', `向节点提交删除实例 ${name}`)
+    return client.request('DELETE', `/1.0/instances/${name}`)
+  })
 }
 
 /**

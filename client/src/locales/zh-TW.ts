@@ -3,6 +3,41 @@
 import en from './en'
 
 const zhTW = {
+    operationTasks: {
+        "title": "任務",
+        "description": "查看實例建立、銷毀進度與節點日誌。",
+        "instance": "實例名稱",
+        "allStatuses": "全部狀態",
+        "allKinds": "全部類型",
+        "create": "建立",
+        "destroy": "銷毀",
+        "running": "執行中",
+        "success": "成功",
+        "failed": "失敗",
+        "interrupted": "執行中斷",
+        "host": "節點",
+        "created": "建立時間",
+        "finished": "完成時間",
+        "view": "查看日誌",
+        "empty": "暫無任務",
+        "detail": "任務詳情",
+        "connecting": "正在連線日誌…",
+        "connected": "即時日誌已連線",
+        "reconnecting": "連線中斷，正在重連…",
+        "complete": "日誌載入完成",
+        "waiting": "暫無日誌，等待任務輸出。",
+        "follow": "跟隨最新日誌",
+        "download": "下載日誌",
+        "previous": "上一頁",
+        "next": "下一頁",
+        "refresh": "重新整理",
+        "search": "搜尋",
+        "server": "伺服器",
+        "node": "節點",
+        "loadFailed": "載入失敗",
+        "interruptedHint": "後端重啟，執行結果未知，請核對節點實際狀態。"
+},
+
     hostPublicIpv4: {
         title: '獨立 IPv4 位址池', description: '為獨立 IPv4 方案提供 routed 公網 IPv4 分配、回收和容量驗證。', newPool: '新增位址池', newPoolTitle: '新增獨立 IPv4 位址池',
         total: '總位址', empty: '暫無獨立 IPv4 位址池。', enabled: '啟用', disabled: '停用', enable: '啟用', disable: '停用', gateway: '閘道', addAddress: '新增位址', add: '新增',
@@ -234,6 +269,7 @@ const zhTW = {
 
     // 導航
     nav: {
+        tasks: "任務",
         main: '常用',
         dashboard: '總覽',
         instances: '實例',

@@ -50,7 +50,7 @@ server {
   }
 
   # Agent 日志流 (SSE)：必须关闭缓冲，实时透传
-  location ~ ^/api/hosts/[0-9]+/agent/logs/stream {
+  location ~ ^/api/(hosts/[0-9]+/agent/logs/stream|admin/tasks/[0-9]+/logs/stream)$ {
     proxy_pass ${BACKEND_UPSTREAM};
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -128,7 +128,7 @@ server {
   }
 
   # Agent 日志流 (SSE)：必须关闭缓冲，实时透传
-  location ~ ^/api/hosts/[0-9]+/agent/logs/stream {
+  location ~ ^/api/(hosts/[0-9]+/agent/logs/stream|admin/tasks/[0-9]+/logs/stream)$ {
     proxy_pass ${BACKEND_UPSTREAM};
     proxy_http_version 1.1;
     proxy_set_header Host $host;

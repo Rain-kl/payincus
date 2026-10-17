@@ -1,0 +1,108 @@
+import assert from 'node:assert/strict'
+import { setTimeout as delay } from 'node:timers/promises'
+import Fastify from 'fastify'
+
+// Isolated integration test. No production database or node is contacted.
+process.env.DATABASE_URL = 'postgresql://test:test@127.0.0.1:1/test'
+const { prisma, closePrismaDatabase } = await import('../src/db/prisma.js')
+const { hostTunnelManager } = await import('../src/lib/incus/tunnel-manager.js')
+const { runOperationTask, taskLog, redactTaskLog, recoverInterruptedOperationTasks } = await import('../src/lib/operation-task-log.js')
+const { default: routes } = await import('../src/routes/admin-tasks.js')
+const tasks: any[] = []
+const logs: any[] = []
+let nextTask = 0
+let nextLog = 0
+const matches = (task: any, where: any) => Object.entries(where || {}).every(([key, value]) => task[key] === value)
+Object.assign(prisma.operationTask, {
+  create: async ({ data }: any) => { const task = { id: ++nextTask, status: 'running', error: null, createdAt: new Date(), finishedAt: null, ...data }; tasks.push(task); return task },
+  findUnique: async ({ where }: any) => tasks.find(task => task.id === where.id) || null,
+  findMany: async ({ where, skip = 0, take }: any = {}) => tasks.filter(task => matches(task, where)).slice().reverse().slice(skip, take ? skip + take : undefined),
+  count: async ({ where }: any) => tasks.filter(task => matches(task, where)).length,
+  updateMany: async ({ where, data }: any) => { const found = tasks.filter(task => matches(task, where)); found.forEach(task => Object.assign(task, data)); return { count: found.length } },
+  update: async ({ where, data }: any) => Object.assign(tasks.find(task => task.id === where.id), data)
+})
+Object.assign(prisma.operationTaskLog, {
+  create: async ({ data }: any) => { const log = { id: ++nextLog, createdAt: new Date(), ...data }; logs.push(log); return log },
+  findMany: async ({ where, take }: any) => logs.filter(log => log.taskId === where.taskId && log.id > where.id.gt).slice(0, take)
+})
+Object.assign(prisma.host, { findMany: async () => [{ id: 1, name: 'node-test' }] })
+;(prisma as any).$transaction = async (operations: any[]) => Promise.all(operations)
+hostTunnelManager.sendTaskLogControl = () => false
+assert.doesNotMatch(redactTaskLog('password="private-value" token=secret-value https://name:pass@example.test/path'), /private-value|secret-value|name:pass/)
+const { waitForOperation } = await import('../src/lib/incus/incus-utils.js')
+let polls = 0
+await runOperationTask(1, 'progress-vm', 'create', async () => {
+  const result = await waitForOperation({ request: async () => ++polls === 1
+    ? { status: 'Running', status_code: 103, description: 'Creating instance', metadata: { download_progress: '50%', secret: 'must-not-log' } }
+    : { status: 'Success', status_code: 200, metadata: { done: true } }
+  } as any, '/1.0/operations/test', 1000)
+  assert.deepEqual(result, { done: true })
+})
+assert(logs.some(log => /download_progress: 50%/.test(log.message)))
+assert(!logs.some(log => /must-not-log/.test(log.message)))
+// Reset only test fixtures before the parallel isolation checks.
+tasks.length = 0; logs.length = 0; nextTask = 0; nextLog = 0
+await Promise.all([
+  runOperationTask(1, 'vm-a', 'create', async () => {
+    taskLog('info', 'a-first'); await delay(10); taskLog('info', 'a-second')
+    hostTunnelManager.emit('task_log', 999, 1, 'WRONG-HOST')
+    hostTunnelManager.emit('task_log', 1, 1, 'node-a')
+    await runOperationTask(1, 'vm-a', 'destroy', async () => taskLog('warn', 'rollback-a'))
+  }),
+  runOperationTask(2, 'vm-b', 'destroy', async () => { await delay(1); taskLog('info', 'b-only') })
+])
+assert.equal(tasks.length, 2, 'nested cleanup belongs to the parent task')
+assert.equal(tasks[0].status, 'success')
+assert(logs.some(log => log.taskId === 1 && log.source === 'node' && log.message === 'node-a'))
+assert(!logs.some(log => log.message === 'WRONG-HOST'))
+assert(!logs.some(log => log.taskId === 2 && /a-first|a-second|node-a/.test(log.message)), 'parallel tasks must not mix logs')
+await assert.rejects(runOperationTask(1, 'failed-vm', 'create', async () => { throw new Error('KVM missing password=hidden') }), /KVM missing/)
+assert.equal(tasks[2].status, 'failed')
+assert.doesNotMatch(tasks[2].error, /hidden/)
+await runOperationTask(1, 'timeout-vm', 'create', async () => { tasks[3].status = 'failed'; tasks[3].error = 'create timeout' })
+assert.equal(tasks[3].status, 'failed', 'late success cannot overwrite timeout cleanup')
+const interrupted = await prisma.operationTask.create({ data: { hostId: 1, instanceName: 'interrupted-vm', kind: 'create' } })
+await recoverInterruptedOperationTasks()
+assert.equal(tasks.find(task => task.id === interrupted.id).status, 'interrupted')
+for (let i = 0; i < 205; i++) await prisma.operationTaskLog.create({ data: { taskId: 1, source: 'server', level: 'info', message: `history-${i}` } })
+const app = Fastify()
+app.decorate('authenticate', async (req: any, reply: any) => {
+  if (!req.headers.authorization) return reply.code(401).send({ error: 'unauthorized' })
+  req.user = { id: 1, role: req.headers.authorization === 'admin' ? 'admin' : 'user' }
+})
+app.decorate('requireAdmin', async (req: any, reply: any) => { if (req.user.role !== 'admin') return reply.code(403).send({ error: 'forbidden' }) })
+await app.register(routes)
+assert.equal((await app.inject('/api/admin/tasks')).statusCode, 401)
+assert.equal((await app.inject({ url: '/api/admin/tasks', headers: { authorization: 'user' } })).statusCode, 403)
+for (const url of ['/api/admin/tasks/0/logs/stream', '/api/admin/tasks/1/logs/stream?after=-1', '/api/admin/tasks?page=-2', '/api/admin/tasks?status=invalid']) {
+  assert.equal((await app.inject({ url, headers: { authorization: 'admin' } })).statusCode, 400, url)
+}
+assert.equal((await app.inject({ url: '/api/admin/tasks/999/logs/stream', headers: { authorization: 'admin' } })).statusCode, 404)
+const response = await app.inject({ url: '/api/admin/tasks/1/logs/stream', headers: { authorization: 'admin' } })
+assert.equal(response.statusCode, 200)
+assert.match(response.headers['content-type'] as string, /text\/event-stream/)
+assert.match(response.body, /history-204/)
+assert.match(response.body, /event: end/)
+assert.doesNotMatch(response.body, /b-only/)
+const last = logs.filter(log => log.taskId === 1).at(-1)!.id
+const resumed = await app.inject({ url: `/api/admin/tasks/1/logs/stream?after=${last - 1}`, headers: { authorization: 'admin' } })
+assert.equal((resumed.body.match(/event: log/g) || []).length, 1)
+const { createServer } = await import('node:http')
+const { Agent } = await import('undici')
+const { IncusClient } = await import('../src/lib/incus/incus-client.js')
+let range = ''
+const node = createServer((req, res) => { range = req.headers.range || ''; res.end('x'.repeat(100000)) })
+await new Promise<void>(resolve => node.listen(0, '127.0.0.1', resolve))
+const address = node.address() as { port: number }
+const client = new IncusClient({ url: `http://127.0.0.1:${address.port}`, certPath: null, keyPath: null })
+client.agent = new Agent()
+const bounded = await client.readFile('/qemu.log', 65536)
+assert.equal(bounded.content.length, 65536)
+assert.equal(range, 'bytes=-65536')
+const unbounded = await client.readFile('/normal-file')
+assert.equal(unbounded.content.length, 100000, 'normal file reads retain their previous behavior')
+await client.close()
+await new Promise<void>(resolve => node.close(() => resolve()))
+await app.close()
+await closePrismaDatabase()
+console.log('operation task lifecycle, isolation, redaction, auth, validation, SSE replay and resume checks passed')

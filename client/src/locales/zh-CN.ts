@@ -1,4 +1,39 @@
 export default {
+    operationTasks: {
+        "title": "任务",
+        "description": "查看实例创建、销毁进度与节点日志。",
+        "instance": "实例名称",
+        "allStatuses": "全部状态",
+        "allKinds": "全部类型",
+        "create": "创建",
+        "destroy": "销毁",
+        "running": "执行中",
+        "success": "成功",
+        "failed": "失败",
+        "interrupted": "执行中断",
+        "host": "节点",
+        "created": "创建时间",
+        "finished": "完成时间",
+        "view": "查看日志",
+        "empty": "暂无任务",
+        "detail": "任务详情",
+        "connecting": "正在连接日志…",
+        "connected": "实时日志已连接",
+        "reconnecting": "连接中断，正在重连…",
+        "complete": "日志加载完成",
+        "waiting": "暂无日志，等待任务输出。",
+        "follow": "跟随最新日志",
+        "download": "下载日志",
+        "previous": "上一页",
+        "next": "下一页",
+        "refresh": "刷新",
+        "search": "搜索",
+        "server": "服务端",
+        "node": "节点",
+        "loadFailed": "加载失败",
+        "interruptedHint": "后端重启，执行结果未知，请核对节点实际状态。"
+},
+
     hostPublicIpv4: {
         title: '独立 IPv4 地址池',
         description: '为独立 IPv4 套餐提供 routed 公网 IPv4 分配、回收和容量校验。',
@@ -410,6 +445,7 @@ export default {
 
     // 导航
     nav: {
+        tasks: "任务",
         main: '常用',
         dashboard: '概览',
         instances: '实例',

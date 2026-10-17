@@ -3663,3 +3663,30 @@ model PromoRedemptionLog {
   @@map("promo_redemption_logs")
 }
 
+
+// 独立快照：实例/节点删除后仍保留运维证据，不关联业务任务队列。
+model OperationTask {
+  id Int @id @default(autoincrement())
+  hostId Int @map("host_id")
+  instanceName String @map("instance_name")
+  kind String
+  status String @default("running")
+  error String?
+  createdAt DateTime @default(now()) @map("created_at")
+  finishedAt DateTime? @map("finished_at")
+  logs OperationTaskLog[]
+  @@index([hostId, status])
+  @@index([createdAt])
+  @@map("operation_tasks")
+}
+model OperationTaskLog {
+  id Int @id @default(autoincrement())
+  taskId Int @map("task_id")
+  source String
+  level String
+  message String
+  createdAt DateTime @default(now()) @map("created_at")
+  task OperationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, id])
+  @@map("operation_task_logs")
+}

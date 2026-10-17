@@ -1,3 +1,4 @@
+import { currentOperationTask, runOperationTask, taskLog } from '../lib/operation-task-log.js'
 /**
  * 管理员计费相关路由
  */
@@ -4726,9 +4727,10 @@ async function createInstanceAsync(
   userId: number,
   resources: { cpu: number; memory: number; disk: number }
 ): Promise<void> {
+  if (!currentOperationTask()) return runOperationTask(host.id, config.name, 'create', () => createInstanceAsync(instanceId, host, config, userId, resources))
   try {
-    console.log(`\n[Admin Provisioning] ===== 开始创建实例流程 =====`)
-    console.log(`[Admin Provisioning] 实例ID: ${instanceId}, 名称: ${config.name}, 宿主机: ${host.name}`)
+    taskLog('info', `\n[Admin Provisioning] ===== 开始创建实例流程 =====`)
+    taskLog('info', `[Admin Provisioning] 实例ID: ${instanceId}, 名称: ${config.name}, 宿主机: ${host.name}`)
 
     const client = await getIncusClient(host)
 
@@ -4769,7 +4771,7 @@ async function createInstanceAsync(
       bootHostShutdownTimeout: config.bootHostShutdownTimeout
     })
 
-    console.log(`[Admin Provisioning] 正在调用 Incus API 创建实例...`)
+    taskLog('info', `[Admin Provisioning] 正在调用 Incus API 创建实例...`)
     await createInstance(client, incusConfig)
 
     // 等待实例创建完成
@@ -4792,7 +4794,7 @@ async function createInstanceAsync(
     }
 
     // 启动实例
-    console.log(`[Admin Provisioning] 正在启动实例...`)
+    taskLog('info', `[Admin Provisioning] 正在启动实例...`)
     await startInstance(client, config.name)
 
     // 等待启动完成
@@ -4840,20 +4842,20 @@ async function createInstanceAsync(
     })
 
     if (updateResult.count === 0) {
-      console.log(`[Admin Provisioning] 实例 ${instanceId} 已被超时清理任务处理，清理已创建的 Incus 实例`)
+      taskLog('info', `[Admin Provisioning] 实例 ${instanceId} 已被超时清理任务处理，清理已创建的 Incus 实例`)
       try {
         await stopInstance(client, config.name, true)
         await deleteInstance(client, config.name)
       } catch (cleanupErr) {
-        console.error(`[Admin Provisioning] 清理超时实例失败:`, cleanupErr)
+        taskLog('error', `[Admin Provisioning] 清理超时实例失败:`, cleanupErr)
       }
       return
     }
 
-    console.log(`[Admin Provisioning] 实例 ${instanceId} 创建成功`)
+    taskLog('info', `[Admin Provisioning] 实例 ${instanceId} 创建成功`)
 
   } catch (error) {
-    console.error(`[Admin Provisioning] 实例 ${instanceId} 创建失败:`, error)
+    taskLog('error', `[Admin Provisioning] 实例 ${instanceId} 创建失败:`, error)
 
     const updateResult = await prisma.instance.updateMany({
       where: { id: instanceId, status: 'creating' },
@@ -4870,21 +4872,21 @@ async function createInstanceAsync(
           portCount: networkModeAllowsPortMapping(config.networkMode) ? (config.portLimit || 0) : 0
         })
       } catch (rollbackErr) {
-        console.error(`[Admin Provisioning] 资源回滚失败:`, rollbackErr)
+        taskLog('error', `[Admin Provisioning] 资源回滚失败:`, rollbackErr)
       }
 
       if (networkModeNeedsPublicIpv4(config.networkMode)) {
         try {
           await prisma.$transaction((tx) => db.releasePublicIpv4ForInstance(tx, instanceId))
         } catch (releaseErr) {
-          console.error(`[Admin Provisioning] 释放独立 IPv4 失败:`, releaseErr)
+          taskLog('error', `[Admin Provisioning] 释放独立 IPv4 失败:`, releaseErr)
         }
       }
 
       try {
         await db.compensateFailedInstancePurchase(instanceId, userId, host.id)
       } catch (compensationErr) {
-        console.error(`[Admin Provisioning] 创建失败后的账务补偿失败:`, compensationErr)
+        taskLog('error', `[Admin Provisioning] 创建失败后的账务补偿失败:`, compensationErr)
       }
     }
 

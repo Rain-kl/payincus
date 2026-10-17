@@ -1,4 +1,39 @@
 export default {
+    operationTasks: {
+        "title": "Tasks",
+        "description": "Track instance creation, destruction, and node logs.",
+        "instance": "Instance name",
+        "allStatuses": "All statuses",
+        "allKinds": "All types",
+        "create": "Create",
+        "destroy": "Destroy",
+        "running": "Running",
+        "success": "Succeeded",
+        "failed": "Failed",
+        "interrupted": "Interrupted",
+        "host": "Node",
+        "created": "Created",
+        "finished": "Finished",
+        "view": "View logs",
+        "empty": "No tasks yet",
+        "detail": "Task details",
+        "connecting": "Connecting to logs…",
+        "connected": "Live logs connected",
+        "reconnecting": "Disconnected, reconnecting…",
+        "complete": "Logs complete",
+        "waiting": "Waiting for task output.",
+        "follow": "Follow latest logs",
+        "download": "Download logs",
+        "previous": "Previous",
+        "next": "Next",
+        "refresh": "Refresh",
+        "search": "Search",
+        "server": "Server",
+        "node": "Node",
+        "loadFailed": "Failed to load",
+        "interruptedHint": "Backend restarted; the outcome is unknown. Check the actual node state."
+},
+
     hostPublicIpv4: {
         title: 'Dedicated IPv4 Pools', description: 'Allocate, reclaim, and validate routed public IPv4 capacity for dedicated IPv4 plans.', newPool: 'New pool', newPoolTitle: 'New dedicated IPv4 pool',
         total: 'Total addresses', empty: 'No dedicated IPv4 pools.', enabled: 'Enabled', disabled: 'Disabled', enable: 'Enable', disable: 'Disable', gateway: 'Gateway', addAddress: 'Add addresses', add: 'Add',
@@ -230,6 +265,7 @@ export default {
 
     // Navigation
     nav: {
+        tasks: "Tasks",
         main: 'Main',
         dashboard: 'Dashboard',
         instances: 'Instances',

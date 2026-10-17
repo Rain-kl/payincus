@@ -1,3 +1,5 @@
+import adminTaskRoutes from './routes/admin-tasks.js'
+import { recoverInterruptedOperationTasks } from './lib/operation-task-log.js'
 // 确保环境变量被加载（必须在最前面）
 import './config/env.js'
 
@@ -537,6 +539,7 @@ await fastify.register(instanceDestroyRoutes, { prefix: '/api/instances' })
 await fastify.register(rechargeRoutes)
 await fastify.register(adminBillingRoutes)
 await fastify.register(adminStatisticsRoutes)
+await fastify.register(adminTaskRoutes)
 await fastify.register(adminHostingRoutes)
 await fastify.register(affRoutes, { prefix: '/api/aff' })
 await fastify.register(entertainmentRoutes, { prefix: '/api/entertainment' })
@@ -728,6 +731,8 @@ const start = async (): Promise<void> => {
       resetDatabase: process.env.RESET_DATABASE === 'true' || process.env.RESET_DATABASE === '1'
     })
 
+    await recoverInterruptedOperationTasks()
+
     const { cleanupStaleCreatingBackups } = await import('./db/backups.js')
     const staleCreatingBackups = await cleanupStaleCreatingBackups()
     if (staleCreatingBackups > 0) {
@@ -901,6 +906,12 @@ const start = async (): Promise<void> => {
             continue
           }
           
+          // 同步运维任务结果，避免原异步请求卡住时任务仍显示执行中。
+          await prisma.operationTask.updateMany({
+            where: { hostId: instance.host_id, instanceName: instance.incus_id || instance.name, kind: 'create', status: 'running' },
+            data: { status: 'failed', error: '实例创建超过 10 分钟，触发超时清理；请核对节点状态', finishedAt: new Date() }
+          }).catch(err => console.error('[CreateTimeout] 更新运维任务失败:', err))
+
           // 状态更新成功，执行资源回滚
           // 2. 回滚资源
           try {

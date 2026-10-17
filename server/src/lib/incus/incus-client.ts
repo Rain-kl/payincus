@@ -223,7 +223,7 @@ export class IncusClient {
    * 读取实例文件（用于 Files API，不解析 JSON）
    * @returns 文件内容与 HTTP 状态码
    */
-  async readFile(path: string): Promise<{ content: string; statusCode: number }> {
+  async readFile(path: string, limit?: number): Promise<{ content: string; statusCode: number }> {
     if (!this.agent) {
       throw new Error('Incus 客户端未连接')
     }
@@ -233,12 +233,27 @@ export class IncusClient {
       method: 'GET',
       dispatcher: this.agent,
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+        ...(limit ? { Range: `bytes=-${limit}` } : {})
+      },
+      ...(limit ? { headersTimeout: 5000, bodyTimeout: 5000 } : {})
     })
 
     // Files API 返回原始文件内容，不是 JSON
-    const content = await response.body.text()
+    let content: string
+    if (limit) {
+      const chunks: Buffer[] = []
+      let size = 0
+      try {
+        for await (const chunk of response.body) {
+          const bytes = Buffer.from(chunk)
+          chunks.push(bytes.subarray(0, limit - size))
+          size += Math.min(bytes.length, limit - size)
+          if (size >= limit) break
+        }
+      } finally { response.body.destroy() }
+      content = Buffer.concat(chunks).toString('utf8')
+    } else content = await response.body.text()
 
     return { content, statusCode: response.statusCode }
   }

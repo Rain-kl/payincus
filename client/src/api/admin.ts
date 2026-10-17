@@ -718,6 +718,9 @@ http.interceptors.response.use(
 
 // API 模块
 const api = {
+  operationTasks: {
+    list: (params: { page?: number; search?: string; status?: string; kind?: string }): Promise<{ items: OperationTask[]; total: number }> => http.get('/admin/tasks', { params })
+  },
   // 认证
   auth: {
     check2FA: (username: string): Promise<{ requires2FA: boolean }> =>
@@ -4217,3 +4220,16 @@ export const authApi = api.auth
 export const usersApi = api.users
 export const instancesApi = api.instances
 export const promosApi = api.promos
+
+export interface OperationTask {
+  id: number
+  hostId: number
+  hostName?: string | null
+  instanceName: string
+  kind: 'create' | 'destroy'
+  status: 'running' | 'success' | 'failed' | 'interrupted'
+  error: string | null
+  createdAt: string
+  finishedAt: string | null
+}
+export interface OperationTaskLog { id: number; source: string; level: string; message: string; createdAt: string }

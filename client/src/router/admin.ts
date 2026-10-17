@@ -270,6 +270,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.tickets', title: '工单' }
   },
   {
+    path: '/admin/tasks',
+    name: 'admin-tasks',
+    component: () => import('@/views/admin/TasksView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.tasks', title: '任务' }
+  },
+  {
     path: '/admin/logs',
     name: 'admin-logs',
     component: () => import('@/views/LogsView.vue'),

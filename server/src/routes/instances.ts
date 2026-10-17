@@ -1,3 +1,4 @@
+import { currentOperationTask, runOperationTask, taskLog } from '../lib/operation-task-log.js'
 /**
  * 实例管理路由
  */
@@ -371,6 +372,8 @@ async function deleteIncusInstanceForDelete(
   instance: { incus_id: string; status: string },
   logger: { warn: (...args: any[]) => void }
 ): Promise<void> {
+  if (!currentOperationTask()) return runOperationTask(client.options.hostId || 0, instance.incus_id, 'destroy', () => deleteIncusInstanceForDelete(client, instance, logger))
+  taskLog('info', '准备停止并删除实例')
   if (instance.status === 'running') {
     try {
       await stopInstance(client, instance.incus_id, true)
@@ -6739,13 +6742,14 @@ async function createInstanceAsync(
   userId: number,
   resources: { cpu: number; memory: number; disk: number }
 ): Promise<void> {
+  if (!currentOperationTask()) return runOperationTask(host.id, config.name, 'create', () => createInstanceAsync(instanceId, host, config, userId, resources))
   try {
-    console.log(`\n[Provisioning] ===== 开始创建实例流程 =====`)
-    console.log(`[Provisioning] 实例ID: ${instanceId}, 名称: ${config.name}, 宿主机: ${host.name}`)
+    taskLog('info', `\n[Provisioning] ===== 开始创建实例流程 =====`)
+    taskLog('info', `[Provisioning] 实例ID: ${instanceId}, 名称: ${config.name}, 宿主机: ${host.name}`)
 
     const client = await getIncusClient(host)
 
-    console.log(`[Provisioning] 正在构建 Incus 配置...`)
+    taskLog('info', `[Provisioning] 正在构建 Incus 配置...`)
     // 构建 IPv6Config (如果有静态 IPv6)
     const ipv6Config = config.ipv6Address ? {
       primaryIp: config.ipv6Address
@@ -6790,21 +6794,21 @@ async function createInstanceAsync(
       bootHostShutdownTimeout: config.bootHostShutdownTimeout
     })
 
-    console.log(`[Provisioning] 开始创建实例 ${instanceId} (${config.name}) on ${host.name}`)
-    console.log(`[Provisioning] 资源配置: CPU=${config.cpu}, Memory=${config.memory}MB, Disk=${config.disk}MB`)
-    console.log(`[Provisioning] Incus 配置已生成，敏感字段已跳过日志输出`)
+    taskLog('info', `[Provisioning] 开始创建实例 ${instanceId} (${config.name}) on ${host.name}`)
+    taskLog('info', `[Provisioning] 资源配置: CPU=${config.cpu}, Memory=${config.memory}MB, Disk=${config.disk}MB`)
+    taskLog('info', `[Provisioning] Incus 配置已生成，敏感字段已跳过日志输出`)
 
     await createInstance(client, incusConfig)
     const instanceTypeLabel = config.instanceType === 'vm' ? '虚拟机' : '容器'
-    console.log(`[Provisioning] 实例 ${config.name} ${instanceTypeLabel}创建完成`)
+    taskLog('info', `[Provisioning] 实例 ${config.name} ${instanceTypeLabel}创建完成`)
 
     await startInstance(client, config.name)
-    console.log(`[Provisioning] 实例 ${config.name} 启动命令已发送`)
+    taskLog('info', `[Provisioning] 实例 ${config.name} 启动命令已发送`)
 
     // KVM 虚拟机需要等待 QEMU 真正完成启动（BIOS→内核→cloud-init→agent）
     // 容器启动是瞬时的，不需要等待
     if (config.instanceType === 'vm') {
-      console.log(`[Provisioning] VM ${config.name} 等待 QEMU 启动完成...`)
+      taskLog('info', `[Provisioning] VM ${config.name} 等待 QEMU 启动完成...`)
       const vmMaxWait = 90 // 最多等 90 轮 × 2秒 = 180秒
       let vmStarted = false
       for (let i = 0; i < vmMaxWait; i++) {
@@ -6812,17 +6816,17 @@ async function createInstanceAsync(
         try {
           const vmState = await getInstanceState(client, config.name) as { status?: string }
           if (vmState.status === 'Running') {
-            console.log(`[Provisioning] VM ${config.name} 已确认启动 (耗时 ${(i + 1) * 2}s)`)
+            taskLog('info', `[Provisioning] VM ${config.name} 已确认启动 (耗时 ${(i + 1) * 2}s)`)
             vmStarted = true
             break
           }
           if (i % 10 === 0) {
-            console.log(`[Provisioning] VM ${config.name} 等待启动中... (${(i + 1) * 2}s, 状态: ${vmState.status || 'unknown'})`)
+            taskLog('info', `[Provisioning] VM ${config.name} 等待启动中... (${(i + 1) * 2}s, 状态: ${vmState.status || 'unknown'})`)
           }
         } catch { /* 继续等待 */ }
       }
       if (!vmStarted) {
-        console.warn(`[Provisioning] VM ${config.name} 启动等待超时 (180s)，继续流程`)
+        taskLog('warn', `[Provisioning] VM ${config.name} 启动等待超时 (180s)，继续流程`)
       }
     }
 
@@ -6830,7 +6834,7 @@ async function createInstanceAsync(
     const ipv4: string | null = config.ipv4Address || null
     const ipv6: string | null = config.ipv6Address || null
 
-    console.log(`[Provisioning] 实例 ${config.name} IP 配置: IPv4=${ipv4}, IPv6=${ipv6}`)
+    taskLog('info', `[Provisioning] 实例 ${config.name} IP 配置: IPv4=${ipv4}, IPv6=${ipv6}`)
 
     // 使用原子操作更新状态，防止与超时清理任务竞争
     // 只有状态仍为 creating 时才更新为 running
@@ -6849,13 +6853,13 @@ async function createInstanceAsync(
 
     // 如果状态已被超时清理任务修改（变为 error），需要清理已创建的 Incus 实例
     if (updateResult.count === 0) {
-      console.log(`[Provisioning] 实例 ${instanceId} 已被超时清理任务处理，清理已创建的 Incus 实例`)
+      taskLog('info', `[Provisioning] 实例 ${instanceId} 已被超时清理任务处理，清理已创建的 Incus 实例`)
       try {
         await stopInstance(client, config.name, true)
         await deleteInstance(client, config.name)
-        console.log(`[Provisioning] Incus 实例 ${config.name} 已清理（因超时）`)
+        taskLog('info', `[Provisioning] Incus 实例 ${config.name} 已清理（因超时）`)
       } catch (cleanupErr) {
-        console.error(`[Provisioning] 清理超时实例失败:`, cleanupErr)
+        taskLog('error', `[Provisioning] 清理超时实例失败:`, cleanupErr)
       }
       // 不再继续后续流程（IP 记录、通知等）
       return
@@ -6871,9 +6875,9 @@ async function createInstanceAsync(
           device: 'eth0',  // 新双网卡架构: IPv4 在 eth0
           instanceId
         })
-        console.log(`[Provisioning] 主 IPv4 地址记录已创建: ${ipv4} (device: eth0)`)
+        taskLog('info', `[Provisioning] 主 IPv4 地址记录已创建: ${ipv4} (device: eth0)`)
       } catch (err) {
-        console.warn(`[Provisioning] 创建 IPv4 记录失败 (可能已存在):`, err)
+        taskLog('warn', `[Provisioning] 创建 IPv4 记录失败 (可能已存在):`, err)
       }
     }
 
@@ -6886,13 +6890,13 @@ async function createInstanceAsync(
           device: 'eth1',  // 新双网卡架构: IPv6 在 eth1
           instanceId
         })
-        console.log(`[Provisioning] 主 IPv6 地址记录已创建: ${ipv6} (device: eth1)`)
+        taskLog('info', `[Provisioning] 主 IPv6 地址记录已创建: ${ipv6} (device: eth1)`)
       } catch (err) {
-        console.warn(`[Provisioning] 创建 IPv6 记录失败 (可能已存在):`, err)
+        taskLog('warn', `[Provisioning] 创建 IPv6 记录失败 (可能已存在):`, err)
       }
     }
 
-    console.log(`[Provisioning] ✔ 实例 ${instanceId} (${config.name}) 创建成功!`)
+    taskLog('info', `[Provisioning] ✔ 实例 ${instanceId} (${config.name}) 创建成功!`)
 
     // 自动下发远程端口映射（Linux=22/SSH，Windows=3389/RDP）。不计入用户端口配额；
     // 失败只记日志，不影响实例创建结果。
@@ -6955,7 +6959,7 @@ async function createInstanceAsync(
           })
         }
       } catch (emailErr) {
-        console.warn(`[Provisioning] 发送实例创建成功邮件失败:`, emailErr)
+        taskLog('warn', `[Provisioning] 发送实例创建成功邮件失败:`, emailErr)
       }
 
       // 注意：不再检查实例配额使用率警告，因为不再限制用户的实例配额
@@ -6972,7 +6976,7 @@ async function createInstanceAsync(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error(`[Provisioning] ✘ 实例 ${instanceId} 创建失败:`, errorMessage)
+    taskLog('error', `[Provisioning] ✘ 实例 ${instanceId} 创建失败:`, errorMessage)
 
     try {
       await compensateFailedInstanceCreation({
@@ -6986,16 +6990,16 @@ async function createInstanceAsync(
         errorMessage
       })
     } catch (compensationError) {
-      console.error(`[Provisioning] 实例 ${instanceId} 创建失败补偿流程异常:`, compensationError)
+      taskLog('error', `[Provisioning] 实例 ${instanceId} 创建失败补偿流程异常:`, compensationError)
     }
 
     try {
       const client = await getIncusClient(host)
       await deleteInstance(client, config.name)
-      console.log(`[Provisioning] 残留容器 ${config.name} 已清理`)
+      taskLog('info', `[Provisioning] 残留容器 ${config.name} 已清理`)
     } catch (cleanupErr) {
       const errorMessage = cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)
-      console.log(`[Provisioning] 清理残留容器失败 (可能不存在):`, errorMessage)
+      taskLog('info', `[Provisioning] 清理残留容器失败 (可能不存在):`, errorMessage)
     }
 
     const instance = await db.getInstanceById(instanceId)
@@ -7009,7 +7013,7 @@ async function createInstanceAsync(
           error: errorMessage
         })
       } catch (notifyErr) {
-        console.error(`[Provisioning] 发送失败通知失败:`, notifyErr)
+        taskLog('error', `[Provisioning] 发送失败通知失败:`, notifyErr)
       }
 
       await createLog(

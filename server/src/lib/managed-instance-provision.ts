@@ -1,3 +1,4 @@
+import { currentOperationTask, runOperationTask, taskLog } from './operation-task-log.js'
 import { prisma } from '../db/prisma.js'
 import * as db from '../db/index.js'
 import { buildInstanceConfig, createInstance, deleteInstance, getIncusClient, getInstanceState, startInstance, stopInstance } from '../lib/incus/index.js'
@@ -45,9 +46,10 @@ export async function provisionManagedInstanceAsync(
   host: Host,
   config: ManagedInstanceProvisionConfig
 ): Promise<void> {
+  if (!currentOperationTask()) return runOperationTask(host.id, config.name, 'create', () => provisionManagedInstanceAsync(instanceId, host, config))
   try {
-    console.log(`\n[Managed Provisioning] ===== start =====`)
-    console.log(`[Managed Provisioning] instanceId=${instanceId}, name=${config.name}, host=${host.name}`)
+    taskLog('info', `\n[Managed Provisioning] ===== start =====`)
+    taskLog('info', `[Managed Provisioning] instanceId=${instanceId}, name=${config.name}, host=${host.name}`)
 
     const client = await getIncusClient(host)
     const ipv6Config = config.ipv6Address ? { primaryIp: config.ipv6Address } : null
@@ -151,12 +153,12 @@ export async function provisionManagedInstanceAsync(
     })
 
     if (updateResult.count === 0) {
-      console.log(`[Managed Provisioning] instance ${instanceId} was already finalized, cleaning created Incus instance`)
+      taskLog('info', `[Managed Provisioning] instance ${instanceId} was already finalized, cleaning created Incus instance`)
       try {
         await stopInstance(client, config.name, true)
         await deleteInstance(client, config.name)
       } catch (cleanupError) {
-        console.error(`[Managed Provisioning] failed to clean finalized instance ${config.name}:`, cleanupError)
+        taskLog('error', `[Managed Provisioning] failed to clean finalized instance ${config.name}:`, cleanupError)
       }
       return
     }
@@ -171,7 +173,7 @@ export async function provisionManagedInstanceAsync(
           instanceId
         })
       } catch (error) {
-        console.warn(`[Managed Provisioning] failed to create IPv4 record for instance ${instanceId}:`, error)
+        taskLog('warn', `[Managed Provisioning] failed to create IPv4 record for instance ${instanceId}:`, error)
       }
     }
 
@@ -185,7 +187,7 @@ export async function provisionManagedInstanceAsync(
           instanceId
         })
       } catch (error) {
-        console.warn(`[Managed Provisioning] failed to create IPv6 record for instance ${instanceId}:`, error)
+        taskLog('warn', `[Managed Provisioning] failed to create IPv6 record for instance ${instanceId}:`, error)
       }
     }
 
@@ -200,7 +202,7 @@ export async function provisionManagedInstanceAsync(
     })
 
     const instance = await db.getInstanceById(instanceId).catch((error) => {
-      console.warn(`[Managed Provisioning] failed to load notification context for instance ${instanceId}:`, error)
+      taskLog('warn', `[Managed Provisioning] failed to load notification context for instance ${instanceId}:`, error)
       return null
     })
     if (instance) {
@@ -220,7 +222,7 @@ export async function provisionManagedInstanceAsync(
           ipv6: ipv6 || undefined
         })
       } catch (error) {
-        console.warn(`[Managed Provisioning] failed to notify user for instance ${instanceId}:`, error)
+        taskLog('warn', `[Managed Provisioning] failed to notify user for instance ${instanceId}:`, error)
       }
 
       try {
@@ -255,11 +257,11 @@ export async function provisionManagedInstanceAsync(
           })
         }
       } catch (error) {
-        console.warn(`[Managed Provisioning] failed to email user for instance ${instanceId}:`, error)
+        taskLog('warn', `[Managed Provisioning] failed to email user for instance ${instanceId}:`, error)
       }
     }
   } catch (error) {
-    console.error(`[Managed Provisioning] instance ${instanceId} failed:`, error)
+    taskLog('error', `[Managed Provisioning] instance ${instanceId} failed:`, error)
 
     const updateResult = await prisma.instance.updateMany({
       where: { id: instanceId, status: 'creating' },
@@ -290,21 +292,21 @@ export async function provisionManagedInstanceAsync(
             portCount: networkModeAllowsPortMapping(instance.networkMode) ? (instance.portLimit || 0) : 0
           })
         } catch (rollbackError) {
-          console.error(`[Managed Provisioning] failed to roll back resources for instance ${instanceId}:`, rollbackError)
+          taskLog('error', `[Managed Provisioning] failed to roll back resources for instance ${instanceId}:`, rollbackError)
         }
 
         if (networkModeNeedsPublicIpv4(instance.networkMode)) {
           try {
             await prisma.$transaction((tx) => db.releasePublicIpv4ForInstance(tx, instanceId))
           } catch (releaseError) {
-            console.error(`[Managed Provisioning] failed to release public IPv4 for instance ${instanceId}:`, releaseError)
+            taskLog('error', `[Managed Provisioning] failed to release public IPv4 for instance ${instanceId}:`, releaseError)
           }
         }
 
         try {
           await db.compensateFailedInstancePurchase(instanceId, instance.userId, instance.hostId)
         } catch (compensationError) {
-          console.error(`[Managed Provisioning] failed to compensate billing for instance ${instanceId}:`, compensationError)
+          taskLog('error', `[Managed Provisioning] failed to compensate billing for instance ${instanceId}:`, compensationError)
         }
       }
     }
