@@ -32,6 +32,8 @@ let rejectControl = false
 let missingDataFd = false
 let rejectCancellation = false
 let operationAlreadyFinished = false
+let orphanedConsole = false
+let forcedOpens = 0
 const channels: string[] = []
 const peers = new Set<WebSocket>()
 const fakeIncus = https.createServer({ key: readFileSync(keyPath), cert: readFileSync(certPath), ca: readFileSync(certPath), requestCert: true }, (req, res) => {
@@ -55,6 +57,12 @@ const fakeIncus = https.createServer({ key: readFileSync(keyPath), cert: readFil
     req.on('end', () => {
       assert.equal((req.socket as any).getPeerCertificate().subject.CN, 'localhost', 'mTLS client certificate required')
       assert.equal(JSON.parse(body).type, 'vga')
+      const reconnect = JSON.parse(body).force === true
+      if (orphanedConsole && !reconnect) {
+        res.statusCode = 500
+        return res.end(JSON.stringify({ type: 'error', error: 'This console is already connected. Force is required to take it over.' }))
+      }
+      if (reconnect) { forcedOpens++; orphanedConsole = false }
       operations++
       activeOperations.add(`op-${operations}`)
       res.statusCode = 202
@@ -108,9 +116,18 @@ try {
     await Promise.all([backend.close(), backend.close()])
     assert.equal(cancellations.length, beforeCancel + 1, 'duplicate close cancels exactly its own operation once')
     assert.equal(activeOperations.size, 0, 'closing sockets must also cancel the Incus operation')
+    orphanedConsole = true
+    await assert.rejects(createSpiceBackend({ ...host, id: tunnel ? 96102 : 96101, tunnel_enabled: tunnel } as any,
+      'vm-test', AbortSignal.timeout(5000)), /create/)
+    assert.equal(orphanedConsole, true, 'ordinary opens must not take over an existing console')
+    const takeover = await createSpiceBackend({ ...host, id: tunnel ? 96102 : 96101, tunnel_enabled: tunnel } as any,
+      'vm-test', AbortSignal.timeout(5000), true)
+    assert.equal(orphanedConsole, false, 'explicit reconnect must take over orphaned Incus consoles')
+    await takeover.close()
     await settle()
     console.log(`SPICE transport passed (${tunnel ? "tunnel" : "direct"})`)
   }
+  assert.equal(forcedOpens, 2, 'takeover must work both directly and through the reverse tunnel')
   hostTunnelManager.isTunnelOnline = originalOnline
   hostTunnelManager.createDuplexStream = originalDuplex
   for (const fail of ['control', 'metadata'] as const) {
@@ -162,7 +179,7 @@ try {
     await once(ws, 'open')
     return ws
   }
-  const post = (id = '6', user = '1') => app.inject({ method: 'POST', url: `/api/ws/instances/${id}/spice-session`, headers: { 'x-user': user } })
+  const post = (id = '6', user = '1', reconnect = false) => app.inject({ method: 'POST', url: `/api/ws/instances/${id}/spice-session`, headers: { 'x-user': user }, payload: { reconnect } })
   assert.equal((await app.inject({ method: 'POST', url: '/api/ws/instances/6/spice-session' })).statusCode, 401)
   for (const id of ['0', '6x', '-6', '9007199254740992']) assert.equal((await post(id)).statusCode, 400)
   assert.equal((await post('6', '4')).statusCode, 403, 'unrelated user denied')
@@ -209,6 +226,20 @@ try {
   }
   const replay = await connectWs(`/api/ws/instances/6/spice?ticket=${ticket}`, { headers: origin })
   assert.equal((await closedSocket(replay))[0], 4001)
+  const previous = (await post()).json().ticket
+  assert.equal((await post('6', '4', true)).statusCode, 403, 'unauthorized reconnect cannot close another user console')
+  assert.ok(spiceSessions.get(previous, 6))
+  invalidated = true
+  assert.equal((await post('6', '1', true)).statusCode, 403)
+  assert.ok(spiceSessions.get(previous, 6), 'revoked credentials cannot trigger takeover')
+  invalidated = false
+  const replaced = await post('6', '1', true)
+  assert.equal(replaced.statusCode, 200)
+  assert.equal(spiceSessions.get(previous, 6), undefined, 'reconnect must invalidate the previous local ticket')
+  assert.ok(spiceSessions.get(replaced.json().ticket, 6))
+  const reconnects = await Promise.all([post('6', '1', true), post('6', '1', true)])
+  assert.deepEqual(reconnects.map(r => r.statusCode).sort(), [200, 409], 'concurrent reconnects must not repeatedly evict each other')
+  await spiceSessions.close(reconnects.find(r => r.statusCode === 200)!.json().ticket)
   const revoked = (await post()).json().ticket
   invalidated = true
   const invalid = await connectWs(`/api/ws/instances/6/spice?ticket=${revoked}`, { headers: origin })

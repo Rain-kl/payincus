@@ -21,14 +21,15 @@ export interface SpiceBackend {
 }
 
 /** Each SPICE channel reopens fd 0 of ONE console operation, like ConsoleInstanceDynamic. */
-export async function createSpiceBackend(host: Host, instanceName: string, signal: AbortSignal): Promise<SpiceBackend> {
+export async function createSpiceBackend(host: Host, instanceName: string, signal: AbortSignal, reconnect = false): Promise<SpiceBackend> {
   const client = await getIncusClient(host)
   signal.throwIfAborted()
   if (!client.agent || !client.certPath || !client.keyPath) throw new Error('Incus connection unavailable')
   const response = await request(`${client.baseUrl}/1.0/instances/${encodeURIComponent(instanceName)}/console`, {
     method: 'POST', dispatcher: client.agent, signal,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'vga', 'wait-for-websocket': true }),
+    // Incus performs the takeover atomically for this VM, including sessions left by an old panel process.
+    body: JSON.stringify({ type: 'vga', 'wait-for-websocket': true, force: reconnect }),
     headersTimeout: 15_000, bodyTimeout: 15_000
   })
   const result = await response.body.json() as {

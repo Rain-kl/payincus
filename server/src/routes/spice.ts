@@ -37,8 +37,9 @@ export default async function spiceRoutes(fastify: FastifyInstance, options: {
     return { user, instance, host }
   }
 
-  fastify.post<{ Params: { id: string } }>('/:id/spice-session', {
-    onRequest: [fastify.authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+  fastify.post<{ Params: { id: string }; Body: { reconnect?: boolean } }>('/:id/spice-session', {
+    onRequest: [fastify.authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    schema: { body: { type: 'object', properties: { reconnect: { type: 'boolean' } }, additionalProperties: false } }
   }, async (request, reply) => {
     const instanceId = parseId(request.params.id)
     if (instanceId === null) return reply.code(400).send({ error: 'Invalid instance ID', code: 'INVALID_ID' })
@@ -52,11 +53,12 @@ export default async function spiceRoutes(fastify: FastifyInstance, options: {
       return reply.code(429).send({ error: 'Connection limit exceeded', code: 'CONSOLE_LIMIT' })
     }
     let disconnected = false
+    const reconnect = request.body?.reconnect === true
     reply.raw.once('close', () => { if (!reply.raw.writableFinished) disconnected = true })
     try {
       const ticket = await sessions.create(context,
-        signal => deps.open(current.host, current.instance.incus_id, signal),
-        async () => Boolean(await access(context)))
+        signal => deps.open(current.host, current.instance.incus_id, signal, reconnect),
+        async () => Boolean(await access(context)), reconnect)
       if (disconnected) { await sessions.close(ticket); return }
       // This capability is limited to this console session; it is NOT a reusable login token.
       reply.header('Cache-Control', 'no-store')

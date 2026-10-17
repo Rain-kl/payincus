@@ -34,6 +34,7 @@ export class SpiceSessionManager {
   private sessions = new Map<string, SpiceSession>()
   private closing = new Map<number, Promise<void>>()
   private failedCleanup = new Map<number, SpiceBackend>()
+  private reconnecting = new Set<number>()
 
   async waitForCleanup(instanceId: number): Promise<void> {
     await this.closing.get(instanceId)
@@ -44,7 +45,21 @@ export class SpiceSessionManager {
     }
   }
 
-  async create(access: SpiceAccess, open: (signal: AbortSignal) => Promise<SpiceBackend>, validate: () => Promise<boolean>): Promise<string> {
+  async create(access: SpiceAccess, open: (signal: AbortSignal) => Promise<SpiceBackend>, validate: () => Promise<boolean>, reconnect = false): Promise<string> {
+    if (this.reconnecting.has(access.instanceId)) throw new Error('CONSOLE_LIMIT')
+    if (reconnect) this.reconnecting.add(access.instanceId)
+    try {
+      if (reconnect) {
+        this.closeMatching(session => session.instanceId === access.instanceId)
+        await this.waitForCleanup(access.instanceId)
+      }
+      return await this.createSession(access, open, validate)
+    } finally {
+      if (reconnect) this.reconnecting.delete(access.instanceId)
+    }
+  }
+
+  private async createSession(access: SpiceAccess, open: (signal: AbortSignal) => Promise<SpiceBackend>, validate: () => Promise<boolean>): Promise<string> {
     if (this.closing.has(access.instanceId) || this.failedCleanup.has(access.instanceId)) {
       await this.waitForCleanup(access.instanceId)
     }

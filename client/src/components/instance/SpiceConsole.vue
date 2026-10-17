@@ -39,7 +39,7 @@ function disconnect() {
   }
 }
 
-async function connect() {
+async function connect(reconnect = false) {
   disconnect()
   if (!props.visible || !props.instanceId) return
   const current = generation
@@ -58,7 +58,7 @@ async function connect() {
     const moduleUrl = `${import.meta.env.BASE_URL}vendor/spice/src/main.js`
     module = await import(/* @vite-ignore */ moduleUrl) as SpiceModule
     if (current !== generation) return
-    const result = await api.instances.createSpiceSession(instanceId)
+    const result = await api.instances.createSpiceSession(instanceId, reconnect)
     if (current !== generation) {
       void api.instances.closeSpiceSession(instanceId, result.ticket).catch(() => {})
       return
@@ -109,7 +109,7 @@ onBeforeUnmount(disconnect)
   <DrawerModal :model-value="visible" :title="`${t('spice.title')} · ${instanceName || ''}`" max-width="max-w-7xl" :close-on-backdrop="false" @update:model-value="emit('update:visible', $event)">
     <div class="flex flex-wrap items-center gap-3 mb-4">
       <span class="text-sm text-themed-secondary" role="status">{{ t(`spice.${status}`) }}</span>
-      <button type="button" class="btn-secondary" @click="connect">{{ t('spice.reconnect') }}</button>
+      <button type="button" class="btn-secondary" :disabled="status === 'connecting'" @click="connect(true)">{{ t('spice.reconnect') }}</button>
       <button type="button" class="btn-secondary" :disabled="status !== 'connected'" @click="sendCtrlAltDel">Ctrl+Alt+Del</button>
       <button type="button" class="btn-secondary" :disabled="status !== 'connected'" @click="fullscreen">{{ t('spice.fullscreen') }}</button>
     </div>

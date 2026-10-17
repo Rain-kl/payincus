@@ -704,8 +704,8 @@ const api = {
       http.post(`/instances/${id}/change-host`, data),
     createTerminalTicket: (id: number): Promise<{ ticket: string; expiresIn: number }> =>
       http.post(`/ws/instances/${id}/terminal-ticket`, {}),
-    createSpiceSession: (id: number): Promise<{ ticket: string; expiresIn: number }> =>
-      http.post(`/ws/instances/${id}/spice-session`, {}),
+    createSpiceSession: (id: number, reconnect = false): Promise<{ ticket: string; expiresIn: number }> =>
+      http.post(`/ws/instances/${id}/spice-session`, { reconnect }),
     closeSpiceSession: (id: number, ticket: string): Promise<{ success: boolean }> =>
       http.delete(`/ws/instances/${id}/spice-session`, { data: { ticket } }),
     updateOrder: (id: number, action: 'top' | 'up' | 'down' | 'bottom'): Promise<{ message: string; updated: number }> =>
