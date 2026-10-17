@@ -1,5 +1,5 @@
 import adminTaskRoutes from './routes/admin-tasks.js'
-import { recoverInterruptedOperationTasks } from './lib/operation-task-log.js'
+import { hasActiveOperationTask, recoverInterruptedOperationTasks } from './lib/operation-task-log.js'
 // 确保环境变量被加载（必须在最前面）
 import './config/env.js'
 
@@ -877,11 +877,11 @@ const start = async (): Promise<void> => {
         }
     }, 5 * 60 * 1000) // 5分钟
 
-    // 启动创建超时清理任务（清理10分钟仍处于创建中的实例）
+    // 为镜像下载和创建操作提供完整的 30 分钟窗口。
     const { getStuckCreatingInstances, getHostById, compensateFailedInstancePurchase, releasePublicIpv4ForInstance } = await import('./db/index.js')
     const { getIncusClient, deleteInstance } = await import('./lib/incus/index.js')
     const { createLog } = await import('./db/logs.js')
-    const CREATE_TIMEOUT_MS = 10 * 60 * 1000 // 10分钟
+    const CREATE_TIMEOUT_MS = 30 * 60 * 1000 // 30分钟
     const CREATE_TIMEOUT_CHECK_INTERVAL = 2 * 60 * 1000 // 每2分钟检查一次
     
     const instanceCreationReservesPorts = (networkMode: string) => networkModeAllowsPortMapping(networkMode)
@@ -891,6 +891,9 @@ const start = async (): Promise<void> => {
         const stuckInstances = await getStuckCreatingInstances(CREATE_TIMEOUT_MS)
         
         for (const instance of stuckInstances) {
+          // The live request owns its operation deadline and failure cleanup.
+          // This sweeper handles orphaned work after a process restart.
+          if (hasActiveOperationTask(instance.host_id, instance.incus_id || instance.name)) continue
           console.log(`[CreateTimeout] 清理超时创建实例: ${instance.name} (ID: ${instance.id})`)
           
           // 使用原子操作更新状态，防止与 createInstanceAsync 的失败回滚竞争
@@ -915,7 +918,7 @@ const start = async (): Promise<void> => {
           // 同步运维任务结果，避免原异步请求卡住时任务仍显示执行中。
           await prisma.operationTask.updateMany({
             where: { hostId: instance.host_id, instanceName: instance.incus_id || instance.name, kind: 'create', status: 'running' },
-            data: { status: 'failed', error: '实例创建超过 10 分钟，触发超时清理；请核对节点状态', finishedAt: new Date() }
+            data: { status: 'failed', error: '实例创建超过 30 分钟，触发超时清理；请核对节点状态', finishedAt: new Date() }
           }).catch(err => console.error('[CreateTimeout] 更新运维任务失败:', err))
 
           // 状态更新成功，执行资源回滚

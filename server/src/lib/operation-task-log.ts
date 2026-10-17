@@ -4,11 +4,41 @@ import { prisma } from '../db/prisma.js'
 import { sanitizeObject, sanitizeTokensInString } from './log-sanitizer.js'
 import { hostTunnelManager } from './incus/tunnel-manager.js'
 
-interface TaskContext { id: number; hostId: number; name: string; queue: Promise<void>; count: number; nodeAck: boolean; pending: number; dropped: number }
+interface TaskContext { id: number; hostId: number; name: string; queue: Promise<void>; count: number; nodeAck: boolean; pending: number; dropped: number; cancel?: () => Promise<void>; stopping?: boolean; cancelled?: boolean }
 const context = new AsyncLocalStorage<TaskContext>()
 const active = new Map<number, TaskContext>()
 const MAX_LOGS = 5000
 export const currentOperationTask = () => context.getStore()
+export const hasActiveOperationTask = (hostId: number, name: string) => [...active.values()].some(ctx => ctx.hostId === hostId && ctx.name === name)
+
+// Only expose cancellation while an actual node operation is attached. Cleanup is
+// deliberately not cancellable: it must finish releasing the failed instance.
+export function operationTaskControl(id: number) {
+  const ctx = active.get(id)
+  return { canStop: Boolean(ctx?.cancel && !ctx.stopping && !ctx.cancelled), stopping: Boolean(ctx?.stopping || ctx?.cancelled) }
+}
+
+export function bindOperationCancellation(cancel: () => Promise<void>): () => void {
+  const ctx = context.getStore()
+  if (!ctx || ctx.cancelled) return () => {}
+  ctx.cancel = cancel
+  return () => { if (ctx.cancel === cancel) ctx.cancel = undefined }
+}
+
+export async function stopOperationTask(id: number): Promise<void> {
+  const ctx = active.get(id)
+  if (!ctx?.cancel || ctx.stopping || ctx.cancelled) throw new Error('任务当前阶段无法停止，或停止请求已提交')
+  ctx.stopping = true
+  enqueue(ctx, '管理员请求停止，正在向节点发送取消信号。', 'warn')
+  try {
+    await ctx.cancel()
+    ctx.cancelled = true
+    enqueue(ctx, '节点已接受取消信号，等待操作结束及清理完成。', 'warn')
+  } catch (error) {
+    enqueue(ctx, `节点未接受停止请求：${error instanceof Error ? error.message : String(error)}`, 'error')
+    throw error
+  } finally { ctx.stopping = false }
+}
 
 export function redactTaskLog(message: string): string {
   return sanitizeTokensInString(message)
@@ -94,7 +124,7 @@ export async function runOperationTask<T>(hostId: number, name: string, kind: 'c
       detach()
       enqueue(ctx, message, 'error')
       await ctx.queue
-      await prisma.operationTask.updateMany({ where: { id: task.id, status: 'running' }, data: { status: 'failed', error: message, finishedAt: new Date() } }).catch(() => { console.error('[OperationTask] 无法写入失败状态') })
+      await prisma.operationTask.updateMany({ where: { id: task.id, status: 'running' }, data: { status: ctx.cancelled ? 'cancelled' : 'failed', error: message, finishedAt: new Date() } }).catch(() => { console.error('[OperationTask] 无法写入失败状态') })
       throw error
     } finally {
       detach()

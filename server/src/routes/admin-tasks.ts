@@ -1,6 +1,7 @@
 import type { OutgoingHttpHeaders } from 'node:http'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../db/prisma.js'
+import { operationTaskControl, redactTaskLog, stopOperationTask } from '../lib/operation-task-log.js'
 
 const taskIdSchema = { type: 'object', required: ['id'], properties: { id: { type: 'integer', minimum: 1, maximum: 2147483647 } } }
 const connections = new Map<number, number>()
@@ -11,7 +12,7 @@ export default async function adminTaskRoutes(app: FastifyInstance): Promise<voi
     onRequest: auth,
     schema: { querystring: { type: 'object', properties: {
       page: { type: 'integer', minimum: 1, maximum: 100000, default: 1 },
-      status: { type: 'string', enum: ['running', 'success', 'failed', 'interrupted'] },
+      status: { type: 'string', enum: ['running', 'success', 'failed', 'cancelled', 'interrupted'] },
       kind: { type: 'string', enum: ['create', 'destroy'] }, search: { type: 'string', maxLength: 100 }
     } } }
   }, async request => {
@@ -22,7 +23,23 @@ export default async function adminTaskRoutes(app: FastifyInstance): Promise<voi
       prisma.operationTask.count({ where })
     ])
     const hosts = await prisma.host.findMany({ where: { id: { in: [...new Set(items.map(item => item.hostId))] } }, select: { id: true, name: true } })
-    return { items: items.map(item => ({ ...item, hostName: hosts.find(host => host.id === item.hostId)?.name || null })), total }
+    return { items: items.map(item => ({ ...item, ...operationTaskControl(item.id), hostName: hosts.find(host => host.id === item.hostId)?.name || null })), total }
+  })
+
+  app.post<{ Params: { id: number } }>('/api/admin/tasks/:id/stop', {
+    onRequest: auth,
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    schema: { params: taskIdSchema }
+  }, async (request, reply) => {
+    const task = await prisma.operationTask.findUnique({ where: { id: request.params.id } })
+    if (!task) return reply.code(404).send({ error: '任务不存在' })
+    if (task.status !== 'running') return reply.code(409).send({ error: '任务已结束' })
+    try {
+      await stopOperationTask(task.id)
+      return { message: '取消信号已发送，等待节点确认结束及清理完成' }
+    } catch (error) {
+      return reply.code(409).send({ error: redactTaskLog(error instanceof Error ? error.message : String(error)) })
+    }
   })
 
   app.get<{ Params: { id: number }; Querystring: { after?: number } }>('/api/admin/tasks/:id/logs/stream', {
@@ -70,7 +87,7 @@ export default async function adminTaskRoutes(app: FastifyInstance): Promise<voi
           cursor = log.id
         }
         const current = await prisma.operationTask.findUnique({ where: { id: taskId } })
-        if (!send('task', current)) return
+        if (!send('task', current ? { ...current, ...operationTaskControl(taskId) } : null)) return
         // Drain all historical pages before completing; never truncate a finished task's logs.
         if ((current?.status !== 'running' && logs.length < 200) || Date.now() >= deadline) {
           send(current?.status === 'running' ? 'reconnect' : 'end', {})
