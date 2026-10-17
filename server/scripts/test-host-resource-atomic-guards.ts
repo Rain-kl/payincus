@@ -61,7 +61,8 @@ assert.ok(
     resourcePoolApplySection.includes('storageSize: true') &&
     resourcePoolApplySection.includes('applyWhere.cpuUsed = { lte: cpuLimit - cpuDelta }') &&
     resourcePoolApplySection.includes('applyWhere.memoryUsed = { lte: memoryLimit - memoryDelta }') &&
-    resourcePoolApplySection.includes('applyWhere.diskUsed = { lte: diskLimit - diskDelta }') &&
+    resourcePoolApplySection.includes('getInstanceStorageCapacity(data.instanceId, diskDelta, tx)') &&
+    resourcePoolApplySection.includes('SELECT id FROM hosts WHERE id = ${data.hostId} FOR UPDATE') &&
     resourcePoolApplySection.includes('const hostUpdate = await tx.host.updateMany({') &&
     resourcePoolApplySection.includes('cpuUsed: { increment: cpuDelta }') &&
     resourcePoolApplySection.includes('memoryUsed: { increment: memoryDelta }') &&

@@ -46,8 +46,9 @@ for (const [section, label] of [
   includes(section, 'let minDisk: number', `${label} must compute minimum disk requirement`)
   includes(section, 'minDisk = Math.min(...availablePlans.map(p => p.disk))', `${label} must use available plan disk`)
   includes(section, 'minDisk = 512', `${label} must keep free package disk default aligned with create defaults`)
-  includes(section, 'const diskUsed = host.instances.reduce((sum, inst) => sum + inst.disk, 0)', `${label} must sum used disk`)
-  includes(section, 'const diskAvailable = (host.storageSize || 0) * 1024 - diskUsed', `${label} must convert host storage GB to MB`)
+  includes(section, 'getStorageCapacity(host.id, { packageId, requiredMB: minDisk })', `${label} must check the actual selected storage pool`)
+  includes(section, 'const diskAvailable = storage.availableMB', `${label} must use physical capacity minus reservations`)
+  assert.ok(!section.includes('(host.storageSize || 0) * 1024 - diskUsed'), 'Initialization size must never be a sales limit')
   includes(section, 'diskAvailable >= minDisk', `${label} must require enough disk before marking in stock`)
 }
 
@@ -55,7 +56,7 @@ includes(readinessSource, 'storageSize: true', 'production readiness must select
 includes(readinessSource, 'select: { cpu: true, memory: true, disk: true }', 'production readiness must select instance disk usage')
 includes(readinessSource, 'select: { cpu: true, memory: true, disk: true, isSoldOut: true }', 'production readiness must select plan disk requirement')
 includes(readinessSource, 'const minDisk = availablePlans.length > 0 ? Math.min(...availablePlans.map(plan => plan.disk)) : 512', 'production readiness must compute minimum disk requirement')
-includes(readinessSource, 'const availableDisk = (host.storageSize || 0) * 1024 - usedDisk', 'production readiness must compute available disk')
+includes(readinessSource, 'getStorageCapacity(host.id, { packageId: pkg.id, requiredMB: minDisk })', 'production readiness must use live storage pool capacity')
 includes(readinessSource, 'minimum CPU/memory/disk requirement', 'production readiness warning must name disk capacity')
 
 console.log('package sold-out capacity guard tests passed')

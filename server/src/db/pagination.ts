@@ -5,6 +5,7 @@
 
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma.js'
+import { getStorageCapacity, getStorageOverview, type StorageCapacity } from '../lib/storage-capacity.js'
 import { getImageDisplayNames } from './images.js'
 import type { Host, User, Instance } from '../types/database.js'
 
@@ -323,6 +324,10 @@ export async function getHostsPaginated(options: PaginationOptions = {}): Promis
         take: pageSize
       })
 
+  const storageByHost = new Map(await Promise.all(hosts.map(async (h: any) => [h.id,
+    h.status === 'online' ? await getStorageOverview(h.id) : null
+  ] as const)))
+
   return {
     items: hosts.map((h: any) => ({
       id: h.id,
@@ -340,7 +345,7 @@ export async function getHostsPaginated(options: PaginationOptions = {}): Promis
       nat_ports_used_count: h.natPortsUsedCount,
       cpu_used: h.cpuUsed,
       memory_used: h.memoryUsed,
-      disk_total: h.storageSize ? Number(h.storageSize) * 1024 : 0, // 使用创建时输入的存储大小（GB转MB）
+      disk_total: storageByHost.get(h.id)?.totalMB || 0,
       disk_used: h.diskUsed,
       cpu_allowance_max: h.cpuAllowanceMax,
       memory_max: h.memoryMax,
@@ -602,6 +607,8 @@ export async function getAvailableHosts(
   memory: number,
   disk: number,
   options: {
+    packageId?: number
+    onUnavailable?: (hostId: number, reason: string) => void
     userId?: number       // 当前用户ID
     packageOwnerId?: number  // 套餐所有者ID（如果是共享套餐）
   } = {}
@@ -694,7 +701,8 @@ export async function getAvailableHosts(
     }
   })
 
-  const availableHosts = hostsWithResources
+  const storageByHost = new Map<number, StorageCapacity>()
+  const cpuMemoryHosts = hostsWithResources
     .filter(host => {
       // 检查 CPU 配额
       // 剩余量 = 用户输入的CPU配额上限 - 实例资源总和
@@ -724,14 +732,19 @@ export async function getAvailableHosts(
         return false
       }
 
-      const diskTotal = host.storageSize ? host.storageSize * 1024 : 0
-      if (diskTotal <= 0 || (host.diskUsedCalculated + disk) > diskTotal) {
-        return false
-      }
-
       return true
     })
     .sort((a, b) => (b.memoryMax - b.memoryUsedCalculated) - (a.memoryMax - a.memoryUsedCalculated))
+
+  const availableHosts = (await Promise.all(cpuMemoryHosts.map(async host => {
+    const storage = await getStorageCapacity(host.id, { packageId: options.packageId, requiredMB: disk })
+    storageByHost.set(host.id, storage)
+    if (storage.reason) {
+      options.onUnavailable?.(host.id, storage.reason)
+      return null
+    }
+    return host
+  }))).filter((host): host is typeof cpuMemoryHosts[number] => host !== null)
 
   return availableHosts.map(h => {
     const isOwn = userId ? h.userId === userId : false
@@ -751,7 +764,8 @@ export async function getAvailableHosts(
       cpu_allowance_max: h.cpuAllowanceMax,
       memory_used: h.memoryUsedCalculated,
       memory_max: h.memoryMax,
-      disk_total: h.storageSize ? h.storageSize * 1024 : 0, // 只使用用户输入的存储大小（GB转MB），不使用实际磁盘容量
+      disk_total: storageByHost.get(h.id)?.totalMB || 0,
+      disk_available: storageByHost.get(h.id)?.availableMB || 0,
       disk_used: h.diskUsedCalculated,
       instance_type: h.instanceType,
       storage_size: h.storageSize,
@@ -787,96 +801,7 @@ export async function getAvailableHostsForInstance(
   packageHostIds: number[] | null = null,
   cpu: number,
   memory: number,
-  _disk: number
+  disk: number
 ): Promise<any[]> {
-  const where: any = {
-    status: 'online'
-  }
-
-  if (packageHostIds && packageHostIds.length > 0) {
-    where.id = { in: packageHostIds }
-  }
-
-  const hosts = await prisma.host.findMany({
-    where,
-    select: {
-      id: true,
-      name: true,
-      url: true,
-      location: true,
-      countryCode: true,
-      architecture: true,
-      status: true,
-      certPath: true,
-      keyPath: true,
-      natPublicIp: true,
-      natPortStart: true,
-      natPortEnd: true,
-      natPortsUsedCount: true,
-      cpuUsed: true,
-      memoryUsed: true,
-      diskUsed: true,
-      cpuAllowanceMax: true,
-      memoryMax: true,
-      instanceType: true,
-      storageSize: true,
-      tags: true,
-      createdAt: true,
-      updatedAt: true
-    },
-    orderBy: {
-      cpuAllowanceMax: 'desc'
-    }
-  })
-
-  // 过滤可用主机
-  const availableHosts = hosts.filter(host => {
-    // 检查 CPU 配额
-    const cpuAllowanceMax = host.cpuAllowanceMax
-    if (cpuAllowanceMax != null && cpuAllowanceMax > 0) {
-      if ((host.cpuUsed + cpu) > cpuAllowanceMax) {
-        return false // CPU配额不足
-      }
-    } else {
-      // 如果没有设置CPU配额上限，该宿主机不可用
-      return false
-    }
-
-    // 检查内存配额
-    const memoryMax = host.memoryMax
-    if (memoryMax != null && memoryMax > 0) {
-      if ((host.memoryUsed + memory) > memoryMax) {
-        return false // 内存配额不足
-      }
-    } else {
-      // 如果没有设置内存配额上限，该宿主机不可用
-      return false
-    }
-
-    // 磁盘配额检查已移除：不再限制磁盘空间
-    return true
-  })
-
-  return availableHosts.map(h => ({
-    id: h.id,
-    name: h.name,
-    url: h.url,
-    location: h.location,
-    country_code: h.countryCode,
-    architecture: h.architecture,
-    status: h.status,
-    cert_path: h.certPath,
-    key_path: h.keyPath,
-    nat_public_ip: h.natPublicIp,
-    nat_port_start: h.natPortStart,
-    nat_port_end: h.natPortEnd,
-    cpu_used: h.cpuUsed,
-    cpu_allowance_max: h.cpuAllowanceMax,
-    memory_used: h.memoryUsed,
-    memory_max: h.memoryMax,
-    disk_total: h.storageSize ? h.storageSize * 1024 : 0,
-    disk_used: h.diskUsed,
-    created_at: h.createdAt.toISOString(),
-    updated_at: h.updatedAt.toISOString()
-  }))
+  return getAvailableHosts(packageHostIds, cpu, memory, disk)
 }

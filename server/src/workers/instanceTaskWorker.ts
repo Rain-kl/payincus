@@ -1856,7 +1856,7 @@ async function executeChangeHostTask(
       configPayload = vmResult.configPayload
     }
 
-    const storagePool = await db.resolveStoragePoolForNewInstance(targetHostId, { packageId: instance.package_id })
+    const storagePool = reservedHost.storage_pool_name || null
     if (!storagePool) {
       throw new Error('目标节点未配置可用于实例系统盘的存储池')
     }
@@ -2611,6 +2611,8 @@ async function executeCloneTask(
       cpu: sourceInstance.cpu,
       memory: sourceInstance.memory,
       disk: sourceInstance.disk,
+      storagePoolName: sourceInstance.storage_pool_name,
+      diskAlreadyAllocated: true,
       portCount: newPortMappingsCount
     })
     resourcesReserved = true

@@ -190,7 +190,8 @@ assert.ok(
   dbSource.includes('const applyWhere: Prisma.HostWhereInput = { id: data.hostId }') &&
   dbSource.includes('applyWhere.cpuUsed = { lte: cpuLimit - cpuDelta }') &&
   dbSource.includes('applyWhere.memoryUsed = { lte: memoryLimit - memoryDelta }') &&
-  dbSource.includes('applyWhere.diskUsed = { lte: diskLimit - diskDelta }') &&
+  dbSource.includes('getInstanceStorageCapacity(data.instanceId, diskDelta, tx)') &&
+  dbSource.includes('SELECT id FROM hosts WHERE id = ${data.hostId} FOR UPDATE') &&
   dbSource.includes('const hostUpdate = await tx.host.updateMany({') &&
   dbSource.includes('cpuUsed: { increment: cpuDelta }') &&
   dbSource.includes('memoryUsed: { increment: memoryDelta }') &&

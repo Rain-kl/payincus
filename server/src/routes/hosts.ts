@@ -1,3 +1,4 @@
+import { getStorageOverview } from '../lib/storage-capacity.js'
 import { GpuError } from '../lib/gpu.js'
 import { compensateGpuPreparationFailure, releaseFailedGpu, reserveInstanceGpu, assertGpuMigration } from '../db/gpus.js'
 /**
@@ -2078,41 +2079,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     // 获取该宿主机上的实例列表
     const instances = await db.getInstancesByHost(hostId)
 
-    // 计算 diskTotal：优先使用存储池的实际大小
-    let diskTotalMB = host.storage_size ? host.storage_size * 1024 : (host.disk_total || 0) // 默认值：使用创建时输入的存储大小（GB转MB）
-    
-    // 如果宿主机在线，尝试从存储池获取实际大小
-    if (effectiveStatus === 'online' && host.cert_path && host.key_path) {
-      try {
-        const client = await getIncusClient(host)
-        // 获取所有系统盘存储池（purpose = 'instance_data'）
-        const systemPools = await db.getSystemDiskPoolsByHostId(hostId)
-        
-        if (systemPools.length > 0) {
-          let totalBytes = 0
-          // 从 Incus API 获取每个存储池的大小并累加
-          for (const pool of systemPools) {
-            try {
-              const poolResources = await getStoragePoolResources(client, pool.name)
-              if (poolResources.space?.total) {
-                totalBytes += poolResources.space.total
-              }
-            } catch (err) {
-              // 单个存储池获取失败，跳过
-              console.warn(`Failed to get resources for storage pool ${pool.name}:`, err)
-            }
-          }
-          
-          // 如果成功获取到存储池大小，使用实际值（字节转MB）
-          if (totalBytes > 0) {
-            diskTotalMB = Math.round(totalBytes / 1024 / 1024)
-          }
-        }
-      } catch (err) {
-        // 无法连接宿主机或获取存储池信息，使用默认值
-        console.warn(`Failed to get storage pool sizes for host ${hostId}:`, err)
-      }
-    }
+    const storage = await getStorageOverview(hostId)
+    const diskTotalMB = storage.totalMB
 
     // 获取节点组信息
     return {
@@ -2127,6 +2095,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         architecture: host.architecture || 'x86_64',
         certPath: host.cert_path || '',
         keyPath: host.key_path || '',
+        storage,
         resources: {
           cpuUsed: host.cpu_used,
           memoryUsed: host.memory_used,
@@ -5938,6 +5907,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           cpu: instance.cpu,
           memory: instance.memory,
           disk: instance.disk,
+          storagePoolName: selectedStoragePool,
           portCount: 0
         })
         targetResourcesReserved = true
@@ -6541,6 +6511,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             name,
             userId: targetUser.id,
             hostId: reservedHost.id,
+            storagePoolName: reservedHost.storage_pool_name,
             packageId,
             packagePlanId: selectedPlan?.id ?? null,
             image,
@@ -6699,7 +6670,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         finalConfigPayload = containerResult.configPayload
       }
 
-      let selectedStoragePool = await db.resolveStoragePoolForNewInstance(lockedHost.id, { packageId })
+      let selectedStoragePool = lockedHost.storage_pool_name || null
       if (!selectedStoragePool) {
         throw new Error(`STORAGE_POOL_UNAVAILABLE: 宿主机  未配置可用于实例系统盘的存储池`)
       }

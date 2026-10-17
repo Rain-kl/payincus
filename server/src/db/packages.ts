@@ -9,7 +9,7 @@ import { prisma } from './prisma.js'
 import { Prisma, type InstanceStatus } from '@prisma/client'
 import type { Package } from '../types/database.js'
 import { normalizeTrafficMultiplier } from '../lib/traffic-multiplier.js'
-import { resolveStoragePoolForNewInstance } from './storage-pools.js'
+import { getStorageCapacity } from '../lib/storage-capacity.js'
 
 const NORMAL_PACKAGE_INSTANCE_STATUSES: InstanceStatus[] = ['running', 'stopped']
 const PACKAGE_PREREQUISITE_LOCK_NAMESPACE = 4201
@@ -1458,9 +1458,8 @@ export async function checkPackageSoldOut(packageId: number): Promise<boolean> {
       continue
     }
 
-    if (!await resolveStoragePoolForNewInstance(host.id, { packageId })) {
-      continue
-    }
+    const storage = await getStorageCapacity(host.id, { packageId, requiredMB: minDisk })
+    if (storage.reason) continue
 
     // 检查是否设置了配额
     if (!host.cpuAllowanceMax || !host.memoryMax) {
@@ -1470,15 +1469,16 @@ export async function checkPackageSoldOut(packageId: number): Promise<boolean> {
     // 计算实际使用量
     const cpuUsed = host.instances.reduce((sum, inst) => sum + inst.cpu, 0)
     const memoryUsed = host.instances.reduce((sum, inst) => sum + inst.memory, 0)
-    const diskUsed = host.instances.reduce((sum, inst) => sum + inst.disk, 0)
 
     // 计算剩余资源
     const cpuAvailable = host.cpuAllowanceMax - cpuUsed
     const memoryAvailable = host.memoryMax - memoryUsed
-    const diskAvailable = (host.storageSize || 0) * 1024 - diskUsed
+    const diskAvailable = storage.availableMB
 
     // 如果能满足最低配置，则未售罄
-    if (cpuAvailable >= minCpu && memoryAvailable >= minMemory && diskAvailable >= minDisk) {
+    if (cpuAvailable >= minCpu && memoryAvailable >= minMemory && diskAvailable >= minDisk &&
+        (availablePlans.length === 0 || availablePlans.some(plan =>
+          cpuAvailable >= plan.cpu && memoryAvailable >= plan.memory && diskAvailable >= plan.disk))) {
       return false
     }
   }
@@ -1581,18 +1581,18 @@ export async function checkPackagesSoldOut(packageIds: number[]): Promise<Map<nu
         continue
       }
 
-      if (!await resolveStoragePoolForNewInstance(host.id, { packageId })) {
-        continue
-      }
+      const storage = await getStorageCapacity(host.id, { packageId, requiredMB: minDisk })
+      if (storage.reason) continue
 
       const cpuUsed = host.instances.reduce((sum, inst) => sum + inst.cpu, 0)
       const memoryUsed = host.instances.reduce((sum, inst) => sum + inst.memory, 0)
-      const diskUsed = host.instances.reduce((sum, inst) => sum + inst.disk, 0)
       const cpuAvailable = host.cpuAllowanceMax - cpuUsed
       const memoryAvailable = host.memoryMax - memoryUsed
-      const diskAvailable = (host.storageSize || 0) * 1024 - diskUsed
+      const diskAvailable = storage.availableMB
 
-      if (cpuAvailable >= minCpu && memoryAvailable >= minMemory && diskAvailable >= minDisk) {
+      if (cpuAvailable >= minCpu && memoryAvailable >= minMemory && diskAvailable >= minDisk &&
+        (availablePlans.length === 0 || availablePlans.some(plan =>
+          cpuAvailable >= plan.cpu && memoryAvailable >= plan.memory && diskAvailable >= plan.disk))) {
         hasAvailableHost = true
         break
       }

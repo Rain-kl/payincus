@@ -80,13 +80,14 @@ export interface Host {
   nat_port_end: number | null
   cpu_used: number
   memory_used: number
-  disk_total?: number   // 计算值，来自 storage_size * 1024
+  disk_total?: number   // 实例存储池容量（MB）
   disk_used: number
   ip_address?: string | null
   storage_driver?: string
   storage_type?: string
   storage_path?: string | null
   storage_size?: number
+  storage_pool_name?: string | null
   ipv6_mode?: number
   ipv6_subnet?: string | null
   ipv6_gateway?: string | null

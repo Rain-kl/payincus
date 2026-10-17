@@ -112,6 +112,8 @@ const packages = ref<Package[]>([])
 const userQuota = ref<UserQuota | null>(null)
 const sshKeys = ref<SshKey[]>([])
 const availableHosts = ref<AvailableHost[]>([])
+const hostLookupMessage = ref('')
+let hostLookupRevision = 0
 const availableImages = ref<ImageOption[]>([])
 const packagePlans = ref<PackagePlan[]>([])
 const imagesLoading = ref<boolean>(false)
@@ -825,6 +827,9 @@ function selectRegion(regionCode: string | null): void {
 
 async function selectPackage(pkg: Package, preferredPlanId?: number | null): Promise<void> {
   isSwitchingPackage.value = true  // 开始切换套餐
+  hostLookupRevision++
+  hostsLoading.value = false
+  hostLookupMessage.value = ''
   
   form.value.packageId = pkg.id
   form.value.hostId = null
@@ -1016,6 +1021,8 @@ async function loadHostOwnerInfo(packageId: number): Promise<void> {
 }
 
 async function loadAvailableHosts(): Promise<void> {
+  const revision = ++hostLookupRevision
+  hostLookupMessage.value = ''
   if (!form.value.packageId) {
     availableHosts.value = []
     form.value.hostId = null
@@ -1042,7 +1049,10 @@ async function loadAvailableHosts(): Promise<void> {
       memory: form.value.memory,
       disk: form.value.disk
     })
-    availableHosts.value = (res as { hosts?: AvailableHost[] }).hosts || []
+    if (revision !== hostLookupRevision) return
+    availableHosts.value = res.hosts || []
+    const reason = res.unavailableHosts?.find(h => h.reason.startsWith('storage_'))?.reason || res.unavailableHosts?.[0]?.reason
+    if (reason) hostLookupMessage.value = t(`storageCapacity.${reason}`)
 
     if (availableHosts.value.length === 0) {
       form.value.hostId = null
@@ -1056,6 +1066,8 @@ async function loadAvailableHosts(): Promise<void> {
       form.value.hostId = availableHosts.value[0].id
     }
   } catch (err: any) {
+    if (revision !== hostLookupRevision) return
+    hostLookupMessage.value = t('storageCapacity.lookupFailed')
     availableHosts.value = []
     form.value.hostId = null
     availableImages.value = []
@@ -1066,7 +1078,7 @@ async function loadAvailableHosts(): Promise<void> {
       toast.error(t('instance.createPage.packageNoHosts'))
     }
   } finally {
-    hostsLoading.value = false
+    if (revision === hostLookupRevision) hostsLoading.value = false
   }
 }
 
@@ -1391,6 +1403,7 @@ async function handleSubmit(): Promise<void> {
               :selected-host-id="form.hostId"
               :hosts-loading="hostsLoading"
               :hosts-insufficient="hostsInsufficient"
+              :unavailable-message="hostLookupMessage"
               :cpu="form.cpu"
               :memory="form.memory"
               :selected-package="selectedPackage || null"

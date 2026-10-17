@@ -1,3 +1,4 @@
+import { getInstanceStorageCapacity } from '../lib/storage-capacity.js'
 import { GpuError } from '../lib/gpu.js'
 import { reserveInstanceGpu, getInstanceGpuPcis, releaseFailedGpu } from '../db/gpus.js'
 /**
@@ -1073,6 +1074,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       packageOwnerId = pkg.user_id!
     }
 
+    const unavailableHosts: Array<{ hostId: number; reason: string }> = []
     const hosts = await db.getAvailableHosts(
       packageHostIds.length > 0 ? packageHostIds : null,
       parseInt(cpu, 10),
@@ -1080,6 +1082,8 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       parseInt(disk, 10),
       {
         userId: user.id,
+        packageId: packageIdNum,
+        onUnavailable: (hostId, reason) => unavailableHosts.push({ hostId, reason }),
         packageOwnerId
       }
     )
@@ -1094,6 +1098,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     const hostTrafficMultipliers = (pkg as { host_traffic_multipliers?: Record<string, number> }).host_traffic_multipliers || {}
 
     return {
+      unavailableHosts,
       hosts: hosts.map((h: unknown) => {
         const host = h as {
           id: number
@@ -1110,6 +1115,8 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           memory_max?: number
           disk_used: number
           storage_size?: number
+          disk_total?: number
+          disk_available?: number
           probe_url?: string | null
         }
         // 计算CPU额配可用量
@@ -1145,8 +1152,8 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
             memoryUsed: memoryUsed,
             memoryMax: memoryMax,
             memoryAvailable: memoryAvailable,
-            diskTotal: host.storage_size ? host.storage_size * 1024 : 0, // 使用创建时输入的存储大小（GB转MB），如果没有则不可用
-            diskAvailable: host.storage_size ? Math.max(0, (host.storage_size * 1024) - (host.disk_used || 0)) : 0
+            diskTotal: host.disk_total || 0,
+            diskAvailable: host.disk_available || 0
           },
           trafficMultiplier: normalizeTrafficMultiplier(hostTrafficMultipliers[String(host.id)] ?? 1),
           effectiveTrafficLimit: applyTrafficMultiplier(baseTrafficLimit, hostTrafficMultipliers[String(host.id)] ?? 1)?.toString() ?? null,
@@ -1785,6 +1792,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
             name,
             userId: user.id,
             hostId: lockedHost.id,
+            storagePoolName: lockedHost.storage_pool_name,
             packageId,
             packagePlanId: selectedPlan?.id ?? null,
             image,
@@ -2227,7 +2235,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     }
 
     // 选择存储池
-    selectedStoragePool = await db.resolveStoragePoolForNewInstance(host.id, { packageId })
+    selectedStoragePool = host.storage_pool_name || null
     if (!selectedStoragePool) {
       throw new Error(`STORAGE_POOL_UNAVAILABLE: 宿主机 ${host.name} 未配置可用于实例系统盘的存储池`)
     }
@@ -5393,7 +5401,8 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     const hostWithQuota = host as typeof host & { cpu_allowance_max?: number; memory_max?: number; storage_size?: number }
     const cpuAvailable = (hostWithQuota.cpu_allowance_max || 0) - (host.cpu_used || 0)
     const memoryAvailable = (hostWithQuota.memory_max || 0) - (host.memory_used || 0)
-    const diskAvailable = ((hostWithQuota.storage_size || 0) * 1024) - (host.disk_used || 0)
+    const storage = await getInstanceStorageCapacity(instanceId, sourceInstance.disk)
+    const diskAvailable = storage?.availableMB || 0
 
     if (sourceInstance.cpu > cpuAvailable) {
       return reply.code(400).send({

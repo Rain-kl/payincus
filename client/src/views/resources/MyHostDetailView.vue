@@ -60,7 +60,7 @@ interface Host {
   resources?: {
     cpuUsed: number
     memoryUsed: number
-    diskTotal: number  // 计算值，来自 storage_size * 1024
+    diskTotal: number  // 实例存储池容量（MB）
     diskUsed: number
   }
   natConfig?: {

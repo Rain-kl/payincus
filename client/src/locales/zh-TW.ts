@@ -3,6 +3,17 @@
 import en from './en'
 
 const zhTW = {
+    storageCapacity: {
+        allocated: '實例已分配 / 儲存池總容量',
+        available: '單池最大可分配容量',
+        unknown: '暫時無法確認儲存池容量',
+        hint: '可分配容量依據實際可用空間、實例預留空間和安全餘量計算。',
+        noHost: '暫無可用宿主機',
+        storage_unavailable: '無法讀取儲存池容量，請檢查節點連線後重試。',
+        storage_pool_missing: '方案指定的系統碟儲存池不存在，或節點尚未登記系統碟池。',
+        disk_full: '實例儲存池剩餘可分配空間不足。',
+        lookupFailed: '取得可用宿主機失敗，請重新整理後重試。',
+    },
     egress: {"errorStage": "失敗步驟", "errorStages": {"extract": "解壓代理核心", "config": "驗證代理設定", "start": "啟動代理服務", "health": "選擇代理出口", "preflight": "檢查執行環境", "incus": "連線 Incus", "acl": "套用防火牆", "xray": "代理核心", "network": "設定宿主網路", "unsupported-nic": "網卡支援", "unsupported-platform": "平台支援", "restore": "重新啟動恢復"}, "failureReasons": {"command_failed": "操作執行失敗，請檢查 Agent 與 incudal-xray 服務狀態。", "timeout": "操作逾時。", "permission_denied": "Agent 沒有存取必要資源的權限。", "missing_file": "缺少必要檔案或執行程式。", "config_invalid": "Xray 拒絕了產生的設定。", "reality_key_invalid": "Reality 公鑰格式無效。", "reality_id_invalid": "Reality Short ID 格式無效。", "tls_config_invalid": "TLS 指紋或設定無效。", "unsupported_transport": "Xray 不支援此傳輸設定。"}, "noProbeResults": "執行測試後在此顯示本次結果。", "pageTitle": "代理", "pageDescription": "統一管理代理節點，支援訂閱與設定匯入，並選擇宿主節點執行連線測試。", "title": "出口代理", "firewall": "防火墙", "proxyNodes": "代理节点", "manageNodes": "管理代理节点", "importNodes": "添加代理节点", "rawOrUri": "配置文件或分享链接", "subscriptionUrl": "订阅地址", "upload": "上传配置文件", "importHint": "粘贴 Xray / sing-box JSON，或每行一个 socks5、vless、vmess、trojan、ss 分享链接。", "preview": "解析预览", "confirmImport": "确认添加", "imported": "已添加", "duplicates": "重复节点", "noNodes": "暂无代理节点", "fileTooLarge": "文件不能超过 512 KiB", "probeHost": "执行检测的宿主节点", "probeUrl": "HTTPS 检测地址", "testSelected": "检测勾选节点", "probeHint": "最多勾選 10 個節點，透過在線 Agent 隧道立即測試。結果僅在本頁顯示，不儲存。HTTPS 成功不代表 UDP 可用。", "probeResults": "检测结果", "mode": "出口模式", "off": "不接管（保持现有出口）", "direct": "Xray 直连出站", "proxy": "通过代理节点出站", "strategy": "多出口策略", "failover": "故障转移（按顺序主备）", "balance": "负载均衡（轮询健康节点）", "leastPing": "最低延迟", "orderHint": "故障转移时，第一个节点为主节点。轮询模式中各健康节点共同参与分流。", "moveUp": "上移", "moveDown": "下移", "probeInterval": "检测间隔（秒）", "internalCidrs": "额外内网 IP / CIDR（每行一条）", "behaviorHint": "仅接管实例主动创建的外网 TCP/UDP 连接。内网直达，外部入站回包保持原路。代理故障时阻断，不回退宿主机直出。已有连接保留原路径；接管模式下阻断外网 ping，保留内网和必要 ICMP。", "saveEgress": "保存出口配置", "agentRequired": "請升級支援即時網路控制的 Agent。", "revision": "生效版本 / 目标版本", "applyFailed": "配置应用失败", "routedFallback": "routed 网卡由宿主机 nftables 补充保护；受支持的网桥和网卡使用 Incus 原生 ACL。", "managedNetworks": "受管网络", "firewallHint": "规则独立于出口代理，先限制实例流量，再进入 Xray。端口使用容器端口，例如公网 2222 映射到容器 22 时填写 22。", "enableFirewall": "启用节点防火墙", "defaultIngress": "默认入站动作", "defaultEgress": "默认出站动作", "allow": "允许", "drop": "丢弃", "reject": "拒绝", "aclOrder": "Incus 按丢弃、拒绝、允许、默认动作排序。已有连接通常继续放行；DHCP、邻居发现和部分网桥 DNS 服务由 Incus 保留。", "enableRule": "启用规则", "editRule": "编辑规则", "addRule": "添加规则", "saveFirewall": "保存防火墙", "reload": "重新载入配置", "direction": "方向", "ingress": "入站", "egress": "出站", "action": "动作", "protocol": "协议", "any": "任意", "source": "源 IP / CIDR（逗号分隔，留空为任意）", "destination": "目标 IP / CIDR（逗号分隔，留空为任意）", "sourcePort": "源端口", "destinationPort": "目标端口", "description": "备注", "states": {"idle": "未配置", "pending": "等待同步或回执已过期", "applied": "已生效", "error": "应用失败"}, "testing": "正在測試…", "applying": "正在套用…"},
     hostPublicIpv4: {
         title: '獨立 IPv4 位址池', description: '為獨立 IPv4 方案提供 routed 公網 IPv4 分配、回收和容量驗證。', newPool: '新增位址池', newPoolTitle: '新增獨立 IPv4 位址池',

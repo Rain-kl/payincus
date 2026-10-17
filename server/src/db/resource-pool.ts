@@ -1,3 +1,4 @@
+import { getInstanceStorageCapacity } from '../lib/storage-capacity.js'
 /**
  * 用户资源池数据库操作
  */
@@ -258,11 +259,14 @@ export async function applyResourcePoolToInstance(data: {
 
       const cpuLimit = host.cpuAllowanceMax || 0
       const memoryLimit = host.memoryMax || 0
-      const diskLimit = host.storageSize > 0 ? host.storageSize * 1024 : 0
+      if (diskDelta > 0) {
+        await tx.$queryRaw`SELECT id FROM hosts WHERE id = ${data.hostId} FOR UPDATE`
+        const storage = await getInstanceStorageCapacity(data.instanceId, diskDelta, tx)
+        if (!storage || storage.reason) throw new Error('HOST_RESOURCES_INSUFFICIENT')
+      }
       if (
         (cpuLimit > 0 && cpuDelta > cpuLimit) ||
-        (memoryLimit > 0 && memoryDelta > memoryLimit) ||
-        (diskLimit > 0 && diskDelta > diskLimit)
+        (memoryLimit > 0 && memoryDelta > memoryLimit)
       ) {
         throw new Error('HOST_RESOURCES_INSUFFICIENT')
       }
@@ -273,9 +277,6 @@ export async function applyResourcePoolToInstance(data: {
       }
       if (memoryLimit > 0) {
         applyWhere.memoryUsed = { lte: memoryLimit - memoryDelta }
-      }
-      if (diskLimit > 0) {
-        applyWhere.diskUsed = { lte: diskLimit - diskDelta }
       }
 
       const hostUpdate = await tx.host.updateMany({

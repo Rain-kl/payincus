@@ -27,8 +27,9 @@ includes(hostsSource, 'FOR UPDATE', 'host row lock for upgrade capacity reservat
 includes(hostsSource, "reason: 'cpu_insufficient'", 'CPU upgrade capacity reason')
 includes(hostsSource, "reason: 'memory_insufficient'", 'memory upgrade capacity reason')
 includes(hostsSource, "reason: 'disk_insufficient'", 'disk upgrade capacity reason')
-includes(hostsSource, 'diskTotal <= 0 || (diskUsedEffective + disk) > diskTotal', 'disk check in host selection')
-includes(paginationSource, '(host.diskUsedCalculated + disk) > diskTotal', 'disk check in available-hosts list')
+includes(hostsSource, 'getStorageCapacity(host.id, { packageId, client: tx, requiredMB: disk })', 'transactional check in the selected pool')
+includes(hostsSource, 'getInstanceStorageCapacity(instance.id, Math.max(0, newPlan.disk - instance.disk), tx)', 'growth must check the existing instance pool')
+includes(paginationSource, 'getStorageCapacity(host.id, { packageId: options.packageId, requiredMB: disk })', 'disk check in available-hosts list')
 
 includes(billingOpsSource, 'reservePlanUpgradeCapacityWithLock(tx, instance, newPlan)', 'user upgrade transactional reservation')
 includes(billingOpsSource, 'limitsIngress: normalizedPlanTrafficLimitSpeed', 'user upgrade DB ingress update')

@@ -1,3 +1,4 @@
+import { getStorageCapacity } from '../lib/storage-capacity.js'
 /**
  * 配额操作相关数据库操作
  * 使用 Prisma ORM
@@ -124,6 +125,8 @@ export async function reserveResources(options: {
   memory: number
   disk: number
   portCount?: number
+  storagePoolName?: string | null
+  diskAlreadyAllocated?: boolean
 }): Promise<void> {
   const { hostId, cpu, memory, disk, portCount = 0 } = options
   if (cpu < 0 || memory < 0 || disk < 0 || portCount < 0) {
@@ -132,6 +135,10 @@ export async function reserveResources(options: {
 
   // 使用条件原子更新，避免并发预占时读改写丢失更新。
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM hosts WHERE id = ${hostId} FOR UPDATE`
+    const storage = await getStorageCapacity(hostId, { client: tx, poolName: options.storagePoolName, requiredMB: options.diskAlreadyAllocated ? 0 : disk })
+    if (storage.reason) throw new Error(`HOST_RESOURCES_INSUFFICIENT: ${storage.reason}`)
+
     // 注意：不再限制用户的实例配额，只检查宿主机资源
 
     // 检查并更新宿主机资源使用量

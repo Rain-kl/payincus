@@ -3908,6 +3908,7 @@ if (provider.type === 'yipay') {
             name,
             userId: targetUser.id,
             hostId: lockedHost.id,
+            storagePoolName: lockedHost.storage_pool_name,
             packageId,
             packagePlanId: selectedPlan?.id ?? null,
             image,
@@ -4085,7 +4086,7 @@ if (provider.type === 'yipay') {
       }
 
       // 17. 选择存储池
-      let selectedStoragePool = await db.resolveStoragePoolForNewInstance(host.id, { packageId })
+      let selectedStoragePool = host.storage_pool_name || null
       if (!selectedStoragePool) {
         throw new Error(`STORAGE_POOL_UNAVAILABLE: 宿主机 ${host.name} 未配置可用于实例系统盘的存储池`)
       }

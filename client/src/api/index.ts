@@ -696,7 +696,7 @@ const api = {
     getPassword: (id: number): Promise<{ rootPassword: string | null }> => http.get(`/instances/${id}/password`),
     getStats: (id: number): Promise<InstanceStats & { status?: string }> => http.get(`/instances/${id}/stats`),
     create: (data: CreateInstanceRequest): Promise<CreateInstanceResponse> => http.post('/instances', data),
-    getAvailableHosts: (params: Record<string, unknown> = {}): Promise<AvailableHost[]> =>
+    getAvailableHosts: (params: Record<string, unknown> = {}): Promise<{ hosts: AvailableHost[]; unavailableHosts?: Array<{ hostId: number; reason: string }> }> =>
       http.get('/instances/available-hosts', { params }),
     getChangeHostOptions: (id: number): Promise<ChangeHostOptionsResponse> =>
       http.get(`/instances/${id}/change-host-options`),

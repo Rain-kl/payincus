@@ -73,7 +73,8 @@ assert.ok(
 assert.ok(
   postTransactionPreparationSection.includes('try {') &&
     postTransactionPreparationSection.includes('db.reservePublicIpv4ForInstance') &&
-    postTransactionPreparationSection.includes('await db.resolveStoragePoolForNewInstance') &&
+    postTransactionPreparationSection.includes('selectedStoragePool = host.storage_pool_name || null') &&
+    instancesSource.includes('storagePoolName: lockedHost.storage_pool_name') &&
     postTransactionPreparationSection.includes('} catch (error) {') &&
     postTransactionPreparationSection.includes('await compensateFailedInstanceCreation({') &&
     postTransactionPreparationSection.includes('return reply.code(503).send(apiError(ErrorCode.HOST_RESOURCES_INSUFFICIENT, errorMessage))'),

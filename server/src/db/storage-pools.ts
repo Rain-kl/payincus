@@ -4,6 +4,7 @@
 
 import { prisma } from './prisma.js'
 import type { Prisma, StoragePurpose } from '@prisma/client'
+import { getStorageCapacity } from '../lib/storage-capacity.js'
 
 const DEFAULT_STORAGE_POOL_NAME = 'default'
 type StoragePoolQueryClient = typeof prisma | Prisma.TransactionClient
@@ -163,7 +164,7 @@ export async function getPackageHostStoragePool(
 
 /**
  * 解析新实例应使用的存储池。
- * 优先使用套餐在当前宿主机上的显式配置，其次回退到随机系统盘池。
+ * 严格遵守套餐指定池；未指定时选择实际可分配空间最多的系统盘池。
  */
 export async function resolveStoragePoolForNewInstance(
   hostId: number,
@@ -172,16 +173,8 @@ export async function resolveStoragePoolForNewInstance(
     client?: StoragePoolQueryClient
   } = {}
 ): Promise<string | null> {
-  const { packageId, client = prisma } = options
-
-  if (packageId) {
-    const configuredPool = await getPackageHostStoragePool(packageId, hostId, client)
-    if (configuredPool && await isSystemDiskPoolForClient(hostId, configuredPool, client)) {
-      return configuredPool
-    }
-  }
-
-  return getRandomSystemDiskPool(hostId, client)
+  const capacity = await getStorageCapacity(hostId, { packageId: options.packageId, client: options.client })
+  return capacity.reason ? null : capacity.poolName
 }
 
 export async function isSystemDiskPoolForClient(

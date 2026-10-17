@@ -7,7 +7,7 @@ import { getGpuPolicy, findAvailableGpus } from './gpus.js'
 import { prisma } from './prisma.js'
 import type { Instance, PackagePlan, Prisma } from '@prisma/client'
 import type { Host } from '../types/database.js'
-import { resolveStoragePoolForNewInstance } from './storage-pools.js'
+import { getStorageCapacity, getInstanceStorageCapacity } from '../lib/storage-capacity.js'
 import {
   networkModeNeedsPublicIpv4,
   networkModeNeedsRoutedIpv6,
@@ -546,7 +546,7 @@ export async function incrementHostResourceUsage(id: number, deltas: {
 }
 
 function buildPlanUpgradeCapacityResult(input: {
-  instance: Pick<Instance, 'hostId' | 'cpu' | 'memory' | 'disk'>
+  instance: Pick<Instance, 'id' | 'hostId' | 'cpu' | 'memory' | 'disk'>
   newPlan: Pick<PackagePlan, 'cpu' | 'memory' | 'disk'>
   host: {
     id: number
@@ -559,6 +559,7 @@ function buildPlanUpgradeCapacityResult(input: {
     storageSize: number | null
   } | null
   aggregate: { cpuUsed: number; memoryUsed: number; diskUsed: number }
+  diskAvailableMB: number
 }): PlanUpgradeCapacityCheck {
   const { instance, newPlan, host, aggregate } = input
   const deltas = {
@@ -598,7 +599,7 @@ function buildPlanUpgradeCapacityResult(input: {
   const limits = {
     cpu: host.cpuAllowanceMax && host.cpuAllowanceMax > 0 ? host.cpuAllowanceMax : null,
     memory: host.memoryMax && host.memoryMax > 0 ? host.memoryMax : null,
-    disk: host.storageSize && host.storageSize > 0 ? host.storageSize * 1024 : null
+    disk: currentUsage.disk + input.diskAvailableMB
   }
   const available = {
     cpu: limits.cpu === null ? null : Math.max(0, limits.cpu - currentUsage.cpu),
@@ -626,7 +627,7 @@ function buildPlanUpgradeCapacityResult(input: {
 }
 
 export async function checkPlanUpgradeCapacity(
-  instance: Pick<Instance, 'hostId' | 'cpu' | 'memory' | 'disk'>,
+  instance: Pick<Instance, 'id' | 'hostId' | 'cpu' | 'memory' | 'disk'>,
   newPlan: Pick<PackagePlan, 'cpu' | 'memory' | 'disk'>,
   client: DbClient = prisma
 ): Promise<PlanUpgradeCapacityCheck> {
@@ -650,9 +651,11 @@ export async function checkPlanUpgradeCapacity(
     })
   ])
 
+  const storage = await getInstanceStorageCapacity(instance.id, Math.max(0, newPlan.disk - instance.disk), client)
   return buildPlanUpgradeCapacityResult({
     instance,
     newPlan,
+    diskAvailableMB: storage?.availableMB || 0,
     host,
     aggregate: {
       cpuUsed: resourceSum._sum.cpu ?? 0,
@@ -664,7 +667,7 @@ export async function checkPlanUpgradeCapacity(
 
 export async function reservePlanUpgradeCapacityWithLock(
   tx: Prisma.TransactionClient,
-  instance: Pick<Instance, 'hostId' | 'cpu' | 'memory' | 'disk'>,
+  instance: Pick<Instance, 'id' | 'hostId' | 'cpu' | 'memory' | 'disk'>,
   newPlan: Pick<PackagePlan, 'cpu' | 'memory' | 'disk'>
 ): Promise<PlanUpgradeCapacityCheck> {
   const hosts = await tx.$queryRaw<Array<{
@@ -688,9 +691,11 @@ export async function reservePlanUpgradeCapacityWithLock(
     _sum: { cpu: true, memory: true, disk: true }
   })
 
+  const storage = await getInstanceStorageCapacity(instance.id, Math.max(0, newPlan.disk - instance.disk), tx)
   const capacity = buildPlanUpgradeCapacityResult({
     instance,
     newPlan,
+    diskAvailableMB: storage?.availableMB || 0,
     host: hosts[0] ?? null,
     aggregate: {
       cpuUsed: resourceSum._sum.cpu ?? 0,
@@ -934,15 +939,9 @@ export async function selectAvailableHost(options: {
       continue
     }
 
-    const diskTotal = host.storageSize ? host.storageSize * 1024 : 0
-    if (diskTotal <= 0 || (diskUsedEffective + disk) > diskTotal) {
-      console.log(`[selectAvailableHost] Host ${host.name} disk insufficient: ${diskUsedEffective} + ${disk} > ${diskTotal}`)
-      continue
-    }
-
-    const storagePoolName = await resolveStoragePoolForNewInstance(host.id, { packageId })
-    if (!storagePoolName) {
-      console.log(`[selectAvailableHost] 宿主机 ${host.name} 未配置可用于实例系统盘的存储池`)
+    const storage = await getStorageCapacity(host.id, { packageId, requiredMB: disk })
+    if (storage.reason) {
+      console.log(`[selectAvailableHost] Host ${host.name} storage unavailable: ${storage.reason}`)
       continue
     }
 
@@ -978,7 +977,8 @@ export async function selectAvailableHost(options: {
       nat_port_end: host.natPortEnd,
       cpu_used: cpuUsedEffective,  // 实例资源总和
       memory_used: memoryUsedEffective,  // 实例资源总和
-      disk_total: host.storageSize ? host.storageSize * 1024 : 0,  // 只使用storageSize（GB转MB：
+      disk_total: storage.totalMB,
+      storage_pool_name: storage.poolName,
       disk_used: diskUsedEffective,  // 实例资源总和
       created_at: host.createdAt.toISOString(),
       updated_at: host.updatedAt.toISOString(),
@@ -1159,18 +1159,9 @@ export async function selectAndReserveHostWithLock(
       continue
     }
 
-    const diskTotal = host.storage_size ? host.storage_size * 1024 : 0
-    if (diskTotal <= 0 || (diskUsedEffective + disk) > diskTotal) {
-      console.log(`[selectAndReserveHostWithLock] Host ${host.name} disk insufficient: ${diskUsedEffective} + ${disk} > ${diskTotal}`)
-      continue
-    }
-
-    const storagePoolName = await resolveStoragePoolForNewInstance(host.id, {
-      packageId,
-      client: tx
-    })
-    if (!storagePoolName) {
-      console.log(`[selectAndReserveHostWithLock] 宿主机 ${host.name} 未配置可用于实例系统盘的存储池`)
+    const storage = await getStorageCapacity(host.id, { packageId, client: tx, requiredMB: disk })
+    if (storage.reason) {
+      console.log(`[selectAndReserveHostWithLock] Host ${host.name} storage unavailable: ${storage.reason}`)
       continue
     }
 
@@ -1229,6 +1220,7 @@ export async function selectAndReserveHostWithLock(
       cpu_used: cpuUsedEffective + cpu,
       memory_used: memoryUsedEffective + memory,
       disk_used: diskUsedEffective + disk,
+      storage_pool_name: storage.poolName,
       created_at: host.created_at.toISOString(),
       updated_at: host.updated_at.toISOString(),
       cpu_allowance_max: host.cpu_allowance_max ?? undefined,

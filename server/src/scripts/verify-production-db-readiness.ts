@@ -1,3 +1,4 @@
+import { getStorageCapacity } from '../lib/storage-capacity.js'
 import '../config/env.js'
 import { closePrismaDatabase, prisma } from '../db/prisma.js'
 import { getAllPaymentProviders } from '../db/payment-providers.js'
@@ -276,9 +277,9 @@ async function checkResourceDeliveryConfig(): Promise<void> {
     warn('No online hosts are configured; instance creation cannot run until at least one Incus host is online')
   }
 
-  const allocatableHosts = onlineHosts.filter(host => host.cpuAllowanceMax > 0 && host.memoryMax > 0 && host.storageSize > 0)
+  const allocatableHosts = onlineHosts.filter(host => host.cpuAllowanceMax > 0 && host.memoryMax > 0)
   if (onlineHosts.length > 0 && allocatableHosts.length === 0) {
-    warn('Online hosts exist but none have positive CPU, memory, and storage capacity configured')
+    warn('Online hosts exist but none have positive CPU and memory quotas configured')
   }
 
   const agentStaleAfterMs = 5 * 60 * 1000
@@ -442,15 +443,15 @@ async function checkResourceDeliveryConfig(): Promise<void> {
     const minCpu = availablePlans.length > 0 ? Math.min(...availablePlans.map(plan => plan.cpu)) : 15
     const minMemory = availablePlans.length > 0 ? Math.min(...availablePlans.map(plan => plan.memory)) : 128
     const minDisk = availablePlans.length > 0 ? Math.min(...availablePlans.map(plan => plan.disk)) : 512
-    const hasCapacity = onlinePackageHosts.some(host => {
+    const capacityChecks = await Promise.all(onlinePackageHosts.map(async host => {
       const usedCpu = host.instances.reduce((sum, instance) => sum + instance.cpu, 0)
       const usedMemory = host.instances.reduce((sum, instance) => sum + instance.memory, 0)
-      const usedDisk = host.instances.reduce((sum, instance) => sum + instance.disk, 0)
-      const availableDisk = (host.storageSize || 0) * 1024 - usedDisk
+      const capacity = await getStorageCapacity(host.id, { packageId: pkg.id, requiredMB: minDisk })
       return host.cpuAllowanceMax - usedCpu >= minCpu
         && host.memoryMax - usedMemory >= minMemory
-        && availableDisk >= minDisk
-    })
+        && !capacity.reason
+    }))
+    const hasCapacity = capacityChecks.some(Boolean)
     if (!hasCapacity) {
       warn(`${prefix} is active but online bound hosts cannot satisfy its minimum CPU/memory/disk requirement`)
     }

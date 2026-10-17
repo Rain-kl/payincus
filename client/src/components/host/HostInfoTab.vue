@@ -29,9 +29,10 @@ interface Host {
   resources?: {
     cpuUsed: number
     memoryUsed: number
-    diskTotal: number  // 计算值，来自 storage_size * 1024
+    diskTotal: number  // 实例存储池容量（MB）
     diskUsed: number
   }
+  storage?: { availableMB: number; reason: string | null }
   natConfig?: {
     publicIp: string | null
     publicIpv6?: string | null
@@ -588,7 +589,7 @@ function formatBytes(bytes: number): string {
         <!-- Disk -->
         <div>
           <div class="flex justify-between text-sm mb-1">
-            <span class="text-gray-500">{{ t('admin.hosts.diskUsage') }}</span>
+            <span class="text-themed-muted">{{ t('storageCapacity.allocated') }}</span>
             <span :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
               {{ formatDisk(instanceStats.diskUsed) }} / {{ formatDisk(host.resources?.diskTotal) }}
             </span>
@@ -600,6 +601,8 @@ function formatBytes(bytes: number): string {
               :style="{ width: diskUsagePercent + '%' }"
             ></div>
           </div>
+          <p v-if="host.storage" class="text-xs text-themed-muted mt-1.5">{{ host.storage.reason ? t('storageCapacity.unknown') : t('storageCapacity.available') + ': ' + formatDisk(host.storage.availableMB) }}</p>
+          <p class="text-xs text-themed-muted mt-1.5">{{ t('storageCapacity.hint') }}</p>
         </div>
       </div>
 
