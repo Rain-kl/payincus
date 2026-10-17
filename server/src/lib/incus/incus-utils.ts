@@ -1,3 +1,4 @@
+import { taskLog } from '../operation-task-log.js'
 /**
  * Incus 客户端工具函数
  */
@@ -16,10 +17,17 @@ export async function waitForOperation(
   timeout: number = 300000 // 从 120000 放宽到 300000 (5分钟)
 ): Promise<unknown> {
   const startTime = Date.now()
+  taskLog('info', `Incus 操作 ${operationUrl}，等待节点执行（超时 ${Math.round(timeout / 1000)} 秒）`)
+  let lastProgress = ''
 
   while (Date.now() - startTime < timeout) {
     const op = await client.request<IncusOperation>('GET', `${operationUrl}/wait?timeout=10`)
 
+    const progress = [op.description, op.status, ...Object.entries(op.metadata || {})
+      .filter(([key]) => /^(download_progress|fs_progress|create_instance_from_image_unpack_progress|progress|unpack_progress)$/.test(key))
+      .map(([key, value]) => `${key}: ${String(value).slice(0, 1000)}`)].filter(Boolean).join(' · ')
+    if (progress !== lastProgress) { taskLog('info', progress); lastProgress = progress }
+    if (op.status === 'Cancelled' || op.status_code >= 400) throw new Error(op.err || op.error || '节点操作失败或已取消')
     if (op.status === 'Success') {
       return op.metadata
     }

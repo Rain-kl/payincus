@@ -18,6 +18,8 @@ const (
 	FrameTypeControlResponse byte = 0x09
 	FrameTypeControlHello    byte = 0x0a
 	FrameTypeControlCancel   byte = 0x0b
+	FrameTypeTaskLogCtl      byte = 0x0c
+	FrameTypeTaskLogData     byte = 0x0d
 )
 
 const HeaderLength = 5

@@ -212,6 +212,13 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 	writeErrChan := make(chan error, 1)
 	controls := newControlSession(connCtx, w.cfg.ControlHandler, writeChan)
 
+	taskStreams := make(map[int]context.CancelFunc)
+	defer func() {
+		for _, cancel := range taskStreams {
+			cancel()
+		}
+	}()
+
 	var logsMu sync.Mutex
 	var logStreamCancel context.CancelFunc
 
@@ -428,6 +435,21 @@ func (w *Worker) connectAndServe(ctx context.Context) error {
 			if err := json.Unmarshal(payload, &cfg); err == nil {
 				log.Printf("[tunnel] dynamic config update received: target=%s:%d", cfg.TargetHost, cfg.TargetPort)
 				w.setTarget(cfg.TargetHost, cfg.TargetPort)
+			}
+
+		case FrameTypeTaskLogCtl:
+			var ctl taskLogControl
+			if err := json.Unmarshal(payload, &ctl); err != nil || ctl.TaskID <= 0 || !taskInstanceName.MatchString(ctl.Name) {
+				continue
+			}
+			if cancel, ok := taskStreams[ctl.TaskID]; ok {
+				cancel()
+				delete(taskStreams, ctl.TaskID)
+			}
+			if ctl.Action == "start" && len(taskStreams) < 32 {
+				taskCtx, cancel := context.WithCancel(connCtx)
+				taskStreams[ctl.TaskID] = cancel
+				go streamTaskLogs(taskCtx, writeChan, ctl)
 			}
 
 		case FrameTypeLogCtl:

@@ -1,3 +1,4 @@
+import { currentOperationTask, runOperationTask, taskLog } from '../lib/operation-task-log.js'
 /**
  * 实例销毁相关路由
  * 处理用户端实例销毁功能（带退款）
@@ -293,6 +294,8 @@ async function deleteIncusInstanceForUserDestroy(
   },
   logger: { warn: (...args: any[]) => void }
 ): Promise<void> {
+  if (!currentOperationTask()) return runOperationTask(instance.hostId, instance.incusId, 'destroy', () => deleteIncusInstanceForUserDestroy(instance, logger))
+  taskLog('info', '连接节点，准备停止并删除实例')
   const host = await db.getHostById(instance.hostId)
   if (!host) {
     throw new Error('宿主机不存在，无法删除实例')

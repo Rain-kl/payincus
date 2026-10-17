@@ -22,6 +22,7 @@ export const navMenuItems: MenuItem[] = [
   { name: 'admin-entertainment', path: '/admin/entertainment', icon: 'gift', label: 'nav.entertainment' },
   { name: 'admin-mail', path: '/admin/mail', icon: 'mail', label: 'nav.mail' },
   { divider: true, label: 'nav.operations' },
+  { name: 'admin-tasks', path: '/admin/tasks', icon: 'logs', label: 'nav.tasks' },
   { name: 'admin-tickets', path: '/admin/tickets', icon: 'ticket', label: 'nav.tickets' },
   { name: 'admin-broadcast', path: '/admin/broadcast', icon: 'bell', label: 'nav.broadcast' },
   { name: 'admin-logs', path: '/admin/logs', icon: 'logs', label: 'nav.logs' },

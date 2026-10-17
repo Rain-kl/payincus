@@ -182,3 +182,17 @@ INCUDAL_PANEL_URL="http://127.0.0.1:3001" \
 INCUDAL_AGENT_INSTALL_TOKEN="ait_testtoken_abcdefghijklmnopqrstuvwxyz123456" \
 bash server/templates/agent-install.sh
 ```
+
+## 运维任务日志
+
+管理端「运维 → 任务」记录实例创建与销毁。任务启动即采集，关闭日志抽屉不会停止采集；日志保存于面板数据库，删除实例后仍可查看。
+
+- 后端需先应用 `20261017130000_operation_tasks` Prisma 迁移。
+- 节点需运行支持任务日志的 Agent（本次版本 `v1.2.13`），并连接现有反向隧道。
+- 节点只读采集按实例过滤的 `journalctl -u incus` 和 `/var/log/incus/<实例名>/qemu.log`。没有 QEMU 日志文件的容器仍有服务端步骤及 Incus 操作进度。
+- 节点到后端复用已鉴权的出站 WebSocket 隧道（`TASK_LOG_CTL` / `TASK_LOG_DATA`）；后端到管理页面使用鉴权 SSE，按日志 ID 续传。不增加节点监听端口。
+- 直连节点、旧 Agent、通道断开或日志权限不足时，详情显示采集提示；服务端步骤仍然记录。断线恢复后重新采集，断线期间的节点日志不保证完整。
+- 每个任务最多保存 5000 条日志，每条最多 8000 字符；采集与待写入队列均有限额。实例删除前会额外读取有界的 QEMU 日志，保留快速启动失败的诊断信息。
+- 部署时同步更新 Nginx SSE location 配置，关闭缓冲。后端重启会把未结束任务标为「执行中断」；这不代表节点操作已经停止，应核对实际状态。
+
+历史任务无法补回此前未采集的创建日志。
