@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import * as db from '../db/index.js'
 import { createLog } from '../db/logs.js'
 import { isAccessTokenInvalidated } from '../lib/security.js'
-import { createSpiceBackend } from '../lib/incus/spice-connection.js'
+import { createSpiceBackend, SpiceConnectionError } from '../lib/incus/spice-connection.js'
 import { spiceSessions, type SpiceAccess, type SpiceSessionManager } from '../lib/spice-sessions.js'
 import { checkIPConnectionLimit, checkUserConnectionLimit, getClientIP, registerConnection, validateWebSocketOrigin } from '../lib/websocket-security.js'
 
@@ -57,13 +57,15 @@ export default async function spiceRoutes(fastify: FastifyInstance, options: {
       const ticket = await sessions.create(context,
         signal => deps.open(current.host, current.instance.incus_id, signal),
         async () => Boolean(await access(context)))
-      if (disconnected) { sessions.close(ticket); return }
+      if (disconnected) { await sessions.close(ticket); return }
       // This capability is limited to this console session; it is NOT a reusable login token.
       reply.header('Cache-Control', 'no-store')
       return { ticket, expiresIn: 7200 }
     } catch (error) {
       const limited = error instanceof Error && error.message === 'CONSOLE_LIMIT'
-      request.log.warn({ instanceId }, limited ? 'SPICE console limit reached' : 'SPICE console setup failed')
+      request.log.warn({ instanceId, stage: error instanceof SpiceConnectionError ? error.stage : 'session',
+        httpStatus: error instanceof SpiceConnectionError ? error.httpStatus : undefined },
+      limited ? 'SPICE console limit reached' : 'SPICE console setup failed')
       return reply.code(limited ? 409 : 502).send({
         error: limited ? 'Console already open or connection limit reached' : 'Unable to open Incus graphical console',
         code: limited ? 'CONSOLE_LIMIT' : 'CONSOLE_UNAVAILABLE'
@@ -82,7 +84,8 @@ export default async function spiceRoutes(fastify: FastifyInstance, options: {
     if (context.userId !== request.user.id || context.sessionId !== request.user.sid) {
       return reply.code(403).send({ error: 'Forbidden' })
     }
-    sessions.close(request.body.ticket)
+    await sessions.close(request.body.ticket)
+    await sessions.waitForCleanup(instanceId)
     return { success: true }
   })
 
@@ -114,5 +117,5 @@ export default async function spiceRoutes(fastify: FastifyInstance, options: {
       return true
     })
   })
-  fastify.addHook('onClose', async () => { sessions.closeMatching(() => true) })
+  fastify.addHook('onClose', async () => { await sessions.drain() })
 }

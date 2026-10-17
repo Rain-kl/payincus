@@ -838,6 +838,10 @@ const start = async (): Promise<void> => {
       
       // 清理所有活跃终端会话
       const { closeAllSessions } = await import('./lib/terminal-proxy.js')
+      // Cancel console operations while reverse tunnels are still available. Fastify's
+      // websocket preClose hook also closes agent tunnels, too early for onClose cleanup.
+      const { spiceSessions } = await import('./lib/spice-sessions.js')
+      await spiceSessions.drain()
       const closedSessions = closeAllSessions('Server shutdown')
       if (closedSessions > 0) {
         console.log(`🖥️ 关闭了 ${closedSessions} 个终端会话`)

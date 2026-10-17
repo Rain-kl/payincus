@@ -3,14 +3,21 @@ import net from 'node:net'
 import { readFileSync } from 'node:fs'
 import WebSocket from 'ws'
 import { request } from 'undici'
+import { setTimeout as delay } from 'node:timers/promises'
 import { getIncusClient } from './incus-pool.js'
 import { hostTunnelManager } from './tunnel-manager.js'
 import type { Host } from '../../types/database.js'
 
+export class SpiceConnectionError extends Error {
+  constructor(public readonly stage: 'create' | 'metadata' | 'control' | 'cleanup', public readonly httpStatus?: number) {
+    super(`Incus console ${stage} failed`)
+  }
+}
+
 export interface SpiceBackend {
   control: WebSocket
   openData(signal: AbortSignal): Promise<WebSocket>
-  close(): void
+  close(): Promise<void>
 }
 
 /** Each SPICE channel reopens fd 0 of ONE console operation, like ConsoleInstanceDynamic. */
@@ -29,20 +36,54 @@ export async function createSpiceBackend(host: Host, instanceName: string, signa
   }
   const operationId = result.metadata?.id
   const fds = result.metadata?.metadata?.fds
-  if (response.statusCode >= 400 || result.type !== 'async' || !operationId || !fds?.['0'] || !fds.control) {
+  if (response.statusCode >= 400 || result.type !== 'async' || !operationId) {
     // Do not log Incus responses: operation metadata contains channel secrets.
-    throw new Error(`Incus VGA console unavailable (HTTP ${response.statusCode})`)
+    throw new SpiceConnectionError('create', response.statusCode)
   }
-  const cert = readFileSync(client.certPath)
-  const key = readFileSync(client.keyPath)
   const sockets = new Set<WebSocket>()
   let closed = false
-  const close = () => {
-    if (closed) return
+  let cleanup: Promise<void> | undefined
+  const close = (): Promise<void> => {
+    if (cleanup) return cleanup
     closed = true
     for (const socket of sockets) socket.terminate()
     sockets.clear()
+    // Closing the websocket alone can leave Incus' VGA operation holding the SPICE socket.
+    // Cancellation must use its own signal: the setup/session signal is already aborted.
+    cleanup = (async () => {
+      const cleanupSignal = AbortSignal.timeout(5000)
+      const operationUrl = `${client.baseUrl}/1.0/operations/${encodeURIComponent(operationId)}`
+      const cancellation = await request(operationUrl, {
+        method: 'DELETE', dispatcher: client.agent!, signal: cleanupSignal,
+        headersTimeout: 5000, bodyTimeout: 5000
+      })
+      await cancellation.body.dump()
+      if (cancellation.statusCode === 404) return
+      // A normal socket close can finish the operation before cancellation reaches Incus.
+      if (cancellation.statusCode >= 400 && ![400, 409].includes(cancellation.statusCode)) {
+        console.warn('[SPICE] Console cancellation rejected', { instanceId: instanceName, httpStatus: cancellation.statusCode })
+        throw new SpiceConnectionError('cleanup', cancellation.statusCode)
+      }
+      while (true) {
+        const state = await request(operationUrl, {
+          method: 'GET', dispatcher: client.agent!, signal: cleanupSignal,
+          headersTimeout: 5000, bodyTimeout: 5000
+        })
+        if (state.statusCode === 404) { await state.body.dump(); return }
+        const operation = await state.body.json() as { metadata?: { status?: string } }
+        if (state.statusCode >= 400) throw new SpiceConnectionError('cleanup', state.statusCode)
+        if (['Success', 'Failure', 'Cancelled'].includes(operation.metadata?.status || '')) return
+        await delay(100, undefined, { signal: cleanupSignal })
+      }
+    })().catch(() => {
+      // Never propagate transport errors containing fd secrets or URLs.
+      cleanup = undefined // A later reconnect may retry cleanup after a transient transport failure.
+      throw new SpiceConnectionError('cleanup')
+    })
+    return cleanup
   }
+  let cert: Buffer
+  let key: Buffer
   const open = (secret: string, abortSignal: AbortSignal): Promise<WebSocket> => {
     abortSignal.throwIfAborted()
     if (closed) throw new Error('Console closed')
@@ -79,10 +120,13 @@ export async function createSpiceBackend(host: Host, instanceName: string, signa
     })
   }
   try {
+    if (!fds?.['0'] || !fds.control) throw new SpiceConnectionError('metadata')
+    cert = readFileSync(client.certPath)
+    key = readFileSync(client.keyPath)
     const control = await open(fds.control, signal)
     return { control, openData: abortSignal => open(fds['0'], abortSignal), close }
   } catch (error) {
-    close()
-    throw error
+    await close()
+    throw error instanceof SpiceConnectionError ? error : new SpiceConnectionError('control')
   }
 }
