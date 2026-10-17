@@ -72,6 +72,12 @@ async function handleOAuthCode(): Promise<boolean> {
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/console/:id',
+    name: 'console-window',
+    component: () => import('@/views/SpiceConsoleWindowView.vue'),
+    meta: { requiresAuth: true, requiresUser: true, consoleWindow: true, titleKey: 'spice.title' }
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),

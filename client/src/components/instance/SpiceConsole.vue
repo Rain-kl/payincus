@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onBeforeUnmount, useId } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount, useId } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import DrawerModal from '@/components/DrawerModal.vue'
 import api from '@/api'
 import { buildApiWebSocketUrl } from '@/utils/api-url'
 
-const props = defineProps<{ visible: boolean; instanceId: number | null; instanceName?: string }>()
+const props = defineProps<{ visible: boolean; instanceId: number | null; instanceName?: string; standalone?: boolean }>()
 const emit = defineEmits<{ (event: 'update:visible', value: boolean): void }>()
 const { t } = useI18n()
+const router = useRouter()
 const screen = ref<HTMLDivElement | null>(null)
 const status = ref<'connecting' | 'connected' | 'error'>('connecting')
 const error = ref('')
@@ -23,6 +25,7 @@ let session: { id: number; ticket: string } | undefined
 let generation = 0
 let deadline: ReturnType<typeof setTimeout> | undefined
 let readyPoll: ReturnType<typeof setInterval> | undefined
+let popupWindow: Window | null = null
 
 function disconnect() {
   generation++
@@ -93,37 +96,59 @@ function sendCtrlAltDel() {
   screen.value?.querySelector('canvas')?.focus()
 }
 
-async function fullscreen() {
-  try { await screen.value?.parentElement?.requestFullscreen() }
-  catch { error.value = t('spice.fullscreenFailed') }
+function openWindow() {
+  if (!props.instanceId) return
+  if (popupWindow && !popupWindow.closed) {
+    popupWindow.focus()
+    emit('update:visible', false)
+    return
+  }
+  const url = router.resolve({ name: 'console-window', params: { id: props.instanceId },
+    query: { name: props.instanceName || '' } }).href
+  // Open synchronously from the click so popup blockers can report failure before disconnecting.
+  popupWindow = window.open('', `incudal-console-${props.instanceId}`, 'popup,width=1100,height=760,resizable=yes,scrollbars=yes')
+  if (!popupWindow) { error.value = t('spice.windowFailed'); return }
+  popupWindow.opener = null
+  disconnect()
+  popupWindow.location.replace(url)
+  popupWindow.focus()
+  emit('update:visible', false)
 }
 
 watch(() => [props.visible, props.instanceId], () => {
-  if (props.visible && props.instanceId) void connect()
+  if (props.visible && props.instanceId) void connect(props.standalone === true)
   else disconnect()
 }, { immediate: true })
-onBeforeUnmount(disconnect)
+onMounted(() => { window.addEventListener('pagehide', disconnect) })
+onBeforeUnmount(() => {
+  window.removeEventListener('pagehide', disconnect)
+  disconnect()
+})
 </script>
 
 <template>
-  <DrawerModal :model-value="visible" :title="`${t('spice.title')} · ${instanceName || ''}`" max-width="max-w-7xl" :close-on-backdrop="false" @update:model-value="emit('update:visible', $event)">
+  <component :is="standalone ? 'section' : DrawerModal"
+    v-bind="standalone ? { class: 'spice-window p-4' } : { modelValue: visible, title: `${t('spice.title')} · ${instanceName || ''}`, maxWidth: 'max-w-7xl', closeOnBackdrop: false }"
+    @update:model-value="emit('update:visible', $event)">
+    <h1 v-if="standalone" class="text-lg font-semibold text-themed mb-4">{{ t('spice.title') }} · {{ instanceName }}</h1>
     <div class="flex flex-wrap items-center gap-3 mb-4">
       <span class="text-sm text-themed-secondary" role="status">{{ t(`spice.${status}`) }}</span>
       <button type="button" class="btn-secondary" :disabled="status === 'connecting'" @click="connect(true)">{{ t('spice.reconnect') }}</button>
       <button type="button" class="btn-secondary" :disabled="status !== 'connected'" @click="sendCtrlAltDel">Ctrl+Alt+Del</button>
-      <button type="button" class="btn-secondary" :disabled="status !== 'connected'" @click="fullscreen">{{ t('spice.fullscreen') }}</button>
+      <button v-if="!standalone" type="button" class="btn-secondary" @click="openWindow">{{ t('spice.window') }}</button>
     </div>
     <p v-if="error" class="text-sm text-themed-secondary mb-3" role="alert">{{ error }}</p>
     <div class="spice-viewport rounded-lg border border-themed overflow-auto">
       <div :id="screenId" ref="screen" class="spice-screen" :aria-label="t('spice.title')"></div>
     </div>
-    <p class="text-xs text-themed-muted mt-3">{{ t('spice.hint') }}</p>
-  </DrawerModal>
+    <p class="text-xs text-themed-muted mt-3">{{ t(standalone ? 'spice.windowHint' : 'spice.hint') }}</p>
+  </component>
 </template>
 
 <style scoped>
 .spice-viewport { min-height: 24rem; max-height: 72vh; background: var(--terminal-bg); }
 .spice-screen { position: relative; width: max-content; min-width: 100%; min-height: 24rem; }
-.spice-viewport:fullscreen { max-height: none; width: 100%; height: 100%; }
+.spice-window { height: 100vh; display: flex; flex-direction: column; background: var(--bg-primary); }
+.spice-window .spice-viewport { flex: 1; max-height: none; min-height: 0; }
 .spice-screen :deep(canvas) { display: block; }
 </style>
