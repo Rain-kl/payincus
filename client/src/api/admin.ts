@@ -739,7 +739,8 @@ const api = {
   },
 
   operationTasks: {
-    list: (params: { page?: number; search?: string; status?: string; kind?: string }): Promise<{ items: OperationTask[]; total: number }> => http.get('/admin/tasks', { params })
+    list: (params: { page?: number; search?: string; status?: string; kind?: string }): Promise<{ items: OperationTask[]; total: number }> => http.get('/admin/tasks', { params }),
+    stop: (id: number): Promise<{ message: string }> => http.post(`/admin/tasks/${id}/stop`)
   },
   // 认证
   auth: {
@@ -4252,12 +4253,14 @@ export const instancesApi = api.instances
 export const promosApi = api.promos
 
 export interface OperationTask {
+  canStop?: boolean
+  stopping?: boolean
   id: number
   hostId: number
   hostName?: string | null
   instanceName: string
   kind: 'create' | 'destroy'
-  status: 'running' | 'success' | 'failed' | 'interrupted'
+  status: 'running' | 'success' | 'failed' | 'cancelled' | 'interrupted'
   error: string | null
   createdAt: string
   finishedAt: string | null

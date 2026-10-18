@@ -60,6 +60,12 @@ async function handleOAuthCode(): Promise<boolean> {
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/console/:id',
+    name: 'console-window',
+    component: () => import('@/views/SpiceConsoleWindowView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, consoleWindow: true, titleKey: 'spice.title' }
+  },
+  {
     path: '/',
     name: 'admin-root',
     redirect: '/admin/dashboard',

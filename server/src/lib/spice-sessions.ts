@@ -19,6 +19,7 @@ interface SpiceSession extends SpiceAccess {
   token: string
   createdAt: number
   backend?: SpiceBackend
+  opening?: Promise<SpiceBackend>
   abort: AbortController
   channels: Set<WebSocket>
   main?: WebSocket
@@ -31,10 +32,40 @@ interface SpiceSession extends SpiceAccess {
 /** Bounded, in-memory capabilities. Never expose Incus operation IDs or fd secrets. */
 export class SpiceSessionManager {
   private sessions = new Map<string, SpiceSession>()
+  private closing = new Map<number, Promise<void>>()
+  private failedCleanup = new Map<number, SpiceBackend>()
+  private reconnecting = new Set<number>()
 
-  async create(access: SpiceAccess, open: (signal: AbortSignal) => Promise<SpiceBackend>, validate: () => Promise<boolean>): Promise<string> {
+  async waitForCleanup(instanceId: number): Promise<void> {
+    await this.closing.get(instanceId)
+    const failed = this.failedCleanup.get(instanceId)
+    if (failed) {
+      await failed.close()
+      this.failedCleanup.delete(instanceId)
+    }
+  }
+
+  async create(access: SpiceAccess, open: (signal: AbortSignal) => Promise<SpiceBackend>, validate: () => Promise<boolean>, reconnect = false): Promise<string> {
+    if (this.reconnecting.has(access.instanceId)) throw new Error('CONSOLE_LIMIT')
+    if (reconnect) this.reconnecting.add(access.instanceId)
+    try {
+      if (reconnect) {
+        this.closeMatching(session => session.instanceId === access.instanceId)
+        await this.waitForCleanup(access.instanceId)
+      }
+      return await this.createSession(access, open, validate)
+    } finally {
+      if (reconnect) this.reconnecting.delete(access.instanceId)
+    }
+  }
+
+  private async createSession(access: SpiceAccess, open: (signal: AbortSignal) => Promise<SpiceBackend>, validate: () => Promise<boolean>): Promise<string> {
+    if (this.closing.has(access.instanceId) || this.failedCleanup.has(access.instanceId)) {
+      await this.waitForCleanup(access.instanceId)
+    }
     const all = [...this.sessions.values()]
-    if (all.length >= 100 || all.filter(s => s.userId === access.userId).length >= 2 || all.some(s => s.instanceId === access.instanceId)) {
+    const reservedInstances = new Set([...all.map(s => s.instanceId), ...this.closing.keys(), ...this.failedCleanup.keys()])
+    if (reservedInstances.size >= 100 || all.filter(s => s.userId === access.userId).length >= 2 || all.some(s => s.instanceId === access.instanceId)) {
       throw new Error('CONSOLE_LIMIT')
     }
     const token = nanoid(48)
@@ -47,16 +78,15 @@ export class SpiceSessionManager {
     this.sessions.set(token, session)
     const timeout = setTimeout(() => this.close(token), 20_000).unref()
     try {
-      const opening = open(session.abort.signal)
+      const opening = session.opening = open(session.abort.signal)
       // A pooled client's initial connect may not support AbortSignal. Bound the caller,
       // and close a backend that finishes after cancellation instead of retaining it.
-      void opening.then(backend => { if (!this.sessions.has(token)) backend.close() }, () => {})
       session.backend = await Promise.race([
         opening,
         new Promise<never>((_, reject) => session.abort.signal.addEventListener('abort',
           () => reject(new Error('Console setup aborted')), { once: true }))
       ])
-      if (!this.sessions.has(token)) { session.backend.close(); throw new Error('Console closed during setup') }
+      if (!this.sessions.has(token)) throw new Error('Console closed during setup')
       if (session.backend.control.readyState !== WebSocket.OPEN) throw new Error('Console control channel closed during setup')
       session.backend.control.on('close', () => this.close(token))
       session.backend.control.on('error', () => this.close(token))
@@ -140,7 +170,10 @@ export class SpiceSessionManager {
         for (const data of pending) backend.send(data, { binary: true })
         pending = []
         clearTimeout(timeout)
-      } catch { terminate() }
+      } catch {
+        console.warn('[SPICE] Console data channel failed', { instanceId })
+        terminate()
+      }
     })()
   }
 
@@ -160,9 +193,9 @@ export class SpiceSessionManager {
     finally { session.checking = false }
   }
 
-  close(token: string): void {
+  close(token: string): Promise<void> {
     const session = this.sessions.get(token)
-    if (!session) return
+    if (!session) return Promise.resolve()
     this.sessions.delete(token)
     clearInterval(session.timer)
     session.abort.abort()
@@ -171,13 +204,35 @@ export class SpiceSessionManager {
       const force = setTimeout(() => socket.terminate(), 2000).unref()
       socket.once('close', () => clearTimeout(force))
     }
-    session.backend?.close()
+    const cleanup = Promise.resolve().then(async () => {
+      // Keep the instance reserved until even a late setup result has been disposed.
+      let backend = session.backend
+      if (!backend && session.opening) {
+        try { backend = await session.opening } catch { return }
+      }
+      if (!backend) return
+      try {
+        await backend.close()
+      } catch {
+        this.failedCleanup.set(session.instanceId, backend)
+        console.warn('[SPICE] Console cleanup failed', { instanceId: session.instanceId })
+      }
+    }).finally(() => {
+      if (this.closing.get(session.instanceId) === cleanup) this.closing.delete(session.instanceId)
+    })
+    this.closing.set(session.instanceId, cleanup)
+    return cleanup
   }
 
   closeMatching(match: (session: SpiceAccess) => boolean): number {
     const tokens = [...this.sessions.values()].filter(match).map(s => s.token)
     for (const token of tokens) this.close(token)
     return tokens.length
+  }
+
+  async drain(): Promise<void> {
+    this.closeMatching(() => true)
+    await Promise.all([...this.closing.values()])
   }
 }
 

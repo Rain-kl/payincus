@@ -18,6 +18,7 @@ import { getInstanceState } from '../lib/incus/incus-instances.js'
 import { mapInstanceStatus } from '../lib/incus/incus-utils.js'
 import { sendNotification } from '../lib/notifier.js'
 import * as db from '../db/index.js'
+import { instanceStatusObservations } from '../lib/instance-status-observation.js'
 
 // ==================== 配置常量 ====================
 
@@ -86,7 +87,7 @@ async function withTimeout<T>(
  * 这些操作期间 Incus 侧会短暂删除并重建实例，incusId 可能暂时查不到，
  * 状态同步必须避免据此把实例误判为已删除，或误报意外停机。
  */
-async function hasActiveInstanceOperation(instanceId: number): Promise<boolean> {
+export async function hasActiveInstanceOperation(instanceId: number): Promise<boolean> {
     const [instanceTask, restoreTask, uploadTask] = await Promise.all([
         prisma.instanceTask.findFirst({
             where: { instanceId, status: { in: ['PENDING', 'PROCESSING'] } },
@@ -117,7 +118,7 @@ async function getInstancesToSync(batchSize: number) {
     const instances = await prisma.instance.findMany({
         where: {
             status: {
-                in: ['running', 'stopped']  // 不包含 creating，避免竞争
+                in: ['running', 'stopped', 'error']  // 包含 error 以复核恢复；不包含 creating
             },
             host: {
                 status: 'online'
@@ -209,30 +210,37 @@ async function syncInstanceStatus(
         recordHostSuccess(instance.host.id, responseTime)
 
         if (!state.status) {
+            instanceStatusObservations.forget(instance.id)
             return { changed: false }
         }
 
         const incusStatus = mapInstanceStatus(state.status)
 
         if (incusStatus === 'unknown') {
+            instanceStatusObservations.forget(instance.id)
+            return { changed: false }
+        }
+
+        if (await hasActiveInstanceOperation(instance.id)) {
+            instanceStatusObservations.forget(instance.id)
+            return { changed: false }
+        }
+        if (!instanceStatusObservations.shouldApply(instance.id, instance.status, incusStatus)) {
             return { changed: false }
         }
 
         // 状态不一致，需要更新
         if (instance.status !== incusStatus) {
-            await db.updateInstanceStatus(
-                instance.id,
-                incusStatus as 'creating' | 'running' | 'stopped' | 'error'
-            )
-            
-            // 同时更新 lastSyncedAt
-            await prisma.instance.updateMany({
+            const updated = await prisma.instance.updateMany({
                 where: {
                     id: instance.id,
-                    status: { not: 'deleted' }
+                    incusId: instance.incusId,
+                    hostId: instance.host.id,
+                    status: instance.status as 'running' | 'stopped' | 'error'
                 },
-                data: { lastSyncedAt: new Date() }
+                data: { status: incusStatus as 'running' | 'stopped' | 'error', lastSyncedAt: new Date() }
             })
+            if (!updated.count) return { changed: false }
 
             // 如果是从 running 变为 stopped，发送意外停机通知
             // 但重建/迁移/恢复/备份上传等操作会主动停机，属正常过程，不应误报
@@ -270,11 +278,15 @@ async function syncInstanceStatus(
         return { changed: false }
 
     } catch (error) {
+        instanceStatusObservations.forget(instance.id)
         const errorMessage = error instanceof Error ? error.message : String(error)
         recordHostError(instance.host.id)
 
         // 如果实例不存在于 Incus，标记为已删除
         if (errorMessage.includes('not found') || errorMessage.includes('Instance not found')) {
+            // Failed provisioning records may have no Incus instance and still carry refund rights.
+            // Rechecking error must never turn those records into deleted.
+            if (instance.status === 'error') return { changed: false, error: errorMessage }
             // 重建/迁移/恢复等操作过程中，Incus 会短暂删除并重建实例，此时 incusId 查不到属正常，
             // 不能据此误判为已删除，否则会导致 restore 终写被 status:'deleted' 拦截、实例记账错乱。
             if (await hasActiveInstanceOperation(instance.id)) {

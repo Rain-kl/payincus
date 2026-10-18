@@ -1,4 +1,4 @@
-import { taskLog } from '../operation-task-log.js'
+import { bindOperationCancellation, taskLog } from '../operation-task-log.js'
 /**
  * Incus 客户端工具函数
  */
@@ -9,35 +9,44 @@ import type { IncusApiResponse, IncusOperation } from '../../types/incus.js'
 
 /**
  * 等待异步操作完成
- * @param timeout 超时时间（毫秒），默认 120 秒
+ * @param timeout 超时时间（毫秒），默认 30 分钟
  */
 export async function waitForOperation(
   client: IncusClient,
   operationUrl: string,
-  timeout: number = 300000 // 从 120000 放宽到 300000 (5分钟)
+  timeout: number = 30 * 60 * 1000
 ): Promise<unknown> {
   const startTime = Date.now()
   taskLog('info', `Incus 操作 ${operationUrl}，等待节点执行（超时 ${Math.round(timeout / 1000)} 秒）`)
   let lastProgress = ''
+  const unbind = bindOperationCancellation(async () => {
+    const op = await client.request<IncusOperation>('GET', operationUrl)
+    if (op.status !== 'Running' && op.status !== 'Pending') throw new Error('节点操作已结束或正在取消，请刷新任务状态')
+    if (!op.may_cancel) throw new Error('Incus 不支持取消当前操作，无法强行停止；请等待操作完成')
+    await client.request('DELETE', operationUrl)
+  })
 
-  while (Date.now() - startTime < timeout) {
-    const op = await client.request<IncusOperation>('GET', `${operationUrl}/wait?timeout=10`)
+  try {
+    while (Date.now() - startTime < timeout) {
+      const op = await client.request<IncusOperation>('GET', `${operationUrl}/wait?timeout=10`)
 
-    const progress = [op.description, op.status, ...Object.entries(op.metadata || {})
-      .filter(([key]) => /^(download_progress|fs_progress|create_instance_from_image_unpack_progress|progress|unpack_progress)$/.test(key))
-      .map(([key, value]) => `${key}: ${String(value).slice(0, 1000)}`)].filter(Boolean).join(' · ')
-    if (progress !== lastProgress) { taskLog('info', progress); lastProgress = progress }
-    if (op.status === 'Cancelled' || op.status_code >= 400) throw new Error(op.err || op.error || '节点操作失败或已取消')
-    if (op.status === 'Success') {
-      return op.metadata
+      const progress = [op.description, op.status, ...Object.entries(op.metadata || {})
+        .filter(([key]) => /^(download_progress|fs_progress|create_instance_from_image_unpack_progress|progress|unpack_progress)$/.test(key))
+        .map(([key, value]) => `${key}: ${String(value).slice(0, 1000)}`)].filter(Boolean).join(' · ')
+      if (progress !== lastProgress) { taskLog('info', progress); lastProgress = progress }
+      if (op.status === 'Cancelled') throw new Error('节点操作已取消，执行失败清理')
+      if (op.status_code >= 400) throw new Error(op.err || op.error || '节点操作失败')
+      if (op.status === 'Success') {
+        return op.metadata
+      }
+
+      if (op.status === 'Failure') {
+        throw new Error(op.err || op.error || '操作失败')
+      }
     }
 
-    if (op.status === 'Failure') {
-      throw new Error(op.err || op.error || '操作失败')
-    }
-  }
-
-  throw new Error('Operation timeout (5 minutes)')
+    throw new Error(`Operation timeout (${Math.round(timeout / 1000)} seconds)`)
+  } finally { unbind() }
 }
 
 /**

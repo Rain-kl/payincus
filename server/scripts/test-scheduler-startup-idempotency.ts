@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import './test-instance-status-observation.js'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

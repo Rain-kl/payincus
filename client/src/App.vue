@@ -31,7 +31,7 @@ const hiddenHostingRouteNames = new Set([
 const noLayoutRoutes: string[] = ['login', 'register', 'forgot-password']
 const publicSiteRouteNames = new Set(['portal', 'market', 'help', 'help-article'])
 const showLayout = computed<boolean>(() => {
-  return authStore.isAuthenticated && !noLayoutRoutes.includes(route.name as string) && !showPublicSiteLayout.value
+  return authStore.isAuthenticated && !route.meta.consoleWindow && !noLayoutRoutes.includes(route.name as string) && !showPublicSiteLayout.value
 })
 const showPublicSiteLayout = computed<boolean>(() => {
   return typeof route.name === 'string' && publicSiteRouteNames.has(route.name)
@@ -206,6 +206,6 @@ onUnmounted(() => {
       </Transition>
     </template>
   </RouterView>
-  <PopupAnnouncementModal />
+  <PopupAnnouncementModal v-if="!route.meta.consoleWindow" />
   <ToastContainer />
 </template>

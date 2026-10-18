@@ -146,7 +146,7 @@ export class IncusClient {
    * 发送 API 请求
    * @param timeout 异步操作的超时时间（毫秒），默认 120 秒。对于长时间操作（如复制实例），建议使用 300000（5分钟）
    */
-  async request<T = unknown>(method: string, path: string, body: unknown = null, timeout: number = 120000, signal?: AbortSignal): Promise<T> {
+  async request<T = unknown>(method: string, path: string, body: unknown = null, timeout: number = 30 * 60 * 1000, signal?: AbortSignal): Promise<T> {
     if (!this.agent) {
       throw new Error('Incus 客户端未连接')
     }

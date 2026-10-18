@@ -1,5 +1,7 @@
 import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getInstanceStorageCapacity } from '../lib/storage-capacity.js'
+import { instanceStatusObservations } from '../lib/instance-status-observation.js'
+import { hasActiveInstanceOperation } from '../services/status-scheduler.js'
 import { GpuError } from '../lib/gpu.js'
 import { reserveInstanceGpu, getInstanceGpuPcis, releaseFailedGpu } from '../db/gpus.js'
 import { currentOperationTask, runOperationTask, taskLog } from '../lib/operation-task-log.js'
@@ -2928,7 +2930,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    if (instance.status !== 'running') {
+    if (instance.status !== 'running' && instance.status !== 'error') {
       return {
         stats: {
           cpu: { usage: 0, usagePercent: 0 },
@@ -2961,10 +2963,17 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       if (state.status) {
         const incusStatus = mapInstanceStatus(state.status)
         // 仅在状态不一致且是有效状态时更新
-        if (incusStatus !== 'unknown' && instance.status !== incusStatus) {
-          console.log(`[StatusSync] Passive sync: Instance ${instance.id} status ${instance.status} → ${incusStatus}`)
-          await db.updateInstanceStatus(instanceId, incusStatus as 'creating' | 'running' | 'stopped' | 'error')
+        if (await hasActiveInstanceOperation(instanceId)) {
+          instanceStatusObservations.forget(instanceId)
+        } else if (instanceStatusObservations.shouldApply(instanceId, instance.status, incusStatus) && instance.status !== incusStatus) {
+          const updated = await prisma.instance.updateMany({
+            where: { id: instanceId, incusId: instance.incus_id, hostId: instance.host_id, status: instance.status },
+            data: { status: incusStatus as 'running' | 'stopped' | 'error', lastSyncedAt: new Date() }
+          })
+          if (updated.count) console.log(`[StatusSync] Passive sync: Instance ${instance.id} status ${instance.status} → ${incusStatus}`)
         }
+      } else {
+        instanceStatusObservations.forget(instanceId)
       }
 
       const memoryUsage = state.memory?.usage || 0
@@ -3018,6 +3027,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       console.error('获取实例资源状态失败:', errorMessage)
+      instanceStatusObservations.forget(instanceId)
       return {
         stats: {
           cpu: { usage: 0, usagePercent: 0 },
