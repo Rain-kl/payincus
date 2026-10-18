@@ -1,3 +1,4 @@
+import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getStorageOverview } from '../lib/storage-capacity.js'
 import { GpuError } from '../lib/gpu.js'
 import { compensateGpuPreparationFailure, releaseFailedGpu, reserveInstanceGpu, assertGpuMigration } from '../db/gpus.js'
@@ -5914,7 +5915,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
         // 14. 在目标节点创建实例
         console.log(`[Migrate] 在目标节点创建实例 ${newIncusId}...`)
-        await createInstance(targetClient, incusConfig)
+        await createInstance(targetClient, incusConfig, instance.id)
         targetIncusCreated = true
 
         // 15. 启动新实例
@@ -5935,6 +5936,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         const { createdInstance: newInstance, migratedBillingRecordCount } = await prisma.$transaction(async tx => {
           const createdInstance = await tx.instance.create({
             data: {
+              ...(await snapshotPackageEgress(tx, finalPackageId, targetHostId, instance.id)),
               incusId: newIncusId,
               name: instance.name,
               userId: instance.userId,
@@ -5999,6 +6001,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             throw new Error('源实例状态已变化，无法完成迁移')
           }
 
+          await tx.instanceEgressAttachment.updateMany({ where: { hostId: targetHostId, incusName: newIncusId }, data: { instanceId: createdInstance.id } })
           return {
             createdInstance,
             migratedBillingRecordCount: movedCount
@@ -6506,6 +6509,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
         const instance = await tx.instance.create({
           data: {
+            ...(await snapshotPackageEgress(tx, packageId, reservedHost.id)),
             ...(await reserveInstanceGpu(tx, { hostId: reservedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             name,

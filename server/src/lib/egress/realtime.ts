@@ -21,13 +21,24 @@ export function controlFailure(error: unknown): { status: number; error: string 
   const [status, message] = failures[code]
   return { status, error: message }
 }
-export async function pushNetworkPolicy(hostId: number) {
-  requireNetworkControl(hostId, 'network.apply')
+// The backend is single-process. Serialize control requests per host so two
+// concurrent provisions cannot supersede each other's in-flight revision.
+const networkPushes = new Map<number, Promise<unknown>>()
+export function pushNetworkPolicy(hostId: number) {
+  const previous = networkPushes.get(hostId) ?? Promise.resolve()
+  const pending = previous.catch(() => {}).then(() => applyNetworkPolicy(hostId))
+  networkPushes.set(hostId, pending)
+  void pending.finally(() => { if (networkPushes.get(hostId) === pending) networkPushes.delete(hostId) }).catch(() => {})
+  return pending
+}
+async function applyNetworkPolicy(hostId: number) {
   const agent = await prisma.hostAgent.findUnique({ where: { hostId }, select: { enabled: true } })
   if (!agent?.enabled) throw new TunnelControlError('OFFLINE')
   const instruction = await networkInstruction(hostId)
   if (!instruction.revision) return null
-  const raw = await hostTunnelManager.requestControl<Record<string, unknown>>(hostId, 'network.apply', instruction, 100_000)
+  const method = instruction.bindings.length || hostTunnelManager.supportsControl(hostId, 'network.apply.v2') ? 'network.apply.v2' : 'network.apply'
+  requireNetworkControl(hostId, method)
+  const raw = await hostTunnelManager.requestControl<Record<string, unknown>>(hostId, method, instruction, 100_000)
   let status: ReturnType<typeof sanitizeNetworkStatus>
   try { status = sanitizeNetworkStatus(raw) } catch { throw new TunnelControlError('INVALID_RESPONSE') }
   if (Number(raw.appliedRevision) > instruction.revision) throw new TunnelControlError('INVALID_RESPONSE')

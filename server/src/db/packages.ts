@@ -1,3 +1,4 @@
+import { validatePackageEgress } from '../lib/egress/package.js'
 import { getGpuOffersForPackages, gpuOffersAvailableOnHost, validateGpuSelection } from './gpus.js'
 import { resolveGpuPolicy } from '../lib/gpu.js'
 /**
@@ -288,6 +289,8 @@ export async function getAllPackages(
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    egress_mode: pkg.egressMode,
+    egress_profile_version_id: pkg.egressProfileVersionId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -371,6 +374,8 @@ export async function getPackageById(id: number): Promise<(Package & { host_ids?
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    egress_mode: pkg.egressMode,
+    egress_profile_version_id: pkg.egressProfileVersionId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -434,6 +439,8 @@ export async function getPackageByName(name: string): Promise<Package | null> {
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    egress_mode: pkg.egressMode,
+    egress_profile_version_id: pkg.egressProfileVersionId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -489,6 +496,8 @@ export async function getPackageByUserAndName(userId: number, name: string): Pro
     bandwidth_max: pkg.bandwidthMax,
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
+    egress_mode: pkg.egressMode,
+    egress_profile_version_id: pkg.egressProfileVersionId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -539,6 +548,8 @@ export async function createPackage(data: {
   hostIds: number[]  // 必须至少绑定一个宿主机
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  egressMode?: string
+  egressProfileVersionId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -612,6 +623,8 @@ async function createPackageUnchecked(data: {
   hostIds: number[]
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  egressMode?: string
+  egressProfileVersionId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -669,8 +682,11 @@ async function createPackageUnchecked(data: {
 
   await validateGpuSelection(client, { gpuShared: data.gpuShared ?? false, gpuDeviceIds: data.gpuDeviceIds ?? [], instanceType: data.instanceType ?? 'container', privileged: data.privileged ?? false, hostIds: data.hostIds })
 
+  await validatePackageEgress(client, data)
   const pkg = await client.package.create({
     data: {
+      egressMode: data.egressMode ?? 'legacy',
+      egressProfileVersionId: data.egressProfileVersionId ?? null,
       userId: data.userId,
       name: data.name,
       description: data.description ?? null,
@@ -746,6 +762,8 @@ export async function updatePackage(id: number, data: {
   hostIds?: number[]  // 如果提供，将更新绑定的宿主机
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  egressMode?: string
+  egressProfileVersionId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -827,6 +845,8 @@ async function updatePackageUnchecked(id: number, data: {
   hostIds?: number[]
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
+  egressMode?: string
+  egressProfileVersionId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -872,6 +892,15 @@ async function updatePackageUnchecked(id: number, data: {
     await validateGpuSelection(client, { ...nextGpuPackage, ...resolveGpuPolicy(nextGpuPackage, plan), hostIds: gpuHostIds })
   }
 
+  await validatePackageEgress(client, {
+    egressMode: data.egressMode ?? currentGpuPackage.egressMode,
+    egressProfileVersionId: data.egressProfileVersionId === undefined ? currentGpuPackage.egressProfileVersionId : data.egressProfileVersionId,
+    networkMode: data.networkMode ?? currentGpuPackage.networkMode,
+    instanceType: data.instanceType ?? currentGpuPackage.instanceType,
+    privileged: data.privileged ?? currentGpuPackage.privileged,
+    hostIds: gpuHostIds
+  })
+
   const updateData: {
     name?: string
     description?: string | null
@@ -881,6 +910,8 @@ async function updatePackageUnchecked(id: number, data: {
     bandwidthMax?: number | null
     networkMode?: 'nat' | 'nat_ipv6' | 'nat_ipv6_nat' | 'ipv6_only' | 'ipv6_nat' | 'public_ipv4' | 'public_ipv4_ipv6'
     instanceType?: 'container' | 'vm'
+    egressMode?: string
+    egressProfileVersionId?: number | null
     gpuShared?: boolean
     gpuDeviceIds?: number[]
     privileged?: boolean
@@ -926,6 +957,8 @@ async function updatePackageUnchecked(id: number, data: {
   if (data.bandwidthMax !== undefined) updateData.bandwidthMax = data.bandwidthMax ?? null
   if (data.networkMode !== undefined) updateData.networkMode = data.networkMode
   if (data.instanceType !== undefined) updateData.instanceType = data.instanceType
+  if (data.egressMode !== undefined) updateData.egressMode = data.egressMode
+  if (data.egressProfileVersionId !== undefined) updateData.egressProfileVersionId = data.egressProfileVersionId
   if (data.gpuShared !== undefined) updateData.gpuShared = data.gpuShared
   if (data.gpuDeviceIds !== undefined) updateData.gpuDeviceIds = data.gpuDeviceIds
   if (data.privileged !== undefined) updateData.privileged = data.privileged

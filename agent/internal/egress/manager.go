@@ -23,6 +23,9 @@ type savedNetwork struct {
 	Rules       string      `json:"rules"`
 }
 type Manager struct {
+	groupChecks  map[string]time.Time
+	groupHashes  map[string]string
+	groupReady   map[string]bool
 	mu           sync.Mutex
 	dir          string
 	desired      *Instruction
@@ -126,9 +129,16 @@ func (m *Manager) Probe(ctx context.Context, request ProbeRequest) ([]ProbeResul
 }
 func (m *Manager) HandleControl(ctx context.Context, method string, params json.RawMessage) (any, error) {
 	switch method {
-	case "network.apply":
+	case "network.apply", "network.apply.v2":
 		var in Instruction
 		if json.Unmarshal(params, &in) != nil || in.Revision <= 0 || (in.Egress.Mode != "off" && in.Egress.Mode != "direct" && in.Egress.Mode != "proxy") || len(in.Nodes) > 16 || len(in.Firewall.Rules) > 200 {
+			return nil, fmt.Errorf("invalid_request")
+		}
+		if method == "network.apply.v2" {
+			if in.SchemaVersion != 2 || validateGroups(in) != nil {
+				return nil, fmt.Errorf("invalid_request")
+			}
+		} else if len(in.Groups) > 0 || len(in.Bindings) > 0 {
 			return nil, fmt.Errorf("invalid_request")
 		}
 		return m.Apply(ctx, in)
@@ -359,7 +369,7 @@ func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 			m.setError("restore")
 			return
 		}
-		if in.Egress.Mode == "off" && !in.Firewall.Enabled {
+		if in.Egress.Mode == "off" && !in.Firewall.Enabled && in.SchemaVersion < 2 {
 			e = removeRestoreUnit(ctx)
 		} else {
 			exe, err := os.Executable()
@@ -389,6 +399,20 @@ func (m *Manager) reconcileLocked(parent context.Context, withHealth bool) {
 		m.lastHash = ""
 		return
 	}
+	if in.SchemaVersion >= 2 {
+		if err := m.reconcileGroups(ctx, in, inv, false); err != nil {
+			m.setError("network")
+			return
+		}
+	}
+	m.mu.Lock()
+	if m.status.AppliedRevision == in.Revision {
+		m.status.State = "applied"
+		m.status.Error = "none"
+		m.status.ErrorStage = ""
+		m.status.ErrorDetail = ""
+	}
+	m.mu.Unlock()
 	if withHealth && in.Egress.Mode == "proxy" && time.Since(m.lastHealth) >= time.Duration(in.Egress.ProbeIntervalSeconds)*time.Second {
 		healthCtx, stopHealth := context.WithCancel(ctx)
 		m.mu.Lock()
@@ -514,6 +538,12 @@ func RestoreCLI() error {
 	defer cancel()
 	if err = replaceHostRules(ctx, saved.Rules); err != nil {
 		return err
+	}
+	if saved.Instruction.SchemaVersion >= 2 {
+		m := NewManager()
+		if err = m.reconcileGroups(ctx, saved.Instruction, saved.Inventory, true); err != nil {
+			return err
+		}
 	}
 	if saved.Instruction.Egress.Mode != "off" {
 		resolvers, resolverErr := hostBootstrapResolvers(saved.Inventory)

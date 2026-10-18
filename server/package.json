@@ -200,7 +200,9 @@
     "test:promo-engine-guards": "node --import tsx scripts/test-promo-engine-guards.ts",
     "test:gpu-sharing": "node --import tsx scripts/test-gpu-sharing.ts",
     "test:gpu-sharing:db": "RUN_GPU_DB_TESTS=1 node --import tsx scripts/test-gpu-sharing.ts",
-    "smoke:gpu-purchase": "node --import tsx scripts/smoke-gpu-purchase.ts"
+    "smoke:gpu-purchase": "node --import tsx scripts/smoke-gpu-purchase.ts",
+    "test:package-egress": "node --import tsx scripts/test-package-egress.ts",
+    "test:package-egress:db": "RUN_PACKAGE_EGRESS_DB_TESTS=1 node --import tsx scripts/test-package-egress.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

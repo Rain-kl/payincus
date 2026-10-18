@@ -69,10 +69,10 @@ export default async function egressRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: number } }>('/admin/proxy-nodes/:id', { onRequest: admin, schema: { params: hostParams } }, async (request, reply) => {
     const state = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74201)`
-      if (await tx.hostNetworkPolicy.count({ where: { egress: { path: ['proxyNodeIds'], array_contains: [request.params.id] } } })) return 'used'
+      if (await tx.hostNetworkPolicy.count({ where: { egress: { path: ['proxyNodeIds'], array_contains: [request.params.id] } } }) || await tx.egressProfileVersion.count({ where: { proxyNodeId: request.params.id } })) return 'used'
       return (await tx.proxyNode.deleteMany({ where: { id: request.params.id } })).count ? 'ok' : 'missing'
     })
-    if (state === 'used') return reply.code(409).send({ error: '代理节点仍被宿主节点引用，请先移除出口配置' })
+    if (state === 'used') return reply.code(409).send({ error: '代理节点仍被节点出口或套餐出口策略引用，无法删除' })
     if (state === 'missing') return reply.code(404).send({ error: '代理节点不存在' })
     await createLog(request.user.id, 'host', 'host.proxy.delete', `Deleted proxy node ${request.params.id}`, 'success')
     return { success: true }

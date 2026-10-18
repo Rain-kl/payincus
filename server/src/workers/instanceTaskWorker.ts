@@ -1534,7 +1534,7 @@ async function executeRecreateTask(
 
   // 12. 创建新实例
   console.log(`[Recreate] 创建新实例 ${newIncusId}...`)
-  await createInstance(client, incusConfig)
+  await createInstance(client, incusConfig, task.instanceId)
   newInstanceCreated = true
 
   if (instanceType === 'container') {
@@ -1902,7 +1902,7 @@ async function executeChangeHostTask(
 
     await updateInstanceTaskProgress(task.id, 'creating_on_target')
     console.log(`[ChangeHost] 在目标节点 ${targetHost.name} 创建实例 ${newIncusId}...`)
-    await createInstance(targetClient, incusConfig)
+    await createInstance(targetClient, incusConfig, task.instanceId)
 
     await updateInstanceTaskProgress(task.id, 'starting_target')
     await startInstance(targetClient, newIncusId)
@@ -2531,6 +2531,7 @@ async function executeCloneTask(
     })
 
     const newInstanceId = await db.createInstance({
+      egressSourceInstanceId: task.instanceId,
       incusId: newIncusId,
       name: newInstanceName,
       userId: task.userId,

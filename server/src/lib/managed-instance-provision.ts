@@ -89,7 +89,7 @@ export async function provisionManagedInstanceAsync(
       bootHostShutdownTimeout: config.bootHostShutdownTimeout
     })
 
-    await createInstance(client, incusConfig)
+    await createInstance(client, incusConfig, instanceId)
 
     let ready = false
     for (let i = 0; i < 60; i++) {

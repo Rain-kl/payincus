@@ -793,6 +793,7 @@ model Host {
 }
 
 model ProxyNode {
+  egressVersions EgressProfileVersion[]
   id              Int      @id @default(autoincrement())
   name            String
   protocol        String
@@ -1012,6 +1013,9 @@ model PackageHost {
 }
 
 model Package {
+  egressMode String @default("legacy") @map("egress_mode")
+  egressProfileVersionId Int? @map("egress_profile_version_id")
+  egressProfileVersion EgressProfileVersion? @relation("PackageEgress", fields: [egressProfileVersionId], references: [id], onDelete: Restrict)
   id                  Int          @id @default(autoincrement())
   userId              Int          @map("user_id") // 所有者
   name                String
@@ -1093,6 +1097,10 @@ model Package {
 // ==================== 实例相关模型 ====================
 
 model Instance {
+  egressMode String @default("legacy") @map("egress_mode")
+  egressProfileVersionId Int? @map("egress_profile_version_id")
+  egressProfileVersion EgressProfileVersion? @relation("InstanceEgress", fields: [egressProfileVersionId], references: [id], onDelete: Restrict)
+  egressAttachments InstanceEgressAttachment[]
   id               Int            @id @default(autoincrement())
   incusId          String         @map("incus_id")
   idempotencyKey   String?        @unique @map("idempotency_key")
@@ -3781,4 +3789,43 @@ model OperationTaskLog {
   task OperationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
   @@index([taskId, id])
   @@map("operation_task_logs")
+}
+
+model EgressProfile {
+  id Int @id @default(autoincrement())
+  name String
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  versions EgressProfileVersion[]
+  @@map("egress_profiles")
+}
+model EgressProfileVersion {
+  id Int @id @default(autoincrement())
+  profileId Int @map("profile_id")
+  version Int
+  proxyNodeId Int @map("proxy_node_id")
+  proxyNode ProxyNode @relation(fields: [proxyNodeId], references: [id], onDelete: Restrict)
+  allowedHostIds Int[] @map("allowed_host_ids")
+  createdAt DateTime @default(now()) @map("created_at")
+  profile EgressProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  packages Package[] @relation("PackageEgress")
+  instances Instance[] @relation("InstanceEgress")
+  @@unique([profileId, version])
+  @@index([proxyNodeId])
+  @@map("egress_profile_versions")
+}
+// Runtime intents also cover stopped replacement instances and migration targets.
+model InstanceEgressAttachment {
+  id Int @id @default(autoincrement())
+  instanceId Int @map("instance_id")
+  hostId Int @map("host_id")
+  incusName String @map("incus_name")
+  mode String
+  profileVersionId Int? @map("profile_version_id")
+  generation Int @default(1)
+  nics Json
+  instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  @@unique([hostId, incusName])
+  @@index([instanceId])
+  @@map("instance_egress_attachments")
 }

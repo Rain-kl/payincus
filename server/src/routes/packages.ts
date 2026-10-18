@@ -1,3 +1,4 @@
+import { normalizePackageEgress } from '../lib/egress/package.js'
 import { gpuPlanAvailable } from '../db/gpus.js'
 import { normalizeGpuInput, GpuError, resolveGpuPolicy, summarizeGpuConfigurations } from '../lib/gpu.js'
 /**
@@ -58,6 +59,8 @@ type NormalizedPackagePlanInput = {
 }
 
 type NormalizedPackageInput = {
+  egressMode?: string
+  egressProfileVersionId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   name?: string
@@ -603,6 +606,7 @@ function normalizePackageInput(input: unknown, options: { requireAll: boolean })
   normalized.bandwidthMax = optionalPackageInteger(input, 'bandwidthMax', '带宽', 0, POSTGRES_INT_MAX)
   normalized.networkMode = optionalPackageEnum(input, 'networkMode', '网络模式', ACTIVE_PACKAGE_NETWORK_MODES)
   normalized.instanceType = optionalPackageEnum(input, 'instanceType', '实例类型', ['container', 'vm'])
+  Object.assign(normalized, normalizePackageEgress(input))
   normalized.hostIds = normalizePackageHostIds(input, options.requireAll)
   normalized.hostStoragePools = normalizePackageHostStoragePools(input)
   normalized.hostTrafficMultipliers = normalizePackageHostTrafficMultipliers(input)
@@ -695,9 +699,11 @@ function normalizePublicPackageMaxInstances(value: unknown): number {
   return validatePublicPackageMaxInstances(value) ? value : PUBLIC_PACKAGE_MAX_INSTANCES_MIN
 }
 
-function getPackagePrerequisiteFields(pkg: { gpuShared?: boolean; gpuDeviceIds?: number[]; gpu_shared?: boolean; gpu_device_ids?: number[]; requiredPackageId?: number | null; requiredPackageName?: string | null; required_package_id?: number | null; required_package_name?: string | null }) {
+function getPackagePrerequisiteFields(pkg: { egressMode?: string; egressProfileVersionId?: number | null; egress_mode?: string; egress_profile_version_id?: number | null; gpuShared?: boolean; gpuDeviceIds?: number[]; gpu_shared?: boolean; gpu_device_ids?: number[]; requiredPackageId?: number | null; requiredPackageName?: string | null; required_package_id?: number | null; required_package_name?: string | null }) {
   return {
     gpu_shared: pkg.gpuShared ?? pkg.gpu_shared ?? false,
+    egress_mode: pkg.egressMode ?? pkg.egress_mode ?? 'legacy',
+    egress_profile_version_id: pkg.egressProfileVersionId ?? pkg.egress_profile_version_id ?? null,
     gpu_device_ids: pkg.gpuDeviceIds ?? pkg.gpu_device_ids ?? [],
     required_package_id: pkg.requiredPackageId ?? pkg.required_package_id ?? null,
     required_package_name: pkg.requiredPackageName ?? pkg.required_package_name ?? null
@@ -1650,6 +1656,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
             type: 'object',
             additionalProperties: { type: ['number', 'string', 'null'] }
           },
+          egressMode: { type: 'string', enum: ['legacy', 'direct', 'profile'] },
+          egressProfileVersionId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
           gpuShared: { type: 'boolean' },
           gpuDeviceIds: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } },
           privileged: { type: 'boolean' },
@@ -1752,6 +1760,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     let id: number
     try {
       id = await db.createPackage({
+        egressMode: packageInput.egressMode,
+        egressProfileVersionId: packageInput.egressProfileVersionId,
         gpuShared: packageInput.gpuShared,
         gpuDeviceIds: packageInput.gpuDeviceIds,
         userId: request.user.id,  // 所有者为当前用户
@@ -1848,6 +1858,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
             type: 'object',
             additionalProperties: { type: ['number', 'string', 'null'] }
           },
+          egressMode: { type: 'string', enum: ['legacy', 'direct', 'profile'] },
+          egressProfileVersionId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
           gpuShared: { type: 'boolean' },
           gpuDeviceIds: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } },
           privileged: { type: 'boolean' },
@@ -1933,6 +1945,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       requiredPackageId
     } = packageInput
     const updateData: Parameters<typeof db.updatePackage>[1] = {}
+    if (packageInput.egressMode !== undefined) updateData.egressMode = packageInput.egressMode
+    if (packageInput.egressProfileVersionId !== undefined) updateData.egressProfileVersionId = packageInput.egressProfileVersionId
     if (packageInput.name !== undefined) updateData.name = packageInput.name
     if (packageInput.description !== undefined) updateData.description = packageInput.description
     if (packageInput.cpuMax !== undefined) updateData.cpuMax = packageInput.cpuMax

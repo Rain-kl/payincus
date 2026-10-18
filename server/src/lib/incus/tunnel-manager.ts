@@ -16,7 +16,7 @@ export interface TunnelTargetConfig {
 }
 
 const WS_OPEN = 1
-export type ControlMethod = 'network.apply' | 'proxy.probe'
+export type ControlMethod = 'network.apply' | 'network.apply.v2' | 'proxy.probe'
 export class TunnelControlError extends Error {
   constructor(public readonly code: 'OFFLINE' | 'UPGRADE_REQUIRED' | 'BUSY' | 'TIMEOUT' | 'DISCONNECTED' | 'CANCELLED' | 'INVALID_RESPONSE' | 'REMOTE_ERROR') {
     super(code)
@@ -318,7 +318,7 @@ export class HostTunnelManager extends EventEmitter {
         if (streamId !== 0 || payload.length > 4096) break
         try {
           const hello = JSON.parse(payload.toString('utf8'))
-          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'network.apply' || v === 'proxy.probe') : [])
+          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'network.apply' || v === 'network.apply.v2' || v === 'proxy.probe') : [])
           const firstHello = !this.controlCapabilities.has(hostId)
           this.controlCapabilities.set(hostId, capabilities)
           if (firstHello && capabilities.has('network.apply')) this.emit('control_ready', hostId)

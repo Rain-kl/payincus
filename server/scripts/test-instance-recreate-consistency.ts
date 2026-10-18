@@ -50,7 +50,7 @@ assert.ok(
 
 const deleteOld = indexOfOrThrow(recreateSection, 'await deleteInstance(client, oldIncusId)', 'old Incus delete')
 const markOldDeleted = indexOfOrThrow(recreateSection, 'oldInstanceDeleted = true', 'old deleted marker')
-const createNew = indexOfOrThrow(recreateSection, 'await createInstance(client, incusConfig)', 'new Incus create')
+const createNew = indexOfOrThrow(recreateSection, 'await createInstance(client, incusConfig, task.instanceId)', 'new Incus create')
 const markNewCreated = indexOfOrThrow(recreateSection, 'newInstanceCreated = true', 'new created marker')
 const cleanupRecords = indexOfOrThrow(recreateSection, 'await cleanupRecreatedInstanceRecords(task.instanceId, instance.host_id)', 'recreate DB cleanup')
 const updateDb = indexOfOrThrow(recreateSection, 'await prisma.instance.update({', 'instance DB switch')

@@ -137,6 +137,8 @@ export type NetworkMode =
   | 'public_ipv4_ipv6'
 
 export interface Package {
+  egress_mode?: string
+  egress_profile_version_id?: number | null
   gpu_shared?: boolean
   gpu_device_ids?: number[]
   id: number

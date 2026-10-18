@@ -38,22 +38,30 @@ type ProbeRequest struct {
 	Nodes    []Node `json:"nodes"`
 }
 type Instruction struct {
-	Revision int      `json:"revision"`
-	Egress   Policy   `json:"egress"`
-	Firewall Firewall `json:"firewall"`
-	Nodes    []Node   `json:"nodes"`
+	SchemaVersion  int             `json:"schemaVersion,omitempty"`
+	Groups         []EgressGroup   `json:"groups,omitempty"`
+	Bindings       []EgressBinding `json:"bindings,omitempty"`
+	GroupDirectDNS string          `json:"-"`
+	GroupBridgeDNS []string        `json:"-"`
+	GroupInternal  []string        `json:"-"`
+	Revision       int             `json:"revision"`
+	Egress         Policy          `json:"egress"`
+	Firewall       Firewall        `json:"firewall"`
+	Nodes          []Node          `json:"nodes"`
 }
 type Status struct {
-	AppliedRevision int      `json:"appliedRevision"`
-	State           string   `json:"state"`
-	Error           string   `json:"error"`
-	ErrorStage      string   `json:"errorStage,omitempty"`
-	ErrorDetail     string   `json:"errorDetail,omitempty"`
-	XrayAvailable   bool     `json:"xrayAvailable"`
-	ActiveNodeID    int      `json:"activeNodeId,omitempty"`
-	HealthyNodeIDs  []int    `json:"healthyNodeIds"`
-	ManagedNetworks []string `json:"managedNetworks"`
-	RoutedFallback  bool     `json:"routedFallback"`
+	Groups          []EgressGroupStatus   `json:"groups,omitempty"`
+	Bindings        []EgressBindingStatus `json:"bindings,omitempty"`
+	AppliedRevision int                   `json:"appliedRevision"`
+	State           string                `json:"state"`
+	Error           string                `json:"error"`
+	ErrorStage      string                `json:"errorStage,omitempty"`
+	ErrorDetail     string                `json:"errorDetail,omitempty"`
+	XrayAvailable   bool                  `json:"xrayAvailable"`
+	ActiveNodeID    int                   `json:"activeNodeId,omitempty"`
+	HealthyNodeIDs  []int                 `json:"healthyNodeIds"`
+	ManagedNetworks []string              `json:"managedNetworks"`
+	RoutedFallback  bool                  `json:"routedFallback"`
 }
 type ProbeResult struct {
 	NodeID      int    `json:"nodeId"`

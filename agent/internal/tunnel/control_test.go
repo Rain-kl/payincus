@@ -103,7 +103,7 @@ func TestRealtimeControlAndIncusStream(t *testing.T) {
 	var hello struct {
 		Capabilities []string `json:"capabilities"`
 	}
-	if err := json.Unmarshal(receive(FrameTypeControlHello, 0), &hello); err != nil || len(hello.Capabilities) != 2 {
+	if err := json.Unmarshal(receive(FrameTypeControlHello, 0), &hello); err != nil || len(hello.Capabilities) != 3 {
 		t.Fatalf("missing handshake: %v", err)
 	}
 	send(FrameTypeControlRequest, 1, map[string]any{"method": "proxy.probe", "params": map[string]any{}})

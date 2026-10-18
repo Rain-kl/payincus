@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import api from '@/api'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import type { Instance } from '@/types/api'
@@ -42,6 +43,10 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const themeStore = useThemeStore()
+const egress = ref<Awaited<ReturnType<typeof api.egress.instance>> | null>(null)
+const egressError = ref(false)
+async function loadEgress() { try { egress.value = await api.egress.instance(props.instance.id); egressError.value = false } catch { egressError.value = true } }
+watch(() => props.instance.id, loadEgress, { immediate: true })
 
 function isIpv4Address(value: string | null | undefined): boolean {
   if (!value) return false
@@ -186,6 +191,15 @@ watch(portMappings, (newMappings) => {
 
 <template>
   <div class="space-y-4">
+    <section class="card p-5 space-y-2">
+      <div class="flex items-center justify-between gap-3"><h2 class="text-sm font-medium text-themed">{{ t('packageEgress.title') }}</h2><button type="button" class="btn-ghost text-sm" @click="loadEgress">{{ t('packageEgress.refresh') }}</button></div>
+      <p v-if="egressError" class="text-sm text-error" role="alert">{{ t('packageEgress.loadFailed') }}</p>
+      <template v-else-if="egress">
+        <p class="text-sm text-themed">{{ t(`packageEgress.${egress.mode}`) }}<span v-if="egress.profileName"> · {{ egress.profileName }} · v{{ egress.version }}</span></p>
+        <p v-if="egress.mode !== 'legacy'" class="text-sm" :class="egress.state === 'ready' ? 'text-success' : 'text-warning'">{{ t(`packageEgress.state_${egress.state}`) }}</p>
+        <p class="text-xs text-themed-muted">{{ t('packageEgress.lastReport') }}: {{ egress.reportedAt ? new Date(egress.reportedAt).toLocaleString() : t('packageEgress.unreported') }}</p>
+      </template>
+    </section>
     <!-- Port Mappings (NAT modes) -->
     <div v-if="['nat', 'nat_ipv6', 'nat_ipv6_nat', 'ipv6_nat', 'ipv6_only'].includes(instance.network_mode || '')" class="card p-5">
       <!-- 头部：标题 + 配额 / 公网 IP -->

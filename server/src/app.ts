@@ -1,3 +1,4 @@
+import egressProfileRoutes from './routes/egress-profiles.js'
 import adminTaskRoutes from './routes/admin-tasks.js'
 import { recoverInterruptedOperationTasks } from './lib/operation-task-log.js'
 // 确保环境变量被加载（必须在最前面）
@@ -546,6 +547,7 @@ await fastify.register(rechargeRoutes)
 await fastify.register(adminBillingRoutes)
 await fastify.register(adminStatisticsRoutes)
 await fastify.register(adminTaskRoutes)
+await fastify.register(egressProfileRoutes)
 await fastify.register(adminHostingRoutes)
 await fastify.register(affRoutes, { prefix: '/api/aff' })
 await fastify.register(entertainmentRoutes, { prefix: '/api/entertainment' })

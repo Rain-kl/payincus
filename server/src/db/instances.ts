@@ -1,3 +1,4 @@
+import { snapshotPackageEgress } from '../lib/egress/package.js'
 /**
  * 实例相关数据库操作
  * 使用 Prisma ORM
@@ -298,6 +299,7 @@ export async function createInstance(data: {
   memory: number
   disk: number
   networkMode: 'nat' | 'nat_ipv6' | 'nat_ipv6_nat' | 'ipv6_only' | 'ipv6_nat' | 'public_ipv4' | 'public_ipv4_ipv6'
+  egressSourceInstanceId?: number
   snapshotSpecs?: Record<string, unknown>
   sshPort?: number | null
   rootPassword?: string | null
@@ -310,8 +312,9 @@ export async function createInstance(data: {
   swapEnabled?: boolean
   swapSize?: number | null
 }): Promise<number> {
-  const instance = await prisma.instance.create({
+  const instance = await prisma.$transaction(async tx => tx.instance.create({
     data: {
+      ...(await snapshotPackageEgress(tx, data.packageId, data.hostId, data.egressSourceInstanceId)),
       incusId: data.incusId,
       name: data.name,
       userId: data.userId,
@@ -336,7 +339,7 @@ export async function createInstance(data: {
       swapEnabled: data.swapEnabled ?? false,
       swapSize: data.swapSize ?? null
     }
-  })
+  }))
 
   return instance.id
 }

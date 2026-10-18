@@ -1,3 +1,4 @@
+import { packageEgressInstruction } from './package.js'
 import { prisma } from '../../db/prisma.js'
 import { decryptSensitiveData } from '../security.js'
 import { defaultEgress, defaultFirewall, type EgressPolicy } from './policy.js'
@@ -15,6 +16,8 @@ export function sanitizeNetworkStatus(status: unknown) {
   const report = status as Record<string, unknown>
   if (!Number.isSafeInteger(report.appliedRevision) || Number(report.appliedRevision) < 0) throw new Error('Invalid network revision')
   return {
+      groups: Array.isArray(report.groups) ? report.groups.filter((group: any) => group && /^v[1-9]\d*$/.test(group.key) && ['ready', 'blocked', 'error'].includes(group.state)).slice(0, 16).map((group: any) => ({ key: group.key, state: group.state, error: ['none', 'preflight', 'network', 'xray', 'health'].includes(group.error) ? group.error : 'network' })) : [],
+      bindings: Array.isArray(report.bindings) ? report.bindings.filter((binding: any) => binding && typeof binding.instanceName === 'string' && binding.instanceName.length <= 100 && Number.isSafeInteger(binding.generation) && binding.generation > 0).slice(0, 10000).map((binding: any) => ({ instanceName: binding.instanceName, generation: binding.generation })) : [],
       state: ['applied', 'applying', 'error', 'unsupported', 'idle'].includes(String(report.state)) ? String(report.state) : 'error',
       error: ['none', 'preflight', 'incus', 'acl', 'xray', 'network', 'unsupported-nic', 'unsupported-platform', 'restore'].includes(String(report.error)) ? String(report.error) : 'network',
       errorStage: ['extract', 'config', 'start', 'health', 'preflight', 'incus', 'acl', 'xray', 'network', 'unsupported-nic', 'unsupported-platform', 'restore'].includes(String(report.errorStage)) ? String(report.errorStage) : '',
@@ -43,6 +46,7 @@ export async function networkInstruction(hostId: number) {
   const nodes = ids.length ? await prisma.proxyNode.findMany({ where: { id: { in: ids } } }) : []
   const byId = new Map(nodes.map(node => [node.id, node]))
   return {
+    ...(await packageEgressInstruction(hostId)),
     revision: policy?.revision ?? 0,
     egress,
     firewall: policy?.firewall ?? defaultFirewall,

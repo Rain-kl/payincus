@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import EgressProfilesPanel from '@/components/EgressProfilesPanel.vue'
 import { ref, watch, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -81,6 +82,7 @@ onUnmounted(deactivate)
       <p class="mt-1 text-sm text-themed-muted">{{ t('egress.pageDescription') }}</p>
     </header>
     <p v-if="error" class="text-error break-words" role="alert">{{ error }}</p>
+    <EgressProfilesPanel :nodes="nodes" />
     <div class="grid items-start gap-6 lg:grid-cols-2">
       <section class="card space-y-3 p-5 sm:p-6">
         <h2 class="font-semibold text-themed">{{ t('egress.importNodes') }}</h2>

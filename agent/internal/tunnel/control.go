@@ -54,7 +54,7 @@ func (s *controlSession) handle(kind byte, id uint32, payload []byte) {
 		}
 		capabilities := []string{}
 		if s.handler != nil {
-			capabilities = []string{"network.apply", "proxy.probe"}
+			capabilities = []string{"network.apply", "network.apply.v2", "proxy.probe"}
 		}
 		s.send(FrameTypeControlHello, 0, map[string]any{"capabilities": capabilities})
 		return
@@ -75,7 +75,7 @@ func (s *controlSession) handle(kind byte, id uint32, payload []byte) {
 		Method string          `json:"method"`
 		Params json.RawMessage `json:"params"`
 	}
-	if len(payload) > 1<<20 || json.Unmarshal(payload, &request) != nil || s.handler == nil || (request.Method != "network.apply" && request.Method != "proxy.probe") {
+	if len(payload) > 1<<20 || json.Unmarshal(payload, &request) != nil || s.handler == nil || (request.Method != "network.apply" && request.Method != "network.apply.v2" && request.Method != "proxy.probe") {
 		s.send(FrameTypeControlResponse, id, map[string]any{"ok": false, "error": "invalid_request"})
 		return
 	}

@@ -3,6 +3,35 @@
 import en from './en'
 
 const zhTW = {
+    packageEgress: {
+        "refresh": "重新整理紀錄",
+        "state_ready": "已確認就緒",
+        "state_pending": "等待節點確認",
+        "state_blocked": "出口不可用，已封鎖",
+        "state_error": "出口套用失敗，已封鎖",
+        "lastReport": "上次節點確認（非即時檢測）",
+        "unreported": "尚無紀錄",
+        "title": "套餐出口",
+        "legacy": "沿用節點出口（相容）",
+        "direct": "直連",
+        "profile": "固定代理策略",
+        "select": "選擇出口策略版本",
+        "unsupported": "套餐出口目前僅支援非特權 IPv4 NAT 容器，宿主會阻擋此實例的 IPv6。",
+        "newOnly": "修改僅影響新實例；既有實例保留建立時的出口。節點需要支援套餐出口的新版 Agent。",
+        "unavailable": "策略未授權給所有所選節點，或已停用。",
+        "profiles": "出口策略",
+        "create": "建立策略",
+        "newVersion": "發佈新版本",
+        "name": "策略名稱",
+        "node": "代理節點",
+        "hosts": "授權母機",
+        "save": "儲存",
+        "cancel": "取消",
+        "version": "版本",
+        "empty": "暫無出口策略",
+        "loadFailed": "載入出口策略失敗",
+        "hostsRequired": "請選擇代理與至少一台授權母機"
+    },
     spice: {
         title: '圖形控制台',
         connecting: '連線中…',

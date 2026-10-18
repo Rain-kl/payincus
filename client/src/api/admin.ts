@@ -721,6 +721,12 @@ http.interceptors.response.use(
 
 // API 模块
 const api = {
+  egress: {
+    instance: (id: number): Promise<{ mode: string; profileName: string | null; version: number | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
+    profiles: (): Promise<{ profiles: Array<{ id: number; profileId: number; version: number; name: string; active: boolean; proxyNodeId?: number; hostIds: number[] }> }> => http.get('/egress/profiles'),
+    create: (data: { name: string; proxyNodeId: number; hostIds: number[] }): Promise<{ id: number; versionId: number }> => http.post('/admin/egress-profiles', data),
+    version: (id: number, data: { proxyNodeId: number; hostIds: number[] }): Promise<{ id: number; version: number }> => http.post(`/admin/egress-profiles/${id}/versions`, data)
+  },
   network: {
     probeHosts: (): Promise<{ hosts: Array<{ id: number; name: string }> }> => http.get('/admin/proxy-probe-hosts'),
     nodes: (): Promise<{ nodes: ProxyNode[] }> => http.get('/admin/proxy-nodes'),

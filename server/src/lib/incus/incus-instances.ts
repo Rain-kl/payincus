@@ -1,3 +1,4 @@
+import { ensurePackageEgressBeforeStart, releasePackageEgress } from '../egress/attachments.js'
 import { prisma } from '../../db/prisma.js'
 import { protectProvisionedNetwork } from '../egress/provision.js'
 import { getInstanceGpuPcis } from '../../db/gpus.js'
@@ -260,11 +261,21 @@ export async function getInstanceState(client: IncusClient, name: string): Promi
 /**
  * 创建实例
  */
-export async function createInstance(client: IncusClient, config: unknown): Promise<unknown> {
+export async function createInstance(client: IncusClient, config: unknown, instanceId?: number): Promise<unknown> {
   const name = (config as { name: string }).name
   return runOperationTask(client.options.hostId || 0, name, 'create', async () => {
-    const protectedConfig = await protectProvisionedNetwork(client, config)
-    return client.request('POST', '/1.0/instances', protectedConfig)
+    try {
+      const protectedConfig = await protectProvisionedNetwork(client, config, instanceId)
+      return await client.request('POST', '/1.0/instances', protectedConfig)
+    } catch (error) {
+      // A timeout or duplicate create may leave an existing instance. Retain
+      // its binding until Incus confirms absence or physical deletion succeeds.
+      try { await client.request('GET', `/1.0/instances/${encodeURIComponent(name)}`) }
+      catch (checkError) {
+        if ((checkError as { statusCode?: number }).statusCode === 404) await releasePackageEgress(client, name)
+      }
+      throw error
+    }
   })
 }
 
@@ -284,10 +295,12 @@ export async function deleteInstance(client: IncusClient, name: string): Promise
     try {
       const result = await client.request('DELETE', `/1.0/instances/${name}`)
       await releaseFailedGpuByName(client, name)
+      await releasePackageEgress(client, name)
       return result
     } catch (error) {
       if ((error as { statusCode?: number }).statusCode !== 404) throw error
       await releaseFailedGpuByName(client, name)
+      await releasePackageEgress(client, name)
       return null
     }
   })
@@ -297,6 +310,7 @@ export async function deleteInstance(client: IncusClient, name: string): Promise
  * 启动实例
  */
 export async function startInstance(client: IncusClient, name: string): Promise<unknown> {
+  await ensurePackageEgressBeforeStart(client, name)
   if (client.options?.hostId) {
     const record = await prisma.instance.findFirst({ where: { incusId: name, hostId: client.options.hostId, status: { not: 'deleted' }, gpuDeviceId: { not: null } }, select: { id: true } })
     if (record) {

@@ -40,7 +40,7 @@ assert(
 )
 
 const reserveTarget = indexOfOrThrow(migrationSection, 'await db.reserveResources({', 'target resource reservation')
-const createTarget = indexOfOrThrow(migrationSection, 'await createInstance(targetClient, incusConfig)', 'target Incus create')
+const createTarget = indexOfOrThrow(migrationSection, 'await createInstance(targetClient, incusConfig, instance.id)', 'target Incus create')
 const startTarget = indexOfOrThrow(migrationSection, 'await startInstance(targetClient, newIncusId)', 'target Incus start')
 const createDb = indexOfOrThrow(migrationSection, 'const { createdInstance: newInstance, migratedBillingRecordCount } = await prisma.$transaction', 'new DB instance transaction')
 const sourceStatusClaim = indexOfOrThrow(migrationSection, 'data: { status: \'deleted\' }', 'source DB deleted claim')

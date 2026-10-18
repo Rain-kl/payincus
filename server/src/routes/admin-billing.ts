@@ -1,3 +1,4 @@
+import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { GpuError } from '../lib/gpu.js'
 import { compensateGpuPreparationFailure, releaseFailedGpu, assertGpuPlanChange, reserveInstanceGpu, getInstanceGpuPcis } from '../db/gpus.js'
 import { currentOperationTask, runOperationTask, taskLog } from '../lib/operation-task-log.js'
@@ -3904,6 +3905,7 @@ if (provider.type === 'yipay') {
         // 创建实例记录
         const instance = await tx.instance.create({
           data: {
+            ...(await snapshotPackageEgress(tx, packageId, lockedHost.id)),
             ...(await reserveInstanceGpu(tx, { hostId: lockedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             name,
@@ -4787,7 +4789,7 @@ async function createInstanceAsync(
     })
 
     taskLog('info', `[Admin Provisioning] 正在调用 Incus API 创建实例...`)
-    await createInstance(client, incusConfig)
+    await createInstance(client, incusConfig, instanceId)
 
     // 等待实例创建完成
     let ready = false

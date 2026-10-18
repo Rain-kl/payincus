@@ -1,3 +1,4 @@
+import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getInstanceStorageCapacity } from '../lib/storage-capacity.js'
 import { GpuError } from '../lib/gpu.js'
 import { reserveInstanceGpu, getInstanceGpuPcis, releaseFailedGpu } from '../db/gpus.js'
@@ -1789,6 +1790,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
         const instance = await tx.instance.create({
           data: {
+            ...(await snapshotPackageEgress(tx, packageId, lockedHost.id)),
             ...(await reserveInstanceGpu(tx, { hostId: lockedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             idempotencyKey: selectedPlan ? normalPaidIdempotencyKey : null,
@@ -6814,7 +6816,7 @@ async function createInstanceAsync(
     taskLog('info', `[Provisioning] 资源配置: CPU=${config.cpu}, Memory=${config.memory}MB, Disk=${config.disk}MB`)
     taskLog('info', `[Provisioning] Incus 配置已生成，敏感字段已跳过日志输出`)
 
-    await createInstance(client, incusConfig)
+    await createInstance(client, incusConfig, instanceId)
     const instanceTypeLabel = config.instanceType === 'vm' ? '虚拟机' : '容器'
     taskLog('info', `[Provisioning] 实例 ${config.name} ${instanceTypeLabel}创建完成`)
 

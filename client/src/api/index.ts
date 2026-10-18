@@ -586,6 +586,10 @@ http.interceptors.response.use(
 
 // API 模块
 const api = {
+  egress: {
+    instance: (id: number): Promise<{ mode: string; profileName: string | null; version: number | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
+    profiles: (): Promise<{ profiles: Array<{ id: number; profileId: number; version: number; name: string; active: boolean; proxyNodeId?: number; hostIds: number[] }> }> => http.get('/egress/profiles')
+  },
   network: {
     probeHosts: (): Promise<{ hosts: Array<{ id: number; name: string }> }> => Promise.reject(new Error('Unavailable in this application')),
     nodes: (): Promise<{ nodes: ProxyNode[] }> => Promise.reject(new Error('Unavailable in this application')),

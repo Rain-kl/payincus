@@ -324,6 +324,9 @@ func hostRules(in Instruction, inv inventory) (string, error) {
 	}
 	if in.Egress.Mode != "off" {
 		b.WriteString("chain classify { type filter hook prerouting priority -90; policy accept;\n iifname \"igw-host\" meta mark set meta mark & 0xff00ffff return\n ct direction reply return\n ct status dnat return\n")
+		if in.SchemaVersion >= 2 {
+			b.WriteString(" meta mark & 0x00ff0000 == 0x00440000 return\n ct mark & 0x00ff0000 == 0x00440000 return\n ct mark & 0x00ff0000 == 0x00420000 ct mark & 0x0000ff00 != 0 return\n")
+		}
 		matches(egressMatches, "selected")
 		b.WriteString("}\n")
 		fmt.Fprintf(&b, `chain selected {
@@ -335,6 +338,9 @@ func hostRules(in Instruction, inv inventory) (string, error) {
 }
 chain guard { type filter hook forward priority 10; policy accept;
 `, mask, mark, mark, strings.Join(v4, ", "), strings.Join(v6, ", "), mark, mark)
+		if in.SchemaVersion >= 2 {
+			b.WriteString(" meta mark & 0x00ff0000 == 0x00440000 return\n ct mark & 0x00ff0000 == 0x00440000 return\n ct mark & 0x00ff0000 == 0x00420000 ct mark & 0x0000ff00 != 0 return\n")
+		}
 		matches(egressMatches, "selected_guard")
 		b.WriteString("}\n")
 		fmt.Fprintf(&b, `chain selected_guard {
