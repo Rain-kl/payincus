@@ -1,3 +1,4 @@
+import { requestNodeAPI, type NodeAPIRequester } from './payincus-node-api.js'
 import { Duplex } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { decodeFrame, encodeFrame, TunnelFrameType } from './tunnel-protocol.js'
@@ -36,6 +37,7 @@ interface PendingControl {
  * 为 IncusClient 提供端到端 TLS 握手所需的全双工字节流通道。
  */
 export class HostTunnelManager extends EventEmitter {
+  constructor(private readonly nodeRequest: NodeAPIRequester = requestNodeAPI) { super() }
   private activeTunnels = new Map<number, WebSocketLike>()
   private streamMap = new Map<string, Duplex>()
   private nextStreamId = 0
@@ -138,7 +140,7 @@ export class HostTunnelManager extends EventEmitter {
   }
 
   supportsControl(hostId: number, method: ControlMethod): boolean {
-    return this.isTunnelOnline(hostId) && this.controlCapabilities.get(hostId)?.has(method) === true
+    return this.isTunnelOnline(hostId) && (this.controlCapabilities.get(hostId)?.has(method) === true || this.controlCapabilities.get(hostId)?.has('payincus_node_v1') === true)
   }
 
   async requestControl<T>(hostId: number, method: ControlMethod, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<T> {
@@ -149,6 +151,7 @@ export class HostTunnelManager extends EventEmitter {
     if ([...this.pendingControls.values()].filter(p => p.hostId === hostId).length >= 4) throw new TunnelControlError('BUSY')
     const payload = Buffer.from(JSON.stringify({ method, params }))
     if (payload.length > 1024 * 1024) throw new TunnelControlError('INVALID_RESPONSE')
+    if (this.controlCapabilities.get(hostId)?.has('payincus_node_v1')) return this.requestNativeControl<T>(hostId, ws, method, params, timeoutMs, signal)
     this.nextStreamId = (this.nextStreamId + 1) & 0x7fffffff || 1
     const id = this.nextStreamId, key = `${hostId}:${id}`
     return new Promise<T>((resolve, reject) => {
@@ -166,6 +169,33 @@ export class HostTunnelManager extends EventEmitter {
       if (signal?.aborted) { abort(); return }
       try { ws.send(encodeFrame(TunnelFrameType.CONTROL_REQUEST, id, payload), error => { if (error) finish(new TunnelControlError('DISCONNECTED')) }) }
       catch { finish(new TunnelControlError('DISCONNECTED')) }
+    })
+  }
+
+  private requestNativeControl<T>(hostId: number, ws: WebSocketLike, method: ControlMethod, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<T> {
+    const controller = new AbortController()
+    this.nextStreamId = (this.nextStreamId + 1) & 0x7fffffff || 1
+    const key = `${hostId}:${this.nextStreamId}`
+    return new Promise<T>((resolve, reject) => {
+      let settled = false
+      const abort = () => finish(new TunnelControlError('CANCELLED'))
+      const timer = setTimeout(() => finish(new TunnelControlError('TIMEOUT')), timeoutMs)
+      const finish = (error?: TunnelControlError, value?: unknown) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', abort)
+        this.pendingControls.delete(key)
+        controller.abort()
+        if (error) reject(error); else resolve(value as T)
+      }
+      this.pendingControls.set(key, { hostId, socket: ws, finish })
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) { abort(); return }
+      void this.nodeRequest(hostId, method, params, controller.signal).then(value => finish(undefined, value), error => {
+        const status = error?.statusCode
+        finish(new TunnelControlError(status === 409 ? 'BUSY' : status === 504 ? 'TIMEOUT' : 'REMOTE_ERROR'))
+      })
     })
   }
 
@@ -318,10 +348,10 @@ export class HostTunnelManager extends EventEmitter {
         if (streamId !== 0 || payload.length > 4096) break
         try {
           const hello = JSON.parse(payload.toString('utf8'))
-          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'network.apply' || v === 'network.apply.v2' || v === 'proxy.probe') : [])
+          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'network.apply' || v === 'network.apply.v2' || v === 'proxy.probe' || v === 'payincus_node_v1') : [])
           const firstHello = !this.controlCapabilities.has(hostId)
           this.controlCapabilities.set(hostId, capabilities)
-          if (firstHello && capabilities.has('network.apply')) this.emit('control_ready', hostId)
+          if (firstHello && (capabilities.has('network.apply') || capabilities.has('payincus_node_v1'))) this.emit('control_ready', hostId)
         } catch { /* never log control payloads */ }
         break
       }

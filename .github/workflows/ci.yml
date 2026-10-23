@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, canary, dev]
   pull_request:
     branches: [main]
 
@@ -40,6 +40,13 @@ jobs:
 
       - name: Type check (server)
         run: pnpm --filter server type-check
+
+      - name: Test native node API and tunnel compatibility
+        run: |
+          pnpm --filter server exec tsx scripts/test-payincus-node-api.ts
+          pnpm --filter server exec tsx scripts/test-agent-tunnel-protocol-guards.ts
+          pnpm --filter server test:egress
+          pnpm --filter server test:package-egress
 
       - name: Setup Go
         uses: actions/setup-go@v5

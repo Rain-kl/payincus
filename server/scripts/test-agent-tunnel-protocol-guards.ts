@@ -177,3 +177,46 @@ async function testControl() {
 await testControl()
 await testTunnelManager()
 console.log('tunnel protocol and manager guard tests passed')
+
+// New transport-only nodes use native Incus extension endpoints, preserving JSON unchanged.
+{
+  const requests: Array<{ hostId: number; method: string; params: unknown; signal: AbortSignal }> = []
+  const native = new HostTunnelManager(async (hostId, method, params, signal) => {
+    requests.push({ hostId, method, params, signal })
+    return { appliedRevision: 7 }
+  })
+  const socket = new MockWebSocket()
+  native.registerTunnel(8101, socket)
+  socket.emit('message', encodeFrame(TunnelFrameType.CONTROL_HELLO, 0, Buffer.from(JSON.stringify({ capabilities: ['payincus_node_v1'] }))))
+  assert.equal(native.supportsControl(8101, 'network.apply.v2'), true)
+  const input = { schemaVersion: 2, revision: 7 }
+  assert.deepEqual(await native.requestControl(8101, 'network.apply.v2', input, 1000), { appliedRevision: 7 })
+  assert.equal(requests[0].hostId, 8101)
+  assert.deepEqual(requests[0].params, input)
+  assert.equal(socket.sentFrames.some(frame => decodeFrame(frame).type === TunnelFrameType.CONTROL_REQUEST), false)
+  native.unregisterTunnel(8101)
+}
+{
+  let requestSignal: AbortSignal | undefined
+  const native = new HostTunnelManager(async (_host, _method, _params, signal) => {
+    requestSignal = signal
+    return new Promise(() => {})
+  })
+  const socket = new MockWebSocket()
+  native.registerTunnel(8102, socket)
+  socket.emit('message', encodeFrame(TunnelFrameType.CONTROL_HELLO, 0, Buffer.from(JSON.stringify({ capabilities: ['payincus_node_v1'] }))))
+  const request = native.requestControl(8102, 'proxy.probe', {}, 1000)
+  const rejected = assert.rejects(request, { code: 'DISCONNECTED' })
+  native.unregisterTunnel(8102)
+  await rejected
+  assert.equal(requestSignal?.aborted, true)
+}
+{
+  const native = new HostTunnelManager(async () => { throw Object.assign(new Error('busy'), { statusCode: 409 }) })
+  const socket = new MockWebSocket()
+  native.registerTunnel(8103, socket)
+  socket.emit('message', encodeFrame(TunnelFrameType.CONTROL_HELLO, 0, Buffer.from(JSON.stringify({ capabilities: ['payincus_node_v1'] }))))
+  await assert.rejects(native.requestControl(8103, 'network.apply', {}, 1000), { code: 'BUSY' })
+  native.unregisterTunnel(8103)
+}
+console.log('native Incus node API routing and disconnect cancellation passed')
