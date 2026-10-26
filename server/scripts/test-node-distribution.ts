@@ -7,6 +7,7 @@ const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 assert.equal(existsSync(resolve(root, 'agent/cmd/incudal-agent/main.go')), false)
 assert.equal(existsSync(resolve(root, '.github/workflows/agent-release.yml')), false)
+assert.equal(existsSync(resolve(root, 'server/scripts/smoke-agent-release.ts')), false)
 assert.doesNotMatch(read('Dockerfile'), /agent-builder|COPY agent|agent-dist/)
 for (const path of ['server/templates/install.sh', 'server/templates/agent-install.sh']) {
  const body = read(path)

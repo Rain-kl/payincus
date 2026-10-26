@@ -1512,7 +1512,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       try {
         const agentInstall = await issueHostAgentInstallToken(host.id, true)
         script = injectInstallVariable(script, 'INJECT_AGENT_INSTALL_TOKEN', agentInstall.installToken)
-        script = injectInstallVariable(script, 'INJECT_AGENT_ENABLED', 'true')
 
 
         request.log.info(

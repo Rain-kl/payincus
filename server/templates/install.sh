@@ -4,7 +4,6 @@ set -euo pipefail
 [[ $# -eq 0 ]] || { echo 'Configure INCUS_NODE_CHANNEL=latest or canary.' >&2; exit 1; }
 INJECT_PANEL_URL=""
 INJECT_AGENT_INSTALL_TOKEN=""
-INJECT_AGENT_ENABLED="true"
 export INCUDAL_PANEL_URL="${INJECT_PANEL_URL:-${INCUDAL_PANEL_URL:-}}"
 export INCUDAL_AGENT_INSTALL_TOKEN="${INJECT_AGENT_INSTALL_TOKEN:-${INCUDAL_AGENT_INSTALL_TOKEN:-}}"
 [[ $EUID -eq 0 ]] || { echo 'Run as root.' >&2; exit 1; }
