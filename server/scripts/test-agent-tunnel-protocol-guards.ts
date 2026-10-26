@@ -130,51 +130,16 @@ async function testTunnelManager() {
   assert.equal(manager.isTunnelOnline(hostId), false)
 }
 
-async function testControl() {
-  const manager = new HostTunnelManager()
-  const ws = new MockWebSocket(), other = new MockWebSocket()
-  const hello = encodeFrame(TunnelFrameType.CONTROL_HELLO, 0, Buffer.from(JSON.stringify({ capabilities: ['network.apply', 'proxy.probe'] })))
-  await assert.rejects(manager.requestControl(1, 'network.apply', {}, 50), { code: 'OFFLINE' })
-  manager.registerTunnel(1, ws); manager.registerTunnel(2, other)
-  await assert.rejects(manager.requestControl(1, 'network.apply', {}, 50), { code: 'UPGRADE_REQUIRED' })
-  ws.simulateIncoming(hello); other.simulateIncoming(hello)
-  const call = manager.requestControl(1, 'network.apply', { revision: 4 }, 500)
-  const request = decodeFrame(ws.sentFrames.at(-1)!)
-  assert.deepEqual(JSON.parse(request.payload.toString()), { method: 'network.apply', params: { revision: 4 } })
-  const response = encodeFrame(TunnelFrameType.CONTROL_RESPONSE, request.streamId, Buffer.from(JSON.stringify({ ok: true, result: { appliedRevision: 4 } })))
-  other.simulateIncoming(response) // Identical IDs on another host cannot resolve this call.
-  assert.equal((manager as any).pendingControls.size, 1)
-  ws.simulateIncoming(response)
-  assert.deepEqual(await call, { appliedRevision: 4 })
-  assert.equal((manager as any).pendingControls.size, 0)
-  await assert.rejects(manager.requestControl(1, 'proxy.probe', {}, 5), { code: 'TIMEOUT' })
-  assert.equal(decodeFrame(ws.sentFrames.at(-1)!).type, TunnelFrameType.CONTROL_CANCEL)
-  const controller = new AbortController()
-  const aborted = manager.requestControl(1, 'proxy.probe', {}, 500, controller.signal)
-  controller.abort()
-  await assert.rejects(aborted, { code: 'CANCELLED' })
-  const malformed = manager.requestControl(1, 'proxy.probe', {}, 500)
-  const id = decodeFrame(ws.sentFrames.at(-1)!).streamId
-  ws.simulateIncoming(encodeFrame(TunnelFrameType.CONTROL_RESPONSE, id, Buffer.from('{')))
-  await assert.rejects(malformed, { code: 'INVALID_RESPONSE' })
-  const active = Array.from({ length: 4 }, () => manager.requestControl(1, 'proxy.probe', {}, 500))
-  const settled = Promise.allSettled(active)
-  await assert.rejects(manager.requestControl(1, 'proxy.probe', {}, 500), { code: 'BUSY' })
-  const replacement = new MockWebSocket()
-  manager.registerTunnel(1, replacement)
-  for (const result of await settled) { assert.equal(result.status, 'rejected'); if (result.status === 'rejected') assert.equal(result.reason.code, 'DISCONNECTED') }
-  assert.equal((manager as any).pendingControls.size, 0)
-  assert.equal(manager.supportsControl(1, 'network.apply'), false)
-  ws.simulateIncoming(hello)
-  assert.equal(manager.supportsControl(1, 'network.apply'), false, 'Replaced sockets cannot re-advertise')
-  replacement.simulateIncoming(hello)
-  const disconnected = manager.requestControl(1, 'network.apply', {}, 500)
-  replacement.close()
-  await assert.rejects(disconnected, { code: 'DISCONNECTED' })
-  assert.equal((manager as any).pendingControls.size, 0)
-  other.close()
+// Retired business-RPC advertisements cannot enable node control.
+{
+ const manager=new HostTunnelManager()
+ const ws=new MockWebSocket()
+ manager.registerTunnel(1,ws)
+ ws.simulateIncoming(encodeFrame(TunnelFrameType.CONTROL_HELLO,0,Buffer.from(JSON.stringify({capabilities:['network.apply','proxy.probe']}))))
+ assert.equal(manager.supportsControl(1,'network.apply'),false)
+ await assert.rejects(manager.requestControl(1,'network.apply',{},50),{code:'UPGRADE_REQUIRED'})
+ ws.close()
 }
-await testControl()
 await testTunnelManager()
 console.log('tunnel protocol and manager guard tests passed')
 
@@ -193,7 +158,7 @@ console.log('tunnel protocol and manager guard tests passed')
   assert.deepEqual(await native.requestControl(8101, 'network.apply.v2', input, 1000), { appliedRevision: 7 })
   assert.equal(requests[0].hostId, 8101)
   assert.deepEqual(requests[0].params, input)
-  assert.equal(socket.sentFrames.some(frame => decodeFrame(frame).type === TunnelFrameType.CONTROL_REQUEST), false)
+  assert.equal(socket.sentFrames.some(frame => Number(decodeFrame(frame).type) === 0x08), false)
   native.unregisterTunnel(8101)
 }
 {
@@ -220,3 +185,22 @@ console.log('tunnel protocol and manager guard tests passed')
   native.unregisterTunnel(8103)
 }
 console.log('native Incus node API routing and disconnect cancellation passed')
+
+// Native controls retain bounded concurrency, timeout, cancellation and socket replacement cleanup.
+{
+ const manager=new HostTunnelManager(async (_host,_method,_params,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('cancelled')))))
+ const ws=new MockWebSocket()
+ manager.registerTunnel(88,ws)
+ ws.simulateIncoming(encodeFrame(TunnelFrameType.CONTROL_HELLO,0,Buffer.from(JSON.stringify({capabilities:['payincus_node_v1']}))))
+ await assert.rejects(manager.requestControl(88,'proxy.probe',{},5),{code:'TIMEOUT'})
+ const abort=new AbortController()
+ const pending=manager.requestControl(88,'proxy.probe',{},1000,abort.signal)
+ abort.abort();await assert.rejects(pending,{code:'CANCELLED'})
+ const calls=Array.from({length:4},()=>manager.requestControl(88,'proxy.probe',{},1000))
+ const settled=Promise.allSettled(calls)
+ await assert.rejects(manager.requestControl(88,'proxy.probe',{},1000),{code:'BUSY'})
+ manager.registerTunnel(88,new MockWebSocket())
+ for(const result of await settled){assert.equal(result.status,'rejected');if(result.status==='rejected')assert.equal(result.reason.code,'DISCONNECTED')}
+ assert.equal((manager as any).pendingControls.size,0)
+ manager.unregisterTunnel(88)
+}

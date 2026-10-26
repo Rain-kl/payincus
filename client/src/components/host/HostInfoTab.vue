@@ -104,7 +104,6 @@ const hostTrafficProgressPercent = computed(() => {
 const agentStatus = ref<HostAgentStatus | null>(null)
 const agentStatusLoading = ref(true)
 const agentStatusRefreshing = ref(false)
-const agentUpgradeRequesting = ref(false)
 const agentInstallCommandLoading = ref(false)
 const agentInstallCommand = ref('')
 const agentInstallTokenExpiresAt = ref('')
@@ -244,37 +243,11 @@ const agentStatusDescription = computed(() => t('admin.hosts.agentStatusDesc', {
   seconds: agentHeartbeatIntervalSeconds.value
 }))
 
-const agentVersionInfo = computed(() => {
-  const latestVersion = agentStatus.value?.latestVersion
-  const status = agentStatus.value?.versionStatus ?? 'unknown'
-  if (status === 'latest') {
-    return {
-      label: t('admin.hosts.agentVersionLatest'),
-      title: latestVersion ? t('admin.hosts.agentLatestVersion', { version: latestVersion }) : '',
-      class: themeStore.isDark
-        ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20'
-        : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-    }
-  }
-  if (status === 'outdated') {
-    return {
-      label: t('admin.hosts.agentVersionOutdated'),
-      title: latestVersion ? t('admin.hosts.agentLatestVersion', { version: latestVersion }) : '',
-      class: themeStore.isDark
-        ? 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20'
-        : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
-    }
-  }
-  return {
-    label: t('admin.hosts.agentVersionUnknown'),
-    title: latestVersion ? t('admin.hosts.agentLatestVersion', { version: latestVersion }) : '',
-    class: themeStore.isDark
-      ? 'bg-gray-800 text-gray-400 ring-1 ring-gray-700'
-      : 'bg-gray-100 text-gray-600 ring-1 ring-gray-200'
-  }
-})
-
-const canRequestAgentUpgrade = computed(() => agentStatus.value?.versionStatus === 'outdated')
+const agentVersionInfo = computed(() => ({
+  label: agentStatus.value?.versionStatus === 'managed' ? 'Incus 软件包管理' : '需要安装 Incus 节点包',
+  title: '连接器随 Incus 软件包安装与更新，请使用 incus-tui 或 apt',
+  class: 'text-themed-muted border border-themed'
+}))
 
 watch(() => props.host.id, () => {
   agentInstallCommand.value = ''
@@ -357,23 +330,6 @@ function formatUptime(seconds: number | undefined): string {
 
 function refreshAgentStatus() {
   loadAgentStatus(true)
-}
-
-async function requestAgentUpgrade() {
-  if (!canRequestAgentUpgrade.value || agentUpgradeRequesting.value) return
-  agentUpgradeRequesting.value = true
-  try {
-    const result = await api.hosts.requestAgentUpgrade(props.host.id)
-    const message = result.requested
-      ? t('admin.hosts.agentUpgradeRequestSuccess', { seconds: result.nextHeartbeatSeconds })
-      : t('admin.hosts.agentAlreadyLatest')
-    toast.success(message)
-    await loadAgentStatus()
-  } catch (err: any) {
-    toast.error(t('admin.hosts.agentUpgradeRequestFailed') + ': ' + (err?.message || String(err)))
-  } finally {
-    agentUpgradeRequesting.value = false
-  }
 }
 
 async function generateAgentInstallCommand() {
@@ -755,29 +711,7 @@ function formatBytes(bytes: number): string {
             <span :class="['w-2 h-2 rounded-full', agentStatusInfo.dot]"></span>
             <span :class="['badge', agentStatusInfo.class]">{{ agentStatusInfo.label }}</span>
           </span>
-          <button
-            v-if="canRequestAgentUpgrade"
-            type="button"
-            class="text-xs px-2 py-1 rounded-full font-mono inline-flex items-center gap-1.5 transition hover:brightness-105 disabled:cursor-wait disabled:opacity-70"
-            :class="agentVersionInfo.class"
-            :title="agentStatus.latestVersion ? t('admin.hosts.agentUpgradeClickHint', { version: agentStatus.latestVersion }) : agentVersionInfo.title"
-            :disabled="agentUpgradeRequesting"
-            @click="requestAgentUpgrade"
-          >
-            <svg
-              v-if="agentUpgradeRequesting"
-              class="w-3 h-3 animate-spin"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span v-if="agentStatus.version">{{ agentStatus.version }}</span>
-            <span class="font-sans font-medium">{{ agentVersionInfo.label }}</span>
-          </button>
           <span
-            v-else
             class="text-xs px-2 py-1 rounded-full font-mono inline-flex items-center gap-1.5"
             :class="agentVersionInfo.class"
             :title="agentVersionInfo.title"

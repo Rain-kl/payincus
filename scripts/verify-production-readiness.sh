@@ -4,7 +4,6 @@ set -Eeuo pipefail
 ENV_FILE="${ENV_FILE:-.env}"
 RUN_LIVE_CHECKS="${RUN_LIVE_CHECKS:-1}"
 RUN_DB_CHECKS="${RUN_DB_CHECKS:-$RUN_LIVE_CHECKS}"
-ALLOW_MISSING_AGENT_RELEASE="${ALLOW_MISSING_AGENT_RELEASE:-false}"
 
 log() {
   printf '[verify-production] %s\n' "$*"
@@ -181,10 +180,6 @@ PAYMENT_CALLBACK_IP_WHITELIST_REQUIRED_VALUE="$(config_value PAYMENT_CALLBACK_IP
 PAYMENT_CALLBACK_SKIP_IP_WHITELIST_VALUE="$(config_value PAYMENT_CALLBACK_SKIP_IP_WHITELIST)"
 COOKIE_DOMAIN_VALUE="$(config_value COOKIE_DOMAIN)"
 BACKEND_URL_VALUE="$(trim_slash "${BACKEND_URL:-$(config_value BACKEND_URL)}")"
-AGENT_RELEASE_REPOSITORY_VALUE="$(config_value INCUDAL_AGENT_RELEASE_REPOSITORY)"
-AGENT_RELEASE_DIR_VALUE="$(config_value INCUDAL_AGENT_RELEASE_DIR)"
-AGENT_BINARY_URL_VALUE="$(config_value INCUDAL_AGENT_BINARY_URL)"
-AGENT_BINARY_SHA256_VALUE="$(config_value INCUDAL_AGENT_BINARY_SHA256)"
 
 require_equals NODE_ENV "$NODE_ENV_VALUE" production
 require_equals PORT "$PORT_VALUE" 3001
@@ -222,17 +217,6 @@ else
   warn "PAYMENT_CALLBACK_IP_WHITELIST is empty; callbacks still require signature/status/amount/idempotency checks, but provider source IPs should be configured when available"
 fi
 
-if [[ -n "$AGENT_BINARY_URL_VALUE" || -n "$AGENT_BINARY_SHA256_VALUE" ]]; then
-  require_value INCUDAL_AGENT_BINARY_URL "$AGENT_BINARY_URL_VALUE"
-  require_value INCUDAL_AGENT_BINARY_SHA256 "$AGENT_BINARY_SHA256_VALUE"
-  validate_http_url INCUDAL_AGENT_BINARY_URL "$AGENT_BINARY_URL_VALUE"
-  require_sha256 INCUDAL_AGENT_BINARY_SHA256 "$AGENT_BINARY_SHA256_VALUE"
-elif [[ -n "$AGENT_RELEASE_DIR_VALUE" ]]; then
-  [[ "$AGENT_RELEASE_DIR_VALUE" == /* ]] || fail "INCUDAL_AGENT_RELEASE_DIR must be an absolute path"
-elif [[ -z "$AGENT_RELEASE_REPOSITORY_VALUE" ]]; then
-  fail "INCUDAL_AGENT_RELEASE_REPOSITORY or INCUDAL_AGENT_RELEASE_DIR is required unless INCUDAL_AGENT_BINARY_URL and INCUDAL_AGENT_BINARY_SHA256 are configured"
-fi
-
 log "Static production environment checks passed"
 
 if [[ "$RUN_DB_CHECKS" == "1" ]]; then
@@ -253,45 +237,7 @@ fi
 
 FRONTEND_URL="$FRONTEND_URL_VALUE" ADMIN_FRONTEND_URL="$ADMIN_FRONTEND_URL_VALUE" BACKEND_URL="$BACKEND_URL_VALUE" bash scripts/verify-split-host.sh
 
-if [[ -z "$AGENT_BINARY_URL_VALUE" ]]; then
-  manifest_body="$(mktemp)"
-  manifest_headers="$(mktemp)"
-  trap 'rm -f "$manifest_body" "$manifest_headers"' EXIT
-  manifest_status="$(
-    curl -sS --max-time 15 \
-      -H 'Accept: application/json' \
-      -D "$manifest_headers" \
-      -o "$manifest_body" \
-      -w '%{http_code}' \
-      "${FRONTEND_URL_VALUE}/api/agent/manifest.json" \
-      || true
-  )"
-
-  if [[ "$manifest_status" == "404" && "$ALLOW_MISSING_AGENT_RELEASE" == "true" ]]; then
-    warn "Agent manifest returned 404, allowed by ALLOW_MISSING_AGENT_RELEASE=true"
-  elif [[ "$manifest_status" != "200" ]]; then
-    fail "Agent manifest must return 200 before production Agent install, got HTTP ${manifest_status}"
-  else
-    node - "$manifest_body" <<'NODE'
-const fs = require('node:fs')
-const manifest = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
-const sha256Pattern = /^[a-f0-9]{64}$/i
-if (!manifest.version || !manifest.files) {
-  console.error('Agent manifest must include version and files')
-  process.exit(1)
-}
-for (const platform of ['linux-amd64', 'linux-arm64']) {
-  const file = manifest.files[platform]
-  if (!file || !file.name || !sha256Pattern.test(file.sha256 || '')) {
-    console.error(`Agent manifest must include ${platform} name and sha256`)
-    process.exit(1)
-  }
-}
-NODE
-    log "Agent manifest check passed"
-  fi
-else
-  log "Agent manifest check skipped because INCUDAL_AGENT_BINARY_URL is configured"
-fi
+curl -fsS --max-time 15 "${FRONTEND_URL_VALUE}/api/agent/distribution" | node -e '
+let body="";process.stdin.on("data",c=>body+=c);process.stdin.on("end",()=>{const d=JSON.parse(body);if(d.repository!=="Rain-kl/incus"||d.managedBy!=="apt")process.exit(1)})'
 
 log "Production readiness verification passed"

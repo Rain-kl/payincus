@@ -1508,27 +1508,12 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       script = injectInstallVariable(script, 'INJECT_PANEL_URL', frontendUrl)
 
       // 将 token 注入脚本，用户无需手动输入
-      script = injectInstallVariable(script, 'INJECT_TOKEN', token)
-
-      const agentBinaryUrl = process.env.INCUDAL_AGENT_BINARY_URL?.trim()
-      const agentBinarySha256 = process.env.INCUDAL_AGENT_BINARY_SHA256?.trim()
-      if (agentBinaryUrl && (!agentBinarySha256 || !/^[a-f0-9]{64}$/i.test(agentBinarySha256))) {
-        request.log.error(
-          { hostId: host.id },
-          'INCUDAL_AGENT_BINARY_SHA256 is required when INCUDAL_AGENT_BINARY_URL is configured'
-        )
-        return reply.code(500).send('# Error: Agent binary checksum is required when custom Agent binary URL is configured')
-      }
 
       try {
         const agentInstall = await issueHostAgentInstallToken(host.id, true)
         script = injectInstallVariable(script, 'INJECT_AGENT_INSTALL_TOKEN', agentInstall.installToken)
         script = injectInstallVariable(script, 'INJECT_AGENT_ENABLED', 'true')
 
-        if (agentBinaryUrl && agentBinarySha256) {
-          script = injectInstallVariable(script, 'INJECT_AGENT_BINARY_URL', agentBinaryUrl)
-          script = injectInstallVariable(script, 'INJECT_AGENT_BINARY_SHA256', agentBinarySha256)
-        }
 
         request.log.info(
           {

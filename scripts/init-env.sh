@@ -98,11 +98,6 @@ set_env_if_missing "SERVE_STATIC_CLIENT" "false" "后端静态文件服务开关
 set_env_if_missing "VITE_API_BASE_URL" "/api" "前端 API 基础路径"
 set_env_if_missing "VITE_CUSTOMER_BASE_URL" "" "管理后台生成客户链接的前端地址"
 set_env_if_missing "VITE_ADMIN_BASE_URL" "" "客户前端管理后台地址"
-set_env_if_missing "INCUDAL_AGENT_RELEASE_REPOSITORY" "" "Agent GitHub Release 仓库"
-set_env_if_missing "INCUDAL_AGENT_RELEASE_TOKEN" "" "Agent GitHub Release Token"
-set_env_if_missing "INCUDAL_AGENT_RELEASE_DIR" "" "Agent 本地 Release 目录"
-set_env_if_missing "INCUDAL_AGENT_BINARY_URL" "" "Agent 自定义二进制地址"
-set_env_if_missing "INCUDAL_AGENT_BINARY_SHA256" "" "Agent 自定义二进制 SHA256"
 set_env_if_missing "LOG_LEVEL" "info" "日志级别"
 set_env_if_missing "DISABLE_REQUEST_LOG" "true" "请求日志开关"
 

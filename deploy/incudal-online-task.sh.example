@@ -40,7 +40,6 @@ static_files() {
     ! -path './.cache/*' \
     ! -path './.incudal-update-downloads/*' \
     ! -path './update-logs/*' \
-    ! -path './agent-release/*' \
     ! -path './.trusted-release-manifests/*' \
     -print0 | sort -z
 }
@@ -52,7 +51,6 @@ static_links() {
     ! -path './.cache/*' \
     ! -path './.incudal-update-downloads/*' \
     ! -path './update-logs/*' \
-    ! -path './agent-release/*' \
     -print0
 }
 
@@ -91,8 +89,7 @@ apply_secure_ownership() {
 
   local mutable
   for mutable in \
-    .npm .cache .incudal-update-downloads update-logs \
-    agent-release; do
+    .npm .cache .incudal-update-downloads update-logs; do
     if [[ -e "${INSTALL_DIR}/${mutable}" ]]; then
       /usr/bin/chown -R "${RUN_USER}:${RUN_GROUP}" "${INSTALL_DIR}/${mutable}"
       find "${INSTALL_DIR}/${mutable}" -xdev -type d -exec /usr/bin/chmod u=rwx,go= {} +

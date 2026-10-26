@@ -26,7 +26,7 @@
 |------|----------------|
 | `client/` | Vue 3 + Vite SPA。双端构建（`VITE_APP_ENTRY`）→ `dist/user`（pay.payincus.com）+ `dist/admin`（admin.payincus.com）。两端独立源、**不共享 cookie 域**。 |
 | `server/` | Fastify 5 + Prisma 7 + PostgreSQL，~300 TS 文件、~70 路由、~15 调度/worker。无 Redis（用 PG advisory lock）。三套鉴权面：Web 的 JWT+refresh cookie、Public API 的 `pat_`/`poa_` token、host agent 的 HMAC。 |
-| `agent/` | Go 宿主 agent，只读监控（心跳/资源/实例态/流量），HMAC 签名，自升级。 |
+| 节点程序 | 统一由 Rain-kl/incus 的 deb 提供；本仓库不再保留、构建或分发独立宿主 Agent。 |
 | 其它 | `docs-site/`（VitePress）、`deploy/`（systemd+Nginx）、`scripts/`（安装/校验/OTA）、`plugin-templates/`、`theme-templates/`。 |
 
 部署：三层拆分（user / admin / 私有后端 `127.0.0.1:3001`），装机根 `/opt/incudal`，原子 OTA（`releases/<ver-ts>` + `current` 软链）+ 自动回滚。
@@ -81,7 +81,7 @@
   - `test:frontend-dist-boundary-guards` —— 双端 dist 边界
   - `test:frontend-i18n-keys` —— i18n key 完整性
   - `test:frontend-color-tokens` —— **主题色纪律**：全局扫描 `client/src` 的 `.vue/.css/.ts`，拦截任何硬编码 hex 色值（白名单见脚本内 `EXEMPT_PATHS`）
-- **Go agent**：`pnpm test:agent`
+- **节点分发边界**：`pnpm --filter server test:node-distribution`
 
 ### ⚠️ 表格布局守卫（最容易踩雷）
 一批表被守卫**锁定**为“**移动卡 + PC 定宽表（`table-fixed` / `overflow-hidden`），绝不横向滚动**”，并**反向禁止** `overflow-x-auto` / `min-w-[...]` / 去掉 `table-fixed`。

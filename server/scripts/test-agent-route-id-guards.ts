@@ -31,7 +31,7 @@ assert.ok(
 const hostIdParseCount = (agentRouteSource.match(/parsePositiveId\(request\.params\.hostId\)/g) ?? []).length
 assert.equal(
   hostIdParseCount,
-  6,
+  5,
   'all Agent host status/install/credential route IDs must use strict positive parsing'
 )
 

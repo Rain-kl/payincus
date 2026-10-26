@@ -33,7 +33,7 @@ PayIncus 的公开文档、源码和 Release 都以当前仓库为准：
 - 管理后台：用户、套餐、方案、节点、镜像、订单、支付渠道、财务对账、系统配置、日志、通知、资源池和 OTA。
 - 计费账务：余额、在线充值、人工充值、支付回调、消费记录、余额调整、订单退款审批、对账、返利、积分、VIP 福利和礼品卡兑换。
 - 开放接口：OAuth Provider、`pat_` API Token、`poa_` OAuth Access Token、OpenAPI 3.1、Public API SDK、scope、分页、排序和统一错误模型。
-- 宿主机 Agent：节点安装脚本、心跳、资源上报、实例状态、流量采集、Agent manifest 和二进制下载代理。
+- 节点连接：Incus 软件包安装入口、HMAC 心跳、资源与实例状态上报及反向连接。
 - 后台 OTA：管理后台查看版本、检查 Release、下载 OTA artifact、校验 SHA256、运行更新任务、查看日志和回滚。
 
 ## 技术栈
@@ -41,7 +41,6 @@ PayIncus 的公开文档、源码和 Release 都以当前仓库为准：
 ```text
 client/                 Vue 3 + Vite，用户端和管理端双入口
 server/                 Fastify + Prisma + PostgreSQL 后端
-agent/                  Go 宿主机 Agent
 server/prisma/          Prisma schema 和 migrations
 server/templates/       节点安装、Agent 和证书模板
 deploy/                 systemd 和 Nginx 生产模板
@@ -57,7 +56,6 @@ docs-site/              VitePress 文档站
 - PostgreSQL，生产推荐 PostgreSQL 16
 - Redis（建议 7；一键安装使用系统仓库版本），安装脚本会保留 `REDIS_URL` 兼容后续分布式状态扩展
 - Nginx + systemd
-- Go 1.22+，仅开发或构建 Agent 时需要
 
 ## 推荐生产架构
 
@@ -269,7 +267,6 @@ SYSTEM_UPDATE_LOG_DIR=/opt/incudal/update-logs
 SYSTEM_UPDATE_STARTED_BY_USER_ID=1
 SYSTEM_UPDATE_RELEASE_REPOSITORY=VipMaxxxx/payincus
 SYSTEM_UPDATE_APPLY_MODE=auto
-INCUDAL_AGENT_RELEASE_REPOSITORY=VipMaxxxx/payincus
 ```
 
 原子 OTA 布局：
@@ -343,3 +340,7 @@ pnpm --filter server test:public-api-openapi-guards
 ## 许可证
 
 本仓库按 [LICENSE](./LICENSE) 发布。生产使用和商业运营前，请确认你的业务场景满足许可证、支付渠道、数据合规和当地法律要求。
+
+## 节点程序
+
+节点统一使用 [Rain-kl/incus](https://github.com/Rain-kl/incus) 发布的 `incus-payincus` deb。宿主连接器、incusd 扩展及 incus-tui 均由该仓库构建与发布，控制端不再构建或分发独立 Agent。仅支持 Debian 13 / Ubuntu 24.04 的 amd64、arm64。安装入口交给 incus-tui 完成连接确认与初始化；无旧节点升级、配置迁移或旧协议回退。详见 [节点安装](docs/NODE_DISTRIBUTION.md)。

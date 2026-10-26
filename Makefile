@@ -38,15 +38,7 @@ canary:
 	git push -u origin canary; \
 	echo "Done: $$orig merged into canary and pushed."
 
-# Guard: detect agent code changes and require agent/VERSION to be bumped.
-# Usage: make agent-hash
-#   - first run creates the baseline record agent/.package-hash
-#   - fails if agent code changed without agent/VERSION also changing
-.PHONY: agent-hash
-
+# The control repository consumes the Incus node distribution; it does not build a host agent.
+.PHONY: check
 check:
-	@echo "Checking agent code changes..."
-	@make agent-hash
-
-agent-hash:
-	@bash agent/scripts/hash-version.sh
+	@node --import ./server/node_modules/tsx/dist/loader.mjs server/scripts/test-node-distribution.ts

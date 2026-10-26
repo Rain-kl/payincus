@@ -77,7 +77,7 @@ const verifyProductionDbReadiness = readRepoFile('server/src/scripts/verify-prod
 const releaseWorkflow = readRepoFile('.github/workflows/release.yml')
 const splitAuthSmokeWrapper = readRepoFile('server/scripts/smoke-split-auth.ts')
 const splitAuthSmoke = readRepoFile('server/src/scripts/smoke-split-auth.ts')
-const agentReleaseSmoke = readRepoFile('server/scripts/smoke-agent-release.ts')
+const agentReleaseSmoke = readRepoFile('server/scripts/smoke-node-distribution.ts')
 const localNginxSplitSmoke = readRepoFile('scripts/smoke-local-nginx-split.sh')
 const serverApp = readRepoFile('server/src/app.ts')
 const viteConfig = readRepoFile('client/vite.config.ts')
@@ -270,7 +270,6 @@ assert.ok(initEnv.includes('set_env_if_missing "SERVE_STATIC_CLIENT" "false" "�
 assert.ok(initEnv.includes('set_env_if_missing "VITE_API_BASE_URL" "/api" "前端 API 基础路径"'), 'init-env script must default VITE_API_BASE_URL=/api')
 assert.ok(initEnv.includes('set_env_if_missing "VITE_CUSTOMER_BASE_URL" "" "管理后台生成客户链接的前端地址"'), 'init-env script must preserve the customer frontend URL for admin-generated customer links')
 assert.ok(initEnv.includes('set_env_if_missing "VITE_ADMIN_BASE_URL" "" "客户前端管理后台地址"'), 'init-env script must preserve the admin frontend URL for customer admin redirects')
-assert.ok(initEnv.includes('set_env_if_missing "INCUDAL_AGENT_RELEASE_DIR" "" "Agent 本地 Release 目录"'), 'init-env script must expose the local Agent release directory setting')
 assert.ok(
   installPanel.includes('set_env_if_value()') &&
     installPanel.includes('set_env_if_value "PORT" "3000" "${DEFAULT_PORT}" "后端监听端口（迁移旧版前端端口）"'),
@@ -280,11 +279,9 @@ assert.ok(installPanel.includes('set_env_if_missing "SERVE_STATIC_CLIENT" "false
 assert.ok(installPanel.includes('set_env_if_missing "VITE_API_BASE_URL" "/api" "前端 API 基础路径"'), 'install script must preserve same-origin /api frontend build mode')
 assert.ok(installPanel.includes('set_env_if_missing "VITE_CUSTOMER_BASE_URL" "" "管理后台生成客户链接的前端地址"'), 'install script must preserve the customer frontend URL for admin-generated customer links')
 assert.ok(installPanel.includes('set_env_if_missing "VITE_ADMIN_BASE_URL" "" "客户前端管理后台地址"'), 'install script must preserve the admin frontend URL for customer admin redirects')
-assert.ok(installPanel.includes('set_env_if_missing "INCUDAL_AGENT_RELEASE_DIR" "" "Agent 本地 Release 目录"'), 'install script must preserve the local Agent release directory setting')
 assert.ok(installPanel.includes('SERVE_STATIC_CLIENT=false'), 'generated production env must disable backend static serving')
 assert.ok(installPanel.includes('VITE_API_BASE_URL=/api'), 'generated production env must keep frontend API traffic under /api')
 assert.ok(installPanel.includes('ADMIN_FRONTEND_URL=') && installPanel.includes('VITE_CUSTOMER_BASE_URL=') && installPanel.includes('VITE_ADMIN_BASE_URL='), 'generated production env must include split user/admin frontend URL settings')
-assert.ok(installPanel.includes('INCUDAL_AGENT_RELEASE_DIR='), 'generated production env must include the local Agent release directory setting')
 assert.ok(
   verifySplitHost.includes('BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:3001}"'),
   'split verify script must default backend URL to port 3001'
@@ -310,9 +307,9 @@ assert.ok(
 assert.ok(splitAuthSmoke.includes('frontend proxied /api/health'), 'split auth smoke must verify frontend /api proxy')
 assert.ok(splitAuthSmoke.includes('/api/auth/refresh'), 'split auth smoke must verify refresh token cookie flow')
 assert.ok(splitAuthSmoke.includes('anonymous admin boundary'), 'split auth smoke must verify anonymous admin boundary')
-assert.ok(rootPackage.includes('"smoke:agent-release": "pnpm --filter server smoke:agent-release"'), 'root package must expose Agent release smoke script')
-assert.ok(serverPackage.includes('"smoke:agent-release": "node --import tsx scripts/smoke-agent-release.ts"'), 'server package must expose Agent release smoke script')
-assert.ok(localNginxSplitSmoke.includes('RUN_AGENT_RELEASE_SMOKE') && localNginxSplitSmoke.includes('pnpm --filter server smoke:agent-release'), 'local nginx split smoke must run the Agent release smoke by default')
+assert.ok(rootPackage.includes('"smoke:node-distribution": "pnpm --filter server smoke:node-distribution"'), 'root package must expose Agent release smoke script')
+assert.ok(serverPackage.includes('"smoke:node-distribution": "node --import tsx scripts/smoke-node-distribution.ts"'), 'server package must expose Agent release smoke script')
+assert.ok(localNginxSplitSmoke.includes('RUN_NODE_DISTRIBUTION_SMOKE') && localNginxSplitSmoke.includes('pnpm --filter server smoke:node-distribution'), 'local nginx split smoke must run the Agent release smoke by default')
 assert.ok(
   localNginxSplitSmoke.includes('ADMIN_LOCAL_NGINX_PORT="${ADMIN_LOCAL_NGINX_PORT:-$((LOCAL_NGINX_PORT + 1))}"') &&
     localNginxSplitSmoke.includes('ADMIN_CLIENT_DIST="${ADMIN_CLIENT_DIST:-$(pwd)/client/dist/admin}"') &&
@@ -320,14 +317,6 @@ assert.ok(
     localNginxSplitSmoke.includes('ADMIN_FRONTEND_URL="$ADMIN_FRONTEND_URL" BACKEND_URL="$BACKEND_URL" bash scripts/verify-split-host.sh'),
   'local nginx split smoke must mount and verify a separate admin frontend'
 )
-assert.ok(
-  agentReleaseSmoke.includes('/api/agent/install.sh') &&
-    agentReleaseSmoke.includes('/api/agent/binary/incudal-agent-linux-amd64?v=v0.0.1') &&
-    agentReleaseSmoke.includes('AGENT_BINARY_QUERY_INCOMPLETE') &&
-    agentReleaseSmoke.includes('INVALID_AGENT_BINARY_NAME'),
-  'Agent release smoke must cover install script serving and deterministic binary download rejection paths'
-)
-assert.ok(readme.includes('INCUDAL_AGENT_RELEASE_REPOSITORY=VipMaxxxx/payincus'), 'README must document the current Agent release repository')
 assert.ok(backendServiceExample.includes('Documentation=https://github.com/VipMaxxxx/payincus'), 'systemd backend example must point documentation to the current repository')
 assert.ok(
   installPanel.includes('readonly GITHUB_REPO="VipMaxxxx/payincus"') &&
@@ -453,7 +442,7 @@ assert.ok(rootPackage.includes('"verify:production": "bash scripts/verify-produc
 assert.ok(rootPackage.includes('"verify:log-header": "bash scripts/verify-log-header-exposure.sh"'), 'root package must expose production log/header exposure verification')
 assert.ok(rootPackage.includes('"verify:live-acceptance": "bash scripts/verify-live-acceptance.sh"'), 'root package must expose live acceptance verification')
 assert.ok(
-  rootPackage.includes('"verify:final-acceptance": "FINAL_ACCEPTANCE_MODE=1 RUN_PRODUCTION_PREFLIGHT=1 RUN_SPLIT_AUTH_SMOKE=1 RUN_AGENT_RELEASE_SMOKE=1 RUN_LOG_HEADER_CHECK=1 REQUIRE_LIVE_PROOF_REFS=1 bash scripts/verify-live-acceptance.sh"'),
+  rootPackage.includes('"verify:final-acceptance": "FINAL_ACCEPTANCE_MODE=1 RUN_PRODUCTION_PREFLIGHT=1 RUN_SPLIT_AUTH_SMOKE=1 RUN_NODE_DISTRIBUTION_SMOKE=1 RUN_LOG_HEADER_CHECK=1 REQUIRE_LIVE_PROOF_REFS=1 bash scripts/verify-live-acceptance.sh"'),
   'root package must expose strict final acceptance verification'
 )
 assert.ok(
@@ -552,20 +541,6 @@ assert.ok(
   'production readiness verifier must require and verify a separate admin frontend origin'
 )
 assert.ok(
-  verifyProductionReadiness.includes('AGENT_RELEASE_DIR_VALUE="$(config_value INCUDAL_AGENT_RELEASE_DIR)"') &&
-    verifyProductionReadiness.includes('INCUDAL_AGENT_RELEASE_DIR must be an absolute path') &&
-    verifyProductionReadiness.includes('INCUDAL_AGENT_RELEASE_REPOSITORY or INCUDAL_AGENT_RELEASE_DIR is required unless INCUDAL_AGENT_BINARY_URL and INCUDAL_AGENT_BINARY_SHA256 are configured') &&
-    verifyProductionReadiness.includes('require_sha256 INCUDAL_AGENT_BINARY_SHA256 "$AGENT_BINARY_SHA256_VALUE"'),
-  'production readiness verifier must require a GitHub Agent release path, local release directory, or checksum-pinned custom binary'
-)
-assert.ok(
-  verifyProductionReadiness.includes('FRONTEND_URL="$FRONTEND_URL_VALUE" ADMIN_FRONTEND_URL="$ADMIN_FRONTEND_URL_VALUE" BACKEND_URL="$BACKEND_URL_VALUE" bash scripts/verify-split-host.sh') &&
-    verifyProductionReadiness.includes('/api/agent/manifest.json') &&
-    verifyProductionReadiness.includes('Agent manifest must include ${platform} name and sha256') &&
-    verifyProductionReadiness.includes('ALLOW_MISSING_AGENT_RELEASE=true'),
-  'production readiness verifier must run split host checks and verify Agent manifest availability unless explicitly waived'
-)
-assert.ok(
   verifyProductionReadiness.includes('RUN_DB_CHECKS="${RUN_DB_CHECKS:-$RUN_LIVE_CHECKS}"') &&
     verifyProductionReadiness.includes('ENV_FILE="$ENV_FILE" pnpm --filter server verify:production-db'),
   'production readiness verifier must run DB readiness checks by default in full mode while allowing config-only skips'
@@ -593,14 +568,14 @@ assert.ok(
   verifyLiveAcceptance.includes('RUN_SPLIT_AUTH_SMOKE="${RUN_SPLIT_AUTH_SMOKE:-0}"') &&
   verifyLiveAcceptance.includes('RUN_RECHARGE_CALLBACK_SMOKE="${RUN_RECHARGE_CALLBACK_SMOKE:-0}"') &&
     verifyLiveAcceptance.includes('RUN_AGENT_HEARTBEAT_SMOKE="${RUN_AGENT_HEARTBEAT_SMOKE:-0}"') &&
-    verifyLiveAcceptance.includes('RUN_AGENT_RELEASE_SMOKE="${RUN_AGENT_RELEASE_SMOKE:-1}"'),
+    verifyLiveAcceptance.includes('RUN_NODE_DISTRIBUTION_SMOKE="${RUN_NODE_DISTRIBUTION_SMOKE:-1}"'),
   'live acceptance wrapper must default mutating smoke checks off while keeping non-mutating Agent release smoke on'
 )
 assert.ok(
   verifyLiveAcceptance.includes('pnpm verify:production') &&
     verifyLiveAcceptance.includes('pnpm verify:log-header') &&
     verifyLiveAcceptance.includes('pnpm smoke:split:auth') &&
-    verifyLiveAcceptance.includes('pnpm smoke:agent-release') &&
+    verifyLiveAcceptance.includes('pnpm smoke:node-distribution') &&
     verifyLiveAcceptance.includes('LIVE_ACCEPTANCE_REPORT') &&
     verifyLiveAcceptance.includes('## Run Configuration') &&
     verifyLiveAcceptance.includes('FINAL_ACCEPTANCE_MODE="${FINAL_ACCEPTANCE_MODE:-0}"') &&
@@ -613,13 +588,13 @@ assert.ok(
     verifyLiveAcceptance.includes('LIVE_ACCEPTANCE_REPORT is required when REQUIRE_LIVE_PROOF_REFS=1') &&
     verifyLiveAcceptance.includes('RUN_PRODUCTION_PREFLIGHT must be 1 when FINAL_ACCEPTANCE_MODE=1') &&
     verifyLiveAcceptance.includes('RUN_SPLIT_AUTH_SMOKE must be 1 when FINAL_ACCEPTANCE_MODE=1') &&
-    verifyLiveAcceptance.includes('RUN_AGENT_RELEASE_SMOKE must be 1 when FINAL_ACCEPTANCE_MODE=1') &&
+    verifyLiveAcceptance.includes('RUN_NODE_DISTRIBUTION_SMOKE must be 1 when FINAL_ACCEPTANCE_MODE=1') &&
     verifyLiveAcceptance.includes('RUN_LOG_HEADER_CHECK must be 1 when FINAL_ACCEPTANCE_MODE=1') &&
     verifyLiveAcceptance.includes('REQUIRE_LIVE_PROOF_REFS must be 1 when FINAL_ACCEPTANCE_MODE=1') &&
     verifyLiveAcceptance.includes('is_live_proof_placeholder()') &&
-    verifyLiveAcceptance.includes('can_run_agent_release_source_smoke()') &&
+    verifyLiveAcceptance.includes('can_run_node_distribution_source_smoke()') &&
     verifyLiveAcceptance.includes("require.resolve('tsx/package.json')") &&
-    verifyLiveAcceptance.includes('Agent release source smoke skipped in production artifact mode') &&
+    verifyLiveAcceptance.includes('Node distribution source smoke skipped in production artifact mode') &&
     verifyLiveAcceptance.includes('append_report "- ${key}: placeholder"') &&
     verifyLiveAcceptance.includes('REPORT_FRONTEND_URL="${FRONTEND_URL_VALUE:-<missing>}"') &&
     verifyLiveAcceptance.includes('ACCEPTED_WARNINGS_NOTE="${ACCEPTED_WARNINGS_NOTE:-}"') &&
@@ -813,6 +788,8 @@ const allowedClientNetworkPrimitiveLines = new Map<string, string[]>([
   ['client/src/api/admin.ts', ["fetch(buildApiUrl('/auth/refresh'), {"]],
   ['client/src/components/TermsOfServiceModal.vue', ['fetch(`/tos/${lang}.md`)']],
   ['client/src/components/host/HostAgentLogsTab.vue', ['const es = new EventSource(url, { withCredentials: true })']],
+  // Task SSE uses buildApiUrl, an authenticated bearer header and a cancellation signal.
+  ['client/src/views/admin/TasksView.vue', ['const response = await fetch(buildApiUrl(`/admin/tasks/${id}/logs/stream?after=${cursor}`), {']],
   ['client/src/components/instance/TerminalModal.vue', ['new WebSocket(wsUrl)']],
   ['client/src/composables/useTerminal.ts', ['new WebSocket(wsUrl)']],
   ['client/src/views/TerminalView.vue', ['new WebSocket(wsUrl)']]
@@ -859,3 +836,6 @@ if (existsSync(clientDistPath)) {
 }
 
 console.log('split deployment config tests passed')
+
+assert.ok(agentReleaseSmoke.includes('/api/agent/distribution') && agentReleaseSmoke.includes("managedBy, 'apt'"), 'smoke must validate the Incus package distribution')
+assert.ok(verifyProductionReadiness.includes('/api/agent/distribution'), 'readiness must validate the node distribution')

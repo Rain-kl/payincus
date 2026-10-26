@@ -129,7 +129,7 @@ assert.ok(
     runTask.includes('waitForBackendHealth()') &&
     runTask.includes("verify:production") &&
     runTask.includes("verify:log-header") &&
-    runTask.includes("smoke:agent-release") &&
+    runTask.includes("smoke:node-distribution") &&
     runTask.includes("tryMarkSystemUpdateTaskRunning(taskId, ['pending'], logPath)") &&
     runTask.includes('already claimed or finished; skipping duplicate worker') &&
     runTask.includes('await closePrismaDatabase()'),
@@ -282,7 +282,6 @@ assert.ok(
 
 assert.ok(
   runTask.includes('server/certs') &&
-    runTask.includes('agent-release') &&
     runTask.includes("'.npm'") &&
     runTask.includes("'.cache'") &&
     rollbackTask.includes('pre-rollback') &&

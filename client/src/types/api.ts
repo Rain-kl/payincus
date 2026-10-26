@@ -1140,8 +1140,7 @@ export interface HostAgentStatus {
   enabled: boolean
   status: 'online' | 'offline' | string
   version: string | null
-  latestVersion: string | null
-  versionStatus: 'latest' | 'outdated' | 'unknown'
+  versionStatus: 'managed' | 'unknown'
   capabilities: string[]
   lastReport: {
     incus?: {
@@ -1189,14 +1188,7 @@ export interface HostAgentStatusResponse {
   agent: HostAgentStatus | null
 }
 
-export interface HostAgentUpgradeRequestResponse {
-  requested: boolean
-  currentVersion: string | null
-  latestVersion: string | null
-  versionStatus: 'latest' | 'outdated' | 'unknown'
-  nextHeartbeatSeconds: number
-  message: string
-}
+
 
 export interface HostAgentInstallCommandResponse {
   host: {

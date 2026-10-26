@@ -25,7 +25,6 @@
     "smoke:split:auth": "node dist/scripts/smoke-split-auth.js",
     "smoke:recharge-callback": "node --import tsx scripts/smoke-recharge-callback.ts",
     "smoke:agent-heartbeat": "node --import tsx scripts/smoke-agent-heartbeat.ts",
-    "smoke:agent-release": "node --import tsx scripts/smoke-agent-release.ts",
     "verify:production-db": "node dist/scripts/verify-production-db-readiness.js",
     "test:operation-tasks": "node --import tsx scripts/test-operation-tasks.ts",
     "test:accounting-route-id-guards": "node --import tsx scripts/test-accounting-route-id-guards.ts",
@@ -205,7 +204,9 @@
     "test:package-egress": "node --import tsx scripts/test-package-egress.ts",
     "test:package-egress:db": "RUN_PACKAGE_EGRESS_DB_TESTS=1 node --import tsx scripts/test-package-egress.ts",
     "test:node-security": "node --import tsx scripts/test-node-security.ts && node --import tsx scripts/test-node-security-routes.ts && node --import tsx scripts/test-node-security-transport.ts",
-    "test:node-security:db": "node --import tsx scripts/test-node-security-db.ts"
+    "test:node-security:db": "node --import tsx scripts/test-node-security-db.ts",
+    "test:node-distribution": "node --import tsx scripts/test-node-distribution.ts",
+    "smoke:node-distribution": "node --import tsx scripts/smoke-node-distribution.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

@@ -258,10 +258,10 @@ for _ in $(seq 1 50); do
         BACKEND_URL="$BACKEND_URL" \
         pnpm --filter server smoke:agent-heartbeat
     fi
-    if [[ "${RUN_AGENT_RELEASE_SMOKE:-true}" == "true" ]]; then
+    if [[ "${RUN_NODE_DISTRIBUTION_SMOKE:-true}" == "true" ]]; then
       SMOKE_API_BASE_URL="$FRONTEND_URL" \
         BACKEND_URL="$BACKEND_URL" \
-        pnpm --filter server smoke:agent-release
+        pnpm --filter server smoke:node-distribution
     fi
     exit 0
   fi

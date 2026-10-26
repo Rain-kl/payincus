@@ -232,11 +232,6 @@ ensure_env_keys() {
     set_env_if_missing "SYSTEM_UPDATE_RELEASE_REPOSITORY" "${GITHUB_REPO}" "在线更新 GitHub Release 仓库"
     set_env_if_missing "SYSTEM_UPDATE_RELEASE_TOKEN" "" "在线更新私有 Release Token"
     set_env_if_missing "SYSTEM_UPDATE_APPLY_MODE" "auto" "在线更新应用模式"
-    set_env_if_missing "INCUDAL_AGENT_RELEASE_REPOSITORY" "" "Agent GitHub Release 仓库"
-    set_env_if_missing "INCUDAL_AGENT_RELEASE_TOKEN" "" "Agent GitHub Release Token"
-    set_env_if_missing "INCUDAL_AGENT_RELEASE_DIR" "" "Agent 本地 Release 目录"
-    set_env_if_missing "INCUDAL_AGENT_BINARY_URL" "" "Agent 自定义二进制地址"
-    set_env_if_missing "INCUDAL_AGENT_BINARY_SHA256" "" "Agent 自定义二进制 SHA256"
     set_env_if_missing "COOKIE_SAME_SITE" "" "Cookie SameSite 策略"
     set_env_if_missing "COOKIE_SECURE" "" "Cookie Secure 开关"
     set_env_if_missing "COOKIE_DOMAIN" "" "Cookie 共享域（必须留空以隔离客户面板和管理后台）"
@@ -855,8 +850,7 @@ create_user() {
     # Nginx runs as www-data and must be able to traverse the install root
     # to serve client/dist while .env stays owner-only below.
     for mutable in \
-        .npm .cache .incudal-update-downloads update-logs \
-        agent-release; do
+        .npm .cache .incudal-update-downloads update-logs; do
         if [[ -e "${INSTALL_DIR}/${mutable}" ]]; then
             chown -R "${RUN_USER}:${RUN_USER}" "${INSTALL_DIR}/${mutable}"
         fi
@@ -992,11 +986,6 @@ SYSTEM_UPDATE_APPLY_MODE=auto
 
 # ============ Agent Release 配置 ============
 # 可使用 GitHub Release 仓库、本地 release 目录，或自定义二进制 URL+SHA256。
-INCUDAL_AGENT_RELEASE_REPOSITORY=
-INCUDAL_AGENT_RELEASE_TOKEN=
-INCUDAL_AGENT_RELEASE_DIR=
-INCUDAL_AGENT_BINARY_URL=
-INCUDAL_AGENT_BINARY_SHA256=
 
 # ============ CORS 配置（必须修改为实际域名！）============
 # 支付回调地址也会使用这个域名，必须是公网可访问的地址

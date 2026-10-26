@@ -521,7 +521,6 @@ async function clearInstallDirForArtifact(): Promise<void> {
     '.gitconfig',
     '.npm',
     '.cache',
-    'agent-release',
     '.incudal-update-downloads',
     'update-logs'
   ])
@@ -538,7 +537,6 @@ async function copyIfExists(from: string, to: string): Promise<void> {
 async function restoreRuntimeAssets(backupDir: string, targetDir = installDir): Promise<void> {
   await copyIfExists(join(backupDir, '.env'), join(targetDir, '.env'))
   await copyIfExists(join(backupDir, 'server/certs'), join(targetDir, 'server/certs'))
-  await copyIfExists(join(backupDir, 'agent-release'), join(targetDir, 'agent-release'))
   await mkdir(join(installDir, '.npm'), { recursive: true })
   await mkdir(join(installDir, '.cache'), { recursive: true })
   await mkdir(join(targetDir, 'server/certs'), { recursive: true })
@@ -670,7 +668,7 @@ async function applyGitUpdate(backupDir: string): Promise<string> {
   await cp(installDir, backupDir, { recursive: true, preserveTimestamps: true })
 
   await run('git', ['checkout', '--force', targetVersion], { timeoutMs: 120000 })
-  await run('git', ['clean', '-fdx', '-e', '.env', '-e', '.gitconfig', '-e', 'server/certs', '-e', 'agent-release', '-e', '.npm', '-e', '.cache', '-e', 'update-logs'], { timeoutMs: 120000 })
+  await run('git', ['clean', '-fdx', '-e', '.env', '-e', '.gitconfig', '-e', 'server/certs', '-e', '.npm', '-e', '.cache', '-e', 'update-logs'], { timeoutMs: 120000 })
   await restoreRuntimeAssets(backupDir)
 
   await run('corepack', ['enable'], { timeoutMs: 120000 })
@@ -721,7 +719,7 @@ async function verifyUpdatedRuntime(isArtifactMode: boolean): Promise<void> {
     }
   })
   if (!isArtifactMode) {
-    await run('pnpm', ['smoke:agent-release'], {
+    await run('pnpm', ['smoke:node-distribution'], {
       timeoutMs: 180000,
       env: {
         FRONTEND_URL: frontendUrl,

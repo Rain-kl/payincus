@@ -3,7 +3,7 @@ import type { ControlMethod } from './tunnel-manager.js'
 
 export type NodeAPIRequester = (hostId: number, method: ControlMethod, params: unknown, signal: AbortSignal) => Promise<unknown>
 
-// Keep legacy Agent support while new nodes use the same mTLS Incus client as instance operations.
+// All node controls use the same mTLS Incus client as instance operations.
 export const requestNodeAPI: NodeAPIRequester = async (hostId, method, params, signal) => {
   const [{ prisma }, { getIncusClient }] = await Promise.all([
     import('../../db/prisma.js'), import('./incus-pool.js')

@@ -7,7 +7,7 @@ RUN_PRODUCTION_PREFLIGHT="${RUN_PRODUCTION_PREFLIGHT:-1}"
 RUN_SPLIT_AUTH_SMOKE="${RUN_SPLIT_AUTH_SMOKE:-0}"
 RUN_RECHARGE_CALLBACK_SMOKE="${RUN_RECHARGE_CALLBACK_SMOKE:-0}"
 RUN_AGENT_HEARTBEAT_SMOKE="${RUN_AGENT_HEARTBEAT_SMOKE:-0}"
-RUN_AGENT_RELEASE_SMOKE="${RUN_AGENT_RELEASE_SMOKE:-1}"
+RUN_NODE_DISTRIBUTION_SMOKE="${RUN_NODE_DISTRIBUTION_SMOKE:-1}"
 RUN_LOG_HEADER_CHECK="${RUN_LOG_HEADER_CHECK:-0}"
 PRINT_MANUAL_CHECKLIST="${PRINT_MANUAL_CHECKLIST:-1}"
 LIVE_ACCEPTANCE_REPORT="${LIVE_ACCEPTANCE_REPORT:-}"
@@ -88,8 +88,8 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing command: $1"
 }
 
-can_run_agent_release_source_smoke() {
-  [[ -f "server/scripts/smoke-agent-release.ts" ]] || return 1
+can_run_node_distribution_source_smoke() {
+  [[ -f "server/scripts/smoke-node-distribution.ts" ]] || return 1
   node -e "require.resolve('tsx/package.json')" >/dev/null 2>&1
 }
 
@@ -165,7 +165,7 @@ if [[ -n "$LIVE_ACCEPTANCE_REPORT" ]]; then
 - RUN_SPLIT_AUTH_SMOKE: ${RUN_SPLIT_AUTH_SMOKE}
 - RUN_RECHARGE_CALLBACK_SMOKE: ${RUN_RECHARGE_CALLBACK_SMOKE}
 - RUN_AGENT_HEARTBEAT_SMOKE: ${RUN_AGENT_HEARTBEAT_SMOKE}
-- RUN_AGENT_RELEASE_SMOKE: ${RUN_AGENT_RELEASE_SMOKE}
+- RUN_NODE_DISTRIBUTION_SMOKE: ${RUN_NODE_DISTRIBUTION_SMOKE}
 - RUN_LOG_HEADER_CHECK: ${RUN_LOG_HEADER_CHECK}
 - PRINT_MANUAL_CHECKLIST: ${PRINT_MANUAL_CHECKLIST}
 - REQUIRE_LIVE_PROOF_REFS: ${REQUIRE_LIVE_PROOF_REFS}
@@ -188,7 +188,7 @@ log "Using env file: ${ENV_FILE}"
 if [[ "$FINAL_ACCEPTANCE_MODE" == "1" ]]; then
   [[ "$RUN_PRODUCTION_PREFLIGHT" == "1" ]] || fail "RUN_PRODUCTION_PREFLIGHT must be 1 when FINAL_ACCEPTANCE_MODE=1"
   [[ "$RUN_SPLIT_AUTH_SMOKE" == "1" ]] || fail "RUN_SPLIT_AUTH_SMOKE must be 1 when FINAL_ACCEPTANCE_MODE=1"
-  [[ "$RUN_AGENT_RELEASE_SMOKE" == "1" ]] || fail "RUN_AGENT_RELEASE_SMOKE must be 1 when FINAL_ACCEPTANCE_MODE=1"
+  [[ "$RUN_NODE_DISTRIBUTION_SMOKE" == "1" ]] || fail "RUN_NODE_DISTRIBUTION_SMOKE must be 1 when FINAL_ACCEPTANCE_MODE=1"
   [[ "$RUN_LOG_HEADER_CHECK" == "1" ]] || fail "RUN_LOG_HEADER_CHECK must be 1 when FINAL_ACCEPTANCE_MODE=1"
   [[ "$REQUIRE_LIVE_PROOF_REFS" == "1" ]] || fail "REQUIRE_LIVE_PROOF_REFS must be 1 when FINAL_ACCEPTANCE_MODE=1"
 fi
@@ -233,21 +233,21 @@ else
   append_report "- split_auth_smoke: skipped"
 fi
 
-if [[ "$RUN_AGENT_RELEASE_SMOKE" == "1" ]]; then
-  if can_run_agent_release_source_smoke; then
-    log "Running Agent release endpoint smoke"
+if [[ "$RUN_NODE_DISTRIBUTION_SMOKE" == "1" ]]; then
+  if can_run_node_distribution_source_smoke; then
+    log "Running Node distribution endpoint smoke"
     ENV_FILE="$ENV_FILE" \
       SMOKE_API_BASE_URL="$FRONTEND_URL_VALUE" \
       BACKEND_URL="$BACKEND_URL_VALUE" \
-      pnpm smoke:agent-release
-    append_report "- agent_release_smoke: passed"
+      pnpm smoke:node-distribution
+    append_report "- node_distribution_smoke: passed"
   else
-    warn "Agent release source smoke skipped in production artifact mode; production preflight already verifies the Agent manifest"
-    append_report "- agent_release_smoke: skipped (artifact mode; production preflight verifies Agent manifest)"
+    warn "Node distribution source smoke skipped in production artifact mode; production preflight already verifies the node distribution"
+    append_report "- node_distribution_smoke: skipped (artifact mode; production preflight verifies node distribution)"
   fi
 else
-  warn "Agent release smoke skipped because RUN_AGENT_RELEASE_SMOKE=${RUN_AGENT_RELEASE_SMOKE}"
-  append_report "- agent_release_smoke: skipped (${RUN_AGENT_RELEASE_SMOKE})"
+  warn "Node distribution smoke skipped because RUN_NODE_DISTRIBUTION_SMOKE=${RUN_NODE_DISTRIBUTION_SMOKE}"
+  append_report "- node_distribution_smoke: skipped (${RUN_NODE_DISTRIBUTION_SMOKE})"
 fi
 
 if [[ "$RUN_RECHARGE_CALLBACK_SMOKE" == "1" ]]; then

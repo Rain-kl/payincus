@@ -22,6 +22,11 @@ app.decorate('authenticateAdmin', async () => {})
 await app.register(websocket)
 await app.register(agentRoutes, { prefix: '/api/agent' })
 try {
+  const distribution = await app.inject({ url: '/api/agent/distribution' })
+  assert.equal(distribution.statusCode, 200)
+  assert.equal(distribution.json().repository, 'Rain-kl/incus')
+  assert.equal(distribution.json().managedBy, 'apt')
+  for (const url of ['/api/agent/manifest.json', '/api/agent/binary/incudal-agent-linux-amd64']) assert.equal((await app.inject({ url })).statusCode, 404)
   const identity = { hostId: host.id, dataset: 'tank/private', version: 1 }
   await prisma.nodeStorageKey.create({ data: { hostId: host.id, dataset: identity.dataset, fingerprint: fingerprint(key), ciphertext: seal(key, identity, master) } })
   const stored = await prisma.nodeStorageKey.findUniqueOrThrow({ where: { hostId_dataset: { hostId: host.id, dataset: identity.dataset } } })
@@ -59,7 +64,8 @@ try {
   assert.equal((await app.inject({ method: 'POST', url: path, headers: headers(report, path), payload: { ...report, state: { ...report.state, locked: false } } })).statusCode, 401)
   const malformed = { state: {}, events: [] }
   assert.equal((await app.inject({ method: 'POST', url: path, headers: headers(malformed, path), payload: malformed })).statusCode, 503)
-  const heartbeat = { nodeSecurity: { state: { locked: true } } }
+  const heartbeat = { nodeApi: 'payincus_node_v1', nodeSecurity: { state: { locked: true } } }
+  assert.equal((await app.inject({ method: 'POST', url: '/api/agent/heartbeat', headers: headers({}, '/api/agent/heartbeat'), payload: {} })).statusCode, 409)
   const heartbeatResponse = await app.inject({ method: 'POST', url: '/api/agent/heartbeat', headers: headers(heartbeat, '/api/agent/heartbeat'), payload: heartbeat })
   assert.equal(heartbeatResponse.statusCode, 200)
   const agent = await prisma.hostAgent.findUniqueOrThrow({ where: { agentId } })
