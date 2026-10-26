@@ -1,3 +1,4 @@
+import { recordReport } from '../lib/node-security/report.js'
 import { syncHostGpuReport } from '../db/gpus.js'
 import { recordNetworkStatus } from '../lib/egress/sync.js'
 import { pushNetworkPolicy } from '../lib/egress/realtime.js'
@@ -58,6 +59,7 @@ interface AgentHeartbeatBody {
   instances?: Record<string, unknown>
   resources?: Record<string, unknown>
   metrics?: Record<string, unknown>
+  nodeSecurity?: { state?: { locked?: boolean } }
   networkStatus?: Record<string, unknown>
 }
 
@@ -1507,6 +1509,17 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     })
   })
 
+  fastify.post<{ Body: unknown }>('/security-report', { bodyLimit: 128 * 1024 }, async (request, reply) => {
+    // Event batches must bind the actual body; the legacy empty-body handshake is GET-only.
+    const signed = readAgentAuthHeaders(request.headers)
+    if (!signed || signed.bodyHash?.toLowerCase() !== createAgentBodyHash(request.body ?? {}).toLowerCase()) return reply.code(401).send({ error: 'Report unavailable' })
+    const agent = await authenticateAgentRequest(request, reply)
+    if (!agent) return
+    reply.header('Cache-Control', 'no-store')
+    try { return { ack: await recordReport(agent.hostId, request.body) } }
+    catch { return reply.code(503).send({ error: 'Report unavailable' }) }
+  })
+
   fastify.post<{ Body: AgentHeartbeatBody }>('/heartbeat', {
     schema: {
       body: {
@@ -1534,6 +1547,12 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     }
 
     const now = new Date()
+    // Locked nodes remain online without turning an intentionally absent inventory into deletions.
+    if (request.body.nodeSecurity?.state?.locked === true) {
+      await agentModel.update({ where: { agentId: agent.agentId }, data: { status: 'online', lastSeenAt: now, lastHeartbeatIp: sanitizeShortString(getAgentHeartbeatIp(request), 128) } })
+      const connection = await prisma.host.findUnique({ where: { id: agent.hostId }, select: { tunnelEnabled: true, targetHost: true, targetPort: true } })
+      return { ok: true, serverTime: now.toISOString(), tunnel: { enabled: connection?.tunnelEnabled === true || (Array.isArray(agent.capabilities) && agent.capabilities.includes('network-control')), targetHost: connection?.targetHost ?? '127.0.0.1', targetPort: connection?.targetPort ?? 8443 } }
+    }
     let instanceReport: Awaited<ReturnType<typeof processAgentInstanceReport>> | null = null
     try {
       instanceReport = await processAgentInstanceReport(agent.hostId, request.body.instances)

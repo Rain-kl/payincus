@@ -1,3 +1,4 @@
+import type { NodeSecurityOverview, NodeSecurityState } from './node-security-types'
 import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
 import type { GpuConfiguration } from '@/types/api'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
@@ -721,6 +722,15 @@ http.interceptors.response.use(
 
 // API 模块
 const api = {
+  nodeSecurity: {
+    identity: (hostId: number, fingerprint: string): Promise<{ fingerprint: string }> => http.post(`/admin/hosts/${hostId}/node-security/identity`, { fingerprint }),
+    status: (hostId: number): Promise<NodeSecurityOverview> => http.get(`/admin/hosts/${hostId}/node-security`),
+    action: (hostId: number, action: 'policy' | 'lock' | 'recover', data: { enabled?: boolean; revision?: number }): Promise<{ state: NodeSecurityState }> => http.post(`/admin/hosts/${hostId}/node-security/${action}`, data),
+    saveKey: (hostId: number, dataset: string, key: string): Promise<{ fingerprint: string }> => http.post(`/admin/hosts/${hostId}/node-security/keys`, { dataset, key }),
+    revealKey: (hostId: number, dataset: string): Promise<{ key: string; fingerprint: string }> => http.post(`/admin/hosts/${hostId}/node-security/keys/reveal`, { dataset }),
+    unlock: (hostId: number, dataset: string): Promise<{ state: NodeSecurityState }> => http.post(`/admin/hosts/${hostId}/node-security/keys/unlock`, { dataset })
+  },
+
   egress: {
     instance: (id: number): Promise<{ mode: string; profileName: string | null; version: number | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
     profiles: (): Promise<{ profiles: Array<{ id: number; profileId: number; version: number; name: string; active: boolean; proxyNodeId?: number; hostIds: number[] }> }> => http.get('/egress/profiles'),

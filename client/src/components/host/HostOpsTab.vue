@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
+import { useAuthStore } from '@/stores/auth'
+const HostNodeSecurity = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostNodeSecurity.vue')) : null
 import type { SshKey, SystemImage } from '@/types/api'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
@@ -279,6 +281,7 @@ interface InstanceAuditHistory {
 }
 
 const props = defineProps<Props>()
+const nodeSecurityAdmin = computed(() => useAuthStore().user?.role === 'admin')
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
@@ -1260,6 +1263,7 @@ async function runAuditKillProcess() {
 
 <template>
   <div class="space-y-6">
+    <component :is="HostNodeSecurity" v-if="nodeSecurityAdmin && HostNodeSecurity" :host-id="hostId" />
     <div class="card p-5 space-y-4">
       <div>
         <h3 class="text-lg font-semibold text-themed">{{ t('admin.hosts.ops.title') }}</h3>

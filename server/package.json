@@ -203,7 +203,9 @@
     "test:gpu-sharing:db": "RUN_GPU_DB_TESTS=1 node --import tsx scripts/test-gpu-sharing.ts",
     "smoke:gpu-purchase": "node --import tsx scripts/smoke-gpu-purchase.ts",
     "test:package-egress": "node --import tsx scripts/test-package-egress.ts",
-    "test:package-egress:db": "RUN_PACKAGE_EGRESS_DB_TESTS=1 node --import tsx scripts/test-package-egress.ts"
+    "test:package-egress:db": "RUN_PACKAGE_EGRESS_DB_TESTS=1 node --import tsx scripts/test-package-egress.ts",
+    "test:node-security": "node --import tsx scripts/test-node-security.ts && node --import tsx scripts/test-node-security-routes.ts && node --import tsx scripts/test-node-security-transport.ts",
+    "test:node-security:db": "node --import tsx scripts/test-node-security-db.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

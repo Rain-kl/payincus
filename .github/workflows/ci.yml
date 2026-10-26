@@ -12,6 +12,18 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: validation
+          POSTGRES_PASSWORD: validation
+          POSTGRES_DB: node_security_validation
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U validation -d node_security_validation"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +60,18 @@ jobs:
           pnpm --filter server exec tsx scripts/test-agent-tunnel-protocol-guards.ts
           pnpm --filter server test:egress
           pnpm --filter server test:package-egress
+
+      - name: Node security contracts
+        env:
+          DATABASE_URL: postgresql://validation:validation@localhost:5432/node_security_validation
+        run: pnpm --filter server test:node-security
+
+      - name: Node key vault and durable report integration
+        env:
+          DATABASE_URL: postgresql://validation:validation@localhost:5432/node_security_validation
+        run: |
+          pnpm --filter server exec prisma db push
+          pnpm --filter server test:node-security:db
 
       - name: Setup Go
         uses: actions/setup-go@v5

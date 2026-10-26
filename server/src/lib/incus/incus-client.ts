@@ -4,6 +4,7 @@
  */
 
 import { Agent, request } from 'undici'
+import { connectPinned } from '../node-security/transport.js'
 import { readFileSync } from 'fs'
 import tls from 'node:tls'
 import net from 'node:net'
@@ -77,7 +78,13 @@ export class IncusClient {
       const cert = readFileSync(this.certPath)
       const key = readFileSync(this.keyPath)
 
-      if (this.options.tunnelEnabled && this.options.hostId) {
+      if (this.options.serverFingerprint) {
+        this.agent = new Agent({
+          connect: (_opts: any, cb: (error: Error | null, socket: any) => void) => connectPinned(this.options, { cert, key }, cb),
+          headersTimeout: 15000,
+          bodyTimeout: 30000
+        })
+      } else if (this.options.tunnelEnabled && this.options.hostId) {
         if (!hostTunnelManager.isTunnelOnline(this.options.hostId)) {
           throw new Error('宿主机内网穿透通道未连接（Agent 离线），无法连接到 Incus API')
         }
@@ -179,6 +186,7 @@ export class IncusClient {
     try {
       data = JSON.parse(text) as IncusApiResponse<T>
     } catch (e) {
+      if (this.options.serverFingerprint) throw new Error('Internal server error')
       // 记录错误日志
       console.error('[Incus API Error]', {
         method,
@@ -191,6 +199,7 @@ export class IncusClient {
     }
 
     // Incus API 返回格式: { type: "sync/async", status: "Success", metadata: {...} }
+    if (this.options.serverFingerprint && (response.statusCode >= 400 || data.type === 'error')) throw new Error('Internal server error')
     if (data.type === 'error') {
       // 记录错误日志
       console.error('[Incus API Error]', {

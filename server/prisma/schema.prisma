@@ -678,6 +678,9 @@ model Friendship {
 // ==================== 节点相关模型 ====================
 
 model Host {
+  nodeSecurity NodeSecurityState?
+  nodeStorageKeys NodeStorageKey[]
+  nodeCliEvents NodeCliEvent[]
   id                  Int          @id @default(autoincrement())
   userId              Int          @map("user_id") // 所有者
   name                String
@@ -3828,4 +3831,42 @@ model InstanceEgressAttachment {
   @@unique([hostId, incusName])
   @@index([instanceId])
   @@map("instance_egress_attachments")
+}
+
+
+// Node storage secrets are encrypted by a dedicated strict envelope in the control service.
+model NodeSecurityState {
+ serverFingerprint String? @map("server_fingerprint")
+ hostId Int @id @map("host_id")
+ host Host @relation(fields:[hostId], references:[id], onDelete:Cascade)
+ report Json
+ reportedAt DateTime @default(now()) @map("reported_at")
+ @@map("node_security_states")
+}
+model NodeStorageKey {
+ id Int @id @default(autoincrement())
+ hostId Int @map("host_id")
+ host Host @relation(fields:[hostId], references:[id], onDelete:Cascade)
+ dataset String
+ fingerprint String
+ ciphertext String
+ version Int @default(1)
+ createdAt DateTime @default(now()) @map("created_at")
+ @@unique([hostId,dataset])
+ @@map("node_storage_keys")
+}
+model NodeCliEvent {
+ hostId Int @map("host_id")
+ host Host @relation(fields:[hostId], references:[id], onDelete:Cascade)
+ eventId String @map("event_id")
+ command String
+ uid BigInt
+ pid Int
+ critical Boolean
+ blocked Boolean
+ occurredAt DateTime @map("occurred_at")
+ receivedAt DateTime @default(now()) @map("received_at")
+ @@id([hostId,eventId])
+ @@index([hostId,receivedAt])
+ @@map("node_cli_events")
 }

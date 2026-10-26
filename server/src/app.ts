@@ -94,6 +94,7 @@ import mailRoutes from './routes/mail.js'
 import adminNotificationChannelsRoutes from './routes/admin-notification-channels.js'
 import telegramRoutes from './routes/telegram.js'
 import agentRoutes from './routes/agent.js'
+import nodeSecurityRoutes from './routes/node-security.js'
 import userInviteRoutes from './routes/user-invites.js'
 import vipLevelRoutes from './routes/vip-levels.js'
 import vipBenefitRoutes from './routes/vip-benefits.js'
@@ -556,6 +557,7 @@ await fastify.register(mailRoutes, { prefix: '/api/mail' })
 await fastify.register(adminNotificationChannelsRoutes, { prefix: '/api/admin/notification-channels' })
 await fastify.register(telegramRoutes, { prefix: '/api/telegram' })
 await fastify.register(agentRoutes, { prefix: '/api/agent' })
+await fastify.register(nodeSecurityRoutes)
 await fastify.register(userInviteRoutes, { prefix: '/api/user-invites' })
 await fastify.register(vipLevelRoutes)
 await fastify.register(vipBenefitRoutes)

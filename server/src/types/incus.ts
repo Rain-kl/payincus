@@ -3,6 +3,7 @@
  */
 
 export interface IncusClientOptions {
+  serverFingerprint?: string
   url: string
   certPath: string | null
   keyPath: string | null

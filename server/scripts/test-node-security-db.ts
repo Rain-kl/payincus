@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict'
+import Fastify from 'fastify'
+import websocket from '@fastify/websocket'
+import agentRoutes from '../src/routes/agent.js'
+import { encryptSensitiveData } from '../src/lib/security.js'
+import { createAgentBodyHash, createAgentSignature, generateAgentId, generateAgentSecret } from '../src/lib/agent-auth.js'
+import { randomBytes } from 'node:crypto'
+import { prisma } from '../src/db/prisma.js'
+import { recordReport } from '../src/lib/node-security/report.js'
+import { fingerprint, seal, unseal } from '../src/lib/node-security/vault.js'
+
+if (!process.env.DATABASE_URL?.includes('/node_security_validation')) throw new Error('Requires dedicated node_security_validation database')
+const suffix = randomBytes(8).toString('hex')
+const key = randomBytes(32).toString('hex')
+const master = randomBytes(48).toString('base64')
+const user = await prisma.user.create({ data: { username: `node-fixture-${suffix}`, passwordHash: 'disabled-fixture-account' } })
+const host = await prisma.host.create({ data: { userId: user.id, name: 'isolated node fixture', url: 'https://127.0.0.1:1' } })
+process.env.ENCRYPTION_KEY = master
+const app = Fastify({ logger: false })
+app.decorate('authenticate', async () => {})
+app.decorate('authenticateAdmin', async () => {})
+await app.register(websocket)
+await app.register(agentRoutes, { prefix: '/api/agent' })
+try {
+  const identity = { hostId: host.id, dataset: 'tank/private', version: 1 }
+  await prisma.nodeStorageKey.create({ data: { hostId: host.id, dataset: identity.dataset, fingerprint: fingerprint(key), ciphertext: seal(key, identity, master) } })
+  const stored = await prisma.nodeStorageKey.findUniqueOrThrow({ where: { hostId_dataset: { hostId: host.id, dataset: identity.dataset } } })
+  assert.equal(stored.ciphertext.includes(key), false)
+  assert.equal(unseal(stored.ciphertext, identity, master) === key, true)
+  const event = { id: randomBytes(16).toString('hex'), time: new Date().toISOString(), uid: 4294967294, pid: 7, command: 'exec', critical: true, blocked: true }
+  const report = { state: { enabled: true, locked: true, revision: 3 }, events: [event] }
+  await prisma.nodeSecurityState.create({ data: { hostId: host.id, report: {}, serverFingerprint: 'a'.repeat(64) } })
+  const ack = await recordReport(host.id, report)
+  assert.deepEqual(ack, [event.id])
+  await recordReport(host.id, report)
+  assert.equal(await prisma.nodeCliEvent.count({ where: { hostId: host.id } }), 1)
+  const entry = await prisma.nodeCliEvent.findFirstOrThrow({ where: { hostId: host.id } })
+  assert.equal(entry.uid, BigInt(event.uid))
+  assert.equal((await prisma.nodeSecurityState.findUniqueOrThrow({ where: { hostId: host.id } })).report !== null, true)
+  const logs = await prisma.log.findMany({ where: { action: 'node.cli_alarm', content: { contains: `#${host.id} ` } } })
+  assert.equal(logs.length, 1)
+  assert.equal(logs.some(l => l.content.includes(key)), false)
+  await recordReport(host.id, { state: { enabled: false, locked: false, revision: 1 }, events: [] })
+  const latest = await prisma.nodeSecurityState.findUniqueOrThrow({ where: { hostId: host.id } })
+  assert.equal((latest.report as any).revision, 3)
+  assert.equal(latest.serverFingerprint, 'a'.repeat(64))
+  const agentId = generateAgentId(), agentSecret = generateAgentSecret()
+  await prisma.hostAgent.create({ data: { hostId: host.id, agentId, secretHash: 'fixture-unused', secretEncrypted: encryptSensitiveData(agentSecret), lastReport: { preserved: true } } })
+  function headers(body: unknown, path: string, nonce = randomBytes(16).toString('hex'), bodyHash = createAgentBodyHash(body)) {
+    const timestamp = String(Date.now())
+    return { 'x-incudal-agent-id': agentId, 'x-incudal-timestamp': timestamp, 'x-incudal-nonce': nonce, 'x-incudal-body-sha256': bodyHash, 'x-incudal-signature': createAgentSignature(agentSecret, { method: 'POST', path, timestamp, nonce, bodyHash }) }
+  }
+  const path = '/api/agent/security-report'
+  const signed = headers(report, path)
+  const accepted = await app.inject({ method: 'POST', url: path, headers: signed, payload: report })
+  assert.equal(accepted.statusCode, 200)
+  assert.deepEqual(accepted.json().ack, [event.id])
+  assert.equal((await app.inject({ method: 'POST', url: path, headers: signed, payload: report })).statusCode, 401)
+  assert.equal((await app.inject({ method: 'POST', url: path, headers: headers(report, path), payload: { ...report, state: { ...report.state, locked: false } } })).statusCode, 401)
+  const malformed = { state: {}, events: [] }
+  assert.equal((await app.inject({ method: 'POST', url: path, headers: headers(malformed, path), payload: malformed })).statusCode, 503)
+  const heartbeat = { nodeSecurity: { state: { locked: true } } }
+  const heartbeatResponse = await app.inject({ method: 'POST', url: '/api/agent/heartbeat', headers: headers(heartbeat, '/api/agent/heartbeat'), payload: heartbeat })
+  assert.equal(heartbeatResponse.statusCode, 200)
+  const agent = await prisma.hostAgent.findUniqueOrThrow({ where: { agentId } })
+  assert.deepEqual(agent.lastReport, { preserved: true })
+  assert.equal(agent.status, 'online')
+  console.log('PostgreSQL + real HMAC route: envelope, ACK, deduplication, replay/body tampering, locked heartbeat and remote alarm passed')
+
+} finally {
+  await app.close()
+  await prisma.log.deleteMany({ where: { action: 'node.cli_alarm', content: { contains: `#${host.id} ` } } })
+  await prisma.host.delete({ where: { id: host.id } })
+  await prisma.user.delete({ where: { id: user.id } })
+  await prisma.$disconnect()
+}
