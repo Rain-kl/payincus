@@ -86,7 +86,7 @@ export const caddyInstallRequested = new Set<number>()
 export const caddyUninstallRequested = new Set<number>()
 
 const maxAgentInstallUrlLength = 2048
-const defaultAgentHeartbeatIntervalSeconds = 30
+const defaultAgentHeartbeatIntervalSeconds = 10
 const minAgentHeartbeatIntervalSeconds = 5
 const maxAgentHeartbeatIntervalSeconds = 3600
 const minAgentOfflineThresholdSeconds = 120

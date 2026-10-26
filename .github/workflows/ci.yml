@@ -62,10 +62,13 @@ jobs:
           pnpm --filter server test:package-egress
           pnpm --filter server test:node-distribution
 
-      - name: Node security contracts
+      - name: Node administration contracts
         env:
           DATABASE_URL: postgresql://validation:validation@localhost:5432/node_security_validation
-        run: pnpm --filter server test:node-security
+        run: |
+          pnpm --filter server test:node-security
+          pnpm --filter server test:instance-advanced-config
+          pnpm --filter server test:traffic-route-limit-guards
 
       - name: Native node installer handoff
         run: sudo python3 server/scripts/test-node-distribution-shell.py
@@ -76,6 +79,7 @@ jobs:
         run: |
           pnpm --filter server exec prisma db push
           pnpm --filter server test:node-security:db
+          pnpm --filter server test:instance-advanced-config:db
 
 
   build:

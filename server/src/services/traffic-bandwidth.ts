@@ -29,6 +29,8 @@ export interface ResolvedTrafficBandwidthLimits {
 }
 
 interface BandwidthArbitrationSource {
+  configuredLimitsIngress?: string | null
+  configuredLimitsEgress?: string | null
   trafficStatus: string
   package?: {
     limitsIngress: string | null
@@ -98,15 +100,15 @@ function mostRestrictiveBandwidth(...values: Array<string | null | undefined>): 
 
 /**
  * 单一带宽仲裁点：配置线速、流量超量和资源风控三者取最严格值。
- * 正常线速只读取套餐/实例方案配置，绝不从当前实际 limits 字段捕获。
+ * 正常线速读取管理员独立覆盖值或套餐/实例方案配置，绝不从当前实际 limits 字段捕获。
  */
 export function computeEffectiveBandwidth(
   instance: BandwidthArbitrationSource,
   overageThrottleSpeed = DEFAULT_TRAFFIC_OVERAGE_THROTTLE_SPEED
 ): EffectiveBandwidth {
   const normalLineSpeed = normalizePlanTrafficLimitSpeed(instance.packagePlan?.trafficLimitSpeed)
-  const baselineIngress = normalLineSpeed ?? instance.package?.limitsIngress ?? null
-  const baselineEgress = normalLineSpeed ?? instance.package?.limitsEgress ?? null
+  const baselineIngress = instance.configuredLimitsIngress ?? normalLineSpeed ?? instance.package?.limitsIngress ?? null
+  const baselineEgress = instance.configuredLimitsEgress ?? normalLineSpeed ?? instance.package?.limitsEgress ?? null
   const trafficConstraint = instance.trafficStatus === 'LIMITED' ? overageThrottleSpeed : null
 
   return {

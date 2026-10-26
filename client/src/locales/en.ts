@@ -6255,6 +6255,7 @@ export default {
 
     // Instance config tab
     instanceConfig: {
+        applyHint: 'Changes are sent to the node immediately. I/O, bandwidth, process and CPU priority limits use Incus live updates; boot settings apply to future host startup and shutdown without restarting the instance.',
         title: 'Advanced Configuration',
         sections: {
             swap: 'SWAP',

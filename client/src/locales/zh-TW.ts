@@ -6946,6 +6946,7 @@ const zhTW = {
 
     // 實例設定標籤頁
     instanceConfig: {
+        applyHint: '儲存後立即下發到節點。I/O、頻寬、程序和 CPU 優先級依 Incus 支援熱更新；啟動設定用於後續主機啟動及關機，不會重啟實例。',
         title: '進階設定',
         sections: {
             swap: 'SWAP',

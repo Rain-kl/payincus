@@ -1149,6 +1149,8 @@ model Instance {
   // 网络限制
   limitsIngress String? @map("limits_ingress")
   limitsEgress  String? @map("limits_egress")
+  configuredLimitsIngress String? @map("configured_limits_ingress")
+  configuredLimitsEgress String? @map("configured_limits_egress")
 
   // 进程与调度
   limitsProcesses   Int? @map("limits_processes")

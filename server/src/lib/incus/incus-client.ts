@@ -212,7 +212,7 @@ export class IncusClient {
 
     // 异步操作需要等待完成
     if (data.type === 'async' && data.operation) {
-      return await waitForOperation(this, data.operation, timeout) as T
+      return await waitForOperation(this, data.operation, timeout, signal) as T
     }
 
     return (data.metadata || data) as T

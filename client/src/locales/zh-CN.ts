@@ -6440,6 +6440,7 @@ export default {
 
     // 实例配置标签页
     instanceConfig: {
+        applyHint: '保存后立即下发到节点。I/O、带宽、进程和 CPU 优先级按 Incus 支持热更新；启动设置用于后续宿主机启动及关机，不会重启实例。',
         title: '高级配置',
         sections: {
             swap: 'SWAP',

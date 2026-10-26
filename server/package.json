@@ -167,6 +167,8 @@
     "test:system-monitor-webhook-guard": "node --import tsx scripts/test-system-monitor-webhook-guard.ts",
     "test:terminal-saved-command-route-id-guards": "node --import tsx scripts/test-terminal-saved-command-route-id-guards.ts",
     "test:spice-console": "node --import tsx scripts/test-spice-console.ts",
+    "test:instance-advanced-config:db": "node --import tsx scripts/test-instance-advanced-config-db.ts",
+    "test:instance-advanced-config": "node --import tsx scripts/test-instance-advanced-config.ts",
     "test:instance-status-observation": "node --import tsx scripts/test-instance-status-observation.ts",
     "test:terminal-route-id-guards": "node --import tsx scripts/test-terminal-route-id-guards.ts",
     "test:terminal-tunnel-guards": "node --import tsx scripts/test-terminal-tunnel-guards.ts",

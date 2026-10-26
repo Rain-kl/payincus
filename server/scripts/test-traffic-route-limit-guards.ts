@@ -1,3 +1,4 @@
+import { deepStrictEqual } from 'node:assert'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
@@ -199,3 +200,6 @@ assert(
 )
 
 console.log('traffic route limit guard checks passed')
+
+deepStrictEqual(computeEffectiveBandwidth({ trafficStatus: 'NORMAL', configuredLimitsIngress: '500Mbit', configuredLimitsEgress: '600Mbit', packagePlan: { trafficLimitSpeed: '10Mbit' } }), { ingress: '500Mbit', egress: '600Mbit' })
+deepStrictEqual(computeEffectiveBandwidth({ trafficStatus: 'LIMITED', configuredLimitsIngress: '500Mbit', configuredLimitsEgress: '600Mbit', packagePlan: { trafficLimitSpeed: '10Mbit' } }, '2Mbit'), { ingress: '2Mbit', egress: '2Mbit' })

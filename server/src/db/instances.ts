@@ -489,8 +489,8 @@ export async function getInstanceConfig(instanceId: number): Promise<{
       limitsWrite: true,
       limitsReadIops: true,
       limitsWriteIops: true,
-      limitsIngress: true,
-      limitsEgress: true,
+      configuredLimitsIngress: true,
+      configuredLimitsEgress: true,
       limitsProcesses: true,
       limitsCpuPriority: true,
       bootAutostart: true,
@@ -507,8 +507,8 @@ export async function getInstanceConfig(instanceId: number): Promise<{
     limits_write: instance.limitsWrite,
     limits_read_iops: instance.limitsReadIops,
     limits_write_iops: instance.limitsWriteIops,
-    limits_ingress: instance.limitsIngress,
-    limits_egress: instance.limitsEgress,
+    limits_ingress: instance.configuredLimitsIngress,
+    limits_egress: instance.configuredLimitsEgress,
     limits_processes: instance.limitsProcesses,
     limits_cpu_priority: instance.limitsCpuPriority,
     boot_autostart: instance.bootAutostart,
@@ -534,8 +534,10 @@ export async function updateInstanceConfig(instanceId: number, data: {
   bootAutostartPriority?: number | null
   bootAutostartDelay?: number | null
   bootHostShutdownTimeout?: number | null
-}): Promise<void> {
+}, effectiveBandwidth?: { ingress?: string; egress?: string }): Promise<void> {
   const updateData: {
+    configuredLimitsIngress?: string | null
+    configuredLimitsEgress?: string | null
     limitsRead?: string | null
     limitsWrite?: string | null
     limitsReadIops?: number | null
@@ -554,14 +556,17 @@ export async function updateInstanceConfig(instanceId: number, data: {
   if (data.limitsWrite !== undefined) updateData.limitsWrite = data.limitsWrite
   if (data.limitsReadIops !== undefined) updateData.limitsReadIops = data.limitsReadIops
   if (data.limitsWriteIops !== undefined) updateData.limitsWriteIops = data.limitsWriteIops
-  if (data.limitsIngress !== undefined) updateData.limitsIngress = data.limitsIngress
-  if (data.limitsEgress !== undefined) updateData.limitsEgress = data.limitsEgress
+  if (data.limitsIngress !== undefined) updateData.configuredLimitsIngress = data.limitsIngress
+  if (data.limitsEgress !== undefined) updateData.configuredLimitsEgress = data.limitsEgress
   if (data.limitsProcesses !== undefined) updateData.limitsProcesses = data.limitsProcesses
   if (data.limitsCpuPriority !== undefined) updateData.limitsCpuPriority = data.limitsCpuPriority
   if (data.bootAutostart !== undefined) updateData.bootAutostart = data.bootAutostart
   if (data.bootAutostartPriority !== undefined) updateData.bootAutostartPriority = data.bootAutostartPriority
   if (data.bootAutostartDelay !== undefined) updateData.bootAutostartDelay = data.bootAutostartDelay
   if (data.bootHostShutdownTimeout !== undefined) updateData.bootHostShutdownTimeout = data.bootHostShutdownTimeout
+
+  if (effectiveBandwidth?.ingress !== undefined) updateData.limitsIngress = effectiveBandwidth.ingress
+  if (effectiveBandwidth?.egress !== undefined) updateData.limitsEgress = effectiveBandwidth.egress
 
   if (Object.keys(updateData).length === 0) return
 

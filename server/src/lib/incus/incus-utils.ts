@@ -14,7 +14,8 @@ import type { IncusApiResponse, IncusOperation } from '../../types/incus.js'
 export async function waitForOperation(
   client: IncusClient,
   operationUrl: string,
-  timeout: number = 30 * 60 * 1000
+  timeout: number = 30 * 60 * 1000,
+  signal?: AbortSignal
 ): Promise<unknown> {
   const startTime = Date.now()
   taskLog('info', `Incus 操作 ${operationUrl}，等待节点执行（超时 ${Math.round(timeout / 1000)} 秒）`)
@@ -28,7 +29,8 @@ export async function waitForOperation(
 
   try {
     while (Date.now() - startTime < timeout) {
-      const op = await client.request<IncusOperation>('GET', `${operationUrl}/wait?timeout=10`)
+      signal?.throwIfAborted()
+      const op = await client.request<IncusOperation>('GET', `${operationUrl}/wait?timeout=10`, null, timeout, signal)
 
       const progress = [op.description, op.status, ...Object.entries(op.metadata || {})
         .filter(([key]) => /^(download_progress|fs_progress|create_instance_from_image_unpack_progress|progress|unpack_progress)$/.test(key))

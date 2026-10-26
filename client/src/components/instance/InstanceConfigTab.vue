@@ -25,6 +25,7 @@ const toast = useToast()
 const loading = ref(true)
 const config = ref<InstanceConfigResponse | null>(null)
 const editMode = ref(false)
+const saving = ref(false)
 const showSwapModal = ref(false)
 const swapActionLoading = ref(false)
 
@@ -93,6 +94,7 @@ async function loadConfig(): Promise<void> {
     const response = await api.instances.getConfig(props.instanceId)
     config.value = response as InstanceConfigResponse
     resetForm()
+    editMode.value = false
   } catch (err: any) {
     toast.error(err.message || t('common.error'))
   } finally {
@@ -120,6 +122,42 @@ function resetForm(): void {
     boot_autostart_delay: overrides.boot_autostart_delay ? cfg.boot_autostart_delay : null,
     boot_host_shutdown_timeout: overrides.boot_host_shutdown_timeout ? cfg.boot_host_shutdown_timeout : null
   }
+}
+
+function beginEdit(): void {
+  resetForm()
+  // A nullable checkbox must display its effective value until explicitly reset.
+  form.value.boot_autostart = config.value?.config.boot_autostart ?? null
+  editMode.value = true
+}
+
+async function saveConfig(): Promise<void> {
+  if (!props.canEditConfig || saving.value || !config.value) return
+  const fields = {
+    limits_read: 'limitsRead', limits_write: 'limitsWrite', limits_read_iops: 'limitsReadIops', limits_write_iops: 'limitsWriteIops',
+    limits_ingress: 'limitsIngress', limits_egress: 'limitsEgress', limits_processes: 'limitsProcesses', limits_cpu_priority: 'limitsCpuPriority',
+    boot_autostart: 'bootAutostart', boot_autostart_priority: 'bootAutostartPriority', boot_autostart_delay: 'bootAutostartDelay', boot_host_shutdown_timeout: 'bootHostShutdownTimeout'
+  } as const
+  const payload: Record<string, string | number | boolean | null> = {}
+  for (const field of Object.keys(fields) as (keyof ConfigForm)[]) {
+    if (ioLimitMode.value === 'throughput' && field.endsWith('_iops')) continue
+    if (ioLimitMode.value === 'iops' && ['limits_read', 'limits_write'].includes(field)) continue
+    if (props.instanceType === 'vm' && field === 'limits_processes') continue
+    const value = form.value[field] === '' ? null : form.value[field]
+    const previous = config.value.overrides[field] ? config.value.config[field] : null
+    if (field === 'boot_autostart' && value === config.value.config[field] && previous === null) continue
+    if (value !== previous) payload[fields[field]] = value
+  }
+  if (!Object.keys(payload).length) { editMode.value = false; return }
+  saving.value = true
+  try {
+    await api.instances.updateInstanceConfig(props.instanceId, payload)
+    toast.success(t('common.success'))
+    editMode.value = false
+    await loadConfig()
+  } catch (err: any) {
+    toast.error(err.message || t('common.error'))
+  } finally { saving.value = false }
 }
 
 function resetField(field: keyof ConfigForm): void {
@@ -224,7 +262,15 @@ async function boostProcesses(): Promise<void> {
         <h2 class="text-lg font-semibold text-themed">
           {{ t('instanceConfig.title') }}
         </h2>
+        <div v-if="props.canEditConfig" class="flex gap-2">
+          <button v-if="!editMode" class="btn-primary btn-sm" :disabled="!['running', 'stopped'].includes(normalizedInstanceStatus)" @click="beginEdit">{{ t('common.edit') }}</button>
+          <template v-else>
+            <button class="btn-secondary btn-sm" :disabled="saving" @click="editMode = false; resetForm()">{{ t('common.cancel') }}</button>
+            <button class="btn-primary btn-sm" :disabled="saving" @click="saveConfig">{{ t(saving ? 'common.saving' : 'common.save') }}</button>
+          </template>
+        </div>
       </div>
+      <p v-if="editMode" class="text-sm text-themed-muted">{{ t('instanceConfig.applyHint') }}</p>
 
       <ChangeHostCard
         :instance-id="props.instanceId"
@@ -294,8 +340,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsRead') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model="form.limits_read" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_read'))" />
-                <button v-if="form.limits_read !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_read')">
+                <input :disabled="saving" v-model="form.limits_read" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_read'))" />
+                <button :disabled="saving" v-if="form.limits_read !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_read')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -313,8 +359,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsWrite') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model="form.limits_write" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_write'))" />
-                <button v-if="form.limits_write !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_write')">
+                <input :disabled="saving" v-model="form.limits_write" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_write'))" />
+                <button :disabled="saving" v-if="form.limits_write !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_write')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -334,8 +380,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsReadIops') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.limits_read_iops" type="number" class="input flex-1" :placeholder="String(getPackageDefault('limits_read_iops'))" />
-                <button v-if="form.limits_read_iops !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_read_iops')">
+                <input :disabled="saving" v-model.number="form.limits_read_iops" type="number" class="input flex-1" :placeholder="String(getPackageDefault('limits_read_iops'))" />
+                <button :disabled="saving" v-if="form.limits_read_iops !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_read_iops')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -353,8 +399,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsWriteIops') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.limits_write_iops" type="number" class="input flex-1" :placeholder="String(getPackageDefault('limits_write_iops'))" />
-                <button v-if="form.limits_write_iops !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_write_iops')">
+                <input :disabled="saving" v-model.number="form.limits_write_iops" type="number" class="input flex-1" :placeholder="String(getPackageDefault('limits_write_iops'))" />
+                <button :disabled="saving" v-if="form.limits_write_iops !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_write_iops')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -380,8 +426,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsIngress') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model="form.limits_ingress" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_ingress'))" />
-                <button v-if="form.limits_ingress !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_ingress')">
+                <input :disabled="saving" v-model="form.limits_ingress" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_ingress'))" />
+                <button :disabled="saving" v-if="form.limits_ingress !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_ingress')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -399,8 +445,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsEgress') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model="form.limits_egress" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_egress'))" />
-                <button v-if="form.limits_egress !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_egress')">
+                <input :disabled="saving" v-model="form.limits_egress" type="text" class="input flex-1" :placeholder="String(getPackageDefault('limits_egress'))" />
+                <button :disabled="saving" v-if="form.limits_egress !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_egress')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -422,12 +468,12 @@ async function boostProcesses(): Promise<void> {
         </h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Processes -->
-          <div>
+          <div v-if="props.instanceType !== 'vm'">
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsProcesses') }}</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.limits_processes" type="number" class="input flex-1" :placeholder="String(getPackageDefault('limits_processes'))" />
-                <button v-if="form.limits_processes !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_processes')">
+                <input :disabled="saving" v-model.number="form.limits_processes" type="number" class="input flex-1" :placeholder="String(getPackageDefault('limits_processes'))" />
+                <button :disabled="saving" v-if="form.limits_processes !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_processes')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -456,8 +502,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.limitsCpuPriority') }} (0-10)</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.limits_cpu_priority" type="number" min="0" max="10" class="input flex-1" :placeholder="String(getPackageDefault('limits_cpu_priority'))" />
-                <button v-if="form.limits_cpu_priority !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_cpu_priority')">
+                <input :disabled="saving" v-model.number="form.limits_cpu_priority" type="number" min="0" max="10" class="input flex-1" :placeholder="String(getPackageDefault('limits_cpu_priority'))" />
+                <button :disabled="saving" v-if="form.limits_cpu_priority !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('limits_cpu_priority')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -482,9 +528,9 @@ async function boostProcesses(): Promise<void> {
           <div class="md:col-span-2">
             <template v-if="editMode">
               <label class="flex items-center gap-2 cursor-pointer">
-                <input v-model="form.boot_autostart" type="checkbox" class="w-4 h-4 rounded" />
+                <input :disabled="saving" :checked="form.boot_autostart ?? config.config.boot_autostart" @change="form.boot_autostart = ($event.target as HTMLInputElement).checked" type="checkbox" class="w-4 h-4 rounded" />
                 <span class="text-sm text-themed-secondary">{{ t('packageForm.fields.bootAutostart') }}</span>
-                <button v-if="form.boot_autostart !== null" class="btn-ghost btn-sm ml-2" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_autostart')">
+                <button :disabled="saving" v-if="form.boot_autostart !== null" class="btn-ghost btn-sm ml-2" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_autostart')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </label>
@@ -503,8 +549,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.bootAutostartPriority') }} (0-100)</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.boot_autostart_priority" type="number" min="0" max="100" class="input flex-1" :placeholder="String(getPackageDefault('boot_autostart_priority'))" />
-                <button v-if="form.boot_autostart_priority !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_autostart_priority')">
+                <input :disabled="saving" v-model.number="form.boot_autostart_priority" type="number" min="0" max="100" class="input flex-1" :placeholder="String(getPackageDefault('boot_autostart_priority'))" />
+                <button :disabled="saving" v-if="form.boot_autostart_priority !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_autostart_priority')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -522,8 +568,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.bootAutostartDelay') }} ({{ t('packageForm.units.seconds') }})</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.boot_autostart_delay" type="number" min="5" max="600" class="input flex-1" :placeholder="String(getPackageDefault('boot_autostart_delay'))" />
-                <button v-if="form.boot_autostart_delay !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_autostart_delay')">
+                <input :disabled="saving" v-model.number="form.boot_autostart_delay" type="number" min="0" max="600" class="input flex-1" :placeholder="String(getPackageDefault('boot_autostart_delay'))" />
+                <button :disabled="saving" v-if="form.boot_autostart_delay !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_autostart_delay')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>
@@ -541,8 +587,8 @@ async function boostProcesses(): Promise<void> {
             <label class="block text-xs text-themed-muted mb-1">{{ t('packageForm.fields.bootHostShutdownTimeout') }} ({{ t('packageForm.units.seconds') }})</label>
             <template v-if="editMode">
               <div class="flex gap-2">
-                <input v-model.number="form.boot_host_shutdown_timeout" type="number" min="30" max="600" class="input flex-1" :placeholder="String(getPackageDefault('boot_host_shutdown_timeout'))" />
-                <button v-if="form.boot_host_shutdown_timeout !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_host_shutdown_timeout')">
+                <input :disabled="saving" v-model.number="form.boot_host_shutdown_timeout" type="number" min="0" max="600" class="input flex-1" :placeholder="String(getPackageDefault('boot_host_shutdown_timeout'))" />
+                <button :disabled="saving" v-if="form.boot_host_shutdown_timeout !== null" class="btn-ghost btn-sm" :title="t('instanceConfig.resetToDefault')" @click="resetField('boot_host_shutdown_timeout')">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
               </div>

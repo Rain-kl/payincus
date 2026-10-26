@@ -1,3 +1,4 @@
+import { registerAdvancedConfigRoute } from './instance-advanced-config.js'
 import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getInstanceStorageCapacity } from '../lib/storage-capacity.js'
 import { instanceStatusObservations } from '../lib/instance-status-observation.js'
@@ -5588,6 +5589,13 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       }
     }
 
+    const currentPlan = instance.package_plan_id ? await getPlanById(instance.package_plan_id) : null
+    const planSpeed = normalizePlanTrafficLimitSpeed(currentPlan?.trafficLimitSpeed)
+    if (packageDefaults && planSpeed) {
+      packageDefaults.limits_ingress = planSpeed
+      packageDefaults.limits_egress = planSpeed
+    }
+
     // 系统默认值
     const systemDefaults = {
       limits_read: '100MB',
@@ -5637,7 +5645,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       boot_host_shutdown_timeout: instanceConfig.boot_host_shutdown_timeout !== null
     }
 
-    const currentPlan = instance.package_plan_id ? await getPlanById(instance.package_plan_id) : null
     const effectiveSwapSizeMb = panelSwapSupported
       ? resolveEffectiveSwapSize(instance.swap_size, currentPlan?.swapSize)
       : 0
@@ -5869,64 +5876,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     }
   })
 
-  // 更新实例配置覆盖（已禁用）
-  fastify.patch<{
-    Params: { id: string }
-    Body: {
-      limitsRead?: string | null
-      limitsWrite?: string | null
-      limitsReadIops?: number | null
-      limitsWriteIops?: number | null
-      limitsIngress?: string | null
-      limitsEgress?: string | null
-      limitsProcesses?: number | null
-      limitsCpuPriority?: number | null
-      bootAutostart?: boolean | null
-      bootAutostartPriority?: number | null
-      bootAutostartDelay?: number | null
-      bootHostShutdownTimeout?: number | null
-    }
-  }>('/:id/advanced-config', {
-    onRequest: [fastify.authenticate],
-    schema: {
-      body: {
-        type: 'object',
-        properties: {
-          limitsRead: { type: ['string', 'null'] },
-          limitsWrite: { type: ['string', 'null'] },
-          limitsReadIops: { type: ['integer', 'null'], minimum: 0 },
-          limitsWriteIops: { type: ['integer', 'null'], minimum: 0 },
-          limitsIngress: { type: ['string', 'null'] },
-          limitsEgress: { type: ['string', 'null'] },
-          limitsProcesses: { type: ['integer', 'null'], minimum: 0 },
-          limitsCpuPriority: { type: ['integer', 'null'], minimum: 0, maximum: 10 },
-          bootAutostart: { type: ['boolean', 'null'] },
-          bootAutostartPriority: { type: ['integer', 'null'], minimum: 0, maximum: 100 },
-          bootAutostartDelay: { type: ['integer', 'null'], minimum: 5, maximum: 600 },
-          bootHostShutdownTimeout: { type: ['integer', 'null'], minimum: 30, maximum: 600 }
-        }
-      }
-    }
-  }, async (_request: FastifyRequest<{
-    Params: { id: string }
-    Body: {
-      limitsRead?: string | null
-      limitsWrite?: string | null
-      limitsReadIops?: number | null
-      limitsWriteIops?: number | null
-      limitsIngress?: string | null
-      limitsEgress?: string | null
-      limitsProcesses?: number | null
-      limitsCpuPriority?: number | null
-      bootAutostart?: boolean | null
-      bootAutostartPriority?: number | null
-      bootAutostartDelay?: number | null
-      bootHostShutdownTimeout?: number | null
-    }
-  }>, reply: FastifyReply) => {
-    // 功能已禁用，直接返回 403
-    return reply.code(403).send(apiError(ErrorCode.FEATURE_DISABLED))
-  })
+  registerAdvancedConfigRoute(fastify, rejectActiveInstanceWorkflowConflict, checkTransferLock)
 
   // 提升进程数限制
   // LXC 实例提升到 1000，KVM 实例提升到 2000
