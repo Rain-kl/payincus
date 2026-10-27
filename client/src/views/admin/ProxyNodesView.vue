@@ -11,7 +11,7 @@ const nodes = ref<ProxyNode[]>([]), selected = ref<number[]>([]), hosts = ref<Ar
 const content = ref(''), subscriptionUrl = ref(''), source = ref('content'), busy = ref(false), error = ref(''), result = ref<ProxyImportResult | null>(null)
 const requestedHost = Number(route.query.hostId)
 const probeHost = ref(Number.isSafeInteger(requestedHost) && requestedHost > 0 ? requestedHost : 0)
-const probeUrl = ref('https://www.gstatic.com/generate_204')
+const probeUrl = ref('https://1.1.1.1/cdn-cgi/trace')
 const testing = ref(false)
 let generation = 0
 let active = false

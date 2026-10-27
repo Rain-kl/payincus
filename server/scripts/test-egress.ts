@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { parseProxyImport } from '../src/lib/egress/import.js'
 import { cidr, defaultEgress, defaultFirewall, validateEgress, validateFirewall } from '../src/lib/egress/policy.js'
+import { assertSafeHttpUrl } from '../src/lib/outbound-security.js'
 
 const uuid = '00000000-0000-4000-8000-000000000001'
+assert.equal((await assertSafeHttpUrl(defaultEgress.probeUrl)).protocol, 'https:', 'Default probe must pass public target validation without relying on local DNS')
 const input = `socks5://user:password@example.com:1080#Socks\nvless://${uuid}@example.com:443?security=tls&type=ws&host=example.com&path=%2Fproxy#Vless`
 const parsed = parseProxyImport(input)
 assert.equal(parsed.nodes.length, 2); assert.deepEqual(parsed.errors, [])

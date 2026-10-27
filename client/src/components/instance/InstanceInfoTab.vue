@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMemory, formatDisk, formatDate } from '@/utils/formatters'
-import type { Instance } from '@/types/api'
+import type { Instance, PortMapping } from '@/types/api'
 import FlagIcon from '@/components/FlagIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import TrafficStats from '@/components/instance/TrafficStats.vue'
@@ -213,6 +213,14 @@ const displayIpv6 = computed<string | null>(() => {
 
 const networkMode = computed<string>(() => props.instance.network_mode || (props.instance as any)?.networkMode || '')
 const isNatMode = computed<boolean>(() => ['nat', 'nat_ipv6', 'nat_ipv6_nat', 'ipv6_nat', 'ipv6_only'].includes(networkMode.value))
+const publicSshPort = computed<number | null>(() => {
+  const internalPort = props.instance.ssh_port
+  if (!internalPort) return null
+  if (!['nat', 'nat_ipv6', 'nat_ipv6_nat', 'ipv6_nat'].includes(networkMode.value)) return internalPort
+  const mappings = (props.instance as Instance & { port_mappings?: PortMapping[] }).port_mappings || []
+  const mapping = mappings.find(item => item.protocol === 'tcp' && (item.privatePort ?? item.private_port) === internalPort)
+  return mapping?.publicPort ?? mapping?.public_port ?? null
+})
 
 // IPv6 重新分配冷却
 const ipv6ReassignCooldown = computed(() => {
@@ -380,7 +388,7 @@ const canReassignIpv6 = computed(() => {
         <div v-if="instance.ssh_port" class="flex justify-between">
           <dt class="text-themed-muted">{{ t('instance.detail.info.sshPort') }}</dt>
           <dd class="flex items-center gap-2 text-themed font-medium">
-            <span class="font-mono">{{ instance.ssh_port }}</span>
+            <span class="font-mono">{{ publicSshPort ?? '-' }}</span>
             <button
               class="text-themed-muted hover:text-themed transition-colors"
               :title="t('instance.detail.info.sshHelpTitle')"
@@ -392,7 +400,8 @@ const canReassignIpv6 = computed(() => {
             </button>
             <button
               class="text-xs text-themed-muted hover:text-themed transition-colors"
-              @click="emit('copy', instance.ssh_port?.toString() || '')"
+              :disabled="publicSshPort === null"
+              @click="emit('copy', publicSshPort?.toString() || '')"
             >
               {{ t('instance.detail.info.copy') }}
             </button>

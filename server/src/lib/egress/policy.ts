@@ -20,7 +20,7 @@ export interface FirewallRule {
   enabled: boolean
 }
 export interface FirewallPolicy { enabled: boolean; ingressAction: 'allow' | 'drop' | 'reject'; egressAction: 'allow' | 'drop' | 'reject'; rules: FirewallRule[] }
-export const defaultEgress: EgressPolicy = { mode: 'off', strategy: 'failover', proxyNodeIds: [], internalCidrs: [], probeUrl: 'https://www.gstatic.com/generate_204', probeIntervalSeconds: 30 }
+export const defaultEgress: EgressPolicy = { mode: 'off', strategy: 'failover', proxyNodeIds: [], internalCidrs: [], probeUrl: 'https://1.1.1.1/cdn-cgi/trace', probeIntervalSeconds: 30 }
 export const defaultFirewall: FirewallPolicy = { enabled: false, ingressAction: 'allow', egressAction: 'allow', rules: [] }
 export class NetworkInputError extends Error { readonly statusCode = 400 }
 export function object(value: unknown): Record<string, any> {

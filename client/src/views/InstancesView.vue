@@ -1665,7 +1665,7 @@ async function confirmBatchDestroy(): Promise<void> {
 
                 <!-- Created At -->
                 <td class="max-w-44 px-3.5 py-3.5 font-mono text-xs text-themed-muted whitespace-nowrap">
-                  {{ instance.created_at ? formatDate(instance.created_at) : '-' }}
+                  {{ formatDate(instance.created_at ?? instance.createdAt) }}
                 </td>
 
                 <!-- User (Admin only) -->
