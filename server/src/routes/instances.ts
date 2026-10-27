@@ -6774,7 +6774,7 @@ async function createInstanceAsync(
 
     taskLog('info', `[Provisioning] 开始创建实例 ${instanceId} (${config.name}) on ${host.name}`)
     taskLog('info', `[Provisioning] 资源配置: CPU=${config.cpu}, Memory=${config.memory}MB, Disk=${config.disk}MB`)
-    taskLog('info', `[Provisioning] Incus 配置已生成，敏感字段已跳过日志输出`)
+    taskLog('info', `[Provisioning] Incus 配置已生成`)
 
     await createInstance(client, incusConfig, instanceId)
     const instanceTypeLabel = config.instanceType === 'vm' ? '虚拟机' : '容器'
