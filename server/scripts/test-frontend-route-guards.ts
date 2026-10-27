@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { dashboardPath as adminDashboardPath } from '../../client/src/utils/app-paths-admin.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -433,7 +434,7 @@ assert.ok(
     adminLoginViewSource.includes('后台管理系统') &&
     adminLoginViewSource.includes('该入口仅限管理员登录') &&
     adminLoginViewSource.includes('仅限管理员账号登录') &&
-    adminLoginViewSource.includes("'/admin/users'") &&
+    adminLoginViewSource.includes("import { dashboardPath } from '@/utils/app-paths'") &&
     adminLoginViewSource.includes("from '@/api/admin'") &&
     adminRouterSource.includes("path: '/admin/login'") &&
     adminRouterSource.includes("path: '/login'") &&
@@ -454,6 +455,47 @@ assert.ok(
     !publicHeaderSource.includes('window.location.href = consoleTarget.value') &&
     !publicFooterSource.includes('window.location.href = consoleTarget.value'),
   'customer frontend must not cross-redirect to the admin host, while the admin frontend still rejects non-admin users'
+)
+assert.equal(adminDashboardPath(), '/admin/dashboard', 'admin home must open the overview dashboard')
+assert.equal(
+  countOccurrences(adminLoginViewSource, 'getSafeRedirectUrl(route.query.redirect as string, dashboardPath())'),
+  2,
+  'password and OAuth admin logins must default to the dashboard while preserving safe redirect validation'
+)
+assert.ok(
+  adminRouterSource.includes("import { dashboardPath } from '@/utils/app-paths'") &&
+    sectionBetween(adminRouterSource, 'if (to.meta.guest && authStore.isAuthenticated)', '\n  next()').includes('next(dashboardPath())'),
+  'signed-in admins revisiting login must return to the same overview dashboard'
+)
+const userMenuTrigger = sectionBetween(appLayoutSource, '<!-- 用户菜单：', '<!-- 下拉菜单 -->')
+assert.ok(
+  appLayoutSource.includes("import UserAvatar from '@/components/UserAvatar.vue'") &&
+    userMenuTrigger.includes('<UserAvatar') &&
+    userMenuTrigger.includes(':username="authStore.user.username"') &&
+    userMenuTrigger.includes(':email="authStore.user.email"') &&
+    userMenuTrigger.includes(':avatar-style="authStore.user.avatarStyle"') &&
+    userMenuTrigger.includes(':badge-id="authStore.user.avatarBadgeId"') &&
+    !userMenuTrigger.includes('<svg'),
+  'topbar must render the saved account avatar and badge through the same UserAvatar component as user lists'
+)
+const userAvatarSource = readRepoFile('client/src/components/UserAvatar.vue')
+const badgeImageSource = readRepoFile('client/src/components/BadgeImage.vue')
+assert.ok(
+  !userAvatarSource.includes('rounded-full') &&
+    badgeImageSource.includes("if (props.variant === 'avatar') return 'rounded'"),
+  'account avatars must stay square across default images, custom styles, badge images and initials fallbacks'
+)
+const hostInfoTabSource = readRepoFile('client/src/components/host/HostInfoTab.vue')
+const hostDetailViewSource = readRepoFile('client/src/views/resources/MyHostDetailView.vue')
+assert.ok(
+  !hostInfoTabSource.includes('generateAgentInstallCommand') &&
+    !hostInfoTabSource.includes('agentInstallCommand') &&
+    hostDetailViewSource.includes('@click="openNodeInstall"') &&
+    hostDetailViewSource.includes('api.hosts.generateAgentInstallCommand(host.value.id)') &&
+    !hostDetailViewSource.includes('api.hosts.regenerateInstall(') &&
+    sectionBetween(hostDetailViewSource, 'function openNodeInstall()', '// 用户确认后').includes('showReinstallModal.value = true') &&
+    !sectionBetween(hostDetailViewSource, 'function openNodeInstall()', '// 用户确认后').includes('api.'),
+  'host detail must expose one Incus node setup drawer; opening it must not rotate credentials'
 )
 assert.deepEqual(
   adminEndpointMarkers.filter(marker => userApiAdminBoundarySource.includes(marker)),

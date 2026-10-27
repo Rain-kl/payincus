@@ -60,6 +60,7 @@ import {
   normalizeNetworkMode
 } from '../lib/network-modes.js'
 import { issueHostAgentInstallToken } from '../lib/host-agent-credentials.js'
+import { buildNodeInstallCommand } from '../lib/node-install.js'
 import {
   persistResolvedInstanceNetworkAddresses,
   resolveInstanceNetworkAddresses
@@ -779,12 +780,6 @@ function injectInstallVariable(script: string, name: string, value: string): str
   )
 }
 
-function buildHostInstallCommand(panelUrl: string, installToken: string): string {
-  // -f: HTTP 错误（例如被 CDN/WAF 以 403 挑战页拦截）时让 curl 直接失败，
-  // 避免把挑战页 HTML 存成 incudal.sh 再交给 bash 执行（会报 syntax error near unexpected token '<'）。
-  return `curl -fsSL ${panelUrl}/api/hosts/install.sh/${installToken} -o incudal.sh && sudo bash incudal.sh`
-}
-
 export default async function hostRoutes(fastify: FastifyInstance) {
   // 获取宿主机列表（支持分页和搜索）
   // 管理员可以看所有节点，普通用户只能看自己的节点 (mine=true)
@@ -1201,16 +1196,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
     }
 
-    // 如果需要初始化，生成安装 Token 和证书下载有效期
-    let installToken: string | null = null
-    let certDownloadExpire: Date | null = null
-    if (needsInitialization) {
-      // 生成 UUID 作为 installToken
-      installToken = randomUUID()
-      // 证书下载有效期 15 分钟
-      certDownloadExpire = new Date(Date.now() + 15 * 60 * 1000)
-    }
-
     let hostId: number
     try {
       hostId = await withHostAddressRegistryLock(async () => {
@@ -1248,11 +1233,11 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             ipv6ParentInterface: normalizedIpv6ParentInterface,
             enableApi: true,  // 脚本已自动启用 API（core.https_address）
             sysctlConfig: null,  // 脚本已根据网络模式自动配置内核参数
-            installToken: installToken,  // UUID Token，用于证书下载验证
-            installTokenExpire: needsInitialization ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
+            installToken: null,  // 新节点通过一次性接入令牌在 incus-tui 中配置
+            installTokenExpire: null,
             isInstalled: !needsInitialization, // 如果不需要初始化，则标记为已安装
             certDownloadCount: 0,  // 证书下载次数初始为 0
-            certDownloadExpire: certDownloadExpire,  // 证书下载有效期 15 分钟
+            certDownloadExpire: null,
             cpuAllowanceMax: cpuAllowanceMax,
             memoryMax: memoryMax,
             instanceType: instanceType,
@@ -1400,11 +1385,16 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       console.warn('[Host] 配额警告检查失败:', quotaCheckError)
     }
 
-    // 如果需要初始化，生成安装命令（面板地址和 token 自动注入脚本）
+    // 新节点与现有节点使用相同的 Incus 软件包接入流程。
     let installCommand: string | undefined
-    if (needsInitialization && installToken) {
+    let installToken: string | undefined
+    let installTokenExpiresAt: string | undefined
+    if (needsInitialization) {
       const panelUrl = derivePanelUrl(request)
-      installCommand = buildHostInstallCommand(panelUrl, installToken)
+      const installation = await issueHostAgentInstallToken(hostId, true)
+      installToken = installation.installToken
+      installTokenExpiresAt = installation.installTokenExpiresAt.toISOString()
+      installCommand = buildNodeInstallCommand({ panelUrl, installToken })
     }
 
     reply.code(201).send({
@@ -1421,7 +1411,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         resources: resourceInfo
       },
       installCommand: installCommand || undefined,
-      installToken: installToken || undefined
+      installToken,
+      installTokenExpiresAt
     })
   })
 
@@ -1875,7 +1866,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
   })
 
-  // 重新生成安装命令（在线/离线节点均可重新安装）
+  // 兼容旧客户端：统一生成 Incus 节点接入命令，不清除已有安装状态或证书。
   fastify.post<{ Params: { id: string } }>('/:id/regenerate-install', {
     onRequest: [fastify.authenticate]
   }, async (request, reply) => {
@@ -1909,25 +1900,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    // 生成新的 installToken
-    const installToken = randomUUID()
-    const installTokenExpire = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24小时有效
-
-    // 更新数据库
-    await prisma.host.update({
-      where: { id: hostId },
-      data: {
-        installToken,
-        installTokenExpire,
-        isInstalled: false,
-        certPath: null,
-        keyPath: null
-      }
-    })
-
-    // 生成安装命令（面板地址和 token 自动注入脚本）
+    const installation = await issueHostAgentInstallToken(hostId, true)
     const panelUrl = derivePanelUrl(request)
-    const installCommand = buildHostInstallCommand(panelUrl, installToken)
+    const installCommand = buildNodeInstallCommand({ panelUrl, installToken: installation.installToken })
 
     await createLog(
       user.id,
@@ -1940,8 +1915,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     return {
       success: true,
       installCommand,
-      installToken,
-      message: '安装命令已重新生成，请在24小时内完成安装'
+      installToken: installation.installToken,
+      installTokenExpiresAt: installation.installTokenExpiresAt.toISOString(),
+      message: 'Incus 节点接入命令已生成，请在30分钟内使用一次性令牌完成配置'
     }
   })
 

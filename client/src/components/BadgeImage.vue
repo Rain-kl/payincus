@@ -37,7 +37,7 @@ const sizeStyle = computed(() => ({
 }))
 
 const roundedClass = computed(() => {
-  if (props.variant === 'avatar') return 'rounded-full'
+  if (props.variant === 'avatar') return 'rounded'
   if (props.variant === 'icon') return 'rounded-xl'
   return ''
 })

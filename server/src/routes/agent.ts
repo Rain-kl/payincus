@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url'
 import { prisma } from '../db/prisma.js'
 import { createLog, LogModule, LogResult } from '../db/logs.js'
 import { decryptSensitiveData } from '../lib/security.js'
+import { buildNodeInstallCommand } from '../lib/node-install.js'
 import {
   agentNonceTtlMs,
   createAgentBodyHash,
@@ -306,14 +307,6 @@ function shellEscape(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
-function buildAgentInstallCommand(input: {
-  panelUrl: string
-  installToken: string
-  channel?: 'latest' | 'canary'
-}): string {
-  return `curl -fsSL ${shellEscape(`${input.panelUrl}/api/agent/install.sh`)} | sudo env INCUDAL_PANEL_URL=${shellEscape(input.panelUrl)} INCUDAL_AGENT_INSTALL_TOKEN=${shellEscape(input.installToken)} INCUS_NODE_CHANNEL=${input.channel || 'canary'} bash`
-}
-
 function buildAgentInstallConfig(input: {
   agentId: string
   agentSecret: string
@@ -498,7 +491,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
   hostTunnelManager.on('control_ready', onControlReady)
   fastify.addHook('onClose', async () => { hostTunnelManager.off('control_ready', onControlReady) })
   fastify.get('/install.sh', async (_request: FastifyRequest, reply: FastifyReply) => {
-    const scriptPath = join(__dirname, '../../templates/agent-install.sh')
+    const scriptPath = join(__dirname, '../../templates/install.sh')
     const script = readFileSync(scriptPath, 'utf8')
     return reply
       .header('Content-Type', 'text/x-shellscript; charset=utf-8')
@@ -623,7 +616,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       }
       throw error
     }
-    const installCommand = buildAgentInstallCommand({
+    const installCommand = buildNodeInstallCommand({
       panelUrl,
       installToken: result.installToken
     })
@@ -762,7 +755,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       throw error
     }
 
-    const installCommand = buildAgentInstallCommand({
+    const installCommand = buildNodeInstallCommand({
       panelUrl,
       installToken: result.installToken,
       channel: request.body?.channel

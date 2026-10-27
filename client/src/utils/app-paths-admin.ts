@@ -21,7 +21,7 @@ export function logsPath(): string {
 }
 
 export function dashboardPath(): string {
-  return '/admin/users'
+  return '/admin/dashboard'
 }
 
 export function marketPath(): string {

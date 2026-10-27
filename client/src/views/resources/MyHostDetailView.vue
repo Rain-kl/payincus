@@ -91,9 +91,10 @@ const showExtendModal = ref(false)
 const extendDays = ref<number | undefined>(undefined)
 const paidInstanceCount = ref(0)
 
-// 重新安装弹窗
+// Incus 节点安装 / 配置抽屉
 const showReinstallModal = ref(false)
 const reinstallCommand = ref('')
+const installTokenExpiresAt = ref('')
 
 const reinstallStatus = ref<'waiting' | 'verifying' | 'success' | 'error'>('waiting')
 const reinstallError = ref('')
@@ -159,6 +160,7 @@ watch(() => route.params.id, async (newId, oldId) => {
     
     showReinstallModal.value = false
     reinstallCommand.value = ''
+    installTokenExpiresAt.value = ''
     reinstallStatus.value = 'waiting'
     reinstallError.value = ''
     
@@ -313,19 +315,23 @@ async function confirmExtendAll() {
   }
 }
 
-// 重新安装：生成新的安装命令
+function openNodeInstall() {
+  showReinstallModal.value = true
+}
+
+// 用户确认后再生成命令，打开抽屉不会轮换节点凭据。
 async function regenerateInstall() {
-  if (!host.value) return
+  if (!host.value || actionLoading.value) return
   
   actionLoading.value = 'reinstall'
   try {
-    const res = await api.hosts.regenerateInstall(host.value.id)
+    const res = await api.hosts.generateAgentInstallCommand(host.value.id)
     reinstallCommand.value = res.installCommand
+    installTokenExpiresAt.value = res.installTokenExpiresAt
     reinstallStatus.value = 'waiting'
     reinstallError.value = ''
-    showReinstallModal.value = true
   } catch (err: any) {
-    toast.error(t('admin.hosts.reinstallFailed') + ': ' + (err?.message || String(err)))
+    toast.error(t('admin.hosts.agentInstallCommandFailed') + ': ' + (err?.message || String(err)))
   } finally {
     actionLoading.value = ''
   }
@@ -338,7 +344,9 @@ async function verifyAfterReinstall() {
   reinstallError.value = ''
   
   try {
-    const res = await api.hosts.verify(host.value.id)
+    const res = needsVerification.value
+      ? await api.hosts.verify(host.value.id)
+      : await api.hosts.test(host.value.id)
     if (res.success) {
       reinstallStatus.value = 'success'
       toast.success(t('admin.hosts.verifySuccess'))
@@ -426,17 +434,17 @@ const tabs = computed(() => [
             </svg>
             <span v-else>{{ t('admin.hosts.batchExtend') }}</span>
           </button>
-          <!-- 重新安装按钮：已安装和离线节点都允许重新生成安装脚本 -->
+          <!-- 唯一的节点安装 / 配置入口 -->
           <button
             :disabled="!!actionLoading"
             class="btn-secondary btn-sm sm:btn"
-            @click="regenerateInstall"
+            @click="openNodeInstall"
           >
             <svg v-if="actionLoading === 'reinstall'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <span v-else>{{ t('admin.hosts.reinstall') }}</span>
+            <span v-else>{{ t('admin.hosts.nodeInstallConfigure') }}</span>
           </button>
           <!-- 未验证的宿主机显示验证按钮 -->
           <button
@@ -614,14 +622,14 @@ const tabs = computed(() => [
         </Transition>
       </Teleport>
 
-      <!-- 重新安装弹窗 -->
+      <!-- 统一的 Incus 节点安装 / 配置抽屉 -->
       <Teleport to="body">
         <Transition name="modal">
           <div v-if="showReinstallModal" class="modal-overlay">
             <div class="modal-backdrop" @click="closeReinstallModal"></div>
-            <div class="modal-content" style="max-width: 72rem; width: 95%;">
+            <div class="modal-content">
               <div class="modal-header">
-                <h3 class="modal-title">{{ t('admin.hosts.reinstallScript') }}</h3>
+                <h3 class="modal-title">{{ t('admin.hosts.nodeInstallConfigure') }}</h3>
                 <button class="text-themed-muted hover:text-themed" @click="closeReinstallModal">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -629,13 +637,20 @@ const tabs = computed(() => [
                 </button>
               </div>
               <div class="modal-body space-y-4">
+                <p class="text-sm text-themed-secondary">{{ t('admin.hosts.nodeInstallUnifiedHint') }}</p>
+                <p class="rounded border border-themed bg-themed-tertiary p-3 text-sm text-themed">
+                  {{ t('admin.hosts.agentInstallCommandConfirm') }}
+                </p>
                 <!-- 步骤 1: 执行安装命令 -->
-                <div class="space-y-2">
+                <div v-if="reinstallCommand" class="space-y-2">
                   <div class="flex items-center gap-2">
                     <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium" :class="reinstallStatus === 'success' ? 'bg-green-500 text-white' : 'bg-accent text-white dark:text-black'">1</span>
                     <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step1RunScript') }}</span>
                   </div>
                   <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.runOnHost') }}</p>
+                  <p v-if="installTokenExpiresAt" class="text-xs text-themed-muted ml-8">
+                    {{ t('admin.hosts.agentInstallTokenExpiresAt', { time: new Date(installTokenExpiresAt).toLocaleString() }) }}
+                  </p>
                   <div class="ml-8 overflow-x-auto rounded-lg border border-gray-800 bg-gray-950 p-4">
                     <code class="text-green-400 text-sm break-all whitespace-pre-wrap font-mono">{{ reinstallCommand }}</code>
                   </div>
@@ -645,7 +660,7 @@ const tabs = computed(() => [
                 </div>
 
                 <!-- 步骤 2: 验证并连接 -->
-                <div class="space-y-2 pt-4 border-t border-themed">
+                <div v-if="reinstallCommand" class="space-y-2 pt-4 border-t border-themed">
                   <div class="flex items-center gap-2">
                     <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium" :class="reinstallStatus === 'success' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'">2</span>
                     <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step2Verify') }}</span>
@@ -683,6 +698,12 @@ const tabs = computed(() => [
               </div>
               <div class="modal-footer">
                 <button class="btn-secondary" @click="closeReinstallModal">{{ t('common.close') }}</button>
+                <button
+                  v-if="reinstallStatus !== 'success'"
+                  class="btn-primary"
+                  :disabled="!!actionLoading || reinstallStatus === 'verifying'"
+                  @click="regenerateInstall"
+                >{{ t('admin.hosts.nodeGenerateCommand') }}</button>
                 <button v-if="reinstallStatus === 'success'" class="btn-primary" @click="closeReinstallModal">{{ t('common.done') }}</button>
               </div>
             </div>

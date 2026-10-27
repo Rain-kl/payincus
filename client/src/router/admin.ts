@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { RouteLocationNormalized, NavigationGuardNext, RouteRecordRaw } from 'vue-router'
 import api from '@/api/admin'
 import { isStaleAssetLoadError, scheduleStaleAssetReload } from '@/utils/staleAssetRecovery'
+import { dashboardPath } from '@/utils/app-paths'
 
 // OAuth 登录码处理状态
 let oauthProcessing = false
@@ -414,8 +415,7 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
 
   // Authenticated admins accessing the admin login page
   if (to.meta.guest && authStore.isAuthenticated) {
-    // 根据用户角色跳转
-    next({ name: 'admin-users' })
+    next(dashboardPath())
     return
   }
 

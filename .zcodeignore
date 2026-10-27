@@ -1,0 +1,146 @@
+# =====================================================
+# PayIncus 项目 .gitignore
+# =====================================================
+
+# ==================== 依赖 ====================
+node_modules/
+.pnpm-store/
+
+# ==================== 构建产物 ====================
+dist/
+build/
+client/dist/
+server/dist/
+agent/dist/
+agent/.package-hash
+package-lock.json
+server/package-lock.json
+client/package-lock.json
+
+# ==================== 环境变量 ====================
+.env
+.env.local
+.env.*.local
+.env.docker
+server/.env
+
+# ==================== Prisma ====================
+server/src/generated/
+**/generated/prisma/
+
+# ==================== 日志 ====================
+logs/
+update-logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+version.json
+release-packages/
+
+# ==================== 扩展/主题运行态临时目录 ====================
+server/plugin-staging/
+server/theme-staging/
+
+# ==================== IDE/编辑器与本地工具 ====================
+.vscode/
+.idea/
+.superpowers/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# ==================== 操作系统 ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ==================== 证书 (敏感) ====================
+server/certs/*.key
+server/certs/*.crt
+server/certs/*.pem
+!server/certs/.gitkeep
+
+# ==================== 数据库 ====================
+*.db
+*.sqlite
+*.sqlite3
+
+# ==================== Docker ====================
+.docker/
+
+# ==================== 临时文件 ====================
+tmp/
+temp/
+.cache/
+*.tmp
+*.temp
+*.pid
+
+# ==================== Vite ====================
+client/node_modules/.vite/
+client/node_modules/.vite-temp/
+
+# ==================== TypeScript ====================
+*.tsbuildinfo
+
+# ==================== 测试覆盖率 ====================
+coverage/
+.nyc_output/
+
+# ==================== 文档 (内部) ====================
+!docs-site/docs/
+!docs-site/docs/**
+!plugin-templates/ai-ticket-agent-plugin/docs/
+!plugin-templates/ai-ticket-agent-plugin/docs/**
+!plugin-templates/*/dist/
+!plugin-templates/*/dist/**
+!plugin-templates/*/docs/
+!plugin-templates/*/docs/**
+!theme-templates/*/dist/
+!theme-templates/*/dist/**
+!theme-templates/*/docs/
+!theme-templates/*/docs/**
+SDK/
+!docs-site/docs/public/sdk/
+!docs-site/docs/public/sdk/**
+SDKNEW/
+agent/internal/egress/assets/*.gz
+namecrane_modules/
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+bower_components/
+jspm_packages/
+__pycache__/
+site-packages/
+venv/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）

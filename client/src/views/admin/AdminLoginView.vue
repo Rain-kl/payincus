@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { getSafeRedirectUrl } from '@/utils/validation'
+import { dashboardPath } from '@/utils/app-paths'
 import api from '@/api/admin'
 import { useBrand } from '@/composables/useBrand'
 import { buildApiUrl } from '@/utils/api-url'
@@ -120,7 +121,7 @@ async function handleLogin(): Promise<void> {
     }
 
     // 安全改进：验证 redirect 参数防止开放重定向漏洞
-    const safeRedirect = getSafeRedirectUrl(route.query.redirect as string, '/admin/users')
+    const safeRedirect = getSafeRedirectUrl(route.query.redirect as string, dashboardPath())
     router.push(safeRedirect)
   } catch (err: any) {
     error.value = err?.message || String(err)
@@ -153,7 +154,7 @@ async function loginWithDemoAccount(): Promise<void> {
 
 function loginWithOAuth(provider: string): void {
   // 安全改进：验证 redirect 参数防止开放重定向漏洞
-  const safeRedirect = getSafeRedirectUrl(route.query.redirect as string, '/admin/users')
+  const safeRedirect = getSafeRedirectUrl(route.query.redirect as string, dashboardPath())
   window.location.href = buildApiUrl(`/oauth/authorize/${provider}?mode=login&redirect=${encodeURIComponent(safeRedirect)}`)
 }
 

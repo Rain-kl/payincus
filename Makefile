@@ -1,4 +1,18 @@
-.PHONY: canary
+.PHONY: dev dev-frontend dev-backend canary
+
+# Start the complete local development stack (backend, user frontend, admin frontend).
+dev:
+	@pnpm dev
+
+# Start both frontend entry points without the backend.
+dev-frontend:
+	@pnpm exec concurrently -n "user,admin" -c "green,magenta" \
+		"VITE_APP_ENTRY=user VITE_DEV_PORT=3000 VITE_DEV_PROXY_TARGET=http://127.0.0.1:3001 VITE_ADMIN_BASE_URL=http://127.0.0.1:3002 pnpm --filter client dev:user" \
+		"VITE_APP_ENTRY=admin VITE_CUSTOMER_BASE_URL=http://127.0.0.1:3000 VITE_DEV_PORT=3002 VITE_DEV_PROXY_TARGET=http://127.0.0.1:3001 pnpm --filter client dev:admin"
+
+# Start the backend only in local development mode.
+dev-backend:
+	@pnpm --filter server dev
 
 # Merge the current local branch into canary, push canary, then restore it.
 # Dirty worktrees are auto-stashed and restored after the operation.

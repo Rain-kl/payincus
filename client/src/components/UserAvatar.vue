@@ -164,14 +164,14 @@ const sizeStyle = computed(() => {
     v-else-if="!defaultImgFailed"
     :src="currentAvatarUrl" 
     :alt="username"
-    class="rounded-full object-cover shrink-0 select-none"
+    class="rounded object-cover shrink-0 select-none"
     :style="sizeStyle"
     loading="lazy"
     @error="onImgError"
   />
   <div 
     v-else
-    class="rounded-full flex items-center justify-center font-semibold shrink-0 select-none leading-none shadow-sm"
+    class="rounded flex items-center justify-center font-semibold shrink-0 select-none leading-none shadow-sm"
     :class="avatarBgClass"
     :style="sizeStyle"
   >

@@ -104,9 +104,6 @@ const hostTrafficProgressPercent = computed(() => {
 const agentStatus = ref<HostAgentStatus | null>(null)
 const agentStatusLoading = ref(true)
 const agentStatusRefreshing = ref(false)
-const agentInstallCommandLoading = ref(false)
-const agentInstallCommand = ref('')
-const agentInstallTokenExpiresAt = ref('')
 const agentStatusError = ref('')
 let agentStatusRefreshTimer: ReturnType<typeof setInterval> | null = null
 let agentStatusRefreshIntervalMs = 0
@@ -250,8 +247,6 @@ const agentVersionInfo = computed(() => ({
 }))
 
 watch(() => props.host.id, () => {
-  agentInstallCommand.value = ''
-  agentInstallTokenExpiresAt.value = ''
   loadInstanceStats()
   loadTrafficHistory()
   loadAgentStatus()
@@ -330,29 +325,6 @@ function formatUptime(seconds: number | undefined): string {
 
 function refreshAgentStatus() {
   loadAgentStatus(true)
-}
-
-async function generateAgentInstallCommand() {
-  if (agentInstallCommandLoading.value) return
-  if (!window.confirm(t('admin.hosts.agentInstallCommandConfirm'))) return
-  agentInstallCommandLoading.value = true
-  try {
-    const result = await api.hosts.generateAgentInstallCommand(props.host.id)
-    agentInstallCommand.value = result.installCommand
-    agentInstallTokenExpiresAt.value = result.installTokenExpiresAt
-    agentStatus.value = result.agent
-    toast.success(t('admin.hosts.agentInstallCommandSuccess'))
-  } catch (err: any) {
-    toast.error(t('admin.hosts.agentInstallCommandFailed') + ': ' + (err?.message || String(err)))
-  } finally {
-    agentInstallCommandLoading.value = false
-  }
-}
-
-function copyAgentInstallCommand() {
-  if (!agentInstallCommand.value) return
-  navigator.clipboard.writeText(agentInstallCommand.value)
-  toast.success(t('admin.hosts.agentInstallCommandCopied'))
 }
 
 // 资源校对
@@ -614,22 +586,6 @@ function formatBytes(bytes: number): string {
       </div>
       <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
         <button
-          class="btn-secondary btn-xs flex items-center gap-1"
-          :disabled="agentInstallCommandLoading"
-          @click="generateAgentInstallCommand"
-        >
-          <svg
-            class="w-3.5 h-3.5"
-            :class="{ 'animate-spin': agentInstallCommandLoading }"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
-          </svg>
-          <span>{{ t('admin.hosts.agentInstallCommand') }}</span>
-        </button>
-        <button
           class="btn-ghost btn-xs flex items-center gap-1"
           :disabled="agentStatusRefreshing"
           @click="refreshAgentStatus"
@@ -646,30 +602,6 @@ function formatBytes(bytes: number): string {
           <span>{{ t('common.refresh') }}</span>
         </button>
       </div>
-    </div>
-
-    <div
-      v-if="agentInstallCommand"
-      class="rounded-lg p-3 mb-4"
-      :class="themeStore.isDark ? 'bg-gray-900/70 border border-gray-800' : 'bg-gray-50 border border-gray-200'"
-    >
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-        <div>
-          <p class="text-xs font-medium" :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
-            {{ t('admin.hosts.agentInstallCommandTitle') }}
-          </p>
-          <p class="text-xs mt-0.5" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
-            {{ t('admin.hosts.agentInstallCommandHint') }}
-            <span v-if="agentInstallTokenExpiresAt">
-              {{ t('admin.hosts.agentInstallTokenExpiresAt', { time: formatDate(agentInstallTokenExpiresAt) }) }}
-            </span>
-          </p>
-        </div>
-        <button class="btn-secondary btn-xs" @click="copyAgentInstallCommand">
-          {{ t('admin.hosts.copyCommand') }}
-        </button>
-      </div>
-      <pre class="rounded-md p-3 overflow-x-auto text-xs font-mono whitespace-pre-wrap break-all" :class="themeStore.isDark ? 'bg-black/40 text-green-300' : 'bg-gray-900 text-green-300'">{{ agentInstallCommand }}</pre>
     </div>
 
     <div v-if="agentStatusLoading" class="animate-pulse grid grid-cols-1 sm:grid-cols-2 gap-3">

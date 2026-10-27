@@ -11,6 +11,7 @@ import { useBrand } from '@/composables/useBrand'
 import SideNav from './SideNav.vue'
 import MenuSearchBox from './MenuSearchBox.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
 import { instancesPath, loginPath, profilePath, terminalPath } from '@/utils/app-paths'
 import { dashboardPath } from '@/utils/app-paths'
@@ -262,20 +263,25 @@ onUnmounted(() => {
           </span>
         </button>
 
-        <!-- 用户菜单 (仅显示方形图标) -->
+        <!-- 用户菜单：与用户列表、个人设置使用同一账号头像 -->
         <div ref="userMenuRef" class="relative">
           <button
             type="button"
             class="nimbus-user-trigger flex items-center justify-center p-0.5 rounded transition-all cursor-pointer focus:outline-none"
-            :class="userMenuOpen ? 'ring-1 ring-white/60' : ''"
+            :class="userMenuOpen ? 'ring-1 ring-[var(--topbar-text)]' : ''"
             :title="authStore.user?.username || t('userMenu.profile')"
             :aria-label="t('userMenu.profile')"
             @click.stop="toggleUserMenu"
           >
             <div class="nimbus-user-icon-box w-[32px] h-[32px] rounded flex items-center justify-center overflow-hidden shadow-sm select-none">
-              <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              <UserAvatar
+                v-if="authStore.user"
+                :username="authStore.user.username"
+                :email="authStore.user.email"
+                :avatar-style="authStore.user.avatarStyle"
+                :badge-id="authStore.user.avatarBadgeId"
+                :size="32"
+              />
             </div>
           </button>
           
@@ -511,21 +517,13 @@ onUnmounted(() => {
 }
 
 .nimbus-user-icon-box {
-  background-color: #745872;
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.1) 0px,
-    rgba(255, 255, 255, 0.1) 1.5px,
-    transparent 1.5px,
-    transparent 3.5px
-  );
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  transition: border-color 160ms ease, filter 160ms ease;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  transition: border-color 160ms ease;
 }
 
 .nimbus-user-trigger:hover .nimbus-user-icon-box {
-  border-color: rgba(255, 255, 255, 0.45);
-  filter: brightness(1.08);
+  border-color: var(--topbar-text);
 }
 
 .oci-user-dropdown {
