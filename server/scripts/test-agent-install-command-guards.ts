@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { buildNodeInstallCommand } from '../src/lib/node-install.js'
 import './test-node-distribution.js'
+import './test-node-enrollment.js'
 const hostAgentCredentialsSource=readFileSync(new URL('../src/lib/host-agent-credentials.ts',import.meta.url),'utf8')
 assert.ok(
   hostAgentCredentialsSource.includes("const agentInstallTokenPrefix = 'ait_'") &&

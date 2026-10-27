@@ -9,6 +9,7 @@ const __dirname = dirname(__filename)
 const hostInstallScript = readFileSync(resolve(__dirname, '../templates/install.sh'), 'utf8')
 const caddyInstallScript = readFileSync(resolve(__dirname, '../templates/caddy.sh'), 'utf8')
 const hostRoutes = readFileSync(resolve(__dirname, '../src/routes/hosts.ts'), 'utf8')
+const panelCertificateSource = readFileSync(resolve(__dirname, '../src/lib/panel-certificate.ts'), 'utf8')
 const zhCnLocale = readFileSync(resolve(__dirname, '../../client/src/locales/zh-CN.ts'), 'utf8')
 const zhTwLocale = readFileSync(resolve(__dirname, '../../client/src/locales/zh-TW.ts'), 'utf8')
 const enLocale = readFileSync(resolve(__dirname, '../../client/src/locales/en.ts'), 'utf8')
@@ -38,12 +39,12 @@ assert.ok(
 )
 
 assert.ok(
-  hostRoutes.includes('function getPanelCertificatePaths') &&
-    hostRoutes.includes("appDir.endsWith('/current') ? dirname(appDir) : null") &&
-    hostRoutes.includes("join(installDir, 'server/certs/client.crt')") &&
-    hostRoutes.includes("join(installDir, 'server/certs/client.key')") &&
-    hostRoutes.includes('existsSync(stableCertPath)') &&
-    hostRoutes.includes('existsSync(stableKeyPath)'),
+  hostRoutes.includes("import { getPanelCertificatePaths } from '../lib/panel-certificate.js'") &&
+    panelCertificateSource.includes("appDir.endsWith('/current') ? dirname(appDir) : null") &&
+    panelCertificateSource.includes("join(installDir, 'server/certs/client.crt')") &&
+    panelCertificateSource.includes("join(installDir, 'server/certs/client.key')") &&
+    panelCertificateSource.includes('existsSync(stableCertPath)') &&
+    panelCertificateSource.includes('existsSync(stableKeyPath)'),
   'host routes must prefer stable install-level panel client certificate paths over release-local paths'
 )
 

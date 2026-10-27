@@ -18,6 +18,7 @@ import { prisma } from '../db/prisma.js'
 import { createLog, LogModule, LogResult } from '../db/logs.js'
 import { decryptSensitiveData } from '../lib/security.js'
 import { buildNodeInstallCommand } from '../lib/node-install.js'
+import { readPanelClientCertificate } from '../lib/panel-certificate.js'
 import {
   agentNonceTtlMs,
   createAgentBodyHash,
@@ -501,12 +502,28 @@ export default async function agentRoutes(fastify: FastifyInstance) {
 
   fastify.get('/distribution', async () => ({ repository: 'Rain-kl/incus', package: 'incus-payincus', channels: ['latest', 'canary'], installer: '/api/agent/install.sh', managedBy: 'apt' }))
 
-  fastify.get<{ Params: AgentInstallTokenParams }>('/install-config/:token', async (
-    request: FastifyRequest<{ Params: AgentInstallTokenParams }>,
+  fastify.get<{ Params: AgentInstallTokenParams; Querystring: { format?: 'json' } }>('/install-config/:token', {
+    schema: { querystring: { type: 'object', properties: { format: { type: 'string', enum: ['json'] } } } }
+  }, async (
+    request: FastifyRequest<{ Params: AgentInstallTokenParams; Querystring: { format?: 'json' } }>,
     reply: FastifyReply
   ) => {
     const { token } = request.params
+    const jsonFormat = request.query.format === 'json'
+    reply.header('Cache-Control', 'no-store')
     try {
+      // Validate the certificate before consuming the one-time token.
+      let panelCertificate: ReturnType<typeof readPanelClientCertificate> | undefined
+      if (jsonFormat) {
+        try {
+          panelCertificate = readPanelClientCertificate()
+        } catch (error) {
+          return reply.code(503).send({
+            code: 'PANEL_CERTIFICATE_UNAVAILABLE',
+            error: `Panel client certificate unavailable: ${error instanceof Error ? error.message : String(error)}`
+          })
+        }
+      }
       const result = await consumeHostAgentInstallToken(token)
       request.log.info(
         { hostId: result.host.id, agentId: result.agent.agentId },
@@ -520,6 +537,15 @@ export default async function agentRoutes(fastify: FastifyInstance) {
         LogResult.SUCCESS
       )
 
+      if (panelCertificate) {
+        return reply.send({
+          schemaVersion: 1,
+          agentId: result.agent.agentId,
+          agentSecret: result.agentSecret,
+          panelClientCertificate: panelCertificate.certificate,
+          panelClientCertificateFingerprint: panelCertificate.fingerprint
+        })
+      }
       return reply
         .header('Content-Type', 'text/plain; charset=utf-8')
         .header('Cache-Control', 'no-store')
@@ -529,12 +555,14 @@ export default async function agentRoutes(fastify: FastifyInstance) {
         }))
     } catch (error) {
       if (error instanceof Error && error.message === 'AGENT_INSTALL_TOKEN_EXPIRED') {
+        if (jsonFormat) return reply.code(403).send({ code: error.message, error: 'Agent install token has expired' })
         return reply.code(403).send('# Error: Agent install token has expired')
       }
       if (error instanceof Error && (
         error.message === 'AGENT_INSTALL_TOKEN_INVALID' ||
         error.message === 'AGENT_SECRET_INVALID'
       )) {
+        if (jsonFormat) return reply.code(403).send({ code: error.message, error: 'Invalid Agent install token' })
         return reply.code(403).send('# Error: Invalid Agent install token')
       }
       throw error
