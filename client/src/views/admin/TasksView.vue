@@ -162,7 +162,7 @@ onUnmounted(() => { disposed = true; stop(); clearInterval(refreshTimer); clearI
     <form class="card p-4 flex flex-wrap gap-3" @submit.prevent="filter">
       <input v-model="search" class="input flex-1" :aria-label="t(key('instance'))" :placeholder="t(key('instance'))" maxlength="100" />
       <select v-model="status" class="input w-auto" :aria-label="t(key('allStatuses'))" @change="filter"><option value="">{{ t(key('allStatuses')) }}</option><option v-for="value in ['running', 'success', 'failed', 'cancelled', 'interrupted']" :key="value" :value="value">{{ t(key(value)) }}</option></select>
-      <select v-model="kind" class="input w-auto" :aria-label="t(key('allKinds'))" @change="filter"><option value="">{{ t(key('allKinds')) }}</option><option value="create">{{ t(key('create')) }}</option><option value="destroy">{{ t(key('destroy')) }}</option></select>
+      <select v-model="kind" class="input w-auto" :aria-label="t(key('allKinds'))" @change="filter"><option value="">{{ t(key('allKinds')) }}</option><option value="create">{{ t(key('create')) }}</option><option value="destroy">{{ t(key('destroy')) }}</option><option value="node_recover">{{ t(key('node_recover')) }}</option></select>
       <button class="btn-primary" type="submit">{{ t(key('search')) }}</button>
     </form>
     <p v-if="listError" role="alert" class="text-error">{{ listError }}</p>

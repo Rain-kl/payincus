@@ -7,7 +7,15 @@ export interface NodeSecurityState {
   targets?: Array<{ dataset: string; fingerprint: string }>
   results?: Array<{ target: string; success: boolean; detail: string }>
 }
+export interface NodeRecoveryTask {
+  id: number
+  status: 'running' | 'success' | 'failed' | 'cancelled' | 'interrupted'
+  error: string | null
+  createdAt: string
+  finishedAt: string | null
+}
 export interface NodeSecurityOverview {
+  recoveryTask?: NodeRecoveryTask | null
   serverFingerprint?: string | null
   state: NodeSecurityState | null
   offline?: boolean

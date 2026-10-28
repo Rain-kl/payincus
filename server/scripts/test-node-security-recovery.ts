@@ -46,3 +46,5 @@ assert.equal(operations, before)
 await assert.rejects(restoreNodeInstances({ request }, { locked: true, revision, resumeInstances: [first] }, async () => true))
 assert.equal((await restoreNodeInstances({ request }, { locked: false, revision, resumeInstances: [] }, async () => true)).failed, 0)
 console.log('Native recovery identity, async failure, frozen state, partial retry and lost ACK passed')
+
+await assert.rejects(restoreNodeInstances({ request }, { locked: false, revision, resumeInstances: [first] }, async () => true, { cancelled: () => true }), /已取消/)

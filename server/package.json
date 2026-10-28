@@ -205,7 +205,7 @@
     "smoke:gpu-purchase": "node --import tsx scripts/smoke-gpu-purchase.ts",
     "test:package-egress": "node --import tsx scripts/test-package-egress.ts",
     "test:package-egress:db": "RUN_PACKAGE_EGRESS_DB_TESTS=1 node --import tsx scripts/test-package-egress.ts",
-    "test:node-security": "node --import tsx scripts/test-node-security.ts && node --import tsx scripts/test-node-security-routes.ts && node --import tsx scripts/test-node-security-transport.ts && node --import tsx scripts/test-node-security-recovery.ts && node --import tsx scripts/test-host-service-status.ts",
+    "test:node-security": "node --import tsx scripts/test-node-security.ts && node --import tsx scripts/test-node-security-routes.ts && node --import tsx scripts/test-node-security-transport.ts && node --import tsx scripts/test-node-security-recovery.ts && node --import tsx scripts/test-node-security-async.ts && node --import tsx scripts/test-host-service-status.ts",
     "test:node-security:db": "node --import tsx scripts/test-node-security-db.ts",
     "test:node-distribution": "node --import tsx scripts/test-node-distribution.ts",
     "test:incus-ui-proxy-guards": "node --import tsx scripts/test-incus-ui-proxy-guards.ts",

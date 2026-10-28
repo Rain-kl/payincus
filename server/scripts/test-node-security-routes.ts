@@ -59,6 +59,7 @@ Object.assign(prisma.nodeCliEvent, { findMany: async ({ where, take }: any) => {
  assert.equal(where.command.in.includes('agent'), false)
  return []
 } })
+Object.assign(prisma.operationTask, { findFirst: async () => null })
 const overview = await app.inject({ url: base, headers: { authorization: 'admin' } })
 assert.equal(overview.statusCode, 200)
 assert.deepEqual(overview.json().events, [])

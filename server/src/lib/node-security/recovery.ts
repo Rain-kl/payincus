@@ -3,11 +3,13 @@ export interface RecoveryState { locked: boolean; revision: number; resumeInstan
 export interface RecoveryClient { request<T = unknown>(method: string, path: string, body?: unknown): Promise<T> }
 
 // The node retains pending identities until native async operations and their final state are verified.
-export async function restoreNodeInstances(client: RecoveryClient, initial: RecoveryState, allowed: (item: ResumeInstance) => Promise<boolean>): Promise<{ state: RecoveryState; failed: number }> {
+export async function restoreNodeInstances(client: RecoveryClient, initial: RecoveryState, allowed: (item: ResumeInstance) => Promise<boolean>, options: { progress?: (completed: number, total: number, failed: number) => void; cancelled?: () => boolean } = {}): Promise<{ state: RecoveryState; failed: number }> {
   let state = initial
   let failed = 0
   if (state.locked || !Number.isSafeInteger(state.revision) || !Array.isArray(state.resumeInstances)) throw new Error('invalid recovery state')
+  let completed = 0
   for (const item of initial.resumeInstances!) {
+    if (options.cancelled?.()) throw new Error('节点恢复任务已取消')
     try {
       if (!item || typeof item.project !== 'string' || !item.project || typeof item.name !== 'string' || !item.name || typeof item.uuid !== 'string' || !item.uuid || typeof item.frozen !== 'boolean') throw new Error('invalid workload identity')
       const query = `?project=${encodeURIComponent(item.project)}`
@@ -29,7 +31,10 @@ export async function restoreNodeInstances(client: RecoveryClient, initial: Reco
       }
       if (current.status !== (item.frozen ? 'Frozen' : 'Running')) throw new Error('workload did not recover')
       await acknowledged()
-    } catch { failed++ }
+    } catch {
+      failed++
+      if (options.cancelled?.()) throw new Error('节点恢复任务已取消')
+    } finally { options.progress?.(++completed, initial.resumeInstances!.length, failed) }
   }
   return { state, failed }
 }

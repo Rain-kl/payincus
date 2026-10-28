@@ -723,9 +723,10 @@ http.interceptors.response.use(
 // API 模块
 const api = {
   nodeSecurity: {
+    recover: (hostId: number, revision: number): Promise<{ taskId: number; status: 'running' }> => http.post(`/admin/hosts/${hostId}/node-security/recover`, { revision }),
     identity: (hostId: number, fingerprint: string): Promise<{ fingerprint: string }> => http.post(`/admin/hosts/${hostId}/node-security/identity`, { fingerprint }),
     status: (hostId: number): Promise<NodeSecurityOverview> => http.get(`/admin/hosts/${hostId}/node-security`),
-    action: (hostId: number, action: 'policy' | 'lock' | 'recover', data: { enabled?: boolean; revision?: number }): Promise<{ state: NodeSecurityState }> => http.post(`/admin/hosts/${hostId}/node-security/${action}`, data),
+    action: (hostId: number, action: 'policy' | 'lock', data: { enabled?: boolean; revision?: number }): Promise<{ state: NodeSecurityState }> => http.post(`/admin/hosts/${hostId}/node-security/${action}`, data),
     saveKey: (hostId: number, dataset: string, key: string): Promise<{ fingerprint: string }> => http.post(`/admin/hosts/${hostId}/node-security/keys`, { dataset, key }),
     revealKey: (hostId: number, dataset: string): Promise<{ key: string; fingerprint: string }> => http.post(`/admin/hosts/${hostId}/node-security/keys/reveal`, { dataset }),
     unlock: (hostId: number, dataset: string): Promise<{ state: NodeSecurityState }> => http.post(`/admin/hosts/${hostId}/node-security/keys/unlock`, { dataset })
@@ -4267,7 +4268,7 @@ export interface OperationTask {
   hostId: number
   hostName?: string | null
   instanceName: string
-  kind: 'create' | 'destroy'
+  kind: 'create' | 'destroy' | 'node_recover'
   status: 'running' | 'success' | 'failed' | 'cancelled' | 'interrupted'
   error: string | null
   createdAt: string

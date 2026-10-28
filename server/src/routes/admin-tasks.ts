@@ -13,7 +13,7 @@ export default async function adminTaskRoutes(app: FastifyInstance): Promise<voi
     schema: { querystring: { type: 'object', properties: {
       page: { type: 'integer', minimum: 1, maximum: 100000, default: 1 },
       status: { type: 'string', enum: ['running', 'success', 'failed', 'cancelled', 'interrupted'] },
-      kind: { type: 'string', enum: ['create', 'destroy'] }, search: { type: 'string', maxLength: 100 }
+      kind: { type: 'string', enum: ['create', 'destroy', 'node_recover'] }, search: { type: 'string', maxLength: 100 }
     } } }
   }, async request => {
     const { page = 1, status, kind, search } = request.query
