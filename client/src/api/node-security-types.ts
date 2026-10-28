@@ -3,6 +3,7 @@ export interface NodeSecurityState {
   locked: boolean
   revision: number
   reason?: string
+  resumeInstances?: Array<{ project: string; name: string; uuid: string; frozen: boolean }>
   targets?: Array<{ dataset: string; fingerprint: string }>
   results?: Array<{ target: string; success: boolean; detail: string }>
 }

@@ -1,8 +1,13 @@
+import { recordHostSuccess } from '../lib/incus/host-health.js'
+import { INCUS_CLI_COMMANDS, recordReport } from '../lib/node-security/report.js'
+import { restoreNodeInstances, type RecoveryState } from '../lib/node-security/recovery.js'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../db/prisma.js'
 import { IncusClient } from '../lib/incus/incus-client.js'
 import { createLog, LogModule, LogResult } from '../db/logs.js'
 import { datasetPattern, fingerprint, seal, unseal } from '../lib/node-security/vault.js'
+
+const recoveringHosts = new Set<number>()
 
 const params = { type: 'object', required: ['hostId'], properties: { hostId: { type: 'integer', minimum: 1, maximum: 2147483647 } } }
 const revision = { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER }
@@ -23,6 +28,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
           await node.connect()
           const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
           if (!Array.isArray(info?.api_extensions) || !info.api_extensions.includes('payincus_security_v1')) throw new Error('节点不支持此功能，请升级集成包')
+          if (path === '/1.0/payincus/security/recover' && !info.api_extensions.includes('payincus_security_resume_v1')) throw new Error('节点不支持状态恢复')
           return await node.request<T>(method, path, body)
         } finally { await node.close() }
       }
@@ -43,11 +49,15 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
     const hostId = req.params.hostId
     const [keys, events, reported] = await Promise.all([
       prisma.nodeStorageKey.findMany({ where: { hostId }, select: { id: true, dataset: true, fingerprint: true, version: true, createdAt: true } }),
-      prisma.nodeCliEvent.findMany({ where: { hostId }, orderBy: { receivedAt: 'desc' }, take: 100 }),
+      prisma.nodeCliEvent.findMany({ where: { hostId, command: { in: [...INCUS_CLI_COMMANDS] } }, orderBy: { receivedAt: 'desc' }, take: 100 }),
       prisma.nodeSecurityState.findUnique({ where: { hostId } })
     ])
     const identity = { serverFingerprint: reported?.serverFingerprint ?? null }
-    try { return { ...identity, state: await (await client(hostId)).request('GET', '/1.0/payincus/security'), keys, events: events.map(e => ({ ...e, uid: Number(e.uid) })), reportedAt: reported?.reportedAt } }
+    try {
+      const state = await (await client(hostId)).request('GET', '/1.0/payincus/security')
+      await recordReport(hostId, { state, events: [] })
+      return { ...identity, state, keys, events: events.map(e => ({ ...e, uid: Number(e.uid) })), reportedAt: reported?.reportedAt }
+    }
     catch { return { ...identity, state: reported?.report && typeof reported.report === 'object' && 'locked' in reported.report ? reported.report : null, keys, events: events.map(e => ({ ...e, uid: Number(e.uid) })), reportedAt: reported?.reportedAt, offline: true } }
   })
   for (const action of ['policy', 'recover', 'lock'] as const) {
@@ -56,11 +66,29 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
       onRequest: auth, schema: { params, body: { type: 'object', additionalProperties: false, required: Object.keys(properties), properties } }
     }, async (req, reply) => {
       noStore(reply)
+      if (action === 'recover' && recoveringHosts.has(req.params.hostId)) return reply.code(409).send({ error: '节点恢复进行中，请稍后刷新' })
+      if (action === 'recover') recoveringHosts.add(req.params.hostId)
       try {
-        const state = await (await client(req.params.hostId)).request('POST', `/1.0/payincus/security/${action}`, req.body)
+        const node = await client(req.params.hostId)
+        let state = await node.request<RecoveryState>('POST', `/1.0/payincus/security/${action}`, req.body)
+        let failed = 0
+        if (action === 'recover') {
+          const result = await restoreNodeInstances(node, state, async item => {
+            // Respect later billing suspension/deletion; unmanaged node containers retain their native state.
+            if (item.project !== 'default') return true
+            const instance = await prisma.instance.findFirst({ where: { hostId: req.params.hostId, incusId: item.name }, select: { status: true, expiresAt: true } })
+            return !instance || (['running', 'stopped', 'error'].includes(instance.status) && (!instance.expiresAt || instance.expiresAt.getTime() > Date.now()))
+          })
+          state = result.state
+          failed = result.failed
+        }
+        recordHostSuccess(req.params.hostId, 0)
+        await recordReport(req.params.hostId, { state, events: [] })
+        if (failed) return reply.code(409).send({ error: '部分实例恢复未完成，请刷新后重试', state })
         await createLog(req.user.id, LogModule.SECURITY, `node.${action}`, `节点 #${req.params.hostId} 管理操作 ${action}`, LogResult.SUCCESS)
         return { state }
       } catch { return reply.code(409).send({ error: '节点操作未完成，请刷新状态并检查连接或存储' }) }
+      finally { if (action === 'recover') recoveringHosts.delete(req.params.hostId) }
     })
   }
   app.post<{ Params: { hostId: number }; Body: { dataset: string; key: string } }>(`${base}/keys`, {

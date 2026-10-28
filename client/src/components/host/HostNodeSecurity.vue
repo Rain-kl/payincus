@@ -16,7 +16,7 @@ const key = ref('')
 const revealed = ref('')
 const savedFingerprint = ref('')
 const state = computed(() => overview.value?.state)
-const title = computed(() => ({ identity: '核对节点证书指纹', policy: '切换关键命令诱捕', recover: '批准节点恢复', lock: '立即锁定节点', save: '托管 ZFS 密钥', reveal: '领取 ZFS 密钥', unlock: '加载 ZFS 密钥' })[action.value])
+const title = computed(() => ({ identity: '核对节点证书指纹', policy: '切换安全模式', recover: '批准节点恢复', lock: '立即锁定节点', save: '托管 ZFS 密钥', reveal: '领取 ZFS 密钥', unlock: '加载 ZFS 密钥' })[action.value])
 let generation = 0
 let loading = false
 async function refresh() {
@@ -72,15 +72,15 @@ async function submit() {
       message.value = '密钥已领取并记录审计；关闭抽屉后清除页面显示。注意剪贴板历史可能保存副本。'
     } else if (action.value === 'unlock') {
       await api.nodeSecurity.unlock(hostId, dataset.value.trim())
-      message.value = '已加载存储密钥；仍需批准节点恢复，再启动容器。'
+      message.value = '已加载存储密钥；批准节点恢复后将自动恢复锁定前的运行状态。'
       drawer.value = false
     } else {
       if (action.value !== 'lock' && (revision === undefined || overview.value?.offline)) throw new Error('请先刷新在线状态')
       await api.nodeSecurity.action(hostId, action.value, action.value === 'policy' ? { enabled: !state.value?.enabled, revision } : action.value === 'recover' ? { revision } : {})
       drawer.value = false
-      message.value = '操作完成；节点恢复不会自动启动全部容器。'
+      message.value = '操作完成；授权恢复后自动恢复锁定前运行的容器。'
     }
-  } catch { if (current === generation) error.value = '操作未完成。请检查密钥、节点连接与最新状态；未自动解除锁定。' }
+  } catch { if (current === generation) error.value = '操作未完成。请检查密钥、节点连接与最新状态；部分实例未恢复时可再次批准恢复重试。' }
   finally { busy.value = false; await refresh() }
 }
 watch(() => props.hostId, () => { generation++; overview.value = null; drawer.value = false; key.value = ''; revealed.value = ''; savedFingerprint.value = ''; message.value = ''; error.value = ''; void refresh() }, { immediate: true })
@@ -92,12 +92,12 @@ onUnmounted(() => { generation++; clearInterval(timer); key.value = ''; revealed
   <section class="card p-5 space-y-4">
     <div>
       <h3 class="text-lg font-semibold text-themed">节点安全模式</h3>
-      <p class="text-sm text-themed-muted mt-1">所有受管 CLI 调用上报审计；关键命令诱捕默认关闭。API 锁定独立于 ZFS，关闭诱捕不会解除已有锁定。</p>
+      <p class="text-sm text-themed-muted mt-1">所有受管 CLI 调用上报审计；安全模式默认关闭。API 锁定独立于 ZFS，关闭安全模式不会解除已有锁定。</p>
     </div>
     <p v-if="error" class="text-sm text-themed" role="alert">{{ error }}</p>
     <p v-if="message" class="text-sm text-themed" role="status">{{ message }}</p>
     <div class="flex flex-wrap gap-3 text-sm text-themed">
-      <span>诱捕：{{ state?.enabled ? '已开启' : '未开启' }}</span>
+      <span>安全模式：{{ state?.enabled ? '已开启' : '未开启' }}</span>
       <span>API：{{ !state ? '未知' : state.locked ? '已锁定' : '未锁定' }}</span>
       <span v-if="overview?.offline">节点离线，显示上次上报</span>
       <span v-if="state?.reason">原因：{{ state.reason }}</span>
@@ -105,9 +105,9 @@ onUnmounted(() => { generation++; clearInterval(timer); key.value = ''; revealed
     <div class="flex flex-wrap gap-2">
       <button class="btn-secondary btn-sm" :disabled="busy" @click="refresh">刷新</button>
       <button class="btn-secondary btn-sm" :disabled="busy" @click="open('identity')">核对证书指纹</button>
-      <button class="btn-secondary btn-sm" :disabled="busy || !state || overview?.offline" @click="open('policy')">{{ state?.enabled ? '关闭诱捕' : '开启诱捕' }}</button>
+      <button class="btn-secondary btn-sm" :disabled="busy || !state || overview?.offline" @click="open('policy')">{{ state?.enabled ? '关闭安全模式' : '开启安全模式' }}</button>
       <button class="btn-secondary btn-sm" :disabled="busy || overview?.offline" @click="open('lock')">立即锁定</button>
-      <button class="btn-primary btn-sm" :disabled="busy || !state?.locked || overview?.offline" @click="open('recover')">批准恢复</button>
+      <button class="btn-primary btn-sm" :disabled="busy || (!state?.locked && !state?.resumeInstances?.length) || overview?.offline" @click="open('recover')">批准恢复</button>
       <button class="btn-secondary btn-sm" :disabled="busy" @click="open('save')">保存 ZFS 密钥</button>
     </div>
     <p class="text-xs text-themed-muted">锁定将停止本节点容器并尝试卸载已注册的加密存储；可能中断业务。存储动作失败时 API 仍保持锁定。</p>
@@ -133,7 +133,7 @@ onUnmounted(() => { generation++; clearInterval(timer); key.value = ''; revealed
       <form class="space-y-4" @submit.prevent="submit">
         <p class="text-sm text-themed-muted">请确认本次管理操作。原始密钥仅用于托管、领取或存储解锁，不会写入操作日志。</p>
         <p v-if="action === 'lock'" class="text-sm text-themed">此操作将中断本节点容器，之后需要人工恢复。</p>
-        <p v-if="action === 'recover'" class="text-sm text-themed">请先确认告警原因已处理，并加载全部已注册存储的密钥。批准后不自动启动容器。</p>
+        <p v-if="action === 'recover'" class="text-sm text-themed">请先确认告警原因已处理，并加载全部已注册存储的密钥。批准后自动恢复锁定前运行的容器，原本关机的容器保持关机。</p>
         <label v-if="action === 'identity'" class="block text-sm text-themed">
           从节点 TUI 可信终端核对服务端证书 SHA256；更换证书时必须重新核对
           <input v-model="dataset" class="input mt-1 w-full" required autocomplete="off" />

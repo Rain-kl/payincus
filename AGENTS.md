@@ -8,6 +8,8 @@
 
 ## Git 提交规范
 
+- **默认开发分支**：默认在 `canary` 开发；开始修改前检查工作区，`git fetch origin` 并以 `--ff-only` 同步最新 `origin/canary`。保留已有改动，禁止以旧的本地分支或 `main` 代替最新开发基线。
+
 每次完成一个功能点开发或修复一个问题后，务必提交 Git commit；推送远程仓库须由 owner 明确授权。
 - **推送目标（owner 固定约定）**：owner 要求“推送”时，将改动同步到 `main` 和 `canary`，两个分支都必须推送。**永远不要推送 `work` 分支**。推送前先获取远程最新状态，保留已有提交并完成必要的合并及验证；禁止强制推送。
 遵循 Conventional Commits：`<type>(<scope>): <subject>`（例：`feat(auth): support email login`）。

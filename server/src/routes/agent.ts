@@ -395,6 +395,7 @@ function buildHeartbeatReport(body: AgentHeartbeatBody): Record<string, unknown>
   return {
     runtime: body.runtime ?? {},
     incus: body.incus ?? {},
+    instances: { available: body.instances?.available === true },
     caddy: body.caddy ?? {},
     resources: body.resources ?? {},
     metrics: normalizeAgentMetrics(body.metrics)

@@ -1072,7 +1072,7 @@ export interface Host {
   location: string | null
   country_code: string
   architecture?: 'x86_64' | 'aarch64'
-  status: 'online' | 'offline' | 'maintenance'
+  status: 'online' | 'offline' | 'maintenance' | 'locked'
   cert_path?: string | null  // Removed from API responses for security
   key_path?: string | null   // Removed from API responses for security
   nat_public_ip: string | null

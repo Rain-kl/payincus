@@ -26,6 +26,7 @@ export interface PaginationOptions {
   sortOrder?: 'asc' | 'desc' | null
   excludeUserId?: number | null  // 排除特定用户的数据
   ownerRole?: 'admin' | 'user' | null  // 按所有者角色过滤
+  serviceStatusWhere?: Prisma.InstanceWhereInput
   includeOwner?: boolean  // 是否包含所有者信息
 }
 
@@ -386,7 +387,9 @@ export async function getInstancesPaginated(options: PaginationOptions = {}): Pr
   const baseWhere: any = {}
 
   // 默认排除已删除的实例（除非明确指定 status='deleted'）
-  if (status === 'deleted') {
+  if (options.serviceStatusWhere) {
+    baseWhere.AND = [options.serviceStatusWhere]
+  } else if (status === 'deleted') {
     baseWhere.status = 'deleted'
   } else if (status) {
     baseWhere.status = status

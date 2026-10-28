@@ -1,3 +1,4 @@
+import { instanceServiceStatus, instanceServiceStatusFilter, loadHostServiceStatuses } from '../lib/host-service-status.js'
 import { registerAdvancedConfigRoute } from './instance-advanced-config.js'
 import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getInstanceStorageCapacity } from '../lib/storage-capacity.js'
@@ -714,6 +715,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       pageSize: number
       search: string
       status?: InstanceStatus
+      serviceStatusWhere?: Prisma.InstanceWhereInput
       userId?: number
       hostId?: number
       countryCode?: string
@@ -761,7 +763,10 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       options.userId = user.id
     }
 
+    const filteredServices = parsedStatus && ['running', 'stopped', 'error'].includes(parsedStatus) ? await loadHostServiceStatuses() : null
+    if (filteredServices) options.serviceStatusWhere = instanceServiceStatusFilter(parsedStatus as 'running' | 'stopped' | 'error', filteredServices)
     const result = await db.getInstancesPaginated(options)
+    const serviceStatuses = filteredServices ?? await loadHostServiceStatuses(result.items.map(item => item.host_id))
 
     return {
       instances: result.items.map((i: unknown) => {
@@ -856,7 +861,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           id: instance.id,
           name: instance.name,
           incusId: instance.incus_id,
-          status: instance.status,
+          status: instanceServiceStatus(instance.status, serviceStatuses.get(instance.host_id), instance.incus_id),
           image: instance.image,
           imageName: instance.image_name || null,
           cpu: instance.cpu,
@@ -2380,6 +2385,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
     const portMappings = await db.getPortMappings(instanceId)
     const host = await db.getHostById(instance.host_id)
+    const serviceStatus = (await loadHostServiceStatuses([instance.host_id])).get(instance.host_id)
     const natPublicIp = host?.nat_public_ip || null
     let hostIpAddress = host?.ip_address || null
     if (!hostIpAddress && host?.url) {
@@ -2645,7 +2651,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       id: instance.id,
       incusId: instance.incus_id,
       name: instance.name,
-      status: instance.status,
+      status: instanceServiceStatus(instance.status, serviceStatus, instance.incus_id),
       image: instance.image,
       imageName: imageName || null,
       cpu: instance.cpu,
@@ -2931,14 +2937,16 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    if (instance.status !== 'running' && instance.status !== 'error') {
+    const serviceStatus = (await loadHostServiceStatuses([instance.host_id])).get(instance.host_id)
+    if (!serviceStatus?.available || serviceStatus.pendingInstances?.includes(instance.incus_id) || (instance.status !== 'running' && instance.status !== 'error')) {
       return {
         stats: {
           cpu: { usage: 0, usagePercent: 0 },
           memory: { usage: 0, limit: instance.memory, usagePercent: 0 },
           disk: { usage: 0, limit: instance.disk, usagePercent: 0 },
           network: { bytesReceived: 0, bytesSent: 0 }
-        }
+        },
+        status: instanceServiceStatus(instance.status, serviceStatus, instance.incus_id)
       }
     }
 
@@ -3023,7 +3031,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           }
         },
         // 返回当前实例状态，便于前端及时更新
-        status: currentStatus
+        status: instanceServiceStatus(currentStatus, serviceStatus, instance.incus_id)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
@@ -3036,7 +3044,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           disk: { usage: 0, limit: instance.disk, usagePercent: 0 },
           network: { bytesReceived: 0, bytesSent: 0 }
         },
-        status: instance.status
+        status: instanceServiceStatus(instance.status, { status: 'offline', available: false })
       }
     }
   })

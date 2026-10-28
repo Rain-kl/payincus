@@ -47,7 +47,7 @@ interface Host {
   url: string
   location?: string
   countryCode: string
-  status: 'online' | 'offline' | 'maintenance'
+  status: 'online' | 'offline' | 'maintenance' | 'locked'
   instanceCount?: number
   certPath?: string
   keyPath?: string
@@ -102,12 +102,13 @@ const reinstallError = ref('')
 const statusInfo = computed(() => {
   if (!host.value) return { label: '', class: '', dot: '' }
   const map: Record<string, { label: string; class: string; dot: string }> = {
+    locked: { label: '已锁定', class: 'badge-error', dot: 'bg-red-500' },
     online: { label: t('admin.hosts.statusOnline'), class: 'badge-success', dot: 'bg-green-500' },
     offline: { label: t('admin.hosts.statusOffline'), class: 'badge-default', dot: 'bg-gray-500' },
     maintenance: { label: t('admin.hosts.statusMaintenance'), class: 'badge-warning', dot: 'bg-yellow-500' }
   }
   let currentStatus = host.value.status
-  if (currentStatus !== 'maintenance' && host.value.tunnelEnabled && !host.value.tunnelOnline) {
+  if (currentStatus !== 'locked' && currentStatus !== 'maintenance' && host.value.tunnelEnabled && !host.value.tunnelOnline) {
     currentStatus = 'offline'
   }
   return map[currentStatus] || map.offline

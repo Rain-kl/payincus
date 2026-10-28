@@ -1,3 +1,4 @@
+import { loadHostServiceStatuses } from '../lib/host-service-status.js'
 import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getStorageOverview } from '../lib/storage-capacity.js'
 import { GpuError } from '../lib/gpu.js'
@@ -840,6 +841,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       includeOwner
     })
 
+    const serviceStatuses = await loadHostServiceStatuses(result.items.map(h => h.id))
     // 获取每个宿主机的实例数量
     const hostsWithCount = await Promise.all(result.items.map(async (h: unknown) => {
       const host = h as {
@@ -882,7 +884,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         id: host.id,
         name: host.name,
         url: host.url,
-        status: deriveEffectiveHostStatus(host),
+        status: serviceStatuses.get(host.id)?.status ?? deriveEffectiveHostStatus(host),
         maintenance: deriveEffectiveHostStatus(host) === 'maintenance',
         location: host.location,
         countryCode: host.country_code || 'us',
@@ -2030,7 +2032,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         id: host.id,
         name: host.name,
         url: host.url,
-        status: effectiveStatus,
+        status: (await loadHostServiceStatuses([hostId])).get(hostId)?.status ?? effectiveStatus,
         maintenance: effectiveStatus === 'maintenance',
         location: host.location,
         countryCode: host.country_code || 'us',

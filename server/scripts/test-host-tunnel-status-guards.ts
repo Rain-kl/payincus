@@ -40,11 +40,11 @@ assert.ok(
   'hosts.ts must export and use deriveEffectiveHostStatus helper'
 )
 assert.ok(
-  hostsRouteSource.includes('status: deriveEffectiveHostStatus(host)'),
+  hostsRouteSource.includes('status: serviceStatuses.get(host.id)?.status ?? deriveEffectiveHostStatus(host)'),
   'GET / hosts list must use deriveEffectiveHostStatus'
 )
 assert.ok(
-  hostsRouteSource.includes('status: effectiveStatus') &&
+  hostsRouteSource.includes('status: (await loadHostServiceStatuses([hostId])).get(hostId)?.status ?? effectiveStatus') &&
   hostsRouteSource.includes('const effectiveStatus = deriveEffectiveHostStatus(host)'),
   'GET /:id host detail must use deriveEffectiveHostStatus'
 )
