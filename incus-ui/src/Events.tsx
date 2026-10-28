@@ -1,4 +1,4 @@
-import { useEffect, useState, type FC } from "react";
+import { useEffect, useRef, useState, type FC } from "react";
 import type { LxdEvent } from "types/event";
 import { useEventQueue } from "context/eventQueue";
 import { useAuth } from "context/auth";
@@ -172,19 +172,33 @@ const Events: FC = () => {
     };
   }, [operations, eventWs, eventQueue]);
 
+  const eventWsFailureCount = useRef(0);
+
   const connectEventWs = (retryCount = 0) => {
     try {
       const protocol = location.protocol === "https:" ? "wss" : "ws";
       const wsUrl = `${protocol}://${location.host}${ROOT_PATH}/1.0/events?type=operation,lifecycle&all-projects=true`;
       const ws = new WebSocket(wsUrl);
+      let openedAt = 0;
+      const registerFailureIfShortLived = () => {
+        // PayIncus: 连接建立后很快被关闭视为失败，指数退避，避免 events 无限刷屏重连
+        if (openedAt === 0 || Date.now() - openedAt < 5000) {
+          eventWsFailureCount.current += 1;
+        } else {
+          eventWsFailureCount.current = 0;
+        }
+      };
       ws.onopen = () => {
+        openedAt = Date.now();
         setEventWs(ws);
         setWsOpenTime(getCurrentTime());
       };
       ws.onclose = () => {
+        registerFailureIfShortLived();
         setEventWs(null);
       };
       ws.onerror = () => {
+        registerFailureIfShortLived();
         setEventWs(null);
       };
       ws.onmessage = (message: MessageEvent<Blob | string | null>) => {
@@ -247,10 +261,17 @@ const Events: FC = () => {
   };
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (!eventWs && isAuthenticated) {
-      connectEventWs();
+      const failures = eventWsFailureCount.current;
+      const delay =
+        failures > 0 ? Math.min(30000, 1000 * 2 ** (failures - 1)) : 0;
+      timer = setTimeout(() => connectEventWs(), delay);
     }
     return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
       if (eventWs) {
         eventWs.close();
       }

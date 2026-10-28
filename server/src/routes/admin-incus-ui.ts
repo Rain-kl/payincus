@@ -14,10 +14,6 @@ import { resolveCertificatePair } from '../lib/incus/certificate-paths.js'
 import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { isAccessTokenInvalidated } from '../lib/security.js'
 import {
-  checkIPConnectionLimit,
-  checkUserConnectionLimit,
-  getClientIP,
-  registerConnection,
   validateWebSocketOrigin
 } from '../lib/websocket-security.js'
 
@@ -150,6 +146,17 @@ export function extractIncusUiTicketFromSubprotocols(headerValue: string | strin
   }
 
   return { ticket, forwardProtocols }
+}
+
+const INCUS_UI_MAX_WS_PER_USER = 64
+const incusUiUserConnections = new Map<number, number>()
+
+/** ws 只允许发送 1000-1003、1007-1014、3000-4999；1005/1006 等保留码直接 close 会抛错导致另一端永不关闭。 */
+function toSendableCloseCode(code: number): number {
+  if (code === 1000 || code === 1001 || code === 1002 || code === 1003) return code
+  if (code >= 1007 && code <= 1014) return code
+  if (code >= 3000 && code <= 4999) return code
+  return 1000
 }
 
 interface CachedTunnelDispatcher {
@@ -503,13 +510,6 @@ export default async function adminIncusUiRoutes(fastify: FastifyInstance) {
       return
     }
 
-    const clientIP = getClientIP(request)
-    const ipCheck = checkIPConnectionLimit(clientIP)
-    if (!ipCheck.allowed) {
-      socket.close(4003, 'IP connection limit exceeded')
-      return
-    }
-
     // 在异步鉴权完成前先缓存客户端可能立即发出的帧
     const pendingClientMessages: Array<{ data: WebSocket.RawData; isBinary: boolean }> = []
     let upstreamReady = false
@@ -567,9 +567,10 @@ export default async function adminIncusUiRoutes(fastify: FastifyInstance) {
       return
     }
 
-    const userWsCheck = checkUserConnectionLimit(user.id)
-    if (!userWsCheck.allowed) {
-      socket.close(4003, 'WebSocket connection limit exceeded')
+    // Incus UI 单个页面会并行持有 events + 终端(data/control) + 控制台(data/control) 等多条长连接，
+    // 不能复用通用 WS 的 5/用户、10/IP 限额，否则超限后前端 events 会在 101 后被立刻关闭并无限重连。
+    if ((incusUiUserConnections.get(user.id) || 0) >= INCUS_UI_MAX_WS_PER_USER) {
+      socket.close(4008, 'WebSocket connection limit exceeded')
       return
     }
 
@@ -607,7 +608,12 @@ export default async function adminIncusUiRoutes(fastify: FastifyInstance) {
       return
     }
 
-    registerConnection(clientIP, socket as any, user.id)
+    incusUiUserConnections.set(user.id, (incusUiUserConnections.get(user.id) || 0) + 1)
+    socket.once('close', () => {
+      const remaining = (incusUiUserConnections.get(user.id) || 1) - 1
+      if (remaining > 0) incusUiUserConnections.set(user.id, remaining)
+      else incusUiUserConnections.delete(user.id)
+    })
 
     const upstreamUrl = `wss://127.0.0.1:8443${targetPath}`
     const upstream = new WebSocket(upstreamUrl, forwardProtocols.length > 0 ? forwardProtocols : undefined, {
@@ -681,7 +687,7 @@ export default async function adminIncusUiRoutes(fastify: FastifyInstance) {
     upstream.once('close', (code) => {
       try {
         if (socket.readyState === WebSocket.OPEN) {
-          socket.close(code >= 1000 && code <= 4999 ? code : 1000)
+          socket.close(toSendableCloseCode(code))
         }
       } catch {
         // ignore

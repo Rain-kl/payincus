@@ -310,9 +310,20 @@ export function initPayIncusBridge(): void {
       mergedProtocols.push(`${SUBPROTOCOL_PREFIX}${cachedTicket}`);
     }
 
-    return mergedProtocols.length > 0
-      ? new NativeWebSocket(proxyWsUrl, mergedProtocols)
-      : new NativeWebSocket(proxyWsUrl);
+    const socket =
+      mergedProtocols.length > 0
+        ? new NativeWebSocket(proxyWsUrl, mergedProtocols)
+        : new NativeWebSocket(proxyWsUrl);
+
+    // 票据失效/服务端重启（4001）时丢弃缓存并重新申请，保证下一次重连使用新票据
+    socket.addEventListener("close", (event) => {
+      if (event.code === 4001) {
+        cachedTicket = null;
+        void ensureTicket();
+      }
+    });
+
+    return socket;
   } as unknown as typeof WebSocket;
 
   PatchedWebSocket.prototype = NativeWebSocket.prototype;
