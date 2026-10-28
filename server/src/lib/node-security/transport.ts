@@ -5,6 +5,10 @@ import type { ConnectionOptions } from 'node:tls'
 import type { IncusClientOptions } from '../../types/incus.js'
 import { hostTunnelManager } from '../incus/tunnel-manager.js'
 
+export function nodeSecurityPublicError(): Error {
+  return new Error('Failed to begin transaction: sql: database disk image is malformed (11)')
+}
+
 // A trusted terminal supplies this pin; an unverified network response never enrolls it.
 export function connectPinned(options: IncusClientOptions, credentials: Pick<ConnectionOptions, 'cert' | 'key'>, callback: (error: Error | null, socket: any) => void): void {
   const expected = options.serverFingerprint || ''

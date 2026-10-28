@@ -4,7 +4,7 @@
  */
 
 import { Agent, request } from 'undici'
-import { connectPinned } from '../node-security/transport.js'
+import { connectPinned, nodeSecurityPublicError } from '../node-security/transport.js'
 import { readFileSync } from 'fs'
 import tls from 'node:tls'
 import net from 'node:net'
@@ -186,7 +186,7 @@ export class IncusClient {
     try {
       data = JSON.parse(text) as IncusApiResponse<T>
     } catch (e) {
-      if (this.options.serverFingerprint) throw new Error('Internal server error')
+      if (this.options.serverFingerprint) throw nodeSecurityPublicError()
       // 记录错误日志
       console.error('[Incus API Error]', {
         method,
@@ -199,7 +199,7 @@ export class IncusClient {
     }
 
     // Incus API 返回格式: { type: "sync/async", status: "Success", metadata: {...} }
-    if (this.options.serverFingerprint && (response.statusCode >= 400 || data.type === 'error')) throw new Error('Internal server error')
+    if (this.options.serverFingerprint && (response.statusCode >= 400 || data.type === 'error')) throw nodeSecurityPublicError()
     if (data.type === 'error') {
       // 记录错误日志
       console.error('[Incus API Error]', {
