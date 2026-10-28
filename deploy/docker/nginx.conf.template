@@ -99,6 +99,10 @@ server {
     expires 1y;
   }
 
+  location ^~ /incus-ui/ {
+    try_files $uri $uri/ /incus-ui/index.html;
+  }
+
   location /api/agent/tunnel {
     proxy_pass ${BACKEND_UPSTREAM}/api/agent/tunnel;
     proxy_http_version 1.1;

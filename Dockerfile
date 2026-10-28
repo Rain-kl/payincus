@@ -13,6 +13,7 @@ COPY server/package.json ./server/package.json
 COPY server/prisma.config.ts ./server/prisma.config.ts
 COPY server/prisma ./server/prisma
 COPY client/package.json ./client/package.json
+COPY incus-ui/package.json ./incus-ui/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build

@@ -69,6 +69,7 @@ jobs:
           pnpm --filter server test:node-security
           pnpm --filter server test:instance-advanced-config
           pnpm --filter server test:traffic-route-limit-guards
+          pnpm --filter server test:incus-ui-proxy-guards
 
       - name: Native node installer handoff
         run: sudo python3 server/scripts/test-node-distribution-shell.py

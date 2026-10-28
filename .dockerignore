@@ -1,6 +1,8 @@
 node_modules
 client/node_modules
 server/node_modules
+incus-ui/node_modules
+incus-ui/dist
 .git
 .github
 docs-site
