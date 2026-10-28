@@ -4522,6 +4522,10 @@ export default {
                 // Common
                 useLoop: 'Use loop file',
                 loopSizeHint: 'Will create image file in /var/lib/incus/',
+                loopDirectory: 'Image file directory (optional)',
+                loopDirectoryHint: 'Absolute path on the host, e.g. /data/incus-disks. Leave empty to use the default directory; the directory is created if missing and the file is named <pool>.img.',
+                preallocate: 'Preallocate disk space',
+                preallocateHint: 'Off by default: a sparse file is created and only the maximum size is reserved; blocks are allocated on demand. If the host disk fills up, the pool may fail, so avoid overcommitting. When on, the full size is allocated immediately.',
                 // ZFS
                 zfsSourceHint: 'Physical disk or partition path, e.g. /dev/disk/by-id/nvme-xxx',
                 zfsPoolName: 'ZFS Pool Name',

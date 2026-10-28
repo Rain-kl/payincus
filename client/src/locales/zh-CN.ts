@@ -4705,6 +4705,10 @@ export default {
                 // 通用
                 useLoop: '使用 Loop 文件',
                 loopSizeHint: '将在 /var/lib/incus/ 下创建镜像文件',
+                loopDirectory: '镜像文件目录（可选）',
+                loopDirectoryHint: '宿主机上的绝对路径，如 /data/incus-disks。留空使用默认目录；目录不存在会自动创建，文件名为 <底层池名>.img。',
+                preallocate: '预先分配磁盘空间',
+                preallocateHint: '默认关闭：创建稀疏文件，仅限制最大容量，按需占用磁盘。宿主机磁盘写满时存储池可能异常，请勿超卖。开启后将立即占满所选容量。',
                 // ZFS
                 zfsSourceHint: '物理盘或分区路径，如 /dev/disk/by-id/nvme-xxx',
                 zfsPoolName: 'ZFS 池名称',

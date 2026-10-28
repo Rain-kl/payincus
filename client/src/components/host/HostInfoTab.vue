@@ -698,6 +698,9 @@ function formatBytes(bytes: number): string {
               <p class="text-xs mt-0.5" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
                 {{ hostResources.cpuTotal || '-' }} {{ t('admin.hosts.agentCpuCores') }}
               </p>
+              <p v-if="hostResources.cpuModel" class="text-xs mt-0.5 break-all" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                {{ hostResources.cpuModel }}
+              </p>
             </div>
             <p class="text-lg font-semibold" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
               {{ formatPercent(hostResources.cpuUsagePercent) }}

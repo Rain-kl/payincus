@@ -132,10 +132,12 @@ const importSource = ref('')
 // 表单
 const form = ref({
   name: '',
-  driver: 'lvm' as 'zfs' | 'lvm' | 'btrfs' | 'dir',
+  driver: 'zfs' as 'zfs' | 'lvm' | 'btrfs' | 'dir',
   source: '',
   sizeValue: '',
   sizeUnit: 'GiB' as 'GiB' | 'TiB',
+  loopDirectory: '',
+  preallocate: false,
   zfsPoolName: '',
   lvmVgName: '',
   lvmUseThinpool: true,
@@ -164,6 +166,8 @@ watch(() => form.value.driver, () => {
   form.value.source = ''
   form.value.sizeValue = ''
   form.value.sizeUnit = 'GiB'
+  form.value.loopDirectory = ''
+  form.value.preallocate = false
   form.value.zfsPoolName = ''
   form.value.lvmVgName = ''
   useLoop.value = false
@@ -175,6 +179,8 @@ watch(useLoop, (enabled) => {
   } else {
     form.value.sizeValue = ''
     form.value.sizeUnit = 'GiB'
+    form.value.loopDirectory = ''
+  form.value.preallocate = false
   }
 })
 
@@ -259,10 +265,12 @@ function openCreateModal() {
   createMode.value = 'create'
   form.value = {
     name: '',
-    driver: 'lvm',
+    driver: 'zfs',
     source: '',
     sizeValue: '',
     sizeUnit: 'GiB',
+    loopDirectory: '',
+    preallocate: false,
     zfsPoolName: '',
     lvmVgName: '',
     lvmUseThinpool: true,
@@ -276,10 +284,8 @@ function openCreateModal() {
 }
 
 async function createPool() {
-  if (!form.value.name) {
-    toast.error(t('admin.hosts.storage.nameRequired'))
-    return
-  }
+  // 名称留空时默认使用 default
+  const poolName = form.value.name.trim() || 'default'
 
   creating.value = true
   try {
@@ -292,7 +298,7 @@ async function createPool() {
       }
       
       const result = await api.hosts.createStoragePool(props.hostId, {
-        name: form.value.name,
+        name: poolName,
         driver: importDriver.value,
         existingSource: importSource.value || undefined,
         description: form.value.description || undefined,
@@ -331,12 +337,14 @@ async function createPool() {
       : undefined
 
     await api.hosts.createStoragePool(props.hostId, {
-      name: form.value.name,
+      name: poolName,
       driver: form.value.driver,
       source: supportsLoop && useLoop.value ? undefined : form.value.source || undefined,
       size: sizeStr,
       useLoop: supportsLoop ? useLoop.value : undefined,
       zfsPoolName: form.value.driver === 'zfs' ? form.value.zfsPoolName || undefined : undefined,
+      preallocate: form.value.driver === 'zfs' && useLoop.value ? form.value.preallocate : undefined,
+      loopDirectory: form.value.driver === 'zfs' && useLoop.value ? form.value.loopDirectory.trim() || undefined : undefined,
       lvmVgName: form.value.driver === 'lvm' ? form.value.lvmVgName || undefined : undefined,
       lvmUseThinpool: form.value.driver === 'lvm' ? form.value.lvmUseThinpool : undefined,
       description: form.value.description || undefined,
@@ -722,6 +730,14 @@ async function submitEdit() {
                       </select>
                     </div>
                     <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.storage.loopSizeHint') }}</p>
+                    <label class="block text-xs text-themed-muted mt-3 mb-1.5">{{ t('admin.hosts.storage.loopDirectory') }}</label>
+                    <input v-model="form.loopDirectory" type="text" class="input" placeholder="/data/incus-disks" />
+                    <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.storage.loopDirectoryHint') }}</p>
+                    <div class="flex items-center gap-2 mt-3">
+                      <input id="preallocate" v-model="form.preallocate" type="checkbox" class="checkbox" />
+                      <label for="preallocate" class="text-sm text-themed">{{ t('admin.hosts.storage.preallocate') }}</label>
+                    </div>
+                    <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.storage.preallocateHint') }}</p>
                   </div>
                   <div>
                     <label class="block text-xs text-themed-muted mb-1.5">底层 ZFS 池名称（可选）</label>
@@ -833,7 +849,7 @@ async function submitEdit() {
 
             <div class="modal-footer">
               <button class="btn-secondary" @click="showCreateModal = false">{{ t('common.cancel') }}</button>
-              <button class="btn-primary" :disabled="creating || !form.name" @click="createPool">
+              <button class="btn-primary" :disabled="creating" @click="createPool">
                 <svg v-if="creating" class="w-4 h-4 animate-spin mr-1.5" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>

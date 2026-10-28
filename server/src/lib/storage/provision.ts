@@ -6,7 +6,7 @@ import { withStorageSession } from './session.js'
 import { StorageEncryptionError, poolEncryption } from './encryption.js'
 
 export interface EncryptedPoolOptions {
-  name: string; source?: string; size?: string; useLoop?: boolean; zfsPoolName?: string
+  name: string; source?: string; size?: string; directory?: string; preallocate?: boolean; useLoop?: boolean; zfsPoolName?: string
   purpose?: 'instance_data' | 'instance_storage'; description?: string
 }
 
@@ -16,6 +16,9 @@ export async function provisionEncryptedPool(hostId: number, input: EncryptedPoo
   const device = input.source?.trim() || ''
   const size = input.size?.trim() || ''
   if (!!device === !!size || (input.useLoop && device)) throw new StorageEncryptionError(400, '请选择一项：专用空磁盘或文件池容量')
+  const directory = input.directory?.trim() || ''
+  if (directory && (device || !size)) throw new StorageEncryptionError(400, '自定义目录仅适用于 Loop 文件池')
+  if (directory && (!/^\/[A-Za-z0-9_.\/-]+$/.test(directory) || directory.length > 255 || directory === '/' || directory.endsWith('/') || directory.split('/').some(seg => seg === '..' || seg === '.' || seg === '') && directory !== '/' || /^\/(dev|proc|sys)(\/|$)/.test(directory))) throw new StorageEncryptionError(400, '存储目录必须是规范的绝对路径，且不能位于 /dev、/proc、/sys')
   let sizeGiB = 0
   if (device && (!device.startsWith('/dev/') || device.includes('..'))) throw new StorageEncryptionError(400, '创建 ZFS 需要 /dev 下的专用空磁盘；已有存储请使用导入')
   if (size) {
@@ -27,6 +30,8 @@ export async function provisionEncryptedPool(hostId: number, input: EncryptedPoo
   return withStorageSession(hostId, true, async (node, vault) => {
     const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
     if (!Array.isArray(info.api_extensions) || !info.api_extensions.includes('payincus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持自动加密存储创建，请先更新节点集成包')
+    if (directory && !info.api_extensions.includes('payincus_storage_pool_dir_v1')) throw new StorageEncryptionError(409, '节点尚不支持自定义存储目录，请先更新节点集成包')
+    if (size && !info.api_extensions.includes('payincus_storage_pool_alloc_v1')) throw new StorageEncryptionError(409, '节点尚不支持按需分配的文件池，请先更新节点集成包')
     const security = await node.request<{ locked: boolean }>('GET', '/1.0/payincus/security')
     if (security.locked !== false) throw new StorageEncryptionError(423, '节点安全锁定中，不能创建存储池')
     const dataset = `${poolName}/incus`
@@ -45,7 +50,7 @@ export async function provisionEncryptedPool(hostId: number, input: EncryptedPoo
       if (!Array.isArray(paths)) throw new Error('invalid storage pool list')
       const poolPath = `/1.0/storage-pools/${encodeURIComponent(input.name)}`
       if (!paths.includes(poolPath)) {
-        const state = await node.request<{ targets: Array<{ dataset: string; fingerprint: string }> }>('POST', '/1.0/payincus/storage/pool', { name: poolName, device, sizeGiB, key })
+        const state = await node.request<{ targets: Array<{ dataset: string; fingerprint: string }> }>('POST', '/1.0/payincus/storage/pool', { name: poolName, device, sizeGiB, ...(directory ? { directory } : {}), preallocate: !!size && input.preallocate === true, key })
         if (!state.targets?.some(t => t.dataset === dataset && t.fingerprint === fp)) throw new Error('node did not confirm dataset identity')
         await node.request('POST', '/1.0/storage-pools', { name: input.name, driver: 'zfs', config: { source: dataset }, description: input.description || '' })
       }

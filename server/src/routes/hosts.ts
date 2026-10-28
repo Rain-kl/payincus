@@ -3556,6 +3556,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       size?: string
       useLoop?: boolean
       zfsPoolName?: string
+      loopDirectory?: string
+      preallocate?: boolean
       lvmVgName?: string
       lvmThinpoolName?: string
       lvmUseThinpool?: boolean
@@ -3577,6 +3579,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           size: { type: 'string' },
           useLoop: { type: 'boolean' },
           zfsPoolName: { type: 'string' },
+          loopDirectory: { type: 'string', maxLength: 255 },
+          preallocate: { type: 'boolean' },
           lvmVgName: { type: 'string' },
           lvmThinpoolName: { type: 'string' },
           lvmUseThinpool: { type: 'boolean' },
@@ -3590,7 +3594,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { user } = request
     const hostId = parsePositiveRouteId(request.params.id)
-    const { name, driver, source, size, useLoop, zfsPoolName, lvmVgName, lvmThinpoolName, lvmUseThinpool, description, purpose, useExisting, existingSource } = request.body
+    const { name, driver, source, size, useLoop, zfsPoolName, loopDirectory, preallocate, lvmVgName, lvmThinpoolName, lvmUseThinpool, description, purpose, useExisting, existingSource } = request.body
 
     if (!hostId) {
       return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
@@ -3608,7 +3612,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
     try {
       if (driver === 'zfs' && !useExisting) {
-        const created = await provisionEncryptedPool(hostId, { name, source, size, useLoop, zfsPoolName, description, purpose })
+        const created = await provisionEncryptedPool(hostId, { name, source, size, directory: loopDirectory, preallocate, useLoop, zfsPoolName, description, purpose })
         await createLog(user.id, 'host', 'storage.create', `Created encrypted ZFS storage on host #${hostId}`, 'success')
         return reply.code(201).send(created)
       }

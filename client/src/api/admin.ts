@@ -1414,6 +1414,8 @@ const api = {
       size?: string
       useLoop?: boolean
       zfsPoolName?: string
+      loopDirectory?: string
+      preallocate?: boolean
       lvmVgName?: string
       lvmUseThinpool?: boolean
       description?: string

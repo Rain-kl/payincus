@@ -5409,6 +5409,10 @@ const zhTW = {
                 // 通用
                 useLoop: '使用 Loop 檔案',
                 loopSizeHint: '將在 /var/lib/incus/ 下建立映像檔檔案',
+                loopDirectory: '映像檔目錄（可選）',
+                loopDirectoryHint: '宿主機上的絕對路徑，如 /data/incus-disks。留空使用預設目錄；目錄不存在會自動建立，檔名為 <底層池名>.img。',
+                preallocate: '預先分配磁碟空間',
+                preallocateHint: '預設關閉：建立稀疏檔案，僅限制最大容量，按需佔用磁碟。宿主機磁碟寫滿時儲存池可能異常，請勿超賣。開啟後將立即佔滿所選容量。',
                 // ZFS
                 zfsSourceHint: '實體碟或分割區路徑，如 /dev/disk/by-id/nvme-xxx',
                 zfsPoolName: 'ZFS 池名稱',

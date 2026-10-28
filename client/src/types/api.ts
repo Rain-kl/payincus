@@ -1149,6 +1149,7 @@ export interface HostAgentStatus {
     }
     resources?: {
       cpuTotal?: number
+      cpuModel?: string
       cpuUsagePercent?: number
       memoryTotalMb?: number
       memoryUsedMb?: number
