@@ -10,6 +10,13 @@ export interface EncryptedPoolOptions {
   purpose?: 'instance_data' | 'instance_storage'; description?: string
 }
 
+/** 文件池目录：规范绝对路径（无空段、`.`、`..`、尾部斜杠），且不在 /dev、/proc、/sys 下。 */
+export function isValidPoolDirectory(directory: string): boolean {
+  if (!/^\/[A-Za-z0-9_.\/-]+$/.test(directory) || directory.length > 255 || directory.endsWith('/')) return false
+  if (directory.split('/').slice(1).some(seg => seg === '' || seg === '.' || seg === '..')) return false
+  return !/^\/(dev|proc|sys)(\/|$)/.test(directory)
+}
+
 export async function provisionEncryptedPool(hostId: number, input: EncryptedPoolOptions) {
   const poolName = input.zfsPoolName?.trim() || input.name
   if (!/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(poolName) || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/.test(input.name)) throw new StorageEncryptionError(400, '存储池名称格式不正确')
@@ -18,7 +25,7 @@ export async function provisionEncryptedPool(hostId: number, input: EncryptedPoo
   if (!!device === !!size || (input.useLoop && device)) throw new StorageEncryptionError(400, '请选择一项：专用空磁盘或文件池容量')
   const directory = input.directory?.trim() || ''
   if (directory && (device || !size)) throw new StorageEncryptionError(400, '自定义目录仅适用于 Loop 文件池')
-  if (directory && (!/^\/[A-Za-z0-9_.\/-]+$/.test(directory) || directory.length > 255 || directory === '/' || directory.endsWith('/') || directory.split('/').some(seg => seg === '..' || seg === '.' || seg === '') && directory !== '/' || /^\/(dev|proc|sys)(\/|$)/.test(directory))) throw new StorageEncryptionError(400, '存储目录必须是规范的绝对路径，且不能位于 /dev、/proc、/sys')
+  if (directory && !isValidPoolDirectory(directory)) throw new StorageEncryptionError(400, '存储目录必须是规范的绝对路径，且不能位于 /dev、/proc、/sys')
   let sizeGiB = 0
   if (device && (!device.startsWith('/dev/') || device.includes('..'))) throw new StorageEncryptionError(400, '创建 ZFS 需要 /dev 下的专用空磁盘；已有存储请使用导入')
   if (size) {

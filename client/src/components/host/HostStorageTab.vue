@@ -180,7 +180,7 @@ watch(useLoop, (enabled) => {
     form.value.sizeValue = ''
     form.value.sizeUnit = 'GiB'
     form.value.loopDirectory = ''
-  form.value.preallocate = false
+    form.value.preallocate = false
   }
 })
 

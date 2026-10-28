@@ -66,6 +66,7 @@ jobs:
           pnpm --filter server test:egress
           pnpm --filter server test:package-egress
           pnpm --filter server test:node-distribution
+          pnpm --filter server test:storage-pool-directory
 
       - name: Node administration contracts
         env:
