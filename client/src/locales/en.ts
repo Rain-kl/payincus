@@ -4486,6 +4486,12 @@ export default {
             agentProcessCount: 'Process Count',
             // Storage pool management
             storage: {
+                statusReady: 'Ready',
+                statusPending: 'Awaiting report',
+                statusUnavailable: 'Unavailable',
+                statusMissing: 'Missing on node',
+                statusLocked: 'Locked',
+
                 title: 'Storage Pools',
                 subtitle: 'Manage Incus storage pools on this host',
                 create: 'Add Storage Pool',

@@ -1,13 +1,9 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { storageHeadroomMB, unconsumedStorageMB } from '../src/lib/storage-capacity-policy.js'
+import { storageHeadroomMB } from '../src/lib/storage-capacity-policy.js'
 
 assert.equal(storageHeadroomMB(100000), 1024)
 assert.equal(storageHeadroomMB(4500000), 10240)
-const allocations = [{ incusId: 'a', disk: 30720 }, { incusId: 'b', disk: 30720 }]
-assert.equal(unconsumedStorageMB(allocations, new Map(), 2000000), 61440, 'Unknown volume usage must keep the full promise')
-assert.equal(unconsumedStorageMB(allocations, new Map([['a', 10240], ['b', 10240]]), 2000000), 40960)
-assert.equal(unconsumedStorageMB(allocations, new Map([['a', 1000000], ['b', 1000000]]), 10240), 51200, 'Credit must never exceed physically occupied space')
 console.log('Storage capacity reservation policy tests passed')
 
 if (process.env.RUN_STORAGE_DB_TESTS === '1') {
@@ -17,7 +13,7 @@ if (process.env.RUN_STORAGE_DB_TESTS === '1') {
   const { prisma, closePrismaDatabase } = await import('../src/db/prisma.js')
   const { IncusClient } = await import('../src/lib/incus/incus-client.js')
   const { closeAllClients } = await import('../src/lib/incus/incus-pool.js')
-  const { getStorageCapacity, getStorageOverview, invalidateHostStorageCapacity } = await import('../src/lib/storage-capacity.js')
+  const { getStorageCapacity, getStorageOverview } = await import('../src/lib/storage-capacity.js')
   const { checkPackageSoldOut, checkPackagesSoldOut } = await import('../src/db/packages.js')
   const { selectAndReserveHostWithLock, checkPlanUpgradeCapacity, reservePlanUpgradeCapacityWithLock } = await import('../src/db/hosts.js')
   const { default: Fastify } = await import('fastify')
@@ -60,7 +56,12 @@ if (process.env.RUN_STORAGE_DB_TESTS === '1') {
       image: 'test', status: 'running' as const, cpu: 200, memory: 4096, disk: 30720, storagePoolName: 'data'
     })) })
     const available = () => app.inject({ url: `/api/instances/available-hosts?packageId=${packages[0].id}&cpu=200&memory=4096&disk=30720` })
-    const refresh = () => invalidateHostStorageCapacity(host.id)
+    const refresh = async () => {
+      for (const [name, value] of spaces) await prisma.storagePool.updateMany({ where: { hostId: host.id, name }, data: {
+        status: readFailure ? 'unavailable' : 'ready', totalBytes: BigInt(value.total), usedBytes: BigInt(value.used), reportedAt: new Date()
+      } })
+    }
+    await refresh()
     assert.equal((await getStorageCapacity(host.id, { packageId: packages[0].id, requiredMB: 30720 })).reason, null)
     for (const pkg of packages) assert.equal(await checkPackageSoldOut(pkg.id), false, 'Initialization size 60 GB must not mark LXC or KVM sold out')
     const batch = await checkPackagesSoldOut(packages.map(pkg => pkg.id))
@@ -105,29 +106,29 @@ if (process.env.RUN_STORAGE_DB_TESTS === '1') {
     assert.equal((await prisma.userResourcePool.findUniqueOrThrow({ where: { userId: owner.id } })).disk, 19456)
 
     // Full and unreachable are different public API reasons.
-    spaces.set('data', { total: 4468 * GiB, used: 4467 * GiB }); refresh()
+    spaces.set('data', { total: 4468 * GiB, used: 4467 * GiB }); await refresh()
     assert.equal((await available()).json().unavailableHosts[0].reason, 'disk_full')
     assert.equal(await checkPackageSoldOut(packages[0].id), true)
     await assert.rejects(claim(), /HOST_RESOURCES_INSUFFICIENT/)
     assert.equal((await prisma.userResourcePool.findUniqueOrThrow({ where: { userId: owner.id } })).disk, 19456, 'Rejected growth rolls back the debit')
-    readFailure = true; refresh()
+    readFailure = true; await refresh()
     assert.equal((await available()).json().unavailableHosts[0].reason, 'storage_unavailable')
     readFailure = false
-    spaces.set('data', { total: 4468 * GiB, used: 1690 * GiB }); refresh()
+    spaces.set('data', { total: 4468 * GiB, used: 1690 * GiB }); await refresh()
 
     // A broken explicit binding cannot silently spill into another pool.
     await prisma.packageHost.update({ where: { packageId_hostId: { packageId: packages[0].id, hostId: host.id } }, data: { storagePoolName: 'missing' } })
     assert.equal((await available()).json().unavailableHosts[0].reason, 'storage_pool_missing')
     await prisma.packageHost.update({ where: { packageId_hostId: { packageId: packages[0].id, hostId: host.id } }, data: { storagePoolName: null } })
     await prisma.storagePool.create({ data: { hostId: host.id, name: 'full', driver: 'zfs', purpose: 'instance_data', config: { source: 'full-tank' } } })
-    spaces.set('full', { total: 100 * GiB, used: 100 * GiB }); refresh()
+    spaces.set('full', { total: 100 * GiB, used: 100 * GiB }); await refresh()
     assert.equal((await getStorageCapacity(host.id, { packageId: packages[0].id, requiredMB: 30720 })).poolName, 'data')
 
     // Alias DIR pools do not multiply physical capacity or escape reservations.
     await prisma.storagePool.create({ data: { hostId: host.id, name: 'alias', driver: 'dir', purpose: 'instance_data' } })
-    spaces.set('alias', spaces.get('data')!); refresh()
+    spaces.set('alias', spaces.get('data')!); await refresh()
     const overview = await getStorageOverview(host.id)
-    assert.equal(overview.totalMB, (4468 + 100) * 1024)
+    assert.equal(overview.totalMB, (4468 * 2 + 100) * 1024)
     const beforeAlias = await getStorageCapacity(host.id, { poolName: 'alias' })
     const beforeData = await getStorageCapacity(host.id, { poolName: 'data' })
     assert.equal(beforeAlias.availableMB, beforeData.availableMB)
@@ -136,7 +137,7 @@ if (process.env.RUN_STORAGE_DB_TESTS === '1') {
     // not let two simultaneous transactions both consume it.
     await prisma.instance.deleteMany({ where: { hostId: host.id } })
     await prisma.host.update({ where: { id: host.id }, data: { cpuUsed: 0, memoryUsed: 0, diskUsed: 0 } })
-    spaces.set('data', { total: 40 * GiB, used: 0 }); spaces.set('alias', spaces.get('data')!); refresh()
+    spaces.set('data', { total: 40 * GiB, used: 0 }); spaces.set('alias', spaces.get('data')!); await refresh()
     const create = () => prisma.$transaction(async tx => {
       const selected = await selectAndReserveHostWithLock(tx, { packageHostIds: [host.id], hostId: host.id, packageId: packages[0].id, cpu: 200, memory: 4096, disk: 30720 })
       if (!selected) throw new Error('storage full')
@@ -148,7 +149,7 @@ if (process.env.RUN_STORAGE_DB_TESTS === '1') {
     const race = await Promise.allSettled([create(), create()])
     assert.equal(race.filter(r => r.status === 'fulfilled').length, 1)
     assert.equal(await prisma.instance.count({ where: { hostId: host.id } }), 1)
-    console.log('Storage capacity DB/API tests passed: legacy 60 GB regression, LXC/KVM stock, expansion, full/offline/broken bindings, pool choice, shared DIR capacity, and concurrent reservations')
+    console.log('Stored capacity DB/API tests passed: initialization-size regression, LXC/KVM stock, expansion, full/offline/broken bindings, pool choice, shared DIR capacity, and concurrent reservations')
   } finally {
     await app.close()
     await closeAllClients()

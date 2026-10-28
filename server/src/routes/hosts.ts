@@ -1,3 +1,5 @@
+import { storedStoragePools } from '../lib/storage/read-model.js'
+import { resizeStoragePool } from '../lib/storage/resize.js'
 import { importEncryptedPool } from '../lib/storage/import.js'
 import { deleteManagedZfsPool } from '../lib/storage/delete.js'
 import { provisionEncryptedPool } from '../lib/storage/provision.js'
@@ -17,9 +19,6 @@ import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
-import tls from 'tls'
-import net from 'node:net'
-import { Agent, request as undiciRequest } from 'undici'
 import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
 import { caddyInstallRequested, caddyUninstallRequested } from './agent.js'
@@ -41,7 +40,7 @@ import { IncusClient, getIncusClient, removeIncusClient } from '../lib/incus/ind
 import { deriveEffectiveHostStatus, hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { getInstance, updateInstance } from '../lib/incus/incus-instances.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
-import { listStoragePools, getStoragePoolResources, createStoragePool, deleteStoragePool, updateStoragePool } from '../lib/incus/incus-storage.js'
+import { createStoragePool, deleteStoragePool, updateStoragePool } from '../lib/incus/incus-storage.js'
 import type { CreateHostRequest, UpdateHostRequest } from '../types/api.js'
 import type { Host } from '../types/database.js'
 import { validateName, validateUrl, validateIpAddress, validateIdentifier, validateIpOrDomain, encryptSensitiveData } from '../lib/security.js'
@@ -661,49 +660,6 @@ async function generateUniqueOwnedName(
 }
 
 /**
- * 从 Incus resources 数据中提取宿主机的公网 IPv6 地址
- * 遍历网卡的地址列表，查找 scope=global 的 IPv6 地址
- * 排除 link-local (fe80::) 和 unique-local (fd/fc) 地址
- */
-function extractHostPublicIpv6FromResources(resources: Record<string, unknown>): string | null {
-  try {
-    const network = resources.network as { cards?: Array<{ addresses?: Array<{ address?: string; family?: string; scope?: string }>; ports?: Array<{ addresses?: Array<{ address?: string; family?: string; scope?: string }> }> }> } | undefined
-    if (!network?.cards) return null
-
-    for (const card of network.cards) {
-      // 直接检查网卡地址
-      const addresses = card.addresses || []
-      for (const addr of addresses) {
-        if (addr.family === 'inet6' && addr.scope === 'global' && addr.address) {
-          const ip = addr.address
-          // 排除 link-local、unique-local 地址
-          if (!ip.startsWith('fe80:') && !ip.startsWith('fd') && !ip.startsWith('fc')) {
-            return ip
-          }
-        }
-      }
-      // 检查端口上的地址
-      if (card.ports) {
-        for (const port of card.ports) {
-          const portAddresses = port.addresses || []
-          for (const addr of portAddresses) {
-            if (addr.family === 'inet6' && addr.scope === 'global' && addr.address) {
-              const ip = addr.address
-              if (!ip.startsWith('fe80:') && !ip.startsWith('fd') && !ip.startsWith('fc')) {
-                return ip
-              }
-            }
-          }
-        }
-      }
-    }
-  } catch {
-    // 忽略解析失败
-  }
-  return null
-}
-
-/**
  * 从请求上下文推导面板访问地址
  * 优先级：SITE_URL/FRONTEND_URL 环境变量 > Origin/Referer 头 > Host 头拼接
  */
@@ -898,7 +854,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         resources: {
           cpuUsed: host.cpu_used,
           memoryUsed: host.memory_used,
-          diskTotal: host.disk_total, // 计算值，来自 storage_size * 1024
+          diskTotal: host.disk_total, // 数据库中的存储池容量
           diskUsed: host.disk_used
         },
         cpuAllowanceMax: host.cpu_allowance_max || 0,
@@ -1281,35 +1237,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           serverInfo.environment?.kernel_architecture ||
           serverInfo.environment?.architectures?.[0]
         )
-        const resources = await client.getResources() as {
-          cpu?: { total?: number }
-          memory?: { total?: number }
-          storage?: {
-            disks?: Array<{ size?: number }>
-            pools?: Record<string, { space?: { total?: number } }>
-            total?: number
-          }
-        }
-
-        // 获取磁盘大小
-        let diskTotalBytes = 0
-        if (resources.storage?.disks && Array.isArray(resources.storage.disks) && resources.storage.disks.length > 0) {
-          diskTotalBytes = resources.storage.disks.reduce((sum: number, disk: { size?: number }) => sum + (disk.size || 0), 0)
-        }
-        if (diskTotalBytes === 0 && resources.storage?.pools) {
-          for (const pool of Object.values(resources.storage.pools)) {
-            const poolData = pool as { space?: { total?: number } }
-            diskTotalBytes += poolData.space?.total || 0
-          }
-        }
-        if (diskTotalBytes === 0) {
-          diskTotalBytes = 1024 * 1024 * 1024 * 1024 // 默认 1TB
-        }
-
-        const cpuTotal = resources.cpu?.total || 0
-        const memoryTotalMB = Math.round((resources.memory?.total || 0) / 1024 / 1024)
-        const diskTotalMB = Math.round(diskTotalBytes / 1024 / 1024)
-
         // 只更新宿主机状态为在线，不覆盖任何用户输入的信息
         await db.updateHostStatus(hostId, 'online')
 
@@ -1325,11 +1252,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
         await client.close()
         autoConnected = true
-        resourceInfo = {
-          cpuTotal,
-          memoryTotalGB: Math.round(memoryTotalMB / 1024),
-          diskTotalGB: Math.round(diskTotalMB / 1024)
-        }
+        hostTunnelManager.requestHeartbeat(hostId)
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.warn(`自动连接节点 ${name} 失败: ${errorMessage}`)
@@ -1613,244 +1536,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    // 检查是否有待验证的安装会话（证书模式不再需要 installToken，但保留过期检查）
-    const fullHost = await prisma.host.findUnique({
-      where: { id: hostId },
-      select: { installTokenExpire: true, url: true, isInstalled: true }
-    })
-
-    if (fullHost?.isInstalled) {
-      return reply.code(400).send({ error: '该宿主机已完成安装，无需再次验证' })
-    }
-
-    // 检查是否过期
-    if (fullHost?.installTokenExpire && new Date() > fullHost.installTokenExpire) {
-      return reply.code(400).send({ error: '安装会话已过期，请删除宿主机后重新创建' })
-    }
-
-    // 直接使用存储的 url 字段，无需重新拼接（避免 IPv6 地址丢失方括号的问题）
-    const urlObj = new URL(host.url)
-    const hostPort = urlObj.port || '8443'
-    const baseUrl = `${urlObj.protocol}//${urlObj.host}`
-
-    // 准备证书路径
-    const { certPath, keyPath } = getPanelCertificatePaths()
-
-    let cert: Buffer
-    let key: Buffer
-
-    try {
-      cert = readFileSync(certPath)
-      key = readFileSync(keyPath)
-    } catch (err) {
-      request.log.error(err, 'Failed to read panel certificate files')
-      return reply.code(500).send({ error: '面板证书文件读取失败，请检查服务器配置' })
-    }
-
-    // 创建 undici Agent（携带面板的 Client 证书）
-    const isTunnel = (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false
-    let panelAgent: Agent
-    if (isTunnel) {
-      if (!hostTunnelManager.isTunnelOnline(host.id)) {
-        return reply.code(400).send({ error: '宿主机内网穿透通道未连接（Agent 离线），请确保 Agent 正常运行后再点击验证' })
-      }
-      panelAgent = new Agent({
-        connect: (_opts: any, cb: (err: Error | null, socket: any) => void) => {
-          try {
-            const duplex = hostTunnelManager.createDuplexStream(
-              host.id,
-              (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
-              (host as any).targetPort ?? (host as any).target_port ?? 8443
-            )
-            const rawHost = _opts?.servername || _opts?.hostname
-            const servername = rawHost && !net.isIP(rawHost) ? rawHost : undefined
-            const tlsSocket = tls.connect({
-              socket: duplex,
-              cert,
-              key,
-              rejectUnauthorized: false,
-              servername
-            })
-            let cbCalled = false
-            tlsSocket.once('secureConnect', () => {
-              if (!cbCalled) {
-                cbCalled = true
-                cb(null, tlsSocket)
-              }
-            })
-            tlsSocket.once('error', (err) => {
-              if (!cbCalled) {
-                cbCalled = true
-                cb(err, null as any)
-              }
-            })
-          } catch (err: any) {
-            cb(err, null as any)
-          }
-        },
-        headersTimeout: 120000,
-        bodyTimeout: 300000
-      })
-    } else {
-      panelAgent = new Agent({
-        connect: {
-          cert,
-          key,
-          rejectUnauthorized: false  // 首次连接必须忽略宿主机的自签名证书错误
-        },
-        headersTimeout: 120000,
-        bodyTimeout: 300000
-      })
-    }
-
-    try {
-      // 证书模式：证书已在安装脚本中导入，直接测试连接
-      request.log.info(`Attempting to verify host at ${baseUrl}`)
-
-      // 直接获取资源信息（测试连接）
-      const resourcesUrl = `${baseUrl}/1.0/resources`
-      const serverInfoUrl = `${baseUrl}/1.0`
-      
-      const resourcesRes = await undiciRequest(resourcesUrl, {
-        method: 'GET',
-        dispatcher: panelAgent
-      })
-      const resourcesText = await resourcesRes.body.text()
-      
-      // 只在解析失败时记录错误日志
-      let resourcesData
-      try {
-        resourcesData = JSON.parse(resourcesText)
-      } catch {
-        console.error('[Incus API Error]', {
-          method: 'GET',
-          url: resourcesUrl,
-          statusCode: resourcesRes.statusCode,
-          error: `解析响应失败: ${resourcesText.substring(0, 200)}`
-        })
-        throw new Error(`无效的响应: ${resourcesText.substring(0, 100)}`)
-      }
-      const resources = resourcesData?.metadata || {}
-
-      const serverInfoRes = await undiciRequest(serverInfoUrl, {
-        method: 'GET',
-        dispatcher: panelAgent
-      })
-      const serverInfoText = await serverInfoRes.body.text()
-      let serverInfoData
-      try {
-        serverInfoData = JSON.parse(serverInfoText)
-      } catch {
-        console.error('[Incus API Error]', {
-          method: 'GET',
-          url: serverInfoUrl,
-          statusCode: serverInfoRes.statusCode,
-          error: `解析响应失败: ${serverInfoText.substring(0, 200)}`
-        })
-        throw new Error(`无效的服务器信息响应: ${serverInfoText.substring(0, 100)}`)
-      }
-      const hostArchitecture = normalizeArchitecture(
-        serverInfoData?.metadata?.environment?.kernel_architecture ||
-        serverInfoData?.metadata?.environment?.architectures?.[0]
-      )
-
-      // 获取磁盘大小
-      let diskTotalBytes = 0
-      if (resources.storage?.disks && Array.isArray(resources.storage.disks)) {
-        diskTotalBytes = resources.storage.disks.reduce((sum: number, disk: { size?: number }) => sum + (disk.size || 0), 0)
-      }
-      if (diskTotalBytes === 0 && resources.storage?.pools) {
-        for (const pool of Object.values(resources.storage.pools)) {
-          const poolData = pool as { space?: { total?: number } }
-          diskTotalBytes += poolData.space?.total || 0
-        }
-      }
-      if (diskTotalBytes === 0) {
-        diskTotalBytes = 1024 * 1024 * 1024 * 1024 // 默认 1TB
-      }
-
-      const cpuTotal = resources.cpu?.total || 0
-      const memoryTotalMB = Math.round((resources.memory?.total || 0) / 1024 / 1024)
-      const diskTotalMB = Math.round(diskTotalBytes / 1024 / 1024)
-
-      // 自动检测宿主机公网 IPv6 地址
-      const detectedIpv6 = extractHostPublicIpv6FromResources(resources)
-
-      // 只更新连接状态和证书路径，不覆盖任何用户输入的信息
-      const updateData: Record<string, unknown> = {
-        status: 'online',
-        isInstalled: true,
-        installToken: null,  // 清空 installToken（已不再需要）
-        installTokenExpire: null,
-        certDownloadCount: 0,  // 重置下载次数
-        certDownloadExpire: null,  // 清空证书下载有效期
-        certPath: certPath,
-        keyPath: keyPath,
-        architecture: hostArchitecture
-      }
-      // 仅在检测到 IPv6 且当前未手动配置时自动填入
-      if (detectedIpv6) {
-        const currentHost = await prisma.host.findUnique({
-          where: { id: hostId },
-          select: { natPublicIpv6: true }
-        })
-        if (!currentHost?.natPublicIpv6) {
-          updateData.natPublicIpv6 = detectedIpv6
-          request.log.info(`Auto-detected host IPv6: ${detectedIpv6} for host ${host.name}`)
-        }
-      }
-      await prisma.host.update({
-        where: { id: hostId },
-        data: updateData
-      })
-
-      await createLog(
-        user.id,
-        'host',
-        'host.verify',
-        `Verified and connected host "${host.name}" [arch: ${hostArchitecture}, CPU: ${cpuTotal} cores, Memory: ${Math.round(memoryTotalMB / 1024)}GB, Disk: ${Math.round(diskTotalMB / 1024)}GB]`,
-        'success'
-      )
-
-      return {
-        success: true,
-        message: '纳管成功',
-        resources: {
-          cpuTotal,
-          memoryTotalGB: Math.round(memoryTotalMB / 1024),
-          diskTotalGB: Math.round(diskTotalMB / 1024)
-        },
-        architecture: hostArchitecture
-      }
-
-    } catch (err: any) {
-      const errorMessage = err.message || String(err)
-      request.log.error({ err, baseUrl }, 'Host verification failed')
-
-      // 根据错误类型返回友好提示
-      if (errorMessage.includes('ECONNREFUSED')) {
-        return reply.code(400).send({
-          error: `连接被拒绝：请检查宿主机防火墙是否放行 TCP ${hostPort} 端口，以及 Incus 服务是否正在运行`
-        })
-      }
-      if (errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ECONNRESET')) {
-        return reply.code(400).send({
-          error: '连接超时：请检查网络连通性和防火墙设置'
-        })
-      }
-      if (errorMessage.includes('not authorized') || errorMessage.includes('certificate') || errorMessage.includes('unauthorized')) {
-        return reply.code(400).send({
-          error: '认证失败：证书未正确导入，请确认安装脚本已正确执行并成功导入面板证书'
-        })
-      }
-
-      return reply.code(400).send({
-        error: `连接失败：${errorMessage}`
-      })
-    } finally {
-      // 关闭 agent
-      await panelAgent.close()
-    }
+    if (!hostTunnelManager.requestHeartbeat(hostId)) return reply.code(409).send({ error: '节点连接不可用或不支持立即上报，请检查节点版本与连接' })
+    return reply.code(202).send({ success: true, queued: true, message: '已通知节点立即上报心跳' })
   })
 
   // 兼容旧客户端：统一生成 Incus 节点接入命令，不清除已有安装状态或证书。
@@ -1935,63 +1622,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(400).send(apiError(ErrorCode.HOST_CERT_NOT_CONFIGURED))
     }
 
-    try {
-      const client = new IncusClient({
-        url: host.url,
-        certPath: host.cert_path,
-        keyPath: host.key_path,
-        tunnelEnabled: (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false,
-        hostId: host.id,
-        targetHost: (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
-        targetPort: (host as any).targetPort ?? (host as any).target_port ?? 8443
-      })
-
-      // 仅测试连通性：尝试连接并获取服务器信息
-      const serverInfo = await client.connect() as {
-        api_version?: string
-        environment?: {
-          server_name?: string
-          kernel_architecture?: string
-          architectures?: string[]
-        }
-      }
-
-      const hostArchitecture = normalizeArchitecture(
-        serverInfo.environment?.kernel_architecture ||
-        serverInfo.environment?.architectures?.[0]
-      )
-
-      await db.updateHostResources(hostId, {
-        architecture: hostArchitecture
-      })
-
-      if (host.status === 'offline') {
-        await db.updateHostStatus(hostId, 'online')
-      }
-
-      await client.close()
-
-      return {
-        success: true,
-        message: 'Connection successful',
-        serverInfo: {
-          apiVersion: serverInfo.api_version,
-          environment: serverInfo.environment?.server_name,
-          architecture: hostArchitecture
-        }
-      }
-    } catch (error) {
-      if (host.status === 'online') {
-        await db.updateHostStatus(hostId, 'offline')
-      }
-
-      const errorMessage = error instanceof Error ? error.message : String(error)
-
-      return reply.code(400).send({
-        success: false,
-        error: errorMessage
-      })
-    }
+    if (!hostTunnelManager.requestHeartbeat(hostId)) return reply.code(409).send({ error: '节点连接不可用或不支持立即上报，请检查节点版本与连接' })
+    return reply.code(202).send({ success: true, queued: true, message: '已通知节点立即上报心跳' })
   })
 
   // 获取宿主机详情（支持节点所有者）
@@ -2047,8 +1679,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         resources: {
           cpuUsed: host.cpu_used,
           memoryUsed: host.memory_used,
-          diskTotal: diskTotalMB, // 使用存储池的实际大小，如果无法获取则使用默认值
-          diskUsed: host.disk_used
+          diskTotal: diskTotalMB, // 数据库中登记的系统盘池容量之和
+          diskUsed: storage.allocatedMB
         },
         cpuAllowanceMax: host.cpu_allowance_max || 0,
         memoryMax: host.memory_max || 0,
@@ -2804,77 +2436,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    try {
-      const client = await getIncusClient(host)
-
-      // 获取资源信息（物理资源）
-      const resources = await client.getResources() as {
-        cpu?: { total?: number }
-        memory?: { total?: number }
-        storage?: {
-          disks?: Array<{ size?: number }>
-          pools?: Record<string, { space?: { total?: number } }>
-          total?: number
-        }
-      }
-
-      // 获取磁盘大小
-      let diskTotalBytes = 0
-      if (resources.storage?.disks && Array.isArray(resources.storage.disks) && resources.storage.disks.length > 0) {
-        diskTotalBytes = resources.storage.disks.reduce((sum: number, disk: { size?: number }) => sum + (disk.size || 0), 0)
-      }
-      if (diskTotalBytes === 0 && resources.storage?.pools) {
-        for (const pool of Object.values(resources.storage.pools)) {
-          const poolData = pool as { space?: { total?: number } }
-          diskTotalBytes += poolData.space?.total || 0
-        }
-      }
-      if (diskTotalBytes === 0) {
-        diskTotalBytes = 1024 * 1024 * 1024 * 1024 // 默认 1TB
-      }
-
-      // 只更新宿主机状态为在线，不覆盖任何用户输入的信息
-      await db.updateHostStatus(hostId, 'online')
-
-      // 自动检测宿主机公网 IPv6（仅在未手动配置时自动填入）
-      const detectedIpv6 = extractHostPublicIpv6FromResources(resources as Record<string, unknown>)
-      if (detectedIpv6 && !host.nat_public_ipv6) {
-        await prisma.host.update({
-          where: { id: hostId },
-          data: { natPublicIpv6: detectedIpv6 }
-        })
-        request.log.info(`[sync] Auto-detected host IPv6: ${detectedIpv6} for host ${host.name}`)
-      }
-
-      // 基于数据库实例统计已用资源（排除已删除的实例）
-      const usedResources = await db.calculateHostResourcesFromInstances(hostId)
-
-      // 只更新资源使用情况（已用资源），不修改用户设置的上限
-      await db.updateHostResources(hostId, {
-        cpuUsed: usedResources.cpuUsed,
-        memoryUsed: usedResources.memoryUsed,
-        diskUsed: usedResources.diskUsed
-      })
-
-      // 获取实例数量（用于返回）
-      const instanceCount = await db.getInstanceCountByHost(hostId)
-
-      return {
-        message: 'Sync completed',
-        instances: instanceCount,
-        resources: {
-          cpuUsed: usedResources.cpuUsed,
-          memoryUsed: usedResources.memoryUsed,
-          diskUsed: usedResources.diskUsed
-        }
-      }
-    } catch (error) {
-      if (host.status === 'online') {
-        await db.updateHostStatus(hostId, 'offline')
-      }
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      return reply.code(500).send({ error: errorMessage })
-    }
+    if (!hostTunnelManager.requestHeartbeat(hostId)) return reply.code(409).send({ error: '节点连接不可用或不支持立即上报，请检查节点版本与连接' })
+    return reply.code(202).send({ message: '已通知节点立即上报心跳', queued: true })
   })
 
   // 批量删除实例预览（计算退款信息）
@@ -3478,67 +3041,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    const dbPools = await db.getStoragePoolsByHostId(hostId)
-
-    try {
-      const client = await getIncusClient(host)
-      const pools = await listStoragePools(client)
-
-      // 从数据库获取存储池的用途信息
-      const purposeMap = new Map(dbPools.map(p => [p.name, p.purpose]))
-      const pendingImports = new Set(dbPools.filter(p => p.config && typeof p.config === 'object' && '_payincusImport' in p.config).map(p => p.name))
-
-      // 获取每个存储池的资源使用情况
-      const poolsWithResources = await Promise.all(
-        pools.map(async (pool) => {
-          try {
-            const resources = await getStoragePoolResources(client, pool.name)
-            return {
-              name: pool.name,
-              pendingImport: pendingImports.has(pool.name),
-              driver: pool.driver,
-              status: pool.status || 'Created',
-              description: pool.description || '',
-              purpose: purposeMap.get(pool.name) || null,
-              config: pool.config || {},
-              usedBy: pool.used_by?.length || 0,
-              space: resources.space || null
-            }
-          } catch {
-            return {
-              name: pool.name,
-              pendingImport: pendingImports.has(pool.name),
-              driver: pool.driver,
-              status: pool.status || 'Created',
-              description: pool.description || '',
-              purpose: purposeMap.get(pool.name) || null,
-              config: pool.config || {},
-              usedBy: pool.used_by?.length || 0,
-              space: null
-            }
-          }
-        })
-      )
-
-      const pendingPools = dbPools.filter(p => p.driver === 'zfs' && p.config && typeof p.config === 'object' && !Array.isArray(p.config) && '_payincusImport' in p.config && !poolsWithResources.some(actual => actual.name === p.name))
-      return { pools: [...poolsWithResources, ...pendingPools.map(pool => ({ name: pool.name, driver: 'zfs', status: 'Pending', description: pool.description || '', purpose: pool.purpose, config: pool.config || {}, usedBy: 0, space: null, pendingImport: true }))] }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      request.log.warn(err, 'Falling back to database storage pools')
-      return {
-        pools: dbPools.map(pool => ({
-          name: pool.name,
-          driver: pool.driver,
-          status: 'Unavailable',
-          description: pool.description || '',
-          purpose: pool.purpose,
-          config: pool.config || {},
-          usedBy: 0,
-          space: null
-        })),
-        warning: `无法连接到 Incus，已显示数据库中登记的存储池: ${errorMessage}`
-      }
-    }
+    return { pools: await storedStoragePools(hostId) }
   })
 
   // 创建存储池
@@ -3661,6 +3164,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             'success'
           )
 
+          hostTunnelManager.requestHeartbeat(hostId)
           return reply.code(201).send({ message: '存储池关联成功', name, driver: poolInfo.driver })
         }
 
@@ -3727,6 +3231,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           'success'
         )
 
+        hostTunnelManager.requestHeartbeat(hostId)
         return reply.code(201).send({ 
           message: '存储池导入成功', 
           name, 
@@ -3786,15 +3291,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
       await createStoragePool(client, { name, driver, config })
 
-      // 保存到数据库
-      await db.createStoragePool({
-        hostId,
-        name,
-        driver,
-        purpose: purpose || 'instance_data',
-        description: description || null,
-        config
-      })
+      // Persist normalized node configuration; later reads use only this record and heartbeat metrics.
+      const actual = await client.request<{ config: Record<string, string> }>('GET', `/1.0/storage-pools/${encodeURIComponent(name)}`)
+      await db.createStoragePool({ hostId, name, driver, purpose: purpose || 'instance_data', description: description || null, config: actual.config })
 
       await createLog(
         user.id,
@@ -3804,6 +3303,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         'success'
       )
 
+      hostTunnelManager.requestHeartbeat(hostId)
       return reply.code(201).send({ message: '存储池创建成功', name })
     } catch (err: unknown) {
       if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
@@ -3912,18 +3412,16 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const client = await getIncusClient(host)
-      
-      // 构建更新配置
-      const config: Record<string, string> = {}
-      if (size) {
-        config['size'] = size
+      const pool = await db.getStoragePool(hostId, poolName)
+      if (!pool) return reply.code(404).send({ error: '存储池不存在' })
+      if (size || description !== undefined) {
+        const client = await getIncusClient(host)
+        if (size) {
+          await resizeStoragePool(client, poolName, size)
+          await prisma.storagePool.update({ where: { id: pool.id }, data: { status: 'pending', reportedAt: new Date() } })
+        }
+        if (description !== undefined) await updateStoragePool(client, poolName, { description })
       }
-
-      await updateStoragePool(client, poolName, {
-        config: Object.keys(config).length > 0 ? config : undefined,
-        description: description
-      })
 
       // 更新数据库中的描述和用途（如果有）
       if (description !== undefined || purpose !== undefined) {
@@ -3941,8 +3439,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         'success'
       )
 
-      return { message: '存储池修改成功' }
+      hostTunnelManager.requestHeartbeat(hostId)
+      return { message: '存储池修改成功，容量将由节点心跳更新' }
     } catch (err: unknown) {
+      if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
       const errorMessage = err instanceof Error ? err.message : String(err)
       request.log.error(err, 'Failed to update storage pool')
       return reply.code(500).send({ error: `修改存储池失败: ${errorMessage}` })
@@ -7290,22 +6790,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     try {
       const client = await getIncusClient(host)
 
-      // 1. 同步宿主机资源信息（复用 sync 逻辑）
-      const resources = await client.getResources() as {
-        cpu?: { total?: number }
-        memory?: { total?: number }
-        storage?: { disks?: Array<{ size?: number }>; pools?: Record<string, { space?: { total?: number } }> }
-      }
-
-      await db.updateHostStatus(hostId, 'online')
-
-      const detectedIpv6 = extractHostPublicIpv6FromResources(resources as Record<string, unknown>)
-      if (detectedIpv6 && !host.nat_public_ipv6) {
-        await prisma.host.update({
-          where: { id: hostId },
-          data: { natPublicIpv6: detectedIpv6 }
-        })
-      }
+      hostTunnelManager.requestHeartbeat(hostId)
 
       const usedResources = await db.calculateHostResourcesFromInstances(hostId)
       await db.updateHostResources(hostId, {

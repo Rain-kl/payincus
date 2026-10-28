@@ -2,6 +2,8 @@ import { prisma } from '../db/prisma.js'
 import { poolEncryption, type StorageNode, type StorageKeyVault } from '../lib/storage/encryption.js'
 import { nodeForPendingPool, unlockAndBindPool } from '../lib/storage/import.js'
 import { withStorageSession } from '../lib/storage/session.js'
+import { evaluateHostService } from '../lib/host-service-status.js'
+import { storageReportMaxAgeMs } from '../lib/storage-capacity-policy.js'
 
 async function automaticStorageNeeded(node: StorageNode, hostId: number, name: string, vault: StorageKeyVault) {
   const security = await node.request<{ locked: boolean }>('GET', '/1.0/payincus/security')
@@ -25,14 +27,17 @@ export function startStorageEncryptionLoader() {
   let active: Promise<void> | undefined
   const failed = new Set<string>()
   const run = async () => {
-    const pools = await prisma.storagePool.findMany({ where: { driver: 'zfs' }, select: { hostId: true, name: true, config: true }, orderBy: { id: 'asc' } })
+    const pools = await prisma.storagePool.findMany({ where: { driver: 'zfs' }, include: { host: { include: { agent: true, nodeSecurity: true } } }, orderBy: { id: 'asc' } })
     for (const pool of pools) {
       if (stopped) return
       if (pool.config && typeof pool.config === 'object' && '_payincusDeletion' in pool.config) continue
+      const reported = (pool.telemetry as { encryption?: { encrypted?: boolean; encryptionRoot?: string; manualLocked?: boolean; state?: string; pendingRecovery?: number } } | null)?.encryption
+      if (!evaluateHostService(pool.host).available || !pool.reportedAt || Date.now() - pool.reportedAt.getTime() > storageReportMaxAgeMs(pool.host.agent?.lastReport) || !reported?.encrypted || reported.manualLocked) continue
+      if (reported.state === 'unlocked' && !reported.pendingRecovery && !(pool.config as Record<string, unknown> | null)?._payincusImport) continue
       const identity = `${pool.hostId}/${pool.name}`
       try {
-        const needed = await withStorageSession(pool.hostId, false, (node, vault) => automaticStorageNeeded(node, pool.hostId, pool.name, vault))
-        if (needed) await withStorageSession(pool.hostId, true, (node, vault) => autoLoadStoragePool(node, pool.hostId, pool.name, vault))
+        if (!reported.encryptionRoot || !await prisma.nodeStorageKey.findUnique({ where: { hostId_dataset: { hostId: pool.hostId, dataset: reported.encryptionRoot } }, select: { id: true } })) continue
+        await withStorageSession(pool.hostId, true, (node, vault) => autoLoadStoragePool(node, pool.hostId, pool.name, vault))
         failed.delete(identity)
       } catch {
         if (!failed.has(identity)) console.warn(`[StorageEncryption] 节点 #${pool.hostId} 存储 ${pool.name} 自动加载未完成；请检查节点或托管状态`)

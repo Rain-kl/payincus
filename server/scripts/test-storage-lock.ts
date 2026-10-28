@@ -15,7 +15,7 @@ const identities=[{project:'default',name:'running',uuid:'one',frozen:false},{pr
 let pending=identities.map(i=>({...i}))
 const statuses:Record<string,string>={running:'Stopped',frozen:'Stopped',vm:'Stopped',suspended:'Stopped'}
 const starts:string[]=[]
-Object.assign(prisma.storagePool, { findUnique: async () => null })
+Object.assign(prisma.storagePool, { updateMany:async()=>({count:1}), findUnique: async () => null })
 Object.assign(prisma.host,{findUnique:async()=>({id:4,userId:10,url:'https://node.invalid'})})
 Object.assign(prisma.nodeSecurityState,{findUnique:async()=>({serverFingerprint:'a'.repeat(64)})})
 Object.assign(prisma.nodeStorageKey,{findUnique:async()=>saved,upsert:async()=>saved,updateMany:async()=>({count:1})})

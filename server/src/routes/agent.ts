@@ -1,3 +1,5 @@
+import { processAgentStorageReport } from '../services/agent-storage-report.js'
+import { recordHostSuccess } from '../lib/incus/host-health.js'
 import { recordReport } from '../lib/node-security/report.js'
 import { syncHostGpuReport } from '../db/gpus.js'
 import { recordNetworkStatus } from '../lib/egress/sync.js'
@@ -18,7 +20,8 @@ import { prisma } from '../db/prisma.js'
 import { createLog, LogModule, LogResult } from '../db/logs.js'
 import { decryptSensitiveData } from '../lib/security.js'
 import { buildNodeInstallCommand } from '../lib/node-install.js'
-import { readPanelClientCertificate } from '../lib/panel-certificate.js'
+import { getPanelCertificatePaths, readPanelClientCertificate } from '../lib/panel-certificate.js'
+import { extractHostPublicIpv6FromResources } from '../lib/host-resources.js'
 import {
   agentNonceTtlMs,
   createAgentBodyHash,
@@ -60,6 +63,7 @@ interface AgentHeartbeatBody {
   instances?: Record<string, unknown>
   resources?: Record<string, unknown>
   metrics?: Record<string, unknown>
+  storage?: Record<string, unknown>
   nodeApi?: string
   nodeSecurity?: { state?: { locked?: boolean } }
   networkStatus?: Record<string, unknown>
@@ -391,13 +395,16 @@ async function serializeAgentStatus(agent: HostAgentRecord) {
   }
 }
 
-function buildHeartbeatReport(body: AgentHeartbeatBody): Record<string, unknown> {
+function buildHeartbeatReport(body: AgentHeartbeatBody, previous: unknown): Record<string, unknown> {
+  const resources = { ...(body.resources || {}) }
+  const previousResources = isRecord(previous) && isRecord(previous.resources) ? previous.resources : {}
+  if (resources.storageAvailable === false && previousResources.storage) resources.storage = previousResources.storage
   return {
     runtime: body.runtime ?? {},
     incus: body.incus ?? {},
     instances: { available: body.instances?.available === true },
     caddy: body.caddy ?? {},
-    resources: body.resources ?? {},
+    resources,
     metrics: normalizeAgentMetrics(body.metrics)
   }
 }
@@ -851,6 +858,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     // Locked nodes remain online without turning an intentionally absent inventory into deletions.
     if (request.body.nodeSecurity?.state?.locked === true) {
       await agentModel.update({ where: { agentId: agent.agentId }, data: { status: 'online', version: sanitizeShortString(request.body.version, 128), capabilities: normalizeCapabilities(request.body.capabilities), lastSeenAt: now, lastHeartbeatIp: sanitizeShortString(getAgentHeartbeatIp(request), 128) } })
+      await prisma.storagePool.updateMany({ where: { hostId: agent.hostId }, data: { status: 'locked' } })
       const connection = await prisma.host.findUnique({ where: { id: agent.hostId }, select: { tunnelEnabled: true, targetHost: true, targetPort: true } })
       return { ok: true, serverTime: now.toISOString(), tunnel: { enabled: connection?.tunnelEnabled === true || (Array.isArray(agent.capabilities) && agent.capabilities.includes('network-control')), targetHost: connection?.targetHost ?? '127.0.0.1', targetPort: connection?.targetPort ?? 8443 } }
     }
@@ -870,7 +878,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
         status: 'online',
         version: sanitizeShortString(request.body.version, 128),
         capabilities: normalizeCapabilities(request.body.capabilities) as Prisma.InputJsonValue,
-        lastReport: buildHeartbeatReport(request.body) as Prisma.InputJsonObject,
+        lastReport: buildHeartbeatReport(request.body, agent.lastReport) as Prisma.InputJsonObject,
         lastSeenAt: now,
         lastHeartbeatIp: sanitizeShortString(getAgentHeartbeatIp(request), 128)
       }
@@ -879,6 +887,22 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     await syncHostGpuReport(agent.hostId, request.body.resources?.nvidiaGpu).catch(error => {
       request.log.warn({ error, hostId: agent.hostId }, 'Failed to update NVIDIA GPU inventory')
     })
+
+    await processAgentStorageReport(agent.hostId, request.body.storage, now).catch(error => {
+      request.log.warn({ error, hostId: agent.hostId }, 'Failed to persist node storage report')
+    })
+
+    if (request.body.incus?.available === true) {
+      await prisma.host.updateMany({ where: { id: agent.hostId, status: 'offline' }, data: { status: 'online' } })
+      // Enrollment already trusted this public client certificate; first heartbeat completes the panel record.
+      const architecture = request.body.runtime?.goarch === 'arm64' ? 'aarch64' : request.body.runtime?.goarch === 'amd64' ? 'x86_64' : undefined
+      await prisma.host.updateMany({ where: { id: agent.hostId, isInstalled: false }, data: { isInstalled: true, ...(architecture ? { architecture } : {}) } })
+      const certificates = getPanelCertificatePaths()
+      await prisma.host.updateMany({ where: { id: agent.hostId, certPath: null, keyPath: null }, data: certificates })
+      const ipv6 = extractHostPublicIpv6FromResources(request.body.resources || {})
+      if (ipv6) await prisma.host.updateMany({ where: { id: agent.hostId, natPublicIpv6: null }, data: { natPublicIpv6: ipv6 } })
+      recordHostSuccess(agent.hostId, 0)
+    }
 
     const host = await prisma.host.findUnique({
       where: { id: agent.hostId },
@@ -903,7 +927,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
 
     // Agent 上报 Caddy 已移除时，自动将宿主机标记为未启用（卸载完成）。
     const caddyUninstallRequestedNow = caddyUninstallRequested.has(agent.hostId)
-    if (caddyUninstallRequestedNow && caddyEnabled && !caddyAvailable) {
+    if (isRecord(request.body.caddy) && caddyUninstallRequestedNow && caddyEnabled && !caddyAvailable) {
       await prisma.host.update({
         where: { id: agent.hostId },
         data: { caddyEnabled: false }

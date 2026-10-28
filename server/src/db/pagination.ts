@@ -326,7 +326,7 @@ export async function getHostsPaginated(options: PaginationOptions = {}): Promis
       })
 
   const storageByHost = new Map(await Promise.all(hosts.map(async (h: any) => [h.id,
-    h.status === 'online' ? await getStorageOverview(h.id) : null
+    await getStorageOverview(h.id)
   ] as const)))
 
   return {
@@ -347,7 +347,7 @@ export async function getHostsPaginated(options: PaginationOptions = {}): Promis
       cpu_used: h.cpuUsed,
       memory_used: h.memoryUsed,
       disk_total: storageByHost.get(h.id)?.totalMB || 0,
-      disk_used: h.diskUsed,
+      disk_used: storageByHost.get(h.id)?.allocatedMB || 0,
       cpu_allowance_max: h.cpuAllowanceMax,
       memory_max: h.memoryMax,
       instance_type: h.instanceType,
@@ -769,7 +769,7 @@ export async function getAvailableHosts(
       memory_max: h.memoryMax,
       disk_total: storageByHost.get(h.id)?.totalMB || 0,
       disk_available: storageByHost.get(h.id)?.availableMB || 0,
-      disk_used: h.diskUsedCalculated,
+      disk_used: storageByHost.get(h.id)?.allocatedMB || 0,
       instance_type: h.instanceType,
       storage_size: h.storageSize,
       probe_url: h.probeUrl || null

@@ -985,6 +985,11 @@ model StoragePool {
   purpose     StoragePurpose @default(instance_data)
   description String?
   config      Json?          @default("{}") // 存储原始配置
+  status      String         @default("pending")
+  totalBytes  BigInt         @default(0) @map("total_bytes")
+  usedBytes   BigInt         @default(0) @map("used_bytes")
+  telemetry   Json           @default("{}")
+  reportedAt  DateTime?      @map("reported_at")
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
 

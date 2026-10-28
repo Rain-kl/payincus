@@ -130,3 +130,7 @@ owner 已确认第 9 项是对已加密 ZFS 存储锁盘，不包含明文盘迁
 - 节点通过：定制模块及 TUI race，真实 daemon TestPayIncusAuthenticatedRoute，原生实例/存储驱动 go vet，定制模块增量 golangci-lint 0 issues，Linux arm64 daemon/TUI 构建。测试环境已替换最终 daemon/TUI；最终读取安全模式未开启、API 未锁定，原有 test/incus 登记保留。
 - 尝试全量 Incus `make check INCUS_OFFLINE=1`：构建完成，Go 测试中的上游 `cmd/lxc-to-incus/TestConvertNetworkConfig` 因隔离构建容器不能创建 LXC busybox 容器失败，`internal/server/sys/TestHaveMacAdmin` 因容器 root 无 MAC_ADMIN capability 失败；未改这些上游测试。Go 测试阶段退出，后续 test/main.sh 未运行，不能称为全量检查通过。相关定制测试与单独 bad VM 实测结果不受这两个环境项替代。
 - 两个本次自建池 e2etui/e2epanel、三个本次 LXC 容器及所下载 Alpine 测试镜像已清理；最终检查两个 backing 文件均不存在，两池对应托管密钥和池记录均为 0。原有 D/pool、test/incus 数据保留，test/incus 已作为 e2e-existing 绑定供继续使用；没有删除原始数据集。未提交、推送、发布或修改其它节点。
+
+## 存储状态改由心跳驱动（2026-10-28）
+
+当前存储 GET 只查询数据库中的最新心跳快照，不再连接节点核验。写操作仍使用 pinned mTLS 进行身份和状态核对；操作前后把存储状态置为等待上报，并通过现有连接通知立即心跳。自动加载调度先检查数据库中的节点/存储状态、托管密钥和手动锁，再按需执行带核验的解锁，不再定时扫描每个健康池的节点接口。容量、重新创建同名池、稀疏 Loop 扩容、测试证据与部署要求见 [STORAGE_HEARTBEAT.md](STORAGE_HEARTBEAT.md)。此处为本次代码行为，前文验收记录保留其对应版本的事实。

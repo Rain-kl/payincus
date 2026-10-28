@@ -148,18 +148,15 @@ assert.ok(
 )
 
 assert.ok(
-  source.includes('const dbPools = await db.getStoragePoolsByHostId(hostId)') &&
-    source.includes("request.log.warn(err, 'Falling back to database storage pools')") &&
-    source.includes("status: 'Unavailable'") &&
-    source.includes('warning: `无法连接到 Incus，已显示数据库中登记的存储池: ${errorMessage}`'),
-  'host storage pool listing must fall back to registered database pools when Incus is unreachable'
+  source.includes('return { pools: await storedStoragePools(hostId) }') && !source.includes('await listStoragePools(client)'),
+  'storage pool listing must only read registered database pools and heartbeat telemetry'
 )
 
 assert.ok(
-  storageTabSource.includes("driver: 'lvm' as 'zfs' | 'lvm' | 'btrfs' | 'dir'") &&
-    storageTabSource.includes("driver: 'lvm',") &&
+  storageTabSource.includes("driver: 'zfs' as 'zfs' | 'lvm' | 'btrfs' | 'dir'") &&
+    storageTabSource.includes("driver: 'zfs',") &&
     storageTabSource.indexOf("{ value: 'lvm', label: 'LVM'") < storageTabSource.indexOf("{ value: 'zfs', label: 'ZFS'"),
-  'storage pool creation UI must default to LVM and list it before ZFS for Debian/cloud hosts'
+  'storage pool creation UI must retain the encrypted ZFS default and offer both supported drivers'
 )
 
 assert.ok(

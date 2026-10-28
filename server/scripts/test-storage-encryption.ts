@@ -16,7 +16,7 @@ let nodeLocked = false
 let failSave = false
 let requests = 0
 let managementDenied = false
-Object.assign(prisma.storagePool, { findUnique: async () => null })
+Object.assign(prisma.storagePool, { updateMany: async () => ({count:1}), findUnique: async () => ({driver:'zfs',config:{},telemetry:{encryption:{encrypted:true,state:available?'unlocked':'locked',dataset:'test/incus',encryptionRoot:'test/incus',keyFormat:'hex'}}}) })
 Object.assign(prisma.host, { findUnique: async () => ({ id: 4, userId: 10, url: 'https://node.invalid', tunnelEnabled: false }) })
 Object.assign(prisma.nodeSecurityState, { findUnique: async () => ({ serverFingerprint: 'a'.repeat(64) }) })
 Object.assign(prisma.nodeStorageKey, {
@@ -93,6 +93,9 @@ assert.match(failedSave.json().error, /已加载密钥.*保存失败/)
 assert.equal(failedSave.body.includes(key), false)
 failSave = false
 supported = false
-assert.equal((await call('GET')).statusCode, 409)
+const beforeRead = requests
+assert.equal((await call('GET')).statusCode, 200)
+assert.equal(requests, beforeRead, 'Cached encryption reads must not probe node capabilities')
+assert.equal((await call('POST', {key})).statusCode, 409)
 await app.close()
 console.log('Storage encryption ownership, discovery, pinned adapter, custody, failed-save truthfulness and saved-key unlock passed')

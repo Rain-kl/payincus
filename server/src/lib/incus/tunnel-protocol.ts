@@ -18,6 +18,7 @@ export enum TunnelFrameType {
   TASK_LOG_DATA = 0x0d,
   LOG_DATA = 0x07, // 日志流数据（Agent -> Server），StreamID = 0，Payload 为一行 UTF-8 文本；空 Payload 表示流结束
   CONTROL_HELLO = 0x0a,
+  HEARTBEAT = 0x0b,
 }
 
 export interface DecodedFrame {

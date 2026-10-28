@@ -28,6 +28,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{ updated: [] }>()
 
 const encryption = ref<Record<string, StorageEncryptionState>>({})
 const encryptionErrors = ref<Record<string, string>>({})
@@ -230,7 +231,7 @@ async function refreshEncryption(hostId: number, generation: number) {
       } catch {
         if (generation === loadGeneration) {
           delete encryption.value[pool.name]
-          encryptionErrors.value[pool.name] = '加密状态暂不可用，请检查节点版本与连接后刷新'
+          encryptionErrors.value[pool.name] = '尚未收到节点加密状态，请验证节点或等待心跳上报'
         }
       }
     }))
@@ -238,8 +239,7 @@ async function refreshEncryption(hostId: number, generation: number) {
 }
 const encryptionTimer = setInterval(() => {
   if (!loading.value && !encryptionRefreshing && !unlocking.value && !locking.value) {
-    if (loadError.value || pools.value.some(p => p.pendingImport)) void loadPools()
-    else void refreshEncryption(props.hostId, loadGeneration)
+    void loadPools()
   }
 }, 10000)
 onUnmounted(() => clearInterval(encryptionTimer))
@@ -252,10 +252,12 @@ async function loadPools() {
   try {
     const res = await api.hosts.getStoragePools(hostId)
     if (generation !== loadGeneration) return
+    const before = JSON.stringify(pools.value.map(p => [p.name, p.space, p.status]))
     pools.value = res.pools || []
+    if (before !== JSON.stringify(pools.value.map(p => [p.name, p.space, p.status]))) emit('updated')
     void refreshEncryption(hostId, generation)
   } catch {
-    if (generation === loadGeneration) loadError.value = '存储列表读取失败，请检查节点连接后重试。'
+    if (generation === loadGeneration) loadError.value = '存储记录读取失败，请稍后重试。'
   } finally {
     if (generation === loadGeneration) loading.value = false
   }
@@ -392,6 +394,10 @@ function formatBytes(bytes: number | undefined | null): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
+function poolStatusLabel(status: string): string {
+  return ({ ready: t('admin.hosts.storage.statusReady'), pending: t('admin.hosts.storage.statusPending'), unavailable: t('admin.hosts.storage.statusUnavailable'), missing: t('admin.hosts.storage.statusMissing'), locked: t('admin.hosts.storage.statusLocked') } as Record<string, string>)[status] || status
+}
+
 function hasValidSpaceInfo(pool: StoragePool): boolean {
   return !!(pool.space && 
     typeof pool.space.total === 'number' && pool.space.total > 0 &&
@@ -510,9 +516,10 @@ async function submitEdit() {
               <span
                 :class="[
                   'w-2 h-2 rounded-full',
-                  pool.status === 'Created' ? 'bg-green-500' : 'bg-gray-400'
+                  pool.status === 'ready' ? 'bg-green-500' : 'bg-gray-400'
                 ]"
               ></span>
+              <span class="text-xs text-themed-muted">{{ poolStatusLabel(pool.status) }}</span>
             </div>
             <p v-if="pool.description" class="text-sm text-themed-secondary mt-1">{{ pool.description }}</p>
             

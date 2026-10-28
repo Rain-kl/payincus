@@ -201,7 +201,7 @@ async function testConnection() {
   try {
     const res = await api.hosts.test(host.value.id)
     if (res.success) {
-      toast.success(t('admin.hosts.testSuccess'))
+      toast.success(res.message || t('admin.hosts.testSuccess'))
     }
     await loadHost()
   } catch (err: any) {
@@ -218,7 +218,7 @@ async function verifyHost() {
   try {
     const res = await api.hosts.verify(host.value.id)
     if (res.success) {
-      toast.success(t('admin.hosts.verifySuccess'))
+      toast.success(res.message || t('admin.hosts.verifySuccess'))
     }
     await loadHost()
   } catch (err: any) {
@@ -535,7 +535,7 @@ const tabs = computed(() => [
         <MyHostConfigTab v-if="activeTab === 'config'" :host="host" @saved="onConfigSaved" />
         <HostFirewallTab v-if="activeTab === 'firewall' && isAdmin" :host-id="host.id" />
         <HostImagesTab v-if="activeTab === 'images'" :host-id="host.id" :host-name="host.name" />
-        <HostStorageTab v-if="activeTab === 'storage'" :host-id="host.id" />
+        <HostStorageTab v-if="activeTab === 'storage'" :host-id="host.id" @updated="loadHost" />
         <HostPublicIpv4Tab v-if="activeTab === 'publicIpv4'" :host-id="host.id" />
         <HostCaddyTab v-if="activeTab === 'caddy'" :host-id="host.id" />
         <HostAgentLogsTab v-if="activeTab === 'agentLogs'" :host-id="host.id" />

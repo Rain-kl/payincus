@@ -1,10 +1,12 @@
+import { storedPoolEncryption } from '../lib/storage/read-model.js'
+import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { IncusApiError, nodeErrorDetail } from '../lib/incus/incus-client.js'
-import { nodeForPendingPool, unlockAndBindPool } from '../lib/storage/import.js'
+import { unlockAndBindPool } from '../lib/storage/import.js'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../db/prisma.js'
 import { lockPool } from '../lib/storage/lock.js'
 import { withStorageSession } from '../lib/storage/session.js'
-import { poolEncryption, StorageEncryptionError } from '../lib/storage/encryption.js'
+import { StorageEncryptionError } from '../lib/storage/encryption.js'
 
 const params = { type: 'object', additionalProperties: false, required: ['id', 'poolName'], properties: {
   id: { type: 'string', pattern: '^[1-9][0-9]{0,9}$' }, poolName: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$' }
@@ -23,10 +25,12 @@ export default async function storageEncryptionRoutes(app: FastifyInstance) {
         if (!host) return reply.code(404).send({ error: '节点不存在' })
         if (req.user.role !== 'admin' && req.user.id !== host.userId) return reply.code(403).send({ error: '无权管理此节点存储' })
         try {
-          return await withStorageSession(hostId, method !== 'GET', async (node, vault) => method === 'GET'
-            ? poolEncryption(await nodeForPendingPool(node, hostId, req.params.poolName), req.params.poolName, vault)
-            : method === 'PUT' ? lockPool(node, req.params.poolName, vault, req.user.id, hostId)
+          if (method === 'GET') return await storedPoolEncryption(hostId, req.params.poolName)
+          const result = await withStorageSession(hostId, true, async (node, vault) => method === 'PUT'
+            ? lockPool(node, req.params.poolName, vault, req.user.id, hostId)
             : unlockAndBindPool(node, hostId, req.params.poolName, vault, req.body?.key))
+          hostTunnelManager.requestHeartbeat(hostId)
+          return result
         } catch (error) {
           if (error instanceof StorageEncryptionError) return reply.code(error.statusCode).send({ error: error.message })
           const status = error instanceof IncusApiError ? error.statusCode === 401 ? 502 : error.statusCode : 409

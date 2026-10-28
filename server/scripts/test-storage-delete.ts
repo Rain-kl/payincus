@@ -17,6 +17,7 @@ let forgotten:string[]=[]
 Object.assign(prisma.host,{findUnique:async()=>({id:4,url:'https://node.invalid'})})
 Object.assign(prisma.nodeSecurityState,{findUnique:async()=>({serverFingerprint:'a'.repeat(64)})})
 const pools={
+ updateMany:async()=>({count:1}),
  findUnique:async()=>record,
  upsert:async({create,update}:any)=>{record=record?{...record,...update}:create;return record},
  deleteMany:async()=>{record=null;return {count:1}}

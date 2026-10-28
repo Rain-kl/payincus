@@ -13,6 +13,7 @@ const inventory=()=>[{dataset:'disk',encryptionRoot:'-',algorithm:'off',keyForma
 Object.assign(prisma.host,{findUnique:async()=>({id:4,userId:10,url:'https://node.invalid'})})
 Object.assign(prisma.nodeSecurityState,{findUnique:async()=>({serverFingerprint:'a'.repeat(64)})})
 Object.assign(prisma.storagePool,{
+ updateMany:async()=>({count:1}),
  findUnique:async()=>record,
  upsert:async({create}:any)=>{record??={id:1,...create};return record},
  update:async({where,data}:any)=>{assert.equal(where.id,record.id);Object.assign(record,data);return record}

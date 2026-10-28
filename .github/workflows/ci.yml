@@ -60,6 +60,8 @@ jobs:
         run: pnpm --filter server type-check
 
       - name: Test native node API and tunnel compatibility
+        env:
+          DATABASE_URL: postgresql://validation:validation@localhost:5432/node_security_validation
         run: |
           pnpm --filter server exec tsx scripts/test-payincus-node-api.ts
           pnpm --filter server exec tsx scripts/test-agent-tunnel-protocol-guards.ts
@@ -67,6 +69,7 @@ jobs:
           pnpm --filter server test:package-egress
           pnpm --filter server test:node-distribution
           pnpm --filter server test:storage-pool-directory
+          pnpm --filter server test:storage-telemetry
 
       - name: Node administration contracts
         env:
@@ -87,6 +90,9 @@ jobs:
           pnpm --filter server exec prisma db push
           pnpm --filter server test:node-security:db
           pnpm --filter server test:instance-advanced-config:db
+          DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test pnpm --filter server exec prisma db push
+          DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test pnpm --filter server test:storage-telemetry:db
+          DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test RUN_STORAGE_DB_TESTS=1 pnpm --filter server test:storage-capacity
 
 
   build:

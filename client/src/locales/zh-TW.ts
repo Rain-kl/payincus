@@ -5373,6 +5373,12 @@ const zhTW = {
             agentProcessCount: '處理程序數',
             // 儲存池管理
             storage: {
+                statusReady: '正常',
+                statusPending: '等待回報',
+                statusUnavailable: '無法使用',
+                statusMissing: '節點上已不存在',
+                statusLocked: '已鎖定',
+
                 title: '儲存池',
                 subtitle: '管理此宿主機上的 Incus 儲存池',
                 create: '新增儲存池',

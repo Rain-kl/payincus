@@ -211,7 +211,9 @@
     "test:storage-pool-directory": "node --import tsx scripts/test-storage-pool-directory-guards.ts",
     "test:node-distribution": "node --import tsx scripts/test-node-distribution.ts",
     "test:incus-ui-proxy-guards": "node --import tsx scripts/test-incus-ui-proxy-guards.ts",
-    "smoke:node-distribution": "node --import tsx scripts/smoke-node-distribution.ts"
+    "smoke:node-distribution": "node --import tsx scripts/smoke-node-distribution.ts",
+    "test:storage-telemetry": "node --import tsx scripts/test-storage-read-model.ts && node --import tsx scripts/test-storage-resize.ts && node --import tsx scripts/test-storage-locked-capacity.ts",
+    "test:storage-telemetry:db": "node --import tsx scripts/test-agent-storage-report.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

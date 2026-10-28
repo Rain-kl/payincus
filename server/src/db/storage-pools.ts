@@ -6,7 +6,6 @@ import { prisma } from './prisma.js'
 import type { Prisma, StoragePurpose } from '@prisma/client'
 import { getStorageCapacity } from '../lib/storage-capacity.js'
 
-const DEFAULT_STORAGE_POOL_NAME = 'default'
 type StoragePoolQueryClient = typeof prisma | Prisma.TransactionClient
 
 export interface CreateStoragePoolData {
@@ -91,11 +90,10 @@ export async function getRandomSystemDiskPool(
 
 /**
  * 检查宿主机上是否存在指定存储池。
- * 对已落库实例，允许继续使用 "default" 回退池，避免因未登记到 storage_pools 表而丢失选择。
+ * 所有池名（包括 default）都必须有数据库登记。
  */
 export async function hasStoragePool(hostId: number, poolName: string): Promise<boolean> {
   if (!poolName) return false
-  if (poolName === DEFAULT_STORAGE_POOL_NAME) return true
 
   const pool = await prisma.storagePool.findUnique({
     where: {
@@ -115,18 +113,6 @@ export async function hasStoragePool(hostId: number, poolName: string): Promise<
  */
 export async function isSystemDiskPool(hostId: number, poolName: string): Promise<boolean> {
   if (!poolName) return false
-  if (poolName === DEFAULT_STORAGE_POOL_NAME) {
-    const pool = await prisma.storagePool.findFirst({
-      where: {
-        hostId,
-        name: poolName,
-        purpose: 'instance_data'
-      },
-      select: { id: true }
-    })
-    return !!pool
-  }
-
   const pool = await prisma.storagePool.findFirst({
     where: {
       hostId,
@@ -224,8 +210,8 @@ export async function resolveStoragePoolForExistingInstance(
     }
   })
 
-  if (instance?.storagePoolName && await hasStoragePool(hostId, instance.storagePoolName)) {
-    return instance.storagePoolName
+  if (instance?.storagePoolName) {
+    return await hasStoragePool(hostId, instance.storagePoolName) ? instance.storagePoolName : null
   }
 
   return resolveStoragePoolForNewInstance(hostId, options)
@@ -251,6 +237,7 @@ export async function getStoragePool(hostId: number, name: string) {
 export interface UpdateStoragePoolData {
   description?: string
   config?: Record<string, string>
+  purpose?: StoragePurpose
 }
 
 export async function updateStoragePool(hostId: number, name: string, data: UpdateStoragePoolData) {
@@ -262,6 +249,7 @@ export async function updateStoragePool(hostId: number, name: string, data: Upda
   if (data.config !== undefined) {
     updateData.config = data.config
   }
+  if (data.purpose !== undefined) updateData.purpose = data.purpose
 
   return prisma.storagePool.updateMany({
     where: {

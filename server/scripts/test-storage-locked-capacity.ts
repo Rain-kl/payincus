@@ -1,30 +1,30 @@
 import assert from 'node:assert/strict'
 import { prisma } from '../src/db/prisma.js'
 import { IncusClient } from '../src/lib/incus/incus-client.js'
-import { closeAllClients } from '../src/lib/incus/incus-pool.js'
-import { getStorageCapacity, invalidateHostStorageCapacity } from '../src/lib/storage-capacity.js'
-let available=true,manual=false,locked=false,failed=false,pending=false
-Object.assign(prisma.storagePool,{findMany:async()=>[{name:'data',driver:'zfs',config:{source:'pool/incus',...(pending?{_payincusImport:{source:'pool/incus'}}:{})},updatedAt:new Date(0)}]})
-Object.assign(prisma.instance,{findMany:async()=>[]})
-Object.assign(prisma.host,{findUnique:async()=>({id:4,url:'https://node.invalid',diskUsed:0})})
-Object.assign(IncusClient.prototype,{
- connect:async function(this:IncusClient){this.connected=true;return {}},
- request:async(_method:string,path:string)=>{
-  if(path==='/1.0/payincus/storage'){
-   if(failed)throw new Error('fixture unavailable')
-   return {locked,datasets:[{dataset:'pool/incus',encryptionRoot:'pool/incus',algorithm:'aes-256-gcm',keyStatus:available?'available':'unavailable'}],locks:{'pool/incus':{locked:manual}}}
-  }
-  if(path.endsWith('/resources'))return {space:{total:100*1024**3,used:0}}
-  throw new Error('unexpected path')
- }
-})
-const read=async()=>{invalidateHostStorageCapacity(4);return getStorageCapacity(4)}
-assert.equal((await read()).reason,null)
-available=false;assert.equal((await read()).reason,'storage_unavailable')
-available=true;manual=true;assert.equal((await read()).reason,'storage_unavailable')
-manual=false;locked=true;assert.equal((await read()).reason,'storage_unavailable')
-locked=false;failed=true;assert.equal((await read()).reason,'storage_unavailable')
-failed=false;pending=true;assert.equal((await read()).reason,'storage_unavailable')
-pending=false;assert.equal((await read()).reason,null)
-await closeAllClients()
-console.log('ZFS allocation excludes unloaded keys, manual/global locks, unknown state and pending imports; unlocked capacity recovers')
+import { getStorageCapacity, getStorageOverview } from '../src/lib/storage-capacity.js'
+const GiB = 1024n ** 3n
+const pool = { id: 1, name: 'data', driver: 'zfs', config: { source: 'pool/incus' }, status: 'ready', totalBytes: 100n * GiB, usedBytes: 0n, reportedAt: new Date(), telemetry: {} }
+const host = { id: 4, status: 'online', diskUsed: 0, agent: null, nodeSecurity: null as any }
+Object.assign(prisma.storagePool, { findMany: async () => [pool] })
+Object.assign(prisma.instance, { findMany: async () => [] })
+Object.assign(prisma.host, { findUnique: async () => host })
+Object.assign(IncusClient.prototype, { connect: async () => { throw new Error('capacity read contacted a node') }, request: async () => { throw new Error('capacity read contacted a node') } })
+const read = () => getStorageCapacity(4)
+assert.equal((await read()).reason, null)
+for (const status of ['locked', 'unavailable', 'missing', 'pending']) {
+ pool.status = status
+ assert.equal((await read()).reason, 'storage_unavailable')
+ assert.equal((await getStorageOverview(4)).totalMB, 102400, 'Last known capacity must survive failures')
+}
+pool.status = 'ready'
+host.nodeSecurity = { report: { locked: true } }
+assert.equal((await read()).reason, 'storage_unavailable')
+host.nodeSecurity = null
+host.status = 'offline'
+assert.equal((await read()).reason, 'storage_unavailable')
+host.status = 'online'
+pool.reportedAt = new Date(Date.now() - 121000)
+assert.equal((await read()).reason, 'storage_unavailable')
+pool.reportedAt = new Date()
+assert.equal((await read()).reason, null)
+console.log('Stored capacity rejects offline/locked/unreported/stale pools, preserves totals and performs no node requests')

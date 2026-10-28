@@ -25,11 +25,11 @@ Object.assign(prisma.nodeStorageKey, {
  upsert: async ({create}: any) => { if (failSave) throw new Error('fixture'); saved ??= create; return saved },
  updateMany: async ({data}: any) => { saved.ciphertext = data.ciphertext; return {count:1} }
 })
-Object.assign(prisma.storagePool, { upsert: async ({create}: any) => { assert.equal(create.config.source,'test/incus'); dbPools++; return create } })
+Object.assign(prisma.storagePool, { updateMany: async () => ({ count: 1 }), upsert: async ({create}: any) => { assert.equal(create.config.source,'test/incus'); dbPools++; return create } })
 Object.assign(IncusClient.prototype, {
  connect: async function(this: IncusClient) { assert.equal(this.options.serverFingerprint,'a'.repeat(64)) }, close: async () => {},
  request: async (method: string, path: string, body?: any) => {
-  if (path === '/1.0/payincus') return {api_extensions:supported?['payincus_storage_encryption_v1']:[]}
+  if (path === '/1.0/payincus') return {api_extensions:supported?['payincus_storage_encryption_v1','payincus_storage_pool_alloc_v1']:[]}
   if (path === '/1.0/payincus/security') return {locked}
   if (path === '/1.0/storage-pools' && method === 'GET') return bound?['/1.0/storage-pools/data']:[]
   if (path === '/1.0/payincus/storage/pool') {

@@ -1,0 +1,6 @@
+ALTER TABLE "storage_pools"
+  ADD COLUMN "status" TEXT NOT NULL DEFAULT 'pending',
+  ADD COLUMN "total_bytes" BIGINT NOT NULL DEFAULT 0,
+  ADD COLUMN "used_bytes" BIGINT NOT NULL DEFAULT 0,
+  ADD COLUMN "telemetry" JSONB NOT NULL DEFAULT '{}',
+  ADD COLUMN "reported_at" TIMESTAMP(3);

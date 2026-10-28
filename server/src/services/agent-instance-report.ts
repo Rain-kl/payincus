@@ -22,6 +22,7 @@ interface NormalizedAgentInstanceItem {
   txBytes: bigint | null
   ipv4?: string | null
   ipv6?: string | null
+  storagePoolName?: string
 }
 
 export interface AgentInstanceReportResult {
@@ -147,7 +148,8 @@ function normalizeAgentInstanceItems(payload: unknown): NormalizedAgentInstanceI
       rxBytes: parseCounter(traffic.rxBytes),
       txBytes: parseCounter(traffic.txBytes),
       ipv4: normalizeNetworkAddress(network.ipv4, 4),
-      ipv6: normalizeNetworkAddress(network.ipv6, 6)
+      ipv6: normalizeNetworkAddress(network.ipv6, 6),
+      storagePoolName: typeof rawItem.storagePoolName === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/.test(rawItem.storagePoolName) ? rawItem.storagePoolName : undefined
     })
   }
 
@@ -393,6 +395,12 @@ export async function processAgentInstanceReport(hostId: number, payload: unknow
   }
 
   const incusIds = Array.from(new Set(items.map(item => item.name)))
+  const registeredPools = new Set((await prisma.storagePool.findMany({ where: { hostId }, select: { name: true } })).map(pool => pool.name))
+  for (const item of items) {
+    if (item.storagePoolName && registeredPools.has(item.storagePoolName)) {
+      await prisma.instance.updateMany({ where: { hostId, incusId: item.name, storagePoolName: null, status: { not: 'deleted' } }, data: { storagePoolName: item.storagePoolName } })
+    }
+  }
   const instances = await prisma.instance.findMany({
     where: {
       hostId,

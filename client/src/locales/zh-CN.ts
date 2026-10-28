@@ -4669,6 +4669,12 @@ export default {
             agentProcessCount: '进程数',
             // 存储池管理
             storage: {
+                statusReady: '正常',
+                statusPending: '等待上报',
+                statusUnavailable: '不可用',
+                statusMissing: '节点上已不存在',
+                statusLocked: '已锁定',
+
                 title: '存储池',
                 subtitle: '管理此宿主机上的 Incus 存储池',
                 create: '添加存储池',

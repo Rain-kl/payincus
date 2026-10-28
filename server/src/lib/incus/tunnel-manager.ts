@@ -139,6 +139,15 @@ export class HostTunnelManager extends EventEmitter {
     return this.activeTunnels.get(hostId)
   }
 
+  requestHeartbeat(hostId: number): boolean {
+    const ws = this.activeTunnels.get(hostId)
+    if (!ws || ws.readyState !== WS_OPEN || !this.controlCapabilities.get(hostId)?.has('heartbeat-trigger-v1')) return false
+    try {
+      ws.send(encodeFrame(TunnelFrameType.HEARTBEAT, 0))
+      return true
+    } catch { return false }
+  }
+
   supportsControl(hostId: number, _method: ControlMethod): boolean {
     return this.isTunnelOnline(hostId) && this.controlCapabilities.get(hostId)?.has('payincus_node_v1') === true
   }
@@ -330,7 +339,7 @@ export class HostTunnelManager extends EventEmitter {
         if (streamId !== 0 || payload.length > 4096) break
         try {
           const hello = JSON.parse(payload.toString('utf8'))
-          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'payincus_node_v1') : [])
+          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'payincus_node_v1' || v === 'heartbeat-trigger-v1') : [])
           const firstHello = !this.controlCapabilities.has(hostId)
           this.controlCapabilities.set(hostId, capabilities)
           if (firstHello && capabilities.has('payincus_node_v1')) this.emit('control_ready', hostId)
