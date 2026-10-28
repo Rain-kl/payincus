@@ -5,7 +5,7 @@ import { INCUS_CLI_COMMANDS, recordReport } from '../lib/node-security/report.js
 import { restoreNodeInstances, type RecoveryState } from '../lib/node-security/recovery.js'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../db/prisma.js'
-import { IncusClient } from '../lib/incus/incus-client.js'
+import { IncusClient, nodeErrorDetail } from '../lib/incus/incus-client.js'
 import { createLog, LogModule, LogResult } from '../db/logs.js'
 import { datasetPattern, fingerprint, seal, unseal } from '../lib/node-security/vault.js'
 
@@ -86,6 +86,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
                 const instance = await prisma.instance.findFirst({ where: { hostId: hostId, incusId: item.name }, select: { status: true, expiresAt: true } })
                 return !instance || (['running', 'stopped', 'error'].includes(instance.status) && (!instance.expiresAt || instance.expiresAt.getTime() > Date.now()))
               }, {
+                types: ['container', 'virtual-machine'],
                 cancelled: () => { const task = currentOperationTask(); return task?.cancelled === true || task?.stopping === true },
                 progress: (completed, total, failed) => taskLog('info', `恢复进度 ${completed}/${total}，未完成 ${failed}`)
               })
@@ -104,7 +105,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
         await recordReport(req.params.hostId, { state, events: [] })
         await createLog(req.user.id, LogModule.SECURITY, `node.${action}`, `节点 #${req.params.hostId} 管理操作 ${action}`, LogResult.SUCCESS)
         return { state }
-      } catch { return reply.code(409).send({ error: '节点操作未完成，请刷新状态并检查连接或存储' }) }
+      } catch (error) { return reply.code(409).send({ error: nodeErrorDetail(error, '节点操作未完成，请刷新状态并检查连接或存储', req.body) }) }
     })
   }
   app.post<{ Params: { hostId: number }; Body: { dataset: string; key: string } }>(`${base}/keys`, {

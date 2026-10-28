@@ -3,7 +3,7 @@ export interface RecoveryState { locked: boolean; revision: number; resumeInstan
 export interface RecoveryClient { request<T = unknown>(method: string, path: string, body?: unknown): Promise<T> }
 
 // The node retains pending identities until native async operations and their final state are verified.
-export async function restoreNodeInstances(client: RecoveryClient, initial: RecoveryState, allowed: (item: ResumeInstance) => Promise<boolean>, options: { progress?: (completed: number, total: number, failed: number) => void; cancelled?: () => boolean } = {}): Promise<{ state: RecoveryState; failed: number }> {
+export async function restoreNodeInstances(client: RecoveryClient, initial: RecoveryState, allowed: (item: ResumeInstance) => Promise<boolean>, options: { progress?: (completed: number, total: number, failed: number) => void; cancelled?: () => boolean; types?: string[] } = {}): Promise<{ state: RecoveryState; failed: number }> {
   let state = initial
   let failed = 0
   if (state.locked || !Number.isSafeInteger(state.revision) || !Array.isArray(state.resumeInstances)) throw new Error('invalid recovery state')
@@ -17,7 +17,7 @@ export async function restoreNodeInstances(client: RecoveryClient, initial: Reco
       const acknowledged = async () => { state = await client.request<RecoveryState>('POST', '/1.0/payincus/security/resume', { revision: state.revision, instance: item }) }
       if (!await allowed(item)) { await acknowledged(); continue }
       const instance = await client.request<{ config?: Record<string, string>; type?: string }>('GET', base + query)
-      if (instance.type !== 'container' || instance.config?.['volatile.uuid'] !== item.uuid) throw new Error('workload identity changed')
+      if (!(options.types || ['container']).includes(instance.type || '') || instance.config?.['volatile.uuid'] !== item.uuid) throw new Error('workload identity changed')
       const readState = () => client.request<{ status: string }>('GET', `${base}/state${query}`)
       let current = await readState()
       if (current.status === 'Stopped') {

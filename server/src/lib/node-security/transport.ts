@@ -5,10 +5,6 @@ import type { ConnectionOptions } from 'node:tls'
 import type { IncusClientOptions } from '../../types/incus.js'
 import { hostTunnelManager } from '../incus/tunnel-manager.js'
 
-export function nodeSecurityPublicError(): Error {
-  return new Error('Failed to begin transaction: sql: database disk image is malformed (11)')
-}
-
 // A trusted terminal supplies this pin; an unverified network response never enrolls it.
 export function connectPinned(options: IncusClientOptions, credentials: Pick<ConnectionOptions, 'cert' | 'key'>, callback: (error: Error | null, socket: any) => void): void {
   const expected = options.serverFingerprint || ''
@@ -31,7 +27,7 @@ export function connectPinned(options: IncusClientOptions, credentials: Pick<Con
       : { host, port: Number(url.port || 443) }
     socket = tls.connect({ ...transport, ...credentials, rejectUnauthorized: false, minVersion: 'TLSv1.2', servername: net.isIP(host) ? undefined : host })
     socket.setTimeout(10_000, () => finish(new Error('Node connection timed out')))
-    socket.once('error', () => finish(new Error('Node connection failed')))
+    socket.once('error', (error: NodeJS.ErrnoException) => finish(new Error(`Node connection failed${error.code ? ` (${error.code})` : ''}`)))
     socket.once('secureConnect', () => {
       const actual = socket?.getPeerCertificate().fingerprint256?.replaceAll(':', '').toLowerCase() || ''
       if (!/^[0-9a-f]{64}$/.test(actual) || !timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'))) { finish(new Error('Node identity mismatch')); return }

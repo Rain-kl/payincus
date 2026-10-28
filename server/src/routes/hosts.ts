@@ -1,3 +1,7 @@
+import { importEncryptedPool } from '../lib/storage/import.js'
+import { deleteManagedZfsPool } from '../lib/storage/delete.js'
+import { provisionEncryptedPool } from '../lib/storage/provision.js'
+import { StorageEncryptionError } from '../lib/storage/encryption.js'
 import { loadHostServiceStatuses } from '../lib/host-service-status.js'
 import { snapshotPackageEgress } from '../lib/egress/package.js'
 import { getStorageOverview } from '../lib/storage-capacity.js'
@@ -3482,6 +3486,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
       // 从数据库获取存储池的用途信息
       const purposeMap = new Map(dbPools.map(p => [p.name, p.purpose]))
+      const pendingImports = new Set(dbPools.filter(p => p.config && typeof p.config === 'object' && '_payincusImport' in p.config).map(p => p.name))
 
       // 获取每个存储池的资源使用情况
       const poolsWithResources = await Promise.all(
@@ -3490,6 +3495,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             const resources = await getStoragePoolResources(client, pool.name)
             return {
               name: pool.name,
+              pendingImport: pendingImports.has(pool.name),
               driver: pool.driver,
               status: pool.status || 'Created',
               description: pool.description || '',
@@ -3501,6 +3507,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           } catch {
             return {
               name: pool.name,
+              pendingImport: pendingImports.has(pool.name),
               driver: pool.driver,
               status: pool.status || 'Created',
               description: pool.description || '',
@@ -3513,7 +3520,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         })
       )
 
-      return { pools: poolsWithResources }
+      const pendingPools = dbPools.filter(p => p.driver === 'zfs' && p.config && typeof p.config === 'object' && !Array.isArray(p.config) && '_payincusImport' in p.config && !poolsWithResources.some(actual => actual.name === p.name))
+      return { pools: [...poolsWithResources, ...pendingPools.map(pool => ({ name: pool.name, driver: 'zfs', status: 'Pending', description: pool.description || '', purpose: pool.purpose, config: pool.config || {}, usedBy: 0, space: null, pendingImport: true }))] }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err)
       request.log.warn(err, 'Falling back to database storage pools')
@@ -3599,6 +3607,15 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
 
     try {
+      if (driver === 'zfs' && !useExisting) {
+        const created = await provisionEncryptedPool(hostId, { name, source, size, useLoop, zfsPoolName, description, purpose })
+        await createLog(user.id, 'host', 'storage.create', `Created encrypted ZFS storage on host #${hostId}`, 'success')
+        return reply.code(201).send(created)
+      }
+      if (driver === 'zfs' && useExisting) {
+        const imported = await importEncryptedPool(hostId, { name, source: existingSource || undefined, purpose, description })
+        if (imported) return reply.code(201).send(imported)
+      }
       const client = await getIncusClient(host)
 
       // 模式2/3：使用/导入已有存储池
@@ -3733,18 +3750,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       const config: Record<string, string> = {}
 
       switch (driver) {
-        case 'zfs':
-          if (storageSource) {
-            config['source'] = storageSource
-          } else if (storageSize) {
-            config['size'] = storageSize
-          } else {
-            return reply.code(400).send({ error: 'ZFS 需要指定 source（物理盘）或 size（Loop 文件）' })
-          }
-          // zfs.pool_name 在两种模式下都应该生效
-          if (zfsPoolName) config['zfs.pool_name'] = zfsPoolName
-          break
-
         case 'lvm':
           if (storageSource) {
             config['source'] = storageSource
@@ -3797,6 +3802,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
       return reply.code(201).send({ message: '存储池创建成功', name })
     } catch (err: unknown) {
+      if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
       const errorMessage = formatStoragePoolCreateError(err)
       request.log.error(err, 'Failed to create storage pool')
       return reply.code(500).send({ error: `创建存储池失败: ${errorMessage}` })
@@ -3826,11 +3832,18 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const client = await getIncusClient(host)
-      await deleteStoragePool(client, poolName)
-
-      // 从数据库删除
-      await db.deleteStoragePool(hostId, poolName)
+      const recorded = await db.getStoragePool(hostId, poolName)
+      let encryptedDeletion = recorded?.driver === 'zfs'
+      if (!encryptedDeletion) {
+        const client = await getIncusClient(host)
+        const actual = await client.request<{ driver: string }>('GET', `/1.0/storage-pools/${encodeURIComponent(poolName)}`)
+        encryptedDeletion = actual.driver === 'zfs'
+        if (!encryptedDeletion) {
+          await deleteStoragePool(client, poolName)
+          await db.deleteStoragePool(hostId, poolName)
+        }
+      }
+      if (encryptedDeletion) await deleteManagedZfsPool(hostId, poolName)
 
       await createLog(
         user.id,
@@ -3842,6 +3855,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
       return { message: '存储池删除成功' }
     } catch (err: unknown) {
+      if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
       const errorMessage = err instanceof Error ? err.message : String(err)
       request.log.error(err, 'Failed to delete storage pool')
       return reply.code(500).send({ error: `删除存储池失败: ${errorMessage}` })

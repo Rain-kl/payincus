@@ -12,6 +12,8 @@ defineOptions({
   name: 'HostOpsTab'
 })
 
+const emit = defineEmits<{ refresh: [] }>()
+
 interface Props {
   hostId: number
   hostName?: string
@@ -1263,7 +1265,7 @@ async function runAuditKillProcess() {
 
 <template>
   <div class="space-y-6">
-    <component :is="HostNodeSecurity" v-if="nodeSecurityAdmin && HostNodeSecurity" :host-id="hostId" />
+    <component :is="HostNodeSecurity" v-if="nodeSecurityAdmin && HostNodeSecurity" :host-id="hostId" @refresh="emit('refresh')" />
     <div class="card p-5 space-y-4">
       <div>
         <h3 class="text-lg font-semibold text-themed">{{ t('admin.hosts.ops.title') }}</h3>

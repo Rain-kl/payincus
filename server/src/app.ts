@@ -95,6 +95,7 @@ import adminNotificationChannelsRoutes from './routes/admin-notification-channel
 import telegramRoutes from './routes/telegram.js'
 import agentRoutes from './routes/agent.js'
 import nodeSecurityRoutes from './routes/node-security.js'
+import storageEncryptionRoutes from './routes/storage-encryption.js'
 import userInviteRoutes from './routes/user-invites.js'
 import vipLevelRoutes from './routes/vip-levels.js'
 import vipBenefitRoutes from './routes/vip-benefits.js'
@@ -559,6 +560,9 @@ await fastify.register(adminNotificationChannelsRoutes, { prefix: '/api/admin/no
 await fastify.register(telegramRoutes, { prefix: '/api/telegram' })
 await fastify.register(agentRoutes, { prefix: '/api/agent' })
 await fastify.register(nodeSecurityRoutes)
+await fastify.register(storageEncryptionRoutes)
+let stopStorageEncryptionLoader: (() => Promise<void>) | undefined
+fastify.addHook('onClose', async () => { await stopStorageEncryptionLoader?.() })
 await fastify.register(userInviteRoutes, { prefix: '/api/user-invites' })
 await fastify.register(vipLevelRoutes)
 await fastify.register(vipBenefitRoutes)
@@ -788,6 +792,8 @@ const start = async (): Promise<void> => {
     // 启动实例状态同步调度器
     const { startStatusScheduler } = await import('./services/status-scheduler.js')
     startStatusScheduler()
+    const { startStorageEncryptionLoader } = await import('./services/storage-encryption-loader.js')
+    stopStorageEncryptionLoader = startStorageEncryptionLoader()
 
     // 启动扩展事件重试调度器
             // 启动扩展存储定时归档调度器（默认关闭）

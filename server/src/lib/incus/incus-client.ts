@@ -4,7 +4,7 @@
  */
 
 import { Agent, request } from 'undici'
-import { connectPinned, nodeSecurityPublicError } from '../node-security/transport.js'
+import { connectPinned } from '../node-security/transport.js'
 import { readFileSync } from 'fs'
 import tls from 'node:tls'
 import net from 'node:net'
@@ -15,6 +15,30 @@ import type {
 import { waitForOperation } from './incus-utils.js'
 import { resolveCertificatePair } from './certificate-paths.js'
 import { hostTunnelManager } from './tunnel-manager.js'
+
+// A certificate pin authenticates the node; it does not imply that node security is locked.
+export class IncusApiError extends Error {
+  readonly statusCode: number
+  constructor(message: string, statusCode: number, body?: unknown) {
+    let detail = message
+    const redact = (value: unknown, depth: number) => {
+      if (!value || typeof value !== 'object' || depth > 5) return
+      for (const [name, item] of Object.entries(value)) {
+        if (/key|password|secret|token|credential/i.test(name) && typeof item === 'string' && item) detail = detail.split(item).join('[REDACTED]')
+        else if (item && typeof item === 'object') redact(item, depth + 1)
+      }
+    }
+    redact(body, 0)
+    super(detail.slice(0, 4096))
+    this.name = 'IncusApiError'
+    this.statusCode = statusCode >= 400 && statusCode <= 599 ? statusCode : 502
+  }
+}
+
+export function nodeErrorDetail(error: unknown, fallback: string, body?: unknown): string {
+  const message = error instanceof Error ? error.message : fallback
+  return new IncusApiError(message || fallback, 500, body).message
+}
 
 export class IncusClient {
   baseUrl: string
@@ -185,29 +209,14 @@ export class IncusClient {
     let data: IncusApiResponse<T>
     try {
       data = JSON.parse(text) as IncusApiResponse<T>
-    } catch (e) {
-      if (this.options.serverFingerprint) throw nodeSecurityPublicError()
-      // 记录错误日志
-      console.error('[Incus API Error]', {
-        method,
-        url,
-        statusCode: response.statusCode,
-        error: text || `HTTP ${response.statusCode}`
-      })
-      // Incus returns plain text for some errors (like mTLS failures)
-      throw new Error(text || `HTTP ${response.statusCode}`)
+    } catch {
+      throw new IncusApiError(text.trim() || `节点 API 返回了非 JSON 响应（HTTP ${response.statusCode}）`, response.statusCode >= 400 ? response.statusCode : 502, body)
     }
 
-    // Incus API 返回格式: { type: "sync/async", status: "Success", metadata: {...} }
-    if (this.options.serverFingerprint && (response.statusCode >= 400 || data.type === 'error')) throw nodeSecurityPublicError()
-    if (data.type === 'error') {
-      // 记录错误日志
-      console.error('[Incus API Error]', {
-        method,
-        url,
-        error: data.error || 'Incus API 错误'
-      })
-      throw Object.assign(new Error(data.error || 'Incus API 错误'), { statusCode: response.statusCode })
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new IncusApiError('节点 API 响应格式无效', 502, body)
+
+    if (response.statusCode >= 400 || data.type === 'error') {
+      throw new IncusApiError(typeof data.error === 'string' && data.error ? data.error : `Incus API HTTP ${response.statusCode}`, response.statusCode >= 400 ? response.statusCode : data.error_code || 502, body)
     }
 
     // 异步操作需要等待完成

@@ -61,8 +61,25 @@ async function snapshot(hostId: number, pools: Pool[], instances: Array<{ incusI
     try {
       const { getIncusClient } = await import('./incus/incus-pool.js')
       const client = await getIncusClient(host)
+      let encryption: { locked?: boolean; datasets: Array<{ dataset: string; encryptionRoot: string; algorithm: string; keyStatus: string }>; locks?: Record<string, { locked: boolean }> } | undefined
+      if (pools.some(pool => pool.driver === 'zfs')) {
+        try { encryption = await client.request('GET', '/1.0/payincus/storage', null, READ_TIMEOUT_MS, signal) }
+        catch { /* Encryption state is unknown: do not allocate ZFS based only on free bytes. */ }
+      }
       await Promise.all(pools.map(async pool => {
+        const config = pool.config as Record<string, unknown> | null
+        if (config?._payincusImport || config?._payincusDeletion) return
         try {
+          if (pool.driver === 'zfs') {
+            if (!encryption || encryption.locked === true || !Array.isArray(encryption.datasets)) return
+            let source = (config as Record<string, string> | null)?.['zfs.pool_name'] || (config as Record<string, string> | null)?.source
+            if (!source || source.startsWith('/')) {
+              const actual = await client.request<{ config: Record<string, string> }>('GET', `/1.0/storage-pools/${encodeURIComponent(pool.name)}`, null, READ_TIMEOUT_MS, signal)
+              source = actual.config['zfs.pool_name'] || actual.config.source
+            }
+            const dataset = encryption.datasets.find(item => item.dataset === source)
+            if (!dataset || (dataset.algorithm !== 'off' && dataset.algorithm !== '-' && (dataset.keyStatus !== 'available' || encryption.locks?.[dataset.encryptionRoot]?.locked))) return
+          }
           const resources = await client.request('GET', `/1.0/storage-pools/${encodeURIComponent(pool.name)}/resources`, null, READ_TIMEOUT_MS, signal)
           const current = space(resources)
           if (current) result.pools.set(pool.name, current)

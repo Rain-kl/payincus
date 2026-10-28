@@ -1,3 +1,4 @@
+import type { StorageEncryptionState } from './storage-encryption-types'
 import type { GpuConfiguration } from '@/types/api'
 import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
@@ -1166,6 +1167,9 @@ const api = {
     setMaintenance: (id: number, enabled: boolean): Promise<Host> =>
       http.post(`/hosts/${id}/maintenance`, { enabled }),
     // 存储池管理
+    getStorageEncryption: (id: number, poolName: string): Promise<StorageEncryptionState> => http.get(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`),
+    lockStorage: (id: number, poolName: string): Promise<StorageEncryptionState> => http.put(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`, {}, { timeout: TIMEOUT.LONG }),
+    unlockStorage: (id: number, poolName: string, key?: string): Promise<StorageEncryptionState> => http.post(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`, key ? { key } : {}, { timeout: TIMEOUT.LONG }),
     getStoragePools: (id: number): Promise<{ pools: Array<{ name: string; driver: string; description: string; status: string; purpose?: 'instance_data' | 'instance_storage' | null; config: Record<string, string>; usedBy: number; space?: { used: number; total: number } | null }> }> =>
       http.get(`/hosts/${id}/storage-pools`),
     createStoragePool: (id: number, data: {

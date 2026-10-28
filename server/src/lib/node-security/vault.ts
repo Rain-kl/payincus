@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto'
 
 export interface KeyIdentity { hostId: number; dataset: string; version: number }
-export const datasetPattern = /^[A-Za-z][A-Za-z0-9_.:-]*(\/[A-Za-z0-9_.:-]+)+$/
+export const datasetPattern = /^[A-Za-z][A-Za-z0-9_.:-]*(\/[A-Za-z0-9_.:-]+)*$/
 export function fingerprint(key: string): string {
   if (!/^[0-9a-f]{64}$/.test(key)) throw new Error('需要 64 位十六进制随机 ZFS 密钥')
   return createHash('sha256').update(Buffer.from(key, 'hex')).digest('hex')

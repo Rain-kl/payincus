@@ -20,6 +20,7 @@ export interface IncusApiResponse<T = unknown> {
   operation?: string
   metadata?: T
   error?: string
+  error_code?: number
   err?: string
 }
 

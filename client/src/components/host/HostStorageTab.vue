@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 import api from '@/api'
+import DrawerModal from '@/components/DrawerModal.vue'
+import type { StorageEncryptionState } from '@/api/storage-encryption-types'
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
@@ -16,6 +18,7 @@ interface StoragePool {
   status: string
   purpose?: 'instance_data' | 'instance_storage' | null
   config: Record<string, string>
+  pendingImport?: boolean
   usedBy: number
   space?: { used: number; total: number } | null
 }
@@ -26,11 +29,81 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const encryption = ref<Record<string, StorageEncryptionState>>({})
+const encryptionErrors = ref<Record<string, string>>({})
+const unlockTarget = ref<StoragePool | null>(null)
+const unlockKey = ref('')
+const unlocking = ref(false)
+const unlockError = ref('')
+const lockTarget = ref<StoragePool | null>(null)
+const lockError = ref('')
+const locking = ref(false)
+function closeLock() {
+  if (locking.value) return
+  lockTarget.value = null
+  lockError.value = ''
+}
+function openLock(pool: StoragePool) {
+  lockTarget.value = pool
+  lockError.value = ''
+}
+async function submitLock() {
+  if (!lockTarget.value || locking.value) return
+  const hostId = props.hostId
+  const poolName = lockTarget.value.name
+  locking.value = true
+  lockError.value = ''
+  try {
+    const result = await api.hosts.lockStorage(hostId, poolName)
+    if (hostId !== props.hostId) return
+    encryption.value[poolName] = result
+    lockTarget.value = null
+    toast.success('相关实例已停止，磁盘密钥已卸载')
+    await loadPools()
+  } catch (error: unknown) {
+    if (hostId === props.hostId) lockError.value = error && typeof error === 'object' && 'message' in error ? String(error.message) : '锁盘未完成，请刷新状态后检查实例与存储占用'
+  } finally { locking.value = false }
+}
+let loadGeneration = 0
+function closeUnlock() {
+  if (unlocking.value) return
+  unlockTarget.value = null
+  unlockKey.value = ''
+  unlockError.value = ''
+}
+function openUnlock(pool: StoragePool) {
+  unlockTarget.value = pool
+  unlockKey.value = ''
+  unlockError.value = ''
+}
+async function submitUnlock() {
+  if (!unlockTarget.value || unlocking.value) return
+  const hostId = props.hostId
+  const poolName = unlockTarget.value.name
+  unlocking.value = true
+  unlockError.value = ''
+  try {
+    const result = await api.hosts.unlockStorage(hostId, poolName, unlockKey.value || undefined)
+    if (props.hostId !== hostId) return
+    encryption.value[poolName] = result
+    unlockKey.value = ''
+    unlockTarget.value = null
+    toast.success(result.pendingImport && result.nodeLocked ? '密钥已加载并保存；请在运维页面批准节点恢复，随后自动完成存储导入' : '存储已解锁，密钥已保存')
+    await loadPools()
+  } catch (error: unknown) {
+    if (props.hostId === hostId) unlockError.value = error && typeof error === 'object' && 'message' in error ? String(error.message) : '解锁未完成，请核对密钥和节点连接'
+  } finally { unlocking.value = false }
+}
+onUnmounted(() => { loadGeneration++; unlockKey.value = ''; unlockTarget.value = null; lockTarget.value = null; deleteTarget.value = null })
+
 const loading = ref(true)
+const loadError = ref('')
 const pools = ref<StoragePool[]>([])
 const showCreateModal = ref(false)
 const creating = ref(false)
 const deleting = ref<string | null>(null)
+const deleteTarget = ref<StoragePool | null>(null)
+const deleteError = ref('')
 
 // 编辑模态框状态
 const showEditModal = ref(false)
@@ -123,6 +196,12 @@ onMounted(() => {
 // 当 hostId 变化时，重置状态并重新加载数据
 watch(() => props.hostId, () => {
   // 重置状态
+  loadGeneration++
+  encryption.value = {}
+  encryptionErrors.value = {}
+  unlockKey.value = ''
+  unlockTarget.value = null
+  lockTarget.value = null
   pools.value = []
   showCreateModal.value = false
   showEditModal.value = false
@@ -130,15 +209,49 @@ watch(() => props.hostId, () => {
   loadPools()
 })
 
-async function loadPools() {
-  loading.value = true
+let encryptionRefreshing = false
+async function refreshEncryption(hostId: number, generation: number) {
+  if (encryptionRefreshing) return
+  encryptionRefreshing = true
   try {
-    const res = await api.hosts.getStoragePools(props.hostId)
+    await Promise.all(pools.value.filter(pool => pool.driver === 'zfs').map(async pool => {
+      try {
+        const state = await api.hosts.getStorageEncryption(hostId, pool.name)
+        if (generation === loadGeneration) {
+          encryption.value[pool.name] = state
+          delete encryptionErrors.value[pool.name]
+        }
+      } catch {
+        if (generation === loadGeneration) {
+          delete encryption.value[pool.name]
+          encryptionErrors.value[pool.name] = '加密状态暂不可用，请检查节点版本与连接后刷新'
+        }
+      }
+    }))
+  } finally { encryptionRefreshing = false }
+}
+const encryptionTimer = setInterval(() => {
+  if (!loading.value && !encryptionRefreshing && !unlocking.value && !locking.value) {
+    if (loadError.value || pools.value.some(p => p.pendingImport)) void loadPools()
+    else void refreshEncryption(props.hostId, loadGeneration)
+  }
+}, 10000)
+onUnmounted(() => clearInterval(encryptionTimer))
+
+async function loadPools() {
+  loading.value = pools.value.length === 0
+  loadError.value = ''
+  const hostId = props.hostId
+  const generation = ++loadGeneration
+  try {
+    const res = await api.hosts.getStoragePools(hostId)
+    if (generation !== loadGeneration) return
     pools.value = res.pools || []
-  } catch (err: any) {
-    toast.error(t('admin.hosts.storage.loadFailed') + ': ' + (err?.message || String(err)))
+    void refreshEncryption(hostId, generation)
+  } catch {
+    if (generation === loadGeneration) loadError.value = '存储列表读取失败，请检查节点连接后重试。'
   } finally {
-    loading.value = false
+    if (generation === loadGeneration) loading.value = false
   }
 }
 
@@ -187,7 +300,7 @@ async function createPool() {
         useExisting: true
       })
       if (result.imported) {
-        toast.success(t('admin.hosts.storage.importSuccess'))
+        toast.success(result.message || t('admin.hosts.storage.importSuccess'))
       } else {
         toast.success(t('admin.hosts.storage.linkSuccess'))
       }
@@ -241,23 +354,25 @@ async function createPool() {
   }
 }
 
-async function deletePool(poolName: string) {
-  if (!confirm(t('admin.hosts.storage.deleteConfirm', { name: poolName }))) {
-    return
-  }
-
+function deletePool(poolName: string) {
+  deleteTarget.value = pools.value.find(p => p.name === poolName) || null
+  deleteError.value = ''
+}
+async function submitDelete() {
+  if (!deleteTarget.value || deleting.value) return
+  const hostId = props.hostId
+  const poolName = deleteTarget.value.name
+  const pending = deleteTarget.value.pendingImport
   deleting.value = poolName
   try {
-    await api.hosts.deleteStoragePool(props.hostId, poolName)
-    toast.success(t('admin.hosts.storage.deleteSuccess'))
+    await api.hosts.deleteStoragePool(hostId, poolName)
+    if (hostId !== props.hostId) return
+    deleteTarget.value = null
+    toast.success(pending ? '已移除待导入记录，外部数据和已有密钥已保留' : t('admin.hosts.storage.deleteSuccess'))
     await loadPools()
   } catch (err: any) {
-    const errMsg = err?.message || String(err)
-    const prefix = t('admin.hosts.storage.deleteFailed')
-    toast.error(errMsg.startsWith(prefix) ? errMsg : `${prefix}: ${errMsg}`)
-  } finally {
-    deleting.value = null
-  }
+    if (hostId === props.hostId) deleteError.value = err?.message || '删除未完成，请刷新状态后重试'
+  } finally { deleting.value = null }
 }
 
 function formatBytes(bytes: number | undefined | null): string {
@@ -329,15 +444,19 @@ async function submitEdit() {
         <h3 class="text-lg font-medium text-themed">{{ t('admin.hosts.storage.title') }}</h3>
         <p class="text-sm text-themed-secondary mt-1">{{ t('admin.hosts.storage.subtitle') }}</p>
       </div>
-      <button class="btn-primary" @click="openCreateModal">
-        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ t('admin.hosts.storage.create') }}
-      </button>
+      <div class="flex gap-2">
+        <button class="btn-secondary" :disabled="loading" @click="loadPools">刷新存储</button>
+        <button class="btn-primary" @click="openCreateModal">
+          <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          {{ t('admin.hosts.storage.create') }}
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->
+    <p v-if="loadError" class="text-sm text-themed" role="alert">{{ loadError }} <button class="btn-secondary btn-sm" @click="loadPools">重新加载</button></p>
     <div v-if="loading" class="card p-8 text-center">
       <svg class="w-8 h-8 animate-spin mx-auto text-themed-muted" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -347,7 +466,7 @@ async function submitEdit() {
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="pools.length === 0" class="card p-8 text-center">
+    <div v-else-if="!loadError && pools.length === 0" class="card p-8 text-center">
       <svg class="w-12 h-12 mx-auto text-themed-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
       </svg>
@@ -369,6 +488,8 @@ async function submitEdit() {
             <div class="flex items-center gap-2">
               <span class="font-medium text-themed">{{ pool.name }}</span>
               <span class="badge badge-default text-xs uppercase">{{ pool.driver }}</span>
+              <span v-if="pool.driver === 'zfs' && !encryption[pool.name] && !encryptionErrors[pool.name]" class="text-xs text-themed-muted">正在核验加密状态…</span>
+              <span v-if="encryption[pool.name]?.encrypted" class="badge badge-default text-xs">已加密 · {{ encryption[pool.name]?.pendingImport ? encryption[pool.name]?.state === 'locked' ? '待解密导入' : '待完成导入' : encryption[pool.name]?.lockPending ? '锁盘未完成' : encryption[pool.name]?.state === 'locked' ? '已锁盘' : '已解锁' }}</span>
               <span
                 v-if="pool.purpose"
                 :class="[
@@ -387,6 +508,7 @@ async function submitEdit() {
             </div>
             <p v-if="pool.description" class="text-sm text-themed-secondary mt-1">{{ pool.description }}</p>
             
+            <p v-if="encryptionErrors[pool.name]" class="text-xs text-themed-muted mt-2" role="status">{{ encryptionErrors[pool.name] }}</p>
             <!-- 使用量 -->
             <div v-if="hasValidSpaceInfo(pool)" class="mt-3">
               <div class="flex items-center justify-between text-xs text-themed-muted mb-1">
@@ -426,9 +548,13 @@ async function submitEdit() {
           </div>
 
           <div class="flex items-center gap-2 ml-4">
+            <button v-if="encryption[pool.name]?.encrypted && (encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked || !!encryption[pool.name]?.pendingRecovery || !encryption[pool.name]?.keySaved)" class="btn-secondary btn-sm" :disabled="unlocking" @click="openUnlock(pool)">{{ encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked && encryption[pool.name]?.state === 'unlocked' ? '继续恢复实例' : encryption[pool.name]?.pendingImport && encryption[pool.name]?.state === 'unlocked' ? '继续导入' : encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked ? '解密磁盘' : '保存解锁密钥' }}</button>
+            <button v-if="encryption[pool.name]?.encrypted && !encryption[pool.name]?.pendingImport && encryption[pool.name]?.keySaved && (encryption[pool.name]?.state === 'unlocked' || encryption[pool.name]?.lockPending)" class="btn-secondary btn-sm" :disabled="encryption[pool.name]?.nodeLocked || locking || unlocking || !!encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked" @click="openLock(pool)">{{ encryption[pool.name]?.lockPending ? '重试锁盘' : '加密锁盘' }}</button>
             <!-- 编辑按钮 -->
             <button
               class="btn-secondary btn-sm"
+              :aria-label="`编辑存储池 ${pool.name}`"
+              :disabled="pool.pendingImport"
               @click="openEditModal(pool)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -438,6 +564,7 @@ async function submitEdit() {
             <!-- 删除按钮 -->
             <button
               class="btn-danger btn-sm"
+              :aria-label="`删除存储池 ${pool.name}`"
               :disabled="deleting === pool.name || pool.usedBy > 0"
               @click="deletePool(pool.name)"
             >
@@ -516,6 +643,7 @@ async function submitEdit() {
                 />
               </div>
 
+              <p v-if="createMode === 'create' && form.driver === 'zfs'" class="text-sm text-themed-muted">默认创建 AES-256-GCM 加密存储，密钥由控制端自动生成并加密保存，无需手动交换。请选择专用空磁盘或文件池容量；不会覆盖已有数据。</p>
               <!-- 导入模式的配置 -->
               <template v-if="createMode === 'import'">
                 <!-- 驱动类型 -->
@@ -531,7 +659,7 @@ async function submitEdit() {
                 <!-- 底层存储源 -->
                 <div>
                   <label class="block text-xs text-themed-muted mb-1.5">
-                    {{ importDriver === 'zfs' ? t('admin.hosts.storage.importZfsSource') :
+                    {{ importDriver === 'zfs' ? 'ZFS 池或数据集' :
                       importDriver === 'lvm' ? t('admin.hosts.storage.importLvmSource') :
                       importDriver === 'btrfs' ? t('admin.hosts.storage.importBtrfsSource') :
                       t('admin.hosts.storage.importDirSource') }}
@@ -547,7 +675,7 @@ async function submitEdit() {
                       '/mnt/storage'"
                   />
                   <p class="text-xs text-themed-muted mt-1">
-                    {{ importDriver === 'zfs' ? t('admin.hosts.storage.importZfsHint') :
+                    {{ importDriver === 'zfs' ? '填写已有数据集（例如 test/incus）；只填池名时会选择其中唯一的加密根。添加后可在列表输入密钥解锁。' :
                       importDriver === 'lvm' ? t('admin.hosts.storage.importLvmHint') :
                       importDriver === 'btrfs' ? t('admin.hosts.storage.importBtrfsHint') :
                       t('admin.hosts.storage.importDirHint') }}
@@ -596,9 +724,9 @@ async function submitEdit() {
                     <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.storage.loopSizeHint') }}</p>
                   </div>
                   <div>
-                    <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.storage.zfsPoolName') }}</label>
+                    <label class="block text-xs text-themed-muted mb-1.5">底层 ZFS 池名称（可选）</label>
                     <input v-model="form.zfsPoolName" type="text" class="input" placeholder="incus-pool" />
-                    <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.storage.zfsPoolNameHint') }}</p>
+                    <p class="text-xs text-themed-muted mt-1">留空则与存储池名称一致；自动在其下创建加密数据集，无需单独配置。</p>
                   </div>
                 </template>
 
@@ -808,5 +936,43 @@ async function submitEdit() {
         </div>
       </Transition>
     </Teleport>
+    <DrawerModal :show="!!lockTarget" title="加密锁盘" :closable="!locking" :close-on-backdrop="!locking" @close="closeLock">
+      <form class="space-y-4" @submit.prevent="submitLock">
+        <p class="text-sm text-themed">存储池：{{ lockTarget?.name }}</p>
+        <p class="text-sm text-themed">此操作会停止使用该加密根的所有相关实例，并卸载密钥；不会转换或重写磁盘加密格式。共用同一加密根的其它存储池也会受影响。</p>
+        <p class="text-sm text-themed-muted">保持锁盘直到你手动解密。解密后恢复本次停止的运行实例。</p>
+        <p v-if="lockError" class="text-sm text-themed" role="alert">{{ lockError }}</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" :disabled="locking" @click="closeLock">取消</button>
+          <button type="submit" class="btn-primary" :disabled="locking">{{ locking ? '正在停止实例并锁盘…' : '确认停止并锁盘' }}</button>
+        </div>
+      </form>
+    </DrawerModal>
+    <DrawerModal :show="!!deleteTarget" :title="deleteTarget?.pendingImport ? '移除待导入存储' : '删除存储池'" :closable="!deleting" :close-on-backdrop="!deleting" @close="deleteTarget = null">
+      <form class="space-y-4" @submit.prevent="submitDelete">
+        <p class="text-sm text-themed">存储池：{{ deleteTarget?.name }}</p>
+        <p class="text-sm text-themed">{{ deleteTarget?.pendingImport ? '仅移除尚未绑定的导入记录，外部数据集和已有托管密钥将保留。' : '此操作将删除此池中的存储数据及对应的托管密钥，无法撤销。有实例或卷正在使用时会拒绝删除。' }}</p>
+        <p v-if="deleteError" class="text-sm text-themed" role="alert">{{ deleteError }}</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" :disabled="!!deleting" @click="deleteTarget = null">取消</button>
+          <button type="submit" class="btn-primary" :disabled="!!deleting">{{ deleting ? '正在删除…' : '确认删除' }}</button>
+        </div>
+      </form>
+    </DrawerModal>
+    <DrawerModal :show="!!unlockTarget" title="解密存储磁盘" :closable="!unlocking" :close-on-backdrop="!unlocking" @close="closeUnlock">
+      <form class="space-y-4" @submit.prevent="submitUnlock">
+        <p class="text-sm text-themed">存储池：{{ unlockTarget?.name }}</p>
+        <p class="text-sm text-themed-muted">{{ unlockTarget && encryption[unlockTarget.name]?.keySaved ? '密钥已托管，可直接解锁；也可输入原密钥重新核验。' : '输入创建此加密卷时保存的密钥。校验并加载成功后，控制端加密保存密钥，后续可使用已保存的密钥解锁，无需重复输入。' }}</p>
+        <label class="block text-sm text-themed">ZFS 密钥
+          <input v-model="unlockKey" class="input mt-1 w-full" type="password" autocomplete="off" spellcheck="false" :required="!!unlockTarget && !encryption[unlockTarget.name]?.keySaved" pattern="[0-9a-f]{64}" placeholder="64 位十六进制密钥" :disabled="unlocking" />
+        </label>
+        <p v-if="unlockError" class="text-sm text-themed" role="alert">{{ unlockError }}</p>
+        <p class="text-xs text-themed-muted">解密后将恢复本次锁盘前运行的相关实例。加载存储密钥不会解除节点安全锁定。</p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" :disabled="unlocking" @click="closeUnlock">取消</button>
+          <button type="submit" class="btn-primary" :disabled="unlocking">{{ unlocking ? '正在校验并解锁…' : '提交并保存' }}</button>
+        </div>
+      </form>
+    </DrawerModal>
   </div>
 </template>

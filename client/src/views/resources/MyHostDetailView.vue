@@ -541,7 +541,7 @@ const tabs = computed(() => [
         <HostAgentLogsTab v-if="activeTab === 'agentLogs'" :host-id="host.id" />
         <HostRedeemCodesTab v-if="activeTab === 'redeemCodes'" :host-id="host.id" />
         <HostInstancesTab v-if="activeTab === 'instances'" :host-id="host.id" :host-name="host.name" />
-        <HostOpsTab v-if="activeTab === 'ops'" :host-id="host.id" :host-name="host.name" />
+        <HostOpsTab v-if="activeTab === 'ops'" :host-id="host.id" :host-name="host.name" @refresh="loadHost" />
         <HostCreateInstanceTab v-if="activeTab === 'create'" :host-id="host.id" :host-name="host.name" :instance-type="host.instanceType" />
       </div>
 
