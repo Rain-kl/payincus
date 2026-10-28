@@ -1,0 +1,15 @@
+.profile-rich-tooltip-table {
+  .networks-list,
+  .storage-list {
+    .rich-tooltip-row-content {
+      align-items: baseline;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+
+      > .p-chip.resource-link {
+        margin-top: 2px;
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+.custom-iso-modal {
+  @include large {
+    > section {
+      width: 50rem;
+    }
+
+    .iso-table {
+      min-height: 15rem;
+    }
+  }
+
+  .iso-name {
+    max-width: 20rem;
+  }
+}
+
+.custom-iso-form {
+  @include large {
+    .alias-error {
+      max-width: 20rem;
+    }
+  }
+}

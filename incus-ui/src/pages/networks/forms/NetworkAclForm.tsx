@@ -1,0 +1,257 @@
+import { useState, type FC } from "react";
+import {
+  Button,
+  Form,
+  Icon,
+  Input,
+  ScrollableContainer,
+  useNotify,
+  usePortal,
+  OutputField,
+} from "@canonical/react-components";
+import AutoExpandingTextArea from "components/AutoExpandingTextArea";
+import type { FormikProps } from "formik/dist/types";
+import NetworkAclRuleModal from "pages/networks/forms/NetworkAclRuleModal";
+import NetworkAclRuleTable from "pages/networks/forms/NetworkAclRuleTable";
+import { ensureEditMode } from "util/editMode";
+import { slugify } from "util/slugify";
+import { YAML_CONFIGURATION } from "pages/networks/forms/NetworkFormMenu";
+import YamlForm from "components/forms/YamlForm";
+import type { LxdNetworkAcl } from "types/network";
+import NetworkAclUsedBy from "pages/networks/NetworkAclUsedBy";
+import type {
+  NetworkAclFormValues,
+  NetworkAclRuleFormValues,
+  RuleDirection,
+} from "types/forms/networkAcl";
+
+export const toNetworkAcl = (
+  values: NetworkAclFormValues,
+  networkAcl?: LxdNetworkAcl,
+): LxdNetworkAcl => {
+  const result: LxdNetworkAcl = {
+    name: values.name,
+    description: values.description,
+    egress: values.egress,
+    ingress: values.ingress,
+  };
+  if (networkAcl?.config) {
+    result.config = networkAcl.config;
+  }
+  return result;
+};
+
+interface Props {
+  formik: FormikProps<NetworkAclFormValues>;
+  getYaml: () => string;
+  section: string;
+}
+
+const NetworkAclForm: FC<Props> = ({ formik, getYaml, section }) => {
+  const notify = useNotify();
+  const { openPortal, closePortal, isOpen, Portal } = usePortal();
+  const [editRule, setEditRule] = useState<NetworkAclRuleFormValues | null>(
+    null,
+  );
+  const [ruleDirection, setRuleDirection] = useState<RuleDirection>("ingress");
+  const isEditing = !formik.values.isCreating;
+
+  const getRules = (direction: RuleDirection) => {
+    return direction === "ingress"
+      ? formik.values.ingress
+      : formik.values.egress;
+  };
+
+  const handleSaveRule = ({
+    index: editIndex,
+    ...rule
+  }: NetworkAclRuleFormValues) => {
+    const rules = getRules(ruleDirection);
+
+    if (editIndex === undefined) {
+      // Add new rule
+      formik.setFieldValue(ruleDirection, [...rules, rule]);
+    } else {
+      // Update existing rule
+      const copy = [...rules];
+      copy[editIndex] = rule;
+      formik.setFieldValue(ruleDirection, copy);
+    }
+
+    ensureEditMode(formik);
+    closePortal();
+    setEditRule(null);
+  };
+
+  const openAddRuleModal = (direction: RuleDirection) => {
+    setRuleDirection(direction);
+    openPortal();
+  };
+
+  const handleRemoveRule = (direction: RuleDirection, index: number) => {
+    const rules = getRules(direction);
+    const copy = [...rules];
+    copy.splice(index, 1);
+
+    formik.setFieldValue(direction, copy);
+    ensureEditMode(formik);
+  };
+
+  const openEditRuleModal = (direction: RuleDirection, index: number) => {
+    const rules = getRules(direction);
+    const rule = rules[index];
+    setRuleDirection(direction);
+    setEditRule({ ...rule, index });
+    openPortal();
+  };
+
+  const handleCloseRuleModal = () => {
+    closePortal();
+    setEditRule(null);
+  };
+
+  const isLackingEditPermission = !!formik.values.editRestriction;
+
+  return (
+    <>
+      {isOpen && (
+        <Portal>
+          <NetworkAclRuleModal
+            onClose={handleCloseRuleModal}
+            onAdd={handleSaveRule}
+            editRule={editRule}
+            direction={ruleDirection}
+          />
+        </Portal>
+      )}
+      <ScrollableContainer
+        dependencies={[notify.notification]}
+        belowIds={["form-footer", "status-bar"]}
+      >
+        <Form onSubmit={formik.handleSubmit}>
+          {section !== slugify(YAML_CONFIGURATION) && (
+            <>
+              {/* hidden submit to enable enter key in inputs */}
+              <div className="bare-inputs">
+                <Input type="submit" hidden value="Hidden input" />
+                {isEditing ? (
+                  <OutputField
+                    id="name"
+                    label="Name"
+                    value={formik.values.name}
+                    help="Click the name in the header to rename the network ACL."
+                  />
+                ) : (
+                  <Input
+                    id="name"
+                    type="text"
+                    label="Name"
+                    placeholder="Enter name"
+                    required
+                    autoFocus
+                    disabled={isLackingEditPermission}
+                    title={formik.values.editRestriction}
+                    {...formik.getFieldProps("name")}
+                    error={formik.touched.name ? formik.errors.name : null}
+                  />
+                )}
+                <AutoExpandingTextArea
+                  id="description"
+                  name="description"
+                  label="Description"
+                  placeholder="Enter description"
+                  onBlur={formik.handleBlur}
+                  onChange={(e) => {
+                    ensureEditMode(formik);
+                    formik.handleChange(e);
+                  }}
+                  value={formik.values.description}
+                  disabled={isLackingEditPermission}
+                  title={formik.values.editRestriction}
+                />
+              </div>
+              {formik.values.ingress.length > 0 && (
+                <>
+                  <h2 className="p-heading--4">Ingress rules</h2>
+                  <NetworkAclRuleTable
+                    rules={formik.values.ingress}
+                    onRemove={(index) => {
+                      handleRemoveRule("ingress", index);
+                    }}
+                    onEdit={(index) => {
+                      openEditRuleModal("ingress", index);
+                    }}
+                    editRestriction={formik.values.editRestriction}
+                  />
+                </>
+              )}
+              <div>
+                <Button
+                  hasIcon
+                  onClick={() => {
+                    openAddRuleModal("ingress");
+                  }}
+                  type="button"
+                  disabled={isLackingEditPermission}
+                  title={formik.values.editRestriction}
+                >
+                  <Icon name="plus" />
+                  <span>Add ingress rule</span>
+                </Button>
+              </div>
+
+              {formik.values.egress.length > 0 && (
+                <>
+                  <h2 className="p-heading--4">Egress rules</h2>
+                  <NetworkAclRuleTable
+                    rules={formik.values.egress}
+                    onRemove={(index) => {
+                      handleRemoveRule("egress", index);
+                    }}
+                    onEdit={(index) => {
+                      openEditRuleModal("egress", index);
+                    }}
+                    editRestriction={formik.values.editRestriction}
+                  />
+                </>
+              )}
+              <div>
+                <Button
+                  hasIcon
+                  onClick={() => {
+                    openAddRuleModal("egress");
+                  }}
+                  type="button"
+                  disabled={isLackingEditPermission}
+                  title={formik.values.editRestriction}
+                >
+                  <Icon name="plus" />
+                  <span>Add egress rule</span>
+                </Button>
+              </div>
+              {formik.values.bareAcl?.used_by && (
+                <>
+                  <h2 className="p-heading--4">Used by</h2>
+                  <NetworkAclUsedBy networkAcl={formik.values.bareAcl} />
+                </>
+              )}
+            </>
+          )}
+          {section === slugify(YAML_CONFIGURATION) && (
+            <YamlForm
+              yaml={getYaml()}
+              setYaml={(yaml) => {
+                ensureEditMode(formik);
+                formik.setFieldValue("yaml", yaml);
+              }}
+              readOnly={isLackingEditPermission}
+              readOnlyMessage={formik.values.editRestriction}
+            />
+          )}
+        </Form>
+      </ScrollableContainer>
+    </>
+  );
+};
+
+export default NetworkAclForm;

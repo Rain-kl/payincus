@@ -1,0 +1,15 @@
+.upload-instance-modal,
+.upload-volume-modal {
+  .content-details {
+    margin-left: -$sph--x-small;
+    padding-left: $sph--x-small;
+  }
+
+  @include large {
+    .p-modal__dialog {
+      margin: auto;
+      position: absolute;
+      width: 35rem;
+    }
+  }
+}

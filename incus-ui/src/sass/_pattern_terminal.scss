@@ -1,0 +1,28 @@
+.p-terminal {
+  height: calc(100dvh - 240px);
+
+  .xterm {
+    .xterm-viewport {
+      background-color: #292c2f;
+      overflow: hidden;
+    }
+
+    /* Temporary CSS fix for the mismatching background problem, to be removed
+    once https://github.com/xtermjs/xterm.js/issues/5781 is resolved */
+    .xterm-scrollable-element {
+      background-color: #292c2f !important;
+    }
+  }
+}
+
+@media screen and (min-width: $breakpoint-small) {
+  .p-terminal {
+    height: calc(100dvh - 170px);
+  }
+}
+
+@media screen and (min-width: $breakpoint-large) {
+  .p-terminal {
+    height: calc(100dvh - 210px);
+  }
+}

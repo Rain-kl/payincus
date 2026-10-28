@@ -1,0 +1,72 @@
+.images-list {
+  .image-table {
+    .architecture {
+      width: 8rem;
+    }
+
+    .cached {
+      width: 8rem;
+    }
+
+    .type {
+      width: 8rem;
+    }
+
+    .uploaded_at {
+      width: 8rem;
+    }
+
+    .size {
+      width: 8rem;
+    }
+
+    .actions {
+      width: 9rem;
+    }
+
+    .actions-list {
+      margin-top: -7px;
+    }
+
+    @media screen and (width < 1500px) {
+      .uploaded_at,
+      .size {
+        display: none;
+      }
+    }
+
+    @media screen and (width < 1200px) {
+      .aliases,
+      .architecture,
+      .cached {
+        display: none;
+      }
+    }
+
+    @media screen and (width < 600px) {
+      .select {
+        display: none;
+      }
+    }
+
+    @media screen and (width < 500px) {
+      .type {
+        display: none;
+      }
+    }
+  }
+
+  @media screen and (width < 650px) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}
+
+.import-image-modal {
+  .p-modal__dialog {
+    @include large {
+      width: 35rem;
+    }
+  }
+}

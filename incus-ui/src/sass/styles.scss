@@ -1,0 +1,485 @@
+@charset "UTF-8";
+@use "sass:map";
+@import "settings";
+@import "vanilla-framework/scss/build";
+@import "./breakpoints";
+@import "pattern_icon";
+@include lxdui-p-icon;
+@include vf-p-icon-add-canvas;
+@include vf-p-icon-add-logical-volume;
+@include vf-p-icon-applications;
+@include vf-p-icon-arrow-left;
+@include vf-p-icon-arrow-right;
+@include vf-p-icon-begin-downloading;
+@include vf-p-icon-book;
+@include vf-p-icon-canvas;
+@include vf-p-icon-certificate;
+@include vf-p-icon-change-version;
+@include vf-p-icon-close;
+@include vf-p-icon-cluster-host;
+@include vf-p-icon-connected;
+@include vf-p-icon-containers;
+@include vf-p-icon-copy-to-clipboard;
+@include vf-p-icon-desktop;
+@include vf-p-icon-disconnect;
+@include vf-p-icon-edit;
+@include vf-p-icon-export;
+@include vf-p-icon-exposed;
+@include vf-p-icon-file-blank;
+@include vf-p-icon-file;
+@include vf-p-icon-filter;
+@include vf-p-icon-folder;
+@include vf-p-icon-fullscreen;
+@include vf-p-icon-get-link;
+@include vf-p-icon-image;
+@include vf-p-icon-import;
+@include vf-p-icon-iso;
+@include vf-p-icon-lock-locked;
+@include vf-p-icon-machines;
+@include vf-p-icon-map;
+@include vf-p-icon-mount;
+@include vf-p-icon-open-terminal;
+@include vf-p-icon-pause;
+@include vf-p-icon-plans;
+@include vf-p-icon-play;
+@include vf-p-icon-pods;
+@include vf-p-icon-power-off;
+@include vf-p-icon-priority-low;
+@include vf-p-icon-private-key;
+@include vf-p-icon-profile;
+@include vf-p-icon-profiles;
+@include vf-p-icon-repository;
+@include vf-p-icon-restart;
+@include vf-p-icon-security;
+@include vf-p-icon-security-tick;
+@include vf-p-icon-settings;
+@include vf-p-icon-single-host;
+@include vf-p-icon-snapshot;
+@include vf-p-icon-statistics;
+@include vf-p-icon-status-failed-small;
+@include vf-p-icon-status-in-progress-small;
+@include vf-p-icon-status-queued-small;
+@include vf-p-icon-status-succeeded-small;
+@include vf-p-icon-status-waiting-small;
+@include vf-p-icon-status;
+@include vf-p-icon-storage-bucket;
+@include vf-p-icon-storage-pool;
+@include vf-p-icon-storage-volume;
+@include vf-p-icon-stop;
+@include vf-p-icon-submit-bug;
+@include vf-p-icon-switcher-dashboard;
+@include vf-p-icon-switcher-environments;
+@include vf-p-icon-task-outstanding;
+@include vf-p-icon-tidy;
+@include vf-p-icon-units;
+@include vf-p-icon-upload;
+@include vf-p-icon-user-group;
+@include vf-p-icon-video-play;
+@include vf-p-icon-warning-grey;
+
+$border-default: 1px solid $colors--theme--border-default;
+$border-thin: 1px solid $colors--theme--border-low-contrast !default;
+
+@import "authentication_setup";
+@import "authentication_options";
+@import "certificate_add";
+@import "certificates";
+@import "cloud_init_form";
+@import "cluster_group_form";
+@import "cluster_link";
+@import "cluster_link_rich_tooltip";
+@import "cluster_list";
+@import "cluster_specific_input";
+@import "code_snippet_with_copy";
+@import "configuration_table";
+@import "copy_to_clipboard";
+@import "custom_dropdown";
+@import "custom_isos";
+@import "detail_page";
+@import "detail_panels";
+@import "disk_device_form";
+@import "device_detail_list";
+@import "empty_state";
+@import "error_page";
+@import "file_explorer";
+@import "file_row";
+@import "form-link";
+@import "font";
+@import "forms";
+@import "images";
+@import "image_registry_detail";
+@import "image_registry_list";
+@import "image_registry_protocol";
+@import "image_registry_protocol_selector";
+@import "image_registry_rich_tooltip";
+@import "incusos_overview";
+@import "instance_detail_console";
+@import "instance_detail_overview";
+@import "instance_detail_page";
+@import "instance_detail_panel";
+@import "instance_detail_terminal";
+@import "instance_ip_edit";
+@import "instance_list";
+@import "instance_rich_tooltip";
+@import "instance_target_selector";
+@import "ip_address";
+@import "load_balancers";
+@import "login";
+@import "meter";
+@import "migrate_instance";
+@import "minimal_console";
+@import "modified_actions";
+@import "network_default_acl_selector";
+@import "network_device_form";
+@import "network_form";
+@import "network_forwards_form";
+@import "network_ipam";
+@import "network_leases";
+@import "network_list";
+@import "network_load_balancers_form";
+@import "network_topology";
+@import "network_selector";
+@import "no_match";
+@import "not_found";
+@import "operation_list";
+@import "page_header";
+@import "pattern_navigation";
+@import "pattern_terminal";
+@import "permission_confirm_modal";
+@import "permission_identities";
+@import "permission_idp_groups";
+@import "permission_group_selection";
+@import "permission_groups";
+@import "pool_rich_tooltip";
+@import "profile_detail_overview";
+@import "profile_detail_panel";
+@import "profile_list";
+@import "profile_rich_tooltip";
+@import "profile_used_by_default_project";
+@import "progress_bar";
+@import "project_configuration";
+@import "project_rich_tooltip";
+@import "project_select";
+@import "rename_device";
+@import "rename_header";
+@import "replicators";
+@import "replicator_rich_tooltip";
+@import "resources";
+@import "rich_tooltip";
+@import "selectable_main_table";
+@import "settings_page";
+@import "snapshots";
+@import "ssh_key_form";
+@import "sso_provider_selector";
+@import "status_bar";
+@import "storage_detail_overview";
+@import "storage_pool_form";
+@import "storage_pool_selector";
+@import "storage_volume_form";
+@import "storage";
+@import "tag";
+@import "upload_instance_modal";
+@import "upper_controls_bar";
+@import "warnings_table";
+@import "yaml_type_selector";
+@import "use_oci_modal";
+
+body {
+  // needed for notification list expanding animation
+  overflow: hidden;
+  scrollbar-color: $color-mid-dark transparent;
+}
+
+.p-heading--4 {
+  padding: 0;
+}
+
+.l-main .row {
+  max-width: none;
+}
+
+.u-vertical-align-middle {
+  vertical-align: middle;
+}
+
+.u-inline-block {
+  display: inline-block;
+}
+
+.storage-detail-table {
+  th {
+    width: 12rem;
+  }
+}
+
+.no-grid-gap {
+  gap: 0;
+}
+
+.u-loader {
+  margin: $spv--x-large $sph--x-large $spv--x-large $sph--x-large;
+}
+
+.p-bottom-controls {
+  background-color: $colors--theme--background-default;
+  bottom: 0;
+  position: sticky;
+}
+
+.status-icon {
+  margin-right: $sph--x-small;
+}
+
+.status-spinner {
+  margin-left: 1.25rem;
+}
+
+.external-link-icon {
+  @include vf-icon-external-link($color-link);
+}
+
+.actions-list {
+  display: inline-block;
+  min-width: 6.5rem;
+
+  .p-inline-list__item {
+    margin-right: 0;
+  }
+
+  & > * {
+    border-right: $border-thin;
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+
+    button {
+      margin: 0;
+      width: 44px;
+    }
+  }
+
+  & > *:last-child {
+    border-right: none;
+  }
+}
+
+// smaller padding on top of all pages to have the logo flush on top
+.p-panel__title,
+.p-panel__controls {
+  padding-top: $spv--x-small;
+}
+
+.p-panel__title {
+  padding-bottom: $spv--medium;
+}
+
+.p-breadcrumbs--large {
+  min-width: 0;
+  width: inherit;
+
+  .p-breadcrumbs__items {
+    margin-bottom: 0;
+
+    .continuous-breadcrumb {
+      display: inline-block;
+      margin-bottom: 0 !important;
+    }
+  }
+
+  .p-breadcrumbs__item {
+    font-size: #{map.get($font-sizes, h4-mobile)}rem;
+    font-weight: 275;
+    line-height: 1.45rem;
+    margin-bottom: 0;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .continuous-breadcrumb::after {
+    content: "/";
+    padding: 0 5px; // Adjust spacing as needed
+  }
+
+  .continuous-breadcrumb:last-child::after {
+    content: ""; // Remove the slash from the last item
+  }
+
+  .p-breadcrumbs__item::before {
+    content: none;
+  }
+
+  .p-breadcrumbs__item:first-of-type {
+    margin-right: $sph--x-small;
+  }
+}
+
+.p-tabs__list {
+  margin-bottom: $spv--large !important;
+}
+
+.u-space-between {
+  display: flex;
+  justify-content: space-between;
+}
+
+.u-flex-row-reverse {
+  flex-direction: row-reverse;
+}
+
+.u-flex {
+  align-items: center;
+  display: flex;
+}
+
+.u-flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.u-no-border {
+  border: none !important;
+}
+
+.u-no-border--bottom {
+  border-bottom: none !important;
+}
+
+.item-name {
+  overflow-wrap: anywhere;
+}
+
+.header-second-row {
+  display: inline-block;
+  padding-top: 1px;
+}
+
+@media (width >= 460px) {
+  .l-application .l-aside.is-narrow {
+    width: 25.65rem;
+  }
+}
+
+.u-text--line-through {
+  text-decoration: line-through;
+}
+
+.margin-right--large {
+  margin-right: $sph--large;
+}
+
+.help-link {
+  align-items: center;
+  display: inline-flex;
+
+  .help-link-icon {
+    height: 1rem;
+    margin-left: $spv--small;
+    margin-top: 0.55rem; // extra margin to align with the text should be removed when this is fixed: https://github.com/canonical/vanilla-framework/issues/4891
+    width: 1rem;
+
+    @include extra-large {
+      margin-top: 0.665rem; // extra margin to align with the text should be removed when this is fixed: https://github.com/canonical/vanilla-framework/issues/4891
+    }
+  }
+}
+
+.no-border-top {
+  border-top: none !important;
+}
+
+.network-forwards-table {
+  .actions {
+    max-width: 8rem;
+  }
+}
+
+#pagination {
+  margin-bottom: 0;
+}
+
+.u-selectable-table-rows {
+  .u-row:hover {
+    background-color: $colors--theme--background-hover;
+    cursor: pointer;
+  }
+
+  .u-row--disabled:hover {
+    background-color: $colors--theme--background-default;
+    cursor: auto;
+  }
+}
+
+.clickable-cell {
+  cursor: pointer;
+}
+
+.create-instance-from-snapshot-modal,
+.copy-instances-modal,
+.copy-volumes-modal,
+.create-image-from-instance-modal,
+.export-instance-modal,
+.export-volume-modal,
+.enable-clustering-modal {
+  .p-modal__dialog {
+    @include large {
+      width: 35rem;
+    }
+  }
+}
+
+.host-path-device-modal,
+.create-tls-identity,
+.create-cluster-link {
+  .p-modal__dialog {
+    @include large {
+      width: 40rem;
+    }
+
+    .p-modal__header {
+      .resource-label {
+        max-width: 14rem;
+
+        /* icon in the header is slightly too small by default, increase its dimensions */
+        i {
+          height: 1rem;
+          width: 1rem;
+        }
+      }
+    }
+  }
+}
+
+.table-description {
+  -webkit-box-orient: vertical;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.u-break-all {
+  word-break: break-all;
+}
+
+.used-by-row-header {
+  .icon {
+    margin-right: $sph--large;
+    opacity: 0.6;
+  }
+}
+
+.u-gap--small {
+  gap: $sph--small;
+}
+
+.u-margin-left--small {
+  margin-left: $sph--small;
+}
+
+.mono-font {
+  font-family: unquote($font-monospace);
+}
+
+.back-link-icon {
+  margin-left: $sph--small !important;
+  margin-right: $sph--small !important;
+}

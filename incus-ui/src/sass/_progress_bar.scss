@@ -1,0 +1,12 @@
+.p-progress-bar {
+  border: 1px solid $colors--theme--border-default;
+  height: 30px;
+  margin-top: 5px;
+  padding: 2px;
+  width: 100%;
+
+  div {
+    background-color: #06c;
+    height: 100%;
+  }
+}

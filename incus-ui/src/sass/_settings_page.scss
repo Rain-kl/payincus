@@ -1,0 +1,83 @@
+.settings {
+  min-height: initial !important;
+
+  .group {
+    width: 8rem;
+
+    @include mobile {
+      display: none;
+    }
+  }
+
+  .key-cell {
+    padding: 0.4rem 0;
+  }
+
+  .input-row,
+  .readmode-button {
+    align-items: center;
+    display: flex;
+  }
+
+  .input-wrapper {
+    flex-grow: 1;
+  }
+
+  .readmode-button {
+    padding: 0 1rem 0 0;
+    text-align: start;
+    width: 100%;
+
+    .readmode-value {
+      flex-grow: 1;
+      padding: 0.4rem 0;
+    }
+
+    .edit-icon {
+      min-width: 1rem;
+    }
+  }
+
+  .reset-button,
+  .delete-button {
+    padding: 0 $sph--small;
+  }
+
+  .cluster-specific-input {
+    padding-bottom: 0;
+  }
+
+  .image-server-row {
+    align-items: flex-end;
+    display: flex;
+    gap: $sph--small;
+
+    .p-form__group {
+      flex-grow: 1;
+      margin-bottom: 0;
+    }
+  }
+
+  .cluster-specific-value-wrapper {
+    align-items: center;
+
+    .cluster-specific-value {
+      flex-grow: 1;
+    }
+  }
+
+  .read-only {
+    .cluster-specific-value-wrapper {
+      display: flex;
+    }
+
+    .cluster-specific-value {
+      flex-grow: 0;
+    }
+
+    .p-button--base {
+      flex-grow: 1;
+      text-align: right;
+    }
+  }
+}

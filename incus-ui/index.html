@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Incus UI</title>
+    <script>
+      (function () {
+        const path = window.location.pathname;
+        const match = path.match(/^(\/incus-ui\/[1-9]\d*)(?:\/ui(?:\/.*)?|\/?)?$/);
+        if (match) {
+          const rootPath = match[1];
+          window.ROOT_PATH = rootPath;
+          if (path === rootPath || path === rootPath + "/") {
+            window.history.replaceState(null, "", rootPath + "/ui" + window.location.search);
+          }
+        } else {
+          const uiIndex = path.indexOf("/ui/");
+          window.ROOT_PATH = uiIndex > -1 ? path.substring(0, uiIndex) : "";
+        }
+
+        const baseTag = document.createElement("base");
+        baseTag.href = window.location.origin + "/incus-ui/";
+        document.head.appendChild(baseTag);
+      })();
+    </script>
+
+    <link rel="shortcut icon" href="/incus-ui/assets/img/favicon-32x32.png" id="favicon" />
+    <script>const global = globalThis;</script>
+    <script type="module" src="/src/index.tsx"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

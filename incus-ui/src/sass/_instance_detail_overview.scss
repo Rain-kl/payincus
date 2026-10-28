@@ -1,0 +1,118 @@
+.instance-overview-tab {
+  overflow: auto;
+
+  .row {
+    margin-top: $spv--x-large;
+  }
+
+  .general,
+  .instance-preview,
+  .usage,
+  .profiles,
+  .networks {
+    border-bottom: $border-thin;
+
+    table {
+      margin-bottom: $spv--large;
+    }
+  }
+
+  .general,
+  .instance-preview,
+  .usage {
+    tr {
+      border: none;
+    }
+
+    td,
+    th {
+      padding-bottom: $spv--x-small;
+      padding-left: 0;
+      padding-top: $spv--x-small;
+    }
+
+    th {
+      width: 30%;
+    }
+
+    td:first-of-type,
+    th:first-of-type {
+      padding-top: $spv--small;
+    }
+  }
+
+  .networks {
+    th {
+      &:nth-child(1) {
+        width: 30%;
+      }
+
+      &:nth-child(2) {
+        width: 6.5rem;
+      }
+
+      &:nth-child(5) {
+        width: 4.5rem;
+      }
+    }
+
+    th:first-of-type,
+    td:first-of-type {
+      padding-left: 0;
+    }
+  }
+
+  .profiles {
+    th:nth-child(1) {
+      width: 30%;
+    }
+
+    th:first-of-type,
+    td:first-of-type {
+      padding-left: 0;
+    }
+  }
+
+  .usage {
+    .metric-row {
+      .p-meter {
+        margin-top: $spv--small;
+      }
+    }
+  }
+
+  .resource-label {
+    max-width: 100%; // allow base image to take full width
+  }
+
+  .instance-load-balancers {
+    margin-left: 40%;
+    margin-top: -0.5rem;
+    width: 21rem;
+
+    @include mobile-and-tablet {
+      margin-left: 33%;
+      width: auto;
+
+      .status-header {
+        padding-left: 1rem !important;
+      }
+    }
+
+    tr {
+      border-bottom: 0;
+    }
+
+    .pools-header {
+      min-width: 10rem;
+    }
+
+    .status-header {
+      padding-left: 2.1rem;
+    }
+  }
+
+  .p-table__expanding-panel:has(.instance-load-balancers:empty) {
+    display: none;
+  }
+}

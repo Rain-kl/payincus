@@ -1,0 +1,25 @@
+.p-meter {
+  background-color: $colors--theme--background-alt;
+  border: $border-thin;
+  display: flex;
+  height: 0.75rem;
+  margin-bottom: 0.375rem;
+
+  div {
+    background-color: #06c;
+    border-right: $border-thin;
+    height: 100%;
+  }
+
+  .has-next-sibling {
+    border-bottom-right-radius: 0;
+    border-right: 0;
+    border-top-right-radius: 0;
+  }
+
+  .has-previous-sibling {
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0;
+    opacity: 0.3;
+  }
+}

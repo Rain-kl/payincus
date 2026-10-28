@@ -1,0 +1,195 @@
+import { useEffect, type FC } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import {
+  ActionButton,
+  useNotify,
+  useToastNotification,
+} from "@canonical/react-components";
+import { useFormik } from "formik";
+import type { NetworkForwardFormValues } from "types/forms/networkForward";
+import NetworkForwardForm, {
+  NetworkForwardSchema,
+  toNetworkForward,
+} from "pages/networks/forms/NetworkForwardForm";
+import {
+  fetchNetworkForward,
+  updateNetworkForward,
+} from "api/network-forwards";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import BaseLayout from "components/BaseLayout";
+import HelpLink from "components/HelpLink";
+import FormFooterLayout from "components/forms/FormFooterLayout";
+import { useEventQueue } from "context/eventQueue";
+import { useNetwork } from "context/useNetworks";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+import { ROOT_PATH } from "util/rootPath";
+
+const EditNetworkForward: FC = () => {
+  const navigate = useNavigate();
+  const notify = useNotify();
+  const toastNotify = useToastNotification();
+  const queryClient = useQueryClient();
+  const {
+    network: networkName,
+    project,
+    forwardAddress,
+    memberName,
+  } = useParams<{
+    network: string;
+    project: string;
+    forwardAddress: string;
+    memberName?: string;
+  }>();
+  const { data: network, error } = useNetwork(networkName ?? "", project ?? "");
+  const { hasStorageAndNetworkOperations } = useSupportedFeatures();
+  const eventQueue = useEventQueue();
+
+  useEffect(() => {
+    if (error) {
+      notify.failure("Loading network failed", error);
+    }
+  }, [error]);
+
+  const { data: forward } = useQuery({
+    queryKey: [
+      queryKeys.projects,
+      project,
+      queryKeys.networks,
+      networkName,
+      queryKeys.forwards,
+      forwardAddress,
+      queryKeys.members,
+      memberName,
+    ],
+    queryFn: async () =>
+      fetchNetworkForward(
+        networkName ?? "",
+        forwardAddress ?? "",
+        project ?? "",
+        memberName ?? "",
+      ),
+  });
+
+  const invalidateCache = () => {
+    queryClient.invalidateQueries({
+      queryKey: [
+        queryKeys.projects,
+        project,
+        queryKeys.networks,
+        networkName,
+        queryKeys.forwards,
+      ],
+    });
+    queryClient.invalidateQueries({
+      queryKey: [
+        queryKeys.projects,
+        project,
+        queryKeys.networks,
+        networkName,
+        queryKeys.forwards,
+        forwardAddress,
+        queryKeys.members,
+        memberName,
+      ],
+    });
+  };
+
+  const onSuccess = (listenAddress: string) => {
+    invalidateCache();
+    navigate(
+      `${ROOT_PATH}/ui/project/${encodeURIComponent(project ?? "")}/network/${encodeURIComponent(networkName ?? "")}/forwards`,
+    );
+    toastNotify.success(`Network forward ${listenAddress} updated.`);
+  };
+
+  const onFailure = (listenAddress: string, e: unknown) => {
+    invalidateCache();
+    formik.setSubmitting(false);
+    notify.failure(`Update of network forward ${listenAddress} failed`, e);
+  };
+
+  const formik = useFormik<NetworkForwardFormValues>({
+    initialValues: {
+      listenAddress: forwardAddress ?? "",
+      defaultTargetAddress: forward?.config.target_address ?? "",
+      description: forward?.description ?? "",
+      ports:
+        forward?.ports.map((port) => ({
+          listenPort: port.listen_port,
+          protocol: port.protocol,
+          targetAddress: port.target_address,
+          targetPort: port.target_port,
+        })) ?? [],
+      location: forward?.location,
+    },
+    enableReinitialize: true,
+    validationSchema: NetworkForwardSchema,
+    onSubmit: (values) => {
+      const forward = toNetworkForward(values);
+
+      updateNetworkForward(networkName ?? "", forward, project ?? "")
+        .then((operation) => {
+          if (hasStorageAndNetworkOperations) {
+            toastNotify.info(
+              <>
+                Update of network forward {forward.listen_address} has started.
+              </>,
+            );
+            eventQueue.set(
+              operation.metadata.id,
+              () => {
+                onSuccess(forward.listen_address);
+              },
+              (msg) => {
+                onFailure(forward.listen_address, new Error(msg));
+              },
+            );
+          } else {
+            onSuccess(forward.listen_address);
+          }
+        })
+        .catch((e) => {
+          onFailure(forward.listen_address, e);
+        });
+    },
+  });
+
+  return (
+    <BaseLayout
+      title={
+        <HelpLink
+          docPath="/howto/network_forwards/"
+          title="Learn more about network forwards"
+        >
+          Edit a network forward
+        </HelpLink>
+      }
+      contentClassName="edit-network"
+    >
+      <NetworkForwardForm formik={formik} isEdit network={network} />
+      <FormFooterLayout>
+        <Link
+          className="p-button--base"
+          to={`${ROOT_PATH}/ui/project/${encodeURIComponent(project ?? "")}/network/${encodeURIComponent(networkName ?? "")}/forwards`}
+        >
+          Cancel
+        </Link>
+        <ActionButton
+          appearance="positive"
+          loading={formik.isSubmitting}
+          disabled={
+            !formik.isValid ||
+            formik.isSubmitting ||
+            !formik.values.listenAddress
+          }
+          onClick={() => void formik.submitForm()}
+        >
+          Update
+        </ActionButton>
+      </FormFooterLayout>
+    </BaseLayout>
+  );
+};
+
+export default EditNetworkForward;

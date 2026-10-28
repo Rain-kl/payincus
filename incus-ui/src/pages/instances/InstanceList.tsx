@@ -1,0 +1,919 @@
+import { useEffect, useState, type FC } from "react";
+import {
+  Button,
+  Col,
+  CustomLayout,
+  EmptyState,
+  Icon,
+  Row,
+  ScrollableTable,
+  Spinner,
+  TablePagination,
+  useListener,
+  useNotify,
+  visibleHeaderColumns,
+  visibleRowColumns,
+} from "@canonical/react-components";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import usePanelParams, { panels } from "util/usePanelParams";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import InstanceStatusIcon from "./InstanceStatusIcon";
+import classnames from "classnames";
+import InstanceStateActions from "pages/instances/actions/InstanceStateActions";
+import { useInstanceLoading } from "context/instanceLoading";
+import InstanceLink from "pages/instances/InstanceLink";
+import ColumnSelector from "components/ColumnSelector";
+import SelectableMainTable from "components/SelectableMainTable";
+import InstanceBulkActions from "pages/instances/actions/InstanceBulkActions";
+import { getIpAddresses, sortIpv6Addresses } from "util/networks";
+import InstanceBulkDelete from "pages/instances/actions/InstanceBulkDelete";
+import MigrateInstanceBulkBtn from "pages/instances/actions/MigrateInstanceBulkBtn";
+import ReceiveMigrationBtn from "pages/instances/actions/ReceiveMigrationBtn";
+import InstanceSearchFilter from "./InstanceSearchFilter";
+import {
+  encodeServerFilters,
+  getServerSupportedFilters,
+  parseFilters,
+  showInstance,
+} from "util/instanceFilter";
+import { enrichStatuses } from "util/instanceFilter";
+import { fetchOperations } from "api/operations";
+import CancelOperationBtn from "pages/operations/actions/CancelOperationBtn";
+import type {
+  MainTableHeader,
+  MainTableRow,
+} from "@canonical/react-components/dist/components/MainTable/MainTable";
+import {
+  ALL_COLUMNS,
+  ACTIONS,
+  CLUSTER_MEMBER,
+  COLUMN_WIDTHS,
+  CREATION_SPAN_COLUMNS,
+  DESCRIPTION,
+  FILESYSTEM,
+  IPV4,
+  IPV6,
+  MEMORY,
+  NAME,
+  OS_NAME,
+  PROJECT,
+  SIZE_HIDEABLE_COLUMNS,
+  SNAPSHOTS,
+  STATUS,
+  TYPE,
+  USER_HIDEABLE_COLUMNS,
+} from "util/instanceTable";
+import {
+  getInstanceName,
+  isCreatingInstance,
+  isRestoringBackup,
+} from "util/operations";
+import NotificationRow from "components/NotificationRow";
+import SelectedTableNotification from "components/SelectedTableNotification";
+import HelpLink from "components/HelpLink";
+import useSortTableData from "util/useSortTableData";
+import PageHeader from "components/PageHeader";
+import InstanceDetailPanel from "./InstanceDetailPanel";
+import {
+  mediumScreenBreakpoint,
+  useIsScreenBelow,
+} from "context/useIsScreenBelow";
+import InstanceUsageMainMemory from "pages/instances/InstanceUsageMainMemory";
+import InstanceUsageRootFilesystem from "pages/instances/InstanceUsageRootFilesystem";
+import { useInstances } from "context/useInstances";
+import { useProjectEntitlements } from "util/entitlements/projects";
+import { useCurrentProject } from "context/useCurrentProject";
+import { useProject } from "context/useProjects";
+import { getTypeFromDisplayName } from "util/images";
+import {
+  getInstanceKey,
+  getInstanceOSName,
+  getInstanceType,
+} from "util/instances";
+import DocLink from "components/DocLink";
+import TruncatedList from "components/TruncatedList";
+import ClusterMemberRichChip from "pages/cluster/ClusterMemberRichChip";
+import { ROOT_PATH } from "util/rootPath";
+import ProjectRichChip from "pages/projects/ProjectRichChip";
+import InstanceCreationProgress from "components/InstanceCreationProgress";
+import { useSettings } from "context/useSettings";
+import { isClusteredServer } from "util/settings";
+
+const loadHidden = () => {
+  const saved = localStorage.getItem("instanceListHiddenColumns");
+  const validColumns = new Set(USER_HIDEABLE_COLUMNS);
+  return saved
+    ? (JSON.parse(saved) as string[]).filter((item) => validColumns.has(item))
+    : [MEMORY, FILESYSTEM];
+};
+
+const loadOrderedColumns = () => {
+  const saved = localStorage.getItem("instanceListOrderedColumns");
+  return saved ? (JSON.parse(saved) as string[]) : ALL_COLUMNS;
+};
+
+const saveHidden = (columns: string[]) => {
+  localStorage.setItem("instanceListHiddenColumns", JSON.stringify(columns));
+};
+
+const saveOrdered = (columns: string[]) => {
+  localStorage.setItem("instanceListOrderedColumns", JSON.stringify(columns));
+};
+
+const InstanceList: FC = () => {
+  const instanceLoading = useInstanceLoading();
+  const navigate = useNavigate();
+  const notify = useNotify();
+  const panelParams = usePanelParams();
+  const { project, isAllProjects } = useCurrentProject();
+  const { data: defaultProject } = useProject("default", isAllProjects);
+  const [createButtonLabel, _setCreateButtonLabel] =
+    useState<string>("Create instance");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { data: settings } = useSettings();
+  const isClustered = isClusteredServer(settings);
+  const { canCreateInstances } = useProjectEntitlements();
+
+  const filters: InstanceFilters = {
+    queries: searchParams.getAll("query").map((value) => value.toLowerCase()),
+    statuses: enrichStatuses(
+      searchParams.getAll("status") as LxdInstanceStatus[],
+    ),
+    types: searchParams.getAll("type").map(getTypeFromDisplayName),
+    profiles: searchParams.getAll("profile"),
+    clusterMembers: searchParams.getAll("member"),
+    projects: searchParams.getAll("project"),
+  };
+
+  const [userHidden, setUserHidden] = useState<string[]>(loadHidden());
+  const [sizeHidden, setSizeHidden] = useState<string[]>([]);
+  const [selectedNames, setSelectedNames] = useState<string[]>([]);
+  const [processingNames, setProcessingNames] = useState<string[]>([]);
+  const isSmallScreen = useIsScreenBelow();
+  const isMediumScreen = useIsScreenBelow(mediumScreenBreakpoint);
+  const [orderedColumns, setOrderedColumns] =
+    useState<string[]>(loadOrderedColumns());
+
+  if (!project && !isAllProjects) {
+    return <>Missing project</>;
+  }
+
+  useEffect(() => {
+    if (isClustered || !userHidden.includes(CLUSTER_MEMBER)) {
+      return;
+    }
+    setUserHidden(userHidden.filter((col) => col !== CLUSTER_MEMBER));
+  }, [isClustered]);
+
+  const filterQuery =
+    searchParams.get("filter") != null ? searchParams.get("filter") : "";
+  const [serverFilters, clientFilters] = getServerSupportedFilters(
+    parseFilters(filterQuery || ""),
+    ["ipv4", "ipv6"],
+  );
+
+  const {
+    data: instances = [],
+    error,
+    isLoading,
+  } = useInstances(project?.name ?? null, encodeServerFilters(serverFilters));
+
+  if (error) {
+    notify.failure("Loading instances failed", error);
+  }
+
+  const setCreateButtonLabel = () => {
+    _setCreateButtonLabel(isMediumScreen ? "Create" : "Create instance");
+  };
+  useListener(window, setCreateButtonLabel, "resize", true);
+
+  const forceReflow = () => {
+    // fixing a layout bug in safari when resizing the window
+    // we shrink the window with the instance detail panel open and
+    // without this, the first column is taken too much space
+    const table = document.getElementById("instances-table");
+    if (!table) {
+      return;
+    }
+    table.style.display = "none";
+    table.offsetHeight; // eslint-disable-line @typescript-eslint/no-unused-expressions
+    table.style.display = "table";
+  };
+  useListener(window, forceReflow, "resize", true);
+
+  const setHidden = (columns: string[]) => {
+    setUserHidden(columns);
+    saveHidden(columns);
+  };
+
+  const setColumnOrder = (columns: string) => {
+    const newOrder = [...columns];
+    for (let i = 0; i < ALL_COLUMNS.length; i++) {
+      if (newOrder.includes(orderedColumns[i])) {
+        continue;
+      }
+
+      newOrder.push(orderedColumns[i]);
+    }
+
+    setOrderedColumns(newOrder);
+    saveOrdered(newOrder);
+  };
+
+  const isValidOrderedColumn = (column: string): boolean => {
+    if (!isAllProjects && column === PROJECT) {
+      return false;
+    }
+
+    if (!isClustered && column === CLUSTER_MEMBER) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const { data: operationList, error: operationError } = useQuery({
+    queryKey: [queryKeys.operations, project?.name],
+    queryFn: async () => fetchOperations(project?.name ?? null),
+  });
+
+  if (operationError && !error) {
+    notify.failure("Loading operations failed", operationError);
+  }
+
+  const migrationNames = (operationList?.running ?? [])
+    .filter((operation) => "Migrating instance" === operation.description)
+    .map(getInstanceName);
+
+  const creationNames: string[] = [];
+  const creationOperations = (operationList?.running ?? [])
+    .concat(operationList?.success ?? [])
+    .filter((operation) => {
+      const name = getInstanceName(operation);
+      const isCreatingOrRestoring =
+        isCreatingInstance(operation) || isRestoringBackup(operation);
+      const isProcessing = processingNames.includes(name);
+      const isMigrating = migrationNames.includes(name);
+      if (!isCreatingOrRestoring || isProcessing || isMigrating || !name) {
+        return false;
+      }
+      const isInInstanceList = instances.some((item) => item.name === name);
+      const isRunning = operation.status === "Running";
+
+      if (!isRunning && isInInstanceList) {
+        return false;
+      }
+
+      creationNames.push(name);
+      return true;
+    });
+
+  const onSearch = (filter: string) => {
+    setSearchParams("filter=" + filter);
+  };
+
+  const filteredInstances = instances.filter((item) => {
+    return showInstance(item, clientFilters);
+  });
+
+  useEffect(() => {
+    const validKeys = new Set(filteredInstances.map(getInstanceKey));
+    const validSelections = selectedNames.filter((name) => validKeys.has(name));
+    if (validSelections.length !== selectedNames.length) {
+      setSelectedNames(validSelections);
+    }
+  }, [filteredInstances]);
+
+  useEffect(() => {
+    if (panelParams.instance) {
+      if (
+        !instances.some(
+          (instance) =>
+            instance.name === panelParams.instance &&
+            instance.project === panelParams.project,
+        )
+      ) {
+        panelParams.clear();
+      }
+    }
+  }, [instances]);
+
+  const getInstanceHeaders = (): MainTableHeader[] => {
+    const headers = {
+      [NAME]: {
+        content: NAME,
+        sortKey: "name",
+        style: { width: `${COLUMN_WIDTHS[NAME]}px` },
+      },
+      [TYPE]: {
+        content: TYPE,
+        sortKey: "type",
+        style: { width: `${COLUMN_WIDTHS[TYPE]}px` },
+      },
+      [PROJECT]: {
+        content: PROJECT,
+        sortKey: "project",
+        style: { width: `${COLUMN_WIDTHS[PROJECT]}px` },
+      },
+      [CLUSTER_MEMBER]: {
+        content: CLUSTER_MEMBER,
+        sortKey: "member",
+        style: { width: `${COLUMN_WIDTHS[CLUSTER_MEMBER]}px` },
+      },
+      [MEMORY]: {
+        content: MEMORY,
+        style: { width: `${COLUMN_WIDTHS[MEMORY]}px` },
+      },
+      [FILESYSTEM]: {
+        content: FILESYSTEM,
+        style: { width: `${COLUMN_WIDTHS[FILESYSTEM]}px` },
+      },
+      [DESCRIPTION]: {
+        content: DESCRIPTION,
+        sortKey: "description",
+        style: { width: `${COLUMN_WIDTHS[DESCRIPTION]}px` },
+      },
+      [IPV4]: {
+        content: IPV4,
+        className: "u-align--right",
+        style: { width: `${COLUMN_WIDTHS[IPV4]}px` },
+      },
+      [IPV6]: {
+        content: IPV6,
+        id: "header-ipv6",
+        style: { width: `${COLUMN_WIDTHS[IPV6]}px` },
+      },
+      [SNAPSHOTS]: {
+        content: SNAPSHOTS,
+        sortKey: "snapshots",
+        className: "u-align--right",
+        style: { width: `${COLUMN_WIDTHS[SNAPSHOTS]}px` },
+      },
+      [STATUS]: {
+        content: STATUS,
+        sortKey: "status",
+        className: "status-header status",
+        style: { width: `${COLUMN_WIDTHS[STATUS]}px` },
+      },
+      [OS_NAME]: {
+        content: OS_NAME,
+        style: { width: `${COLUMN_WIDTHS[OS_NAME]}px` },
+      },
+      [ACTIONS]: {
+        "aria-label": "Actions",
+        className: classnames({ "u-hide": panelParams.instance }),
+        style: { width: `${COLUMN_WIDTHS[ACTIONS]}px` },
+      },
+    };
+
+    const result: MainTableHeader[] = [];
+    for (let i = 0; i < orderedColumns.length; i++) {
+      if (!isValidOrderedColumn(orderedColumns[i])) {
+        continue;
+      }
+
+      result.push(headers[orderedColumns[i]]);
+    }
+
+    return result;
+  };
+
+  const headers: MainTableHeader[] = getInstanceHeaders();
+
+  const visibleHeaders = visibleHeaderColumns(
+    headers,
+    userHidden.concat(sizeHidden),
+  );
+
+  const getRows = (hiddenCols: string[]): MainTableRow[] => {
+    const spannedWidth = CREATION_SPAN_COLUMNS.filter(
+      (col) => !hiddenCols.includes(col),
+    )
+      .concat(
+        ...(isClustered && !hiddenCols.includes(CLUSTER_MEMBER)
+          ? [CLUSTER_MEMBER]
+          : []),
+      )
+      .concat(...(isAllProjects ? [PROJECT] : []))
+      .reduce((partialSum, col) => partialSum + COLUMN_WIDTHS[col], 0);
+
+    const totalColumnCount = visibleHeaders.length;
+
+    const creationRows: MainTableRow[] = creationOperations.map((operation) => {
+      return {
+        key: operation.id,
+        className: "u-row",
+        columns: [
+          {
+            content: getInstanceName(operation),
+            className: "u-truncate",
+            title: getInstanceName(operation),
+            role: "rowheader",
+            "aria-label": NAME,
+            style: { width: `${COLUMN_WIDTHS[NAME]}px` },
+          },
+          ...(totalColumnCount > 3
+            ? [
+                {
+                  content: (
+                    <i key={JSON.stringify(operation.metadata ?? {})}>
+                      <InstanceCreationProgress operation={operation} />
+                    </i>
+                  ),
+                  role: "cell",
+                  colSpan: totalColumnCount - 3,
+                  style: { width: `${spannedWidth}px` },
+                },
+              ]
+            : []),
+          ...(sizeHidden.includes(STATUS)
+            ? []
+            : [
+                {
+                  content: (
+                    <>
+                      <Spinner className="status-icon" /> Setting up
+                    </>
+                  ),
+                  role: "cell",
+                  "aria-label": STATUS,
+                  style: { width: `${COLUMN_WIDTHS[STATUS]}px` },
+                },
+              ]),
+          {
+            content: (
+              <CancelOperationBtn
+                operation={operation}
+                project={project?.name}
+              />
+            ),
+            role: "cell",
+            className: classnames("u-align--right", {
+              "u-hide": panelParams.instance,
+            }),
+            "aria-label": "Actions",
+            style: { width: `${COLUMN_WIDTHS[ACTIONS]}px` },
+          },
+        ],
+        sortData: {
+          name: null, // we want the creating instances always on top
+        },
+      };
+    });
+
+    const instanceRows: MainTableRow[] = filteredInstances.map((instance) => {
+      const openSummary = () => {
+        panelParams.openInstanceSummary(instance.name, instance.project);
+      };
+
+      const ipv4 = getIpAddresses(instance, "inet");
+      const ipv6 = sortIpv6Addresses(getIpAddresses(instance, "inet6"));
+
+      const loadingType = instanceLoading.getType(instance);
+
+      const hasActivePanel =
+        panelParams.instance === instance.name &&
+        panelParams.project === instance.project;
+
+      const getColumns = () => {
+        const columns = {
+          [NAME]: {
+            content: <InstanceLink instance={instance} />,
+            className: "u-truncate",
+            title: `Instance ${instance.name}`,
+            role: "rowheader",
+            style: { width: `${COLUMN_WIDTHS[NAME]}px` },
+            "aria-label": NAME,
+            onClick: openSummary,
+          },
+          [TYPE]: {
+            content: getInstanceType(instance),
+            role: "cell",
+            "aria-label": TYPE,
+            onClick: openSummary,
+            className: "clickable-cell",
+            style: { width: `${COLUMN_WIDTHS[TYPE]}px` },
+          },
+          [PROJECT]: {
+            content: (
+              <ProjectRichChip
+                projectName={instance.project}
+                urlSuffix="/instances"
+              />
+            ),
+            role: "cell",
+            "aria-label": PROJECT,
+            style: { width: `${COLUMN_WIDTHS[PROJECT]}px` },
+          },
+          [CLUSTER_MEMBER]: {
+            content: (
+              <ClusterMemberRichChip clusterMember={instance.location} />
+            ),
+            role: "cell",
+            "aria-label": CLUSTER_MEMBER,
+            style: { width: `${COLUMN_WIDTHS[CLUSTER_MEMBER]}px` },
+          },
+          [MEMORY]: {
+            content: <InstanceUsageMainMemory instance={instance} />,
+            role: "cell",
+            "aria-label": MEMORY,
+            onClick: openSummary,
+            className: "clickable-cell",
+            style: { width: `${COLUMN_WIDTHS[MEMORY]}px` },
+          },
+          [FILESYSTEM]: {
+            content: <InstanceUsageRootFilesystem instance={instance} />,
+            role: "cell",
+            "aria-label": FILESYSTEM,
+            onClick: openSummary,
+            className: "clickable-cell",
+            style: { width: `${COLUMN_WIDTHS[FILESYSTEM]}px` },
+          },
+          [DESCRIPTION]: {
+            content: (
+              <div className="u-truncate" title={instance.description}>
+                {instance.description}
+              </div>
+            ),
+            role: "cell",
+            "aria-label": DESCRIPTION,
+            onClick: openSummary,
+            className: "clickable-cell",
+            style: { width: `${COLUMN_WIDTHS[DESCRIPTION]}px` },
+          },
+          [IPV4]: {
+            key: `ipv4-${ipv4.length}`,
+            content: <TruncatedList items={ipv4.map((val) => val.address)} />,
+            role: "cell",
+            className: "u-align--right clickable-cell",
+            "aria-label": IPV4,
+            onClick: openSummary,
+            style: { width: `${COLUMN_WIDTHS[IPV4]}px` },
+          },
+          [IPV6]: {
+            key: `ipv6-${ipv6.length}`,
+            content: <TruncatedList items={ipv6.map((val) => val.address)} />,
+            role: "cell",
+            "aria-label": IPV6,
+            onClick: openSummary,
+            className: "clickable-cell",
+            style: { width: `${COLUMN_WIDTHS[IPV6]}px` },
+          },
+          [SNAPSHOTS]: {
+            content: instance.snapshots?.length ?? "0",
+            role: "cell",
+            className: "u-align--right clickable-cell",
+            "aria-label": SNAPSHOTS,
+            onClick: openSummary,
+            style: { width: `${COLUMN_WIDTHS[SNAPSHOTS]}px` },
+          },
+          [STATUS]: {
+            key: instance.status + loadingType,
+            content: <InstanceStatusIcon instance={instance} />,
+            role: "cell",
+            className: "clickable-cell",
+            "aria-label": STATUS,
+            onClick: openSummary,
+            style: { width: `${COLUMN_WIDTHS[STATUS]}px` },
+          },
+          [OS_NAME]: {
+            content: getInstanceOSName(instance),
+            role: "cell",
+            className: "clickable-cell",
+            "aria-label": "OS",
+            onClick: openSummary,
+            style: { width: `${COLUMN_WIDTHS[OS_NAME]}px` },
+          },
+          [ACTIONS]: {
+            content: (
+              <InstanceStateActions
+                className={classnames(
+                  "instance-actions",
+                  "u-no-margin--bottom",
+                )}
+                instance={instance}
+              />
+            ),
+            role: "cell",
+            className: classnames("u-align--right", {
+              "u-hide": panelParams.instance,
+            }),
+            "aria-label": "Actions",
+            style: { width: `${COLUMN_WIDTHS[ACTIONS]}px` },
+          },
+        };
+
+        const result = [];
+        for (let i = 0; i < orderedColumns.length; i++) {
+          if (!isValidOrderedColumn(orderedColumns[i])) {
+            continue;
+          }
+
+          result.push(columns[orderedColumns[i]]);
+        }
+
+        return result;
+      };
+
+      return {
+        key: getInstanceKey(instance),
+        className: hasActivePanel ? "u-row-selected" : "u-row",
+        name: getInstanceKey(instance),
+        columns: getColumns(),
+        sortData: {
+          name: instance.name.toLowerCase(),
+          member: instance.location,
+          description: instance.description.toLowerCase(),
+          status: instance.status,
+          type: instance.type,
+          snapshots: instance.snapshots?.length ?? 0,
+          project: instance.project,
+        },
+      };
+    });
+
+    return visibleRowColumns(creationRows.concat(instanceRows), hiddenCols);
+  };
+
+  const { rows: sortedRows, updateSort } = useSortTableData({
+    rows: getRows(userHidden.concat(sizeHidden)),
+  });
+
+  const figureSizeHidden = () => {
+    const wrapper = document.getElementById("instance-table-measure");
+    const tableHead = wrapper?.children[0]?.children[0]?.children[0];
+
+    if (!wrapper || !tableHead) {
+      return;
+    }
+
+    const wrapWidth = wrapper.getBoundingClientRect().width;
+    const tableWidth = tableHead.getBoundingClientRect().width;
+    const colWidth = new Map();
+    tableHead.childNodes.forEach((item) => {
+      const col = item as Element;
+      const name = col.innerHTML;
+      const width = col.getBoundingClientRect().width;
+      colWidth.set(name, width);
+    });
+
+    let gainedSpace = 0;
+    const sizeHiddenNew: string[] = [];
+    SIZE_HIDEABLE_COLUMNS.forEach((column) => {
+      if (column === CLUSTER_MEMBER && !isClustered) {
+        return;
+      }
+      if (
+        tableWidth - gainedSpace > wrapWidth &&
+        !userHidden.includes(column)
+      ) {
+        gainedSpace += colWidth.get(column);
+        sizeHiddenNew.push(column);
+      }
+    });
+    if (JSON.stringify(sizeHiddenNew) !== JSON.stringify(sizeHidden)) {
+      setSizeHidden(sizeHiddenNew);
+    }
+  };
+  useListener(window, figureSizeHidden, "resize", true);
+  useEffect(figureSizeHidden, [
+    panelParams.instance,
+    userHidden,
+    instances,
+    creationOperations,
+  ]);
+
+  const hasInstances =
+    isLoading ||
+    instances.length > 0 ||
+    creationOperations.length > 0 ||
+    filterQuery;
+  const selectedInstances = instances.filter((instance) =>
+    selectedNames.includes(getInstanceKey(instance)),
+  );
+  const totalInstanceCount =
+    instances.filter((item) => !creationNames.includes(item.name)).length +
+    creationOperations.length;
+
+  const projectForCreation = isAllProjects ? defaultProject : project;
+  const projectForCreationName = projectForCreation?.name ?? "default";
+  const createInstanceRestriction = canCreateInstances(projectForCreation)
+    ? ""
+    : `You do not have permission to create instances in project ${projectForCreationName}`;
+
+  return (
+    <>
+      <CustomLayout
+        mainClassName={classnames("instance-list", {
+          "has-side-panel": Boolean(panelParams.instance),
+        })}
+        contentClassName="instance-content"
+        header={
+          <PageHeader>
+            <PageHeader.Left>
+              <PageHeader.Title>
+                <HelpLink
+                  docPath="/explanation/instances/#expl-instances"
+                  title="Learn more about instances"
+                >
+                  Instances
+                </HelpLink>
+              </PageHeader.Title>
+              {hasInstances && selectedNames.length === 0 && (
+                <PageHeader.Search>
+                  <InstanceSearchFilter onSearch={onSearch} />
+                </PageHeader.Search>
+              )}
+              {selectedNames.length > 0 && (
+                <>
+                  <InstanceBulkActions
+                    instances={selectedInstances}
+                    onStart={() => {
+                      setProcessingNames(selectedNames);
+                    }}
+                    onFinish={() => {
+                      setProcessingNames([]);
+                    }}
+                  />
+                  <MigrateInstanceBulkBtn
+                    instances={selectedInstances}
+                    onStart={setProcessingNames}
+                    onFinish={() => {
+                      setProcessingNames([]);
+                    }}
+                  />
+                  <InstanceBulkDelete
+                    instances={selectedInstances}
+                    onStart={setProcessingNames}
+                    onFinish={() => {
+                      setProcessingNames([]);
+                    }}
+                  />
+                </>
+              )}
+            </PageHeader.Left>
+            {hasInstances && selectedNames.length === 0 && (
+              <PageHeader.BaseActions>
+                <ReceiveMigrationBtn
+                  project={projectForCreationName}
+                  isSmallScreen={isSmallScreen}
+                />
+                <Button
+                  appearance="positive"
+                  className="u-float-right u-no-margin--bottom"
+                  onClick={async () =>
+                    navigate(
+                      `${ROOT_PATH}/ui/project/${encodeURIComponent(projectForCreationName)}/instances/create`,
+                    )
+                  }
+                  hasIcon={!isSmallScreen}
+                  disabled={!!createInstanceRestriction}
+                  title={createInstanceRestriction}
+                >
+                  {!isSmallScreen && <Icon name="plus" light />}
+                  <span>{createButtonLabel}</span>
+                </Button>
+              </PageHeader.BaseActions>
+            )}
+          </PageHeader>
+        }
+      >
+        <NotificationRow />
+        <Row className="no-grid-gap">
+          <Col size={12}>
+            {hasInstances && (
+              <>
+                <ScrollableTable
+                  dependencies={[filteredInstances, notify.notification]}
+                  tableId="instances-table"
+                  belowIds={["status-bar"]}
+                >
+                  <TablePagination
+                    data={sortedRows}
+                    id="pagination"
+                    itemName="instance"
+                    className="u-no-margin--top"
+                    aria-label="Table pagination control"
+                    description={
+                      selectedNames.length > 0 && (
+                        <SelectedTableNotification
+                          totalCount={totalInstanceCount}
+                          itemName="instance"
+                          parentName={
+                            project ? `project: ${project?.name}` : undefined
+                          }
+                          selectedNames={selectedNames}
+                          setSelectedNames={setSelectedNames}
+                          filteredNames={filteredInstances.map(getInstanceKey)}
+                        />
+                      )
+                    }
+                  >
+                    <ColumnSelector
+                      columns={orderedColumns.filter((column) => {
+                        if (column === CLUSTER_MEMBER && !isClustered) {
+                          return false;
+                        }
+
+                        if (column === PROJECT && !isAllProjects) {
+                          return false;
+                        }
+
+                        if (column === ACTIONS) {
+                          return false;
+                        }
+
+                        return true;
+                      })}
+                      hideableColumns={USER_HIDEABLE_COLUMNS}
+                      userHidden={userHidden}
+                      sizeHidden={sizeHidden}
+                      setUserHidden={setHidden}
+                      setColumnOrder={setColumnOrder}
+                      className={classnames({
+                        "u-hide": panelParams.instance,
+                      })}
+                    />
+                    <SelectableMainTable
+                      id="instances-table"
+                      headers={visibleHeaders}
+                      rows={sortedRows}
+                      sortable
+                      emptyStateMsg={
+                        isLoading ? (
+                          <Spinner
+                            className="u-loader"
+                            text="Loading instances..."
+                          />
+                        ) : (
+                          <>No instance found matching this search</>
+                        )
+                      }
+                      itemName="instance"
+                      parentName="project"
+                      selectedNames={selectedNames}
+                      setSelectedNames={setSelectedNames}
+                      disabledNames={processingNames}
+                      filteredNames={filteredInstances.map(getInstanceKey)}
+                      onUpdateSort={updateSort}
+                    />
+                  </TablePagination>
+                </ScrollableTable>
+                <div id="instance-table-measure">
+                  <SelectableMainTable
+                    headers={visibleHeaderColumns(headers, userHidden)}
+                    rows={getRows(userHidden)}
+                    className="scrollable-table"
+                    itemName="instance"
+                    parentName="project"
+                    selectedNames={selectedNames}
+                    setSelectedNames={setSelectedNames}
+                    disabledNames={processingNames}
+                    filteredNames={filteredInstances.map(getInstanceKey)}
+                  />
+                </div>
+              </>
+            )}
+            {!hasInstances && (
+              <EmptyState
+                className="empty-state"
+                image={<Icon name="pods" className="empty-state-icon" />}
+                title="No instances found"
+              >
+                <p>
+                  There are no instances in {project ? "this" : "any"} project.
+                  {canCreateInstances(project)
+                    ? " Spin up your first instance!"
+                    : ""}
+                </p>
+                <p>
+                  <DocLink docPath="/howto/instances_create/" hasExternalIcon>
+                    How to create instances
+                  </DocLink>
+                </p>
+                <Button
+                  className="empty-state-button"
+                  appearance="positive"
+                  onClick={async () =>
+                    navigate(
+                      `${ROOT_PATH}/ui/project/${encodeURIComponent(projectForCreationName)}/instances/create`,
+                    )
+                  }
+                  disabled={!!createInstanceRestriction}
+                  title={createInstanceRestriction}
+                >
+                  Create instance
+                </Button>
+                <ReceiveMigrationBtn project={projectForCreationName} />
+              </EmptyState>
+            )}
+          </Col>
+        </Row>
+      </CustomLayout>
+      {panelParams.panel === panels.instanceSummary && <InstanceDetailPanel />}
+    </>
+  );
+};
+
+export default InstanceList;

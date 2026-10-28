@@ -1,0 +1,232 @@
+.storage-buckets,
+.storage-volumes,
+.custom-iso-list {
+  .search-wrapper {
+    max-width: 42rem;
+    width: 100%;
+  }
+}
+
+.storage-bucket-key-list {
+  .actions {
+    min-width: 5rem;
+  }
+
+  .description {
+    width: 15rem;
+  }
+
+  .name,
+  .role {
+    width: 10rem;
+  }
+
+  .p-panel__controls {
+    padding-top: 0;
+  }
+
+  .pagination {
+    margin-top: 0;
+  }
+
+  .key-field {
+    min-width: 15rem;
+  }
+
+  @media screen and (width > 1090px) and (width < 1400px) {
+    .description,
+    .role {
+      display: none;
+    }
+  }
+}
+
+.storage-pool-table {
+  .size {
+    width: 14rem;
+  }
+
+  .size.clustered {
+    width: 20rem;
+  }
+
+  .actions {
+    width: 5rem;
+  }
+
+  button {
+    margin-top: -6px;
+  }
+
+  .p-meter {
+    margin-top: 4px;
+  }
+
+  @media screen and (width < 1200px) {
+    .size.clustered {
+      display: none;
+    }
+
+    .cluster-member {
+      display: none;
+    }
+  }
+
+  @media screen and (width < 1000px) {
+    .status {
+      display: none;
+    }
+
+    .driver {
+      display: none;
+    }
+
+    .actions {
+      display: none;
+    }
+
+    .volumes-this-project {
+      display: none;
+    }
+
+    .volumes-total {
+      display: none;
+    }
+  }
+
+  .clustered-resource-link {
+    height: 2.25rem;
+  }
+}
+
+.storage-bucket-list,
+.storage-volume-list {
+  .storage-volume-table {
+    .used_by {
+      width: 5rem;
+    }
+
+    .actions {
+      width: 5rem;
+    }
+
+    button {
+      margin-top: -6px;
+    }
+
+    .volume-name-link {
+      max-width: 90%;
+    }
+
+    .storage-volume-actions button {
+      padding: 0;
+    }
+
+    @media screen and (width < 1000px) {
+      .pool,
+      .size,
+      .used_by {
+        display: none;
+      }
+    }
+
+    @media screen and (width < 500px) {
+      .actions {
+        display: none;
+      }
+    }
+  }
+
+  .storage-buckets-table {
+    @media screen and (width > 1090px) and (width < 1400px) {
+      .description,
+      .keys {
+        display: none;
+      }
+    }
+  }
+
+  @media screen and (pointer: fine) {
+    .storage-bucket-actions,
+    .storage-volume-actions {
+      visibility: hidden;
+    }
+
+    .u-row:hover {
+      background-color: $colors--theme--background-hover;
+
+      .storage-bucket-actions,
+      .storage-volume-actions {
+        visibility: visible;
+
+        button:hover {
+          background-color: $colors--theme--background-active;
+        }
+      }
+    }
+  }
+
+  @media screen and (width < 500px) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}
+
+.custom-iso-list {
+  .custom-iso-table {
+    @media screen and (width > 1200px) {
+      .uploaded_at {
+        width: 12rem;
+      }
+
+      .size {
+        width: 9rem;
+      }
+    }
+
+    .used_by {
+      width: 9rem;
+    }
+
+    .actions {
+      width: 9rem;
+    }
+
+    .actions-list {
+      margin-top: -7px;
+    }
+
+    @media screen and (width < 1300px) {
+      .uploaded_at,
+      .size,
+      .used_by {
+        width: 6rem;
+      }
+    }
+
+    @media screen and (width < 1000px) {
+      .used_by {
+        display: none;
+      }
+    }
+
+    @media screen and (width < 900px) {
+      .size {
+        display: none;
+      }
+    }
+
+    @media screen and (width < 500px) {
+      .pool {
+        display: none;
+      }
+    }
+  }
+
+  @media screen and (width < 800px) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}

@@ -1,0 +1,231 @@
+import type { FC } from "react";
+import {
+  Button,
+  EmptyState,
+  Icon,
+  MainTable,
+  Row,
+  ScrollableTable,
+  useNotify,
+  Spinner,
+} from "@canonical/react-components";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import type { LxdNetwork } from "types/network";
+import { fetchNetworkForwards } from "api/network-forwards";
+import DeleteNetworkForwardBtn from "pages/networks/actions/DeleteNetworkForwardBtn";
+import { Link } from "react-router-dom";
+import ExpandableList from "components/ExpandableList";
+import NetworkForwardPort from "pages/networks/NetworkForwardPort";
+import { useNetworkEntitlements } from "util/entitlements/networks";
+import { useIsClustered } from "context/useIsClustered";
+import { bridgeType } from "util/networks";
+import DocLink from "components/DocLink";
+import CreateNetworkForwardBtn from "./actions/CreateNetworkForwardBtn";
+import ClusterMemberRichChip from "pages/cluster/ClusterMemberRichChip";
+import { ROOT_PATH } from "util/rootPath";
+
+interface Props {
+  network: LxdNetwork;
+  project: string;
+}
+
+const NetworkForwards: FC<Props> = ({ network, project }) => {
+  const notify = useNotify();
+  const { canEditNetwork } = useNetworkEntitlements();
+  const isClustered = useIsClustered();
+  const isClusterMemberSpecific = isClustered && network?.type === bridgeType;
+
+  const {
+    data: forwards = [],
+    error,
+    isLoading,
+  } = useQuery({
+    queryKey: [
+      queryKeys.projects,
+      project,
+      queryKeys.networks,
+      network.name,
+      queryKeys.forwards,
+    ],
+    queryFn: async () => fetchNetworkForwards(network.name, project),
+  });
+
+  if (error) {
+    notify.failure("Loading network forwards failed", error);
+  }
+
+  const hasNetworkForwards = forwards.length > 0;
+
+  const headers = [
+    { content: "Listen address", sortKey: "listenAddress" },
+    { content: "Description", sortKey: "description" },
+    {
+      content: "Default target address",
+      sortKey: "defaultTarget",
+    },
+    { content: "Ports" },
+    ...(isClusterMemberSpecific
+      ? [
+          {
+            content: "Location",
+            sortKey: "location",
+          },
+        ]
+      : []),
+    {
+      "aria-label": "Actions",
+      className: "u-align--right actions",
+    },
+  ];
+
+  const rows = forwards.map((forward) => {
+    return {
+      key: forward.listen_address,
+      columns: [
+        {
+          content: forward.listen_address,
+          role: "rowheader",
+          "aria-label": "Listen address",
+        },
+        {
+          content: forward.description,
+          role: "cell",
+          "aria-label": "Description",
+        },
+        {
+          content: forward.config.target_address,
+          role: "cell",
+          "aria-label": "Default target address",
+        },
+        {
+          content: (
+            <ExpandableList
+              items={forward.ports.map((port) => (
+                <NetworkForwardPort key={port.listen_port} port={port} />
+              ))}
+            />
+          ),
+          role: "cell",
+          "aria-label": "Forwarded ports",
+        },
+        ...(isClusterMemberSpecific
+          ? [
+              {
+                content: (
+                  <ClusterMemberRichChip
+                    clusterMember={forward.location ?? ""}
+                  />
+                ),
+                role: "cell",
+              },
+            ]
+          : []),
+        {
+          content: (
+            <>
+              {canEditNetwork(network) && (
+                <Link
+                  className="p-button--base u-no-margin--bottom has-icon"
+                  to={
+                    isClusterMemberSpecific
+                      ? `${ROOT_PATH}/ui/project/${encodeURIComponent(project)}/network/${encodeURIComponent(network.name)}/member/${encodeURIComponent(forward.location ?? "")}/forwards/${encodeURIComponent(forward.listen_address)}/edit`
+                      : `${ROOT_PATH}/ui/project/${encodeURIComponent(project)}/network/${encodeURIComponent(network.name)}/forwards/${encodeURIComponent(forward.listen_address)}/edit`
+                  }
+                  title="Edit network forward"
+                >
+                  <Icon name="edit" />
+                </Link>
+              )}
+              {!canEditNetwork(network) && (
+                <Button
+                  key="edit"
+                  appearance="base"
+                  className="u-no-margin--bottom"
+                  dense
+                  hasIcon
+                  type="button"
+                  title="You do not have permission to edit forwards for this network"
+                  disabled
+                >
+                  <Icon name="edit" />
+                </Button>
+              )}
+              <DeleteNetworkForwardBtn
+                key={forward.listen_address + forward.location}
+                network={network}
+                forward={forward}
+                project={project}
+              />
+            </>
+          ),
+          role: "cell",
+          className: "u-align--right actions",
+          "aria-label": "Actions",
+        },
+      ],
+      sortData: {
+        listenAddress: forward.listen_address,
+        description: forward.description,
+        defaultTarget: forward.config.target_address ?? "",
+        location: forward.location,
+      },
+    };
+  });
+
+  if (isLoading) {
+    return <Spinner className="u-loader" text="Loading..." isMainComponent />;
+  }
+
+  return (
+    <>
+      {hasNetworkForwards && (
+        <CreateNetworkForwardBtn network={network} className="u-float-right" />
+      )}
+      <Row>
+        {hasNetworkForwards && (
+          <ScrollableTable
+            dependencies={forwards}
+            tableId="network-forwards-table"
+            belowIds={["status-bar"]}
+          >
+            <MainTable
+              id="network-forwards-table"
+              headers={headers}
+              expanding
+              rows={rows}
+              paginate={30}
+              sortable
+              defaultSort="listenAddress"
+              defaultSortDirection="ascending"
+              className="u-table-layout--auto network-forwards-table"
+              emptyStateMsg="No data to display"
+            />
+          </ScrollableTable>
+        )}
+        {!isLoading && !hasNetworkForwards && (
+          <EmptyState
+            className="empty-state"
+            image={<Icon className="empty-state-icon" name="exposed" />}
+            title="No network forwards found"
+          >
+            <p>There are no network forwards in this project.</p>
+            <p>
+              <DocLink docPath="/howto/network_forwards/" hasExternalIcon>
+                Learn more about network forwards
+              </DocLink>
+            </p>
+            {!hasNetworkForwards && (
+              <CreateNetworkForwardBtn
+                network={network}
+                className="empty-state-button"
+              />
+            )}
+          </EmptyState>
+        )}
+      </Row>
+    </>
+  );
+};
+
+export default NetworkForwards;

@@ -208,6 +208,7 @@
     "test:node-security": "node --import tsx scripts/test-node-security.ts && node --import tsx scripts/test-node-security-routes.ts && node --import tsx scripts/test-node-security-transport.ts",
     "test:node-security:db": "node --import tsx scripts/test-node-security-db.ts",
     "test:node-distribution": "node --import tsx scripts/test-node-distribution.ts",
+    "test:incus-ui-proxy-guards": "node --import tsx scripts/test-incus-ui-proxy-guards.ts",
     "smoke:node-distribution": "node --import tsx scripts/smoke-node-distribution.ts"
   },
   "dependencies": {

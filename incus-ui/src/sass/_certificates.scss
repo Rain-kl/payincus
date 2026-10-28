@@ -1,0 +1,49 @@
+.certificates {
+  margin: 0 auto;
+
+  .p-panel__header {
+    background: $colors--theme--background-default;
+    z-index: 10;
+  }
+
+  .p-panel__content {
+    max-width: 64rem !important;
+    padding-bottom: 0;
+
+    .p-list__item {
+      box-shadow: none;
+    }
+
+    .p-list__item:first-child {
+      box-shadow: none;
+    }
+
+    .p-stepped-list__item:first-child::after {
+      display: none;
+    }
+
+    .p-stepped-list__item {
+      padding-top: $spv--x-small;
+    }
+
+    .p-modal__dialog {
+      width: 35rem;
+    }
+  }
+}
+
+.certificates-with-bearer-token {
+  margin: unset;
+
+  .p-panel__content {
+    max-width: 64rem;
+  }
+
+  .stepper-horizontal :first-child .step {
+    padding-left: $spv--medium;
+  }
+
+  .create-tls-identity-with-bearer-token-footer {
+    justify-content: flex-end;
+  }
+}

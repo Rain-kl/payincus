@@ -1,0 +1,70 @@
+.delete-project-dialog {
+  .p-modal__dialog {
+    @include large {
+      width: 40rem;
+    }
+
+    .delete-project-table {
+      tbody {
+        tr {
+          th:first-child {
+            width: 14rem;
+
+            @include mobile-and-tablet {
+              width: 9rem;
+            }
+          }
+        }
+      }
+    }
+
+    .p-modal__footer {
+      align-items: center;
+      display: flex;
+      gap: $sph--large;
+
+      @include mobile {
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .confirm-input {
+        flex: 1;
+
+        @include mobile {
+          width: 100%;
+        }
+      }
+
+      .p-action-button {
+        flex: 1;
+
+        @include mobile {
+          width: 100%;
+        }
+      }
+    }
+  }
+}
+
+.project-replica-form {
+  .replica-mode-field {
+    .replica-mode-output-wrapper {
+      align-items: baseline;
+      display: flex;
+      gap: $sph--large;
+
+      output.mono-font {
+        width: 15rem;
+      }
+    }
+
+    .p-form-help-text {
+      max-width: 15rem;
+    }
+  }
+
+  .replicator-list-project-configuration-empty-state {
+    margin-top: $spv--x-large;
+  }
+}

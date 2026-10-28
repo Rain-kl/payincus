@@ -1,0 +1,195 @@
+import { useEffect, type FC } from "react";
+import {
+  Button,
+  Icon,
+  Label,
+  Select,
+  useNotify,
+  Spinner,
+  Tooltip,
+} from "@canonical/react-components";
+import { defaultFirst } from "util/helpers";
+import { focusField } from "util/formFields";
+import { useProfiles } from "context/useProfiles";
+
+interface Props {
+  project: string;
+  selected: string[];
+  setSelected: (profiles: string[]) => void;
+  title?: string;
+  readOnly?: boolean;
+  disabledReason?: string;
+  initialProfiles?: string[];
+}
+
+const ProfileSelector: FC<Props> = ({
+  project,
+  selected,
+  setSelected,
+  title,
+  readOnly = false,
+  disabledReason,
+  initialProfiles,
+}) => {
+  const notify = useNotify();
+
+  const { data: profiles = [], error, isLoading } = useProfiles(project);
+
+  useEffect(() => {
+    if (error) {
+      notify.failure("Loading profiles failed", error);
+    }
+  }, [error]);
+
+  if (isLoading) {
+    return <Spinner className="u-loader" text="Loading profiles..." />;
+  }
+
+  profiles.sort(defaultFirst);
+
+  // we combine the initial instance profiles and the profiles from the API list endpoint into a deduplicated list
+  // this way, we take into account profiles that the user does not have permission to view
+  const profileNames = [
+    ...new Set(
+      profiles.map((profile) => profile.name).concat(initialProfiles ?? []),
+    ),
+  ];
+
+  const unselected = profileNames.filter((name) => !selected.includes(name));
+
+  const addProfile = () => {
+    const nextProfile = unselected[0];
+    if (nextProfile) {
+      const nextIndex = selected.length;
+      setSelected([...selected, nextProfile]);
+      focusField(`profile-${nextIndex}`);
+    }
+  };
+
+  return (
+    <>
+      <Label forId="profile-0">
+        Profiles{" "}
+        <Tooltip
+          message={
+            <>
+              A profile stores a set of configuration, such as instance and
+              device options.
+              <br />
+              Profiles lower in this list take precedence and override values
+              from profiles above.
+            </>
+          }
+        >
+          <Icon name="information" />
+        </Tooltip>
+      </Label>
+      {selected.map((value, index) => (
+        <div className="profile-select" key={value}>
+          <div>
+            <Select
+              id={`profile-${index}`}
+              aria-label="Select a profile"
+              onChange={(e) => {
+                const newValues = [...selected];
+                newValues[index] = e.target.value;
+                setSelected(newValues);
+              }}
+              options={profileNames
+                .filter(
+                  (profile: string) =>
+                    !selected.includes(profile) ||
+                    selected.indexOf(profile) === index,
+                )
+                .map((profile) => {
+                  return {
+                    label: profile,
+                    value: profile,
+                  };
+                })}
+              value={value}
+              disabled={readOnly || !!disabledReason}
+              title={disabledReason ?? title}
+            />
+          </div>
+
+          <div className="profile-actions">
+            {!readOnly && (index > 0 || selected.length > 1) && (
+              <div>
+                <Button
+                  appearance="base"
+                  className="profile-action-btn"
+                  onClick={() => {
+                    const newSelection = [...selected];
+                    newSelection.splice(index, 1);
+                    newSelection.splice(index - 1, 0, value);
+                    setSelected(newSelection);
+                  }}
+                  type="button"
+                  aria-label="move profile up"
+                  title={disabledReason ?? "move profile up"}
+                  disabled={!!disabledReason || index === 0}
+                  hasIcon
+                >
+                  <Icon name="chevron-up" />
+                </Button>
+                <Button
+                  appearance="base"
+                  className="profile-action-btn"
+                  onClick={() => {
+                    const newSelection = [...selected];
+                    newSelection.splice(index, 1);
+                    newSelection.splice(index + 1, 0, value);
+                    setSelected(newSelection);
+                  }}
+                  type="button"
+                  aria-label="move profile down"
+                  title={disabledReason ?? "move profile down"}
+                  disabled={!!disabledReason || index === selected.length - 1}
+                  hasIcon
+                >
+                  <Icon name="chevron-down" />
+                </Button>
+              </div>
+            )}
+
+            {!readOnly && (
+              <Button
+                appearance="base"
+                className="profile-remove-btn"
+                onClick={() => {
+                  setSelected(selected.filter((item) => item !== value));
+                }}
+                type="button"
+                disabled={!!disabledReason}
+                title={disabledReason}
+                hasIcon
+              >
+                <Icon name="delete" />
+                <span>Remove</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+      {!readOnly && (
+        <div>
+          <Button
+            id="addProfileButton"
+            disabled={!!disabledReason || unselected.length === 0}
+            className="profile-add-btn"
+            onClick={addProfile}
+            type="button"
+            title={disabledReason}
+            hasIcon
+          >
+            <Icon name="plus" />
+            <span>Add profile</span>
+          </Button>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default ProfileSelector;

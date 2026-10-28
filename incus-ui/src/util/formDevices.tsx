@@ -1,0 +1,234 @@
+import type {
+  FormDevice,
+  FormDiskDevice,
+  IsoVolumeDevice,
+} from "types/formDevice";
+import type { LxdNicDevice, LxdDevices, LxdIsoDevice } from "types/device";
+import type { RemoteImage } from "types/image";
+import type { InstanceAndProfileFormikProps } from "types/forms/instanceAndProfileFormProps";
+import { focusField } from "util/formFields";
+import {
+  isCustomNic,
+  isIsoDeviceName,
+  ISO_VOLUME_NAME,
+  ISO_VOLUME_TYPE,
+} from "./devices";
+
+export const parseDevices = (devices: LxdDevices): FormDevice[] => {
+  return Object.keys(devices).map((key) => {
+    const item = devices[key];
+
+    if (isCustomNic(item)) {
+      return {
+        name: key,
+        bare: item as LxdNicDevice,
+        type: "custom-nic",
+      };
+    }
+
+    if (isIsoDeviceName(key) && item.type !== "none") {
+      const isoDevice = item as LxdIsoDevice;
+      return {
+        name: key,
+        bare: isoDevice,
+        type: ISO_VOLUME_TYPE,
+        source: isoDevice.source,
+        pool: isoDevice.pool,
+      };
+    }
+
+    switch (item.type) {
+      case "nic":
+        if (item.parent && item.parent != "") {
+          return {
+            name: key,
+            parent: item.parent,
+            nictype: item.nictype,
+            type: "nic",
+            hwaddr: item.hwaddr,
+            "security.acls": item["security.acls"],
+            "security.acls.default.egress.action":
+              item["security.acls.default.egress.action"],
+            "security.acls.default.ingress.action":
+              item["security.acls.default.ingress.action"],
+          };
+        }
+
+        return {
+          name: key,
+          "ipv4.address": item["ipv4.address"],
+          "ipv6.address": item["ipv6.address"],
+          network: item.network,
+          type: "nic",
+          hwaddr: item.hwaddr,
+          "security.acls": item["security.acls"],
+          "security.acls.default.egress.action":
+            item["security.acls.default.egress.action"],
+          "security.acls.default.ingress.action":
+            item["security.acls.default.ingress.action"],
+        };
+      case "disk":
+        return {
+          name: key,
+          path: "path" in item ? item.path : undefined,
+          pool: item.pool,
+          source: "source" in item ? item.source : undefined,
+          size: "size" in item ? item.size : undefined,
+          dependent: "dependent" in item ? item.dependent : undefined,
+          type: "disk",
+          bare: item,
+        };
+      case "gpu":
+      case "proxy":
+      case "infiniband":
+      case "pci":
+      case "tpm":
+      case "unix-block":
+      case "unix-char":
+      case "unix-hotplug":
+      case "usb":
+        return {
+          ...item,
+          name: key,
+        };
+      case "none":
+        return {
+          name: key,
+          type: "none",
+        };
+      default:
+        return {
+          name: key,
+          bare: item,
+          type: "unknown",
+        };
+    }
+  });
+};
+
+export const isFormDiskDevice = (
+  device: FormDevice,
+): device is FormDiskDevice => {
+  return device.type === "disk";
+};
+
+export const isCustomNicFormDevice = (
+  device: FormDevice,
+): device is FormDevice & { type: "custom-nic"; bare: LxdNicDevice } => {
+  if (device.type !== "custom-nic") return false;
+  return isCustomNic(device.bare);
+};
+
+export const isEmptyDevice = (device: FormDevice): boolean =>
+  device.type === "nic" &&
+  device.name.length === 0 &&
+  (device.network?.length ?? 0) === 0;
+
+export const remoteImageToIsoDevice = (
+  image: RemoteImage,
+  name = `${ISO_VOLUME_NAME}-1`,
+): IsoVolumeDevice => {
+  return {
+    type: ISO_VOLUME_TYPE,
+    name,
+    pool: image.pool ?? "",
+    source: image.aliases,
+    bare: {
+      "boot.priority": "10",
+      "io.bus": "usb",
+      pool: image.pool ?? "",
+      source: image.aliases,
+      type: "disk",
+    },
+  };
+};
+
+export const addNoneDevice = (
+  name: string,
+  formik: InstanceAndProfileFormikProps,
+) => {
+  const copy = [...formik.values.devices].filter((t) => t.name !== name);
+  copy.push({
+    type: "none",
+    name,
+  });
+  formik.setFieldValue("devices", copy);
+};
+
+export const findNoneDeviceIndex = (
+  name: string,
+  formik: InstanceAndProfileFormikProps,
+) => {
+  return formik.values.devices.findIndex(
+    (item) => item.name === name && item.type === "none",
+  );
+};
+
+export const removeDevice = (
+  index: number,
+  formik: InstanceAndProfileFormikProps,
+): void => {
+  const copy = [...formik.values.devices];
+  copy.splice(index, 1);
+  formik.setFieldValue("devices", copy);
+};
+
+export const deduplicateName = (
+  prefix: string,
+  index: number,
+  existingNames: string[],
+): string => {
+  const candidate = `${prefix}-${index}`;
+  const hasConflict = existingNames.some((item) => item === candidate);
+  if (hasConflict) {
+    return deduplicateName(prefix, index + 1, existingNames);
+  }
+  return candidate;
+};
+
+export const addNicDevice = ({
+  formik,
+  deviceName,
+  deviceNetworkName,
+  deviceParentName,
+}: {
+  formik: InstanceAndProfileFormikProps;
+  deviceName: string;
+  deviceNetworkName: string;
+  deviceParentName: string;
+}) => {
+  const copy = [...formik.values.devices].filter((t) => t.name !== deviceName);
+
+  if (deviceParentName != "") {
+    copy.push({
+      type: "nic",
+      name: deviceName,
+      parent: deviceParentName,
+      nictype: "bridged",
+    });
+  } else {
+    copy.push({
+      type: "nic",
+      name: deviceName,
+      network: deviceNetworkName,
+    });
+  }
+
+  formik.setFieldValue("devices", copy);
+  return copy.length;
+};
+
+export const focusNicDevice = (id: number) => {
+  focusField(`devices.${id}.network`);
+};
+
+export const removeNicDevice = ({
+  formik,
+  deviceName,
+}: {
+  formik: InstanceAndProfileFormikProps;
+  deviceName: string;
+}) => {
+  const copy = [...formik.values.devices].filter((t) => t.name !== deviceName);
+  formik.setFieldValue("devices", copy);
+};

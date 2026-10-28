@@ -1,0 +1,293 @@
+import { useEffect, useState, type FC } from "react";
+import {
+  Button,
+  useNotify,
+  useToastNotification,
+} from "@canonical/react-components";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  getNetworkNameValidation,
+  toNetworkFormValues,
+} from "util/networkForm";
+import { queryKeys } from "util/queryKeys";
+import { ROOT_PATH } from "util/rootPath";
+import { updateNetwork, updateClusterNetwork } from "api/networks";
+import type { NetworkFormValues } from "types/forms/network";
+import NetworkForm, {
+  isNetworkFormInvalid,
+  toNetwork,
+} from "pages/networks/forms/NetworkForm";
+import type { LxdNetwork } from "types/network";
+import { objectToYaml, yamlToObject } from "util/yaml";
+import { slugify } from "util/slugify";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  GENERAL,
+  CONNECTIONS,
+  YAML_CONFIGURATION,
+} from "pages/networks/forms/NetworkFormMenu";
+import FormFooterLayout from "components/forms/FormFooterLayout";
+import YamlSwitch from "components/forms/YamlSwitch";
+import FormSubmitBtn from "components/forms/FormSubmitBtn";
+import { useNetworkEntitlements } from "util/entitlements/networks";
+import { scrollToElement } from "util/scroll";
+import { useClusterMembers } from "context/useClusterMembers";
+import { useEventQueue } from "context/eventQueue";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+import { useNetworkFromClusterMembers } from "context/useNetworks";
+import {
+  clusteredTypes,
+  isNetwork,
+  notifyNetworkError,
+  ovnType,
+} from "util/networks";
+import NetworkRichChip from "./NetworkRichChip";
+
+interface Props {
+  network: LxdNetwork;
+  project: string;
+}
+
+const EditNetwork: FC<Props> = ({ network, project }) => {
+  const navigate = useNavigate();
+  const notify = useNotify();
+  const toastNotify = useToastNotification();
+  const { hash } = useLocation();
+  const initialSection = hash ? hash.substring(1) : slugify(CONNECTIONS);
+  const [section, updateSection] = useState(initialSection);
+
+  const queryClient = useQueryClient();
+  const controllerState = useState<AbortController | null>(null);
+  const [version, setVersion] = useState(0);
+  const { data: clusterMembers = [] } = useClusterMembers();
+  const { canEditNetwork } = useNetworkEntitlements();
+
+  const shouldLoadMemberSpecificSettings =
+    network.managed && clusteredTypes.includes(network.type);
+  const { data: networkOnMembers = [], error } = useNetworkFromClusterMembers(
+    network.name,
+    project,
+    shouldLoadMemberSpecificSettings,
+  );
+  const { hasStorageAndNetworkOperations } = useSupportedFeatures();
+  const eventQueue = useEventQueue();
+
+  useEffect(() => {
+    if (error) {
+      notify.failure("Loading network from cluster members failed", error);
+    }
+  }, [error]);
+
+  const networkOnMembersFulfilled = networkOnMembers.filter(isNetwork);
+  useEffect(() => {
+    notifyNetworkError(networkOnMembers, notify);
+  }, [networkOnMembers]);
+
+  const NetworkSchema = Yup.object().shape({
+    name: getNetworkNameValidation(project, controllerState, network.name),
+    network: Yup.string().test(
+      "required",
+      "Uplink network is required",
+      (value, context) =>
+        (context.parent as NetworkFormValues).networkType !== ovnType ||
+        Boolean(value),
+    ),
+  });
+
+  const editRestriction = canEditNetwork(network)
+    ? undefined
+    : "You do not have permission to edit this network";
+
+  const invalidateCache = () => {
+    queryClient.invalidateQueries({
+      queryKey: [queryKeys.projects, project, queryKeys.networks, network.name],
+    });
+
+    queryClient.invalidateQueries({
+      queryKey: [
+        queryKeys.projects,
+        project,
+        queryKeys.networks,
+        network.name,
+        queryKeys.cluster,
+      ],
+    });
+  };
+
+  const onSuccess = (yamlNetwork: LxdNetwork) => {
+    formik.resetForm({
+      values: toNetworkFormValues(yamlNetwork, networkOnMembersFulfilled),
+    });
+    invalidateCache();
+    toastNotify.success(
+      <>
+        Network{""}
+        <NetworkRichChip
+          networkName={network.name}
+          projectName={project}
+        />{" "}
+        updated.
+      </>,
+    );
+  };
+
+  const onFailure = (e: unknown) => {
+    invalidateCache();
+    notify.failure(`Update of network ${network.name} failed`, e);
+  };
+
+  const formik = useFormik<NetworkFormValues>({
+    initialValues: toNetworkFormValues(
+      network,
+      networkOnMembersFulfilled,
+      editRestriction,
+    ),
+    validationSchema: NetworkSchema,
+    enableReinitialize: true,
+    onSubmit: (values) => {
+      const yaml = values.yaml ? values.yaml : getYaml();
+      const yamlNetwork = yamlToObject(yaml) as LxdNetwork;
+      const saveNetwork = { ...yamlNetwork, etag: network.etag };
+
+      const mutation = async (values: NetworkFormValues) => {
+        if (
+          values.parentPerClusterMember &&
+          Object.keys(values.parentPerClusterMember).length > 0
+        ) {
+          return updateClusterNetwork(
+            saveNetwork,
+            project,
+            clusterMembers,
+            values.parentPerClusterMember,
+            hasStorageAndNetworkOperations,
+            values.bridge_external_interfaces_per_member,
+            network.config,
+          );
+        } else {
+          return updateNetwork(saveNetwork, project);
+        }
+      };
+
+      mutation(values)
+        .then((operation) => {
+          if (hasStorageAndNetworkOperations && operation.metadata.id) {
+            toastNotify.info(
+              <>
+                Update of network{" "}
+                <NetworkRichChip
+                  networkName={network.name}
+                  projectName={project}
+                />{" "}
+                has started.
+              </>,
+            );
+
+            eventQueue.set(
+              operation.metadata.id,
+              () => {
+                onSuccess(yamlNetwork);
+              },
+              (msg) => {
+                onFailure(new Error(msg));
+              },
+            );
+          } else {
+            onSuccess(yamlNetwork);
+          }
+        })
+        .catch((e) => {
+          onFailure(e);
+        })
+        .finally(() => {
+          formik.setSubmitting(false);
+        });
+    },
+  });
+
+  const getYaml = () => {
+    const payload = toNetwork(formik.values);
+    return objectToYaml(payload);
+  };
+
+  useEffect(() => {
+    scrollToElement(initialSection);
+    updateSection(initialSection);
+  }, [initialSection]);
+
+  const baseUrl = `${ROOT_PATH}/ui/project/${encodeURIComponent(project)}/network/${encodeURIComponent(network.name)}`;
+
+  const setSection = (newSection: string, source: "click" | "scroll") => {
+    if (source === "scroll" && section === slugify(YAML_CONFIGURATION)) {
+      return;
+    }
+
+    if (source === "click") {
+      if (newSection === GENERAL) {
+        navigate(baseUrl);
+      } else {
+        navigate(`${baseUrl}/#${slugify(newSection)}`);
+      }
+    }
+    updateSection(slugify(newSection));
+  };
+
+  const readOnly = formik.values.readOnly;
+
+  return (
+    <>
+      <NetworkForm
+        key={network.name}
+        formik={formik}
+        getYaml={getYaml}
+        project={project}
+        section={section ?? slugify(GENERAL)}
+        setSection={setSection}
+        version={version}
+      />
+      <FormFooterLayout>
+        <YamlSwitch
+          formik={formik}
+          section={section}
+          setSection={() => {
+            setSection(
+              section === slugify(YAML_CONFIGURATION)
+                ? GENERAL
+                : YAML_CONFIGURATION,
+              "click",
+            );
+          }}
+          disableReason={
+            formik.values.name
+              ? undefined
+              : "Please enter a network name to enable this section"
+          }
+        />
+        {readOnly ? null : (
+          <>
+            <Button
+              appearance="base"
+              onClick={() => {
+                setVersion((old) => old + 1);
+                void formik.setValues(
+                  toNetworkFormValues(network, networkOnMembersFulfilled),
+                );
+              }}
+            >
+              Cancel
+            </Button>
+            <FormSubmitBtn
+              formik={formik}
+              baseUrl={baseUrl}
+              isYaml={section === slugify(YAML_CONFIGURATION)}
+              disabled={isNetworkFormInvalid(formik, clusterMembers)}
+            />
+          </>
+        )}
+      </FormFooterLayout>
+    </>
+  );
+};
+
+export default EditNetwork;

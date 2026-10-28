@@ -1,0 +1,13 @@
+.instance-target-selector {
+  display: flex;
+  gap: $sph--large;
+
+  @media screen and (width <= 860px) {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .select-input {
+    flex: 1;
+  }
+}

@@ -1,0 +1,33 @@
+.profile-list {
+  .profile-content {
+    padding-bottom: 0;
+
+    @media screen and (width <= 860px) {
+      margin-top: 0;
+    }
+
+    .p-notification--caution {
+      margin-bottom: $spv--small;
+    }
+
+    .p-notification--positive,
+    .p-notification--negative {
+      margin-bottom: $spv--large;
+    }
+  }
+
+  .u-row:hover,
+  .u-row-selected {
+    background-color: $colors--theme--background-hover;
+  }
+
+  .p-panel {
+    min-height: auto;
+  }
+
+  @media screen and (width < 500px) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}

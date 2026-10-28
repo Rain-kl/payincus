@@ -1,0 +1,54 @@
+import type { FC } from "react";
+import { Select } from "@canonical/react-components";
+import type { InstanceAndProfileFormikProps } from "types/forms/instanceAndProfileFormProps";
+import { getConfigurationRow } from "components/ConfigurationRow";
+import ScrollableConfigurationTable from "components/forms/ScrollableConfigurationTable";
+import { optionRenderer } from "util/formFields";
+import { optionAllowDeny } from "util/options";
+import { clusterEvacuationOptions } from "util/instanceOptions";
+import type { CreateInstanceFormValues } from "types/forms/instanceAndProfile";
+export { migrationPayload } from "util/instanceAndProfilePayloads";
+
+interface Props {
+  formik: InstanceAndProfileFormikProps;
+}
+
+const MigrationForm: FC<Props> = ({ formik }) => {
+  const isInstance = formik.values.entityType === "instance";
+  const isVmOnlyDisabled =
+    isInstance &&
+    (formik.values as CreateInstanceFormValues).instanceType !==
+      "virtual-machine";
+
+  return (
+    <ScrollableConfigurationTable
+      rows={[
+        getConfigurationRow({
+          formik,
+          label: "Stateful migration",
+          name: "migration_stateful",
+          defaultValue: "",
+          disabled: isVmOnlyDisabled,
+          disabledReason: isVmOnlyDisabled
+            ? "Only available for virtual machines"
+            : undefined,
+          readOnlyRenderer: (val) => optionRenderer(val, optionAllowDeny),
+          children: (
+            <Select options={optionAllowDeny} disabled={isVmOnlyDisabled} />
+          ),
+        }),
+        getConfigurationRow({
+          formik,
+          label: "Cluster evacuation",
+          name: "cluster_evacuate",
+          defaultValue: "auto",
+          readOnlyRenderer: (val) =>
+            optionRenderer(val, clusterEvacuationOptions),
+          children: <Select options={clusterEvacuationOptions} />,
+        }),
+      ]}
+    />
+  );
+};
+
+export default MigrationForm;

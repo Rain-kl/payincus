@@ -1,0 +1,332 @@
+import { useEffect, useState, type FC } from "react";
+import {
+  EmptyState,
+  Icon,
+  List,
+  Row,
+  ScrollableTable,
+  SearchBox,
+  TablePagination,
+  useNotify,
+  CustomLayout,
+  Spinner,
+} from "@canonical/react-components";
+import { humanFileSize, isoTimeToString } from "util/helpers";
+import DeleteImageBtn from "./actions/DeleteImageBtn";
+import { useParams } from "react-router-dom";
+import CreateInstanceFromImageBtn from "pages/images/actions/CreateInstanceFromImageBtn";
+import {
+  getImageAlias,
+  getImageName,
+  getImageTypeDisplayName,
+  localLxdToRemoteImage,
+} from "util/images";
+import useSortTableData from "util/useSortTableData";
+import SelectableMainTable from "components/SelectableMainTable";
+import BulkDeleteImageBtn from "pages/images/actions/BulkDeleteImageBtn";
+import ExpandableList from "components/ExpandableList";
+import HelpLink from "components/HelpLink";
+import NotificationRow from "components/NotificationRow";
+import PageHeader from "components/PageHeader";
+import SelectedTableNotification from "components/SelectedTableNotification";
+import CustomIsoBtn from "pages/storage/actions/CustomIsoBtn";
+import DownloadImageBtn from "./actions/DownloadImageBtn";
+import ImportImageBtn from "pages/images/actions/ImportImageBtn";
+import { useLocalImagesInProject } from "context/useImages";
+import { getArchitectureDisplayName } from "util/architectures";
+import { useImageEntitlements } from "util/entitlements/images";
+
+const LocalImageList: FC = () => {
+  const notify = useNotify();
+  const { project } = useParams<{ project: string }>();
+  const [query, setQuery] = useState<string>("");
+  const [processingNames, setProcessingNames] = useState<string[]>([]);
+  const [selectedNames, setSelectedNames] = useState<string[]>([]);
+  const { canDeleteImage } = useImageEntitlements();
+
+  if (!project) {
+    return <>Missing project</>;
+  }
+
+  const {
+    data: images = [],
+    error,
+    isLoading,
+  } = useLocalImagesInProject(project);
+
+  if (error) {
+    notify.failure("Loading images failed", error);
+  }
+
+  useEffect(() => {
+    const validNames = new Set(images?.map((image) => image.fingerprint));
+    const validSelections = selectedNames.filter((name) =>
+      validNames.has(name),
+    );
+    if (validSelections.length !== selectedNames.length) {
+      setSelectedNames(validSelections);
+    }
+  }, [images]);
+
+  const headers = [
+    { content: "Name", sortKey: "name" },
+    { content: "Alias", sortKey: "alias", className: "aliases" },
+    {
+      content: "Architecture",
+      sortKey: "architecture",
+      className: "architecture",
+    },
+    {
+      content: "Cached",
+      sortKey: "cached",
+      className: "cached",
+    },
+    { content: "Type", sortKey: "type", className: "type" },
+    {
+      content: "Import date",
+      sortKey: "uploaded_at",
+      className: "uploaded_at",
+    },
+    { content: "Size", sortKey: "size", className: "u-align--right size" },
+    { "aria-label": "Actions", className: "actions" },
+  ];
+
+  const filteredImages = images.filter(
+    (item) =>
+      !query ||
+      (item.properties?.description ?? "")
+        .toLowerCase()
+        .includes(query.toLowerCase()) ||
+      item.aliases
+        .map((alias) => alias.name)
+        .join(", ")
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+
+  const deletableImages = filteredImages
+    .filter(canDeleteImage)
+    .map((image) => image.fingerprint);
+
+  const selectedImages = images.filter((image) =>
+    selectedNames.includes(image.fingerprint),
+  );
+
+  const rows = filteredImages.map((image) => {
+    const actions = (
+      <List
+        inline
+        className="actions-list u-no-margin--bottom"
+        items={[
+          <CreateInstanceFromImageBtn
+            key="launch"
+            projectName={project}
+            image={localLxdToRemoteImage(image)}
+          />,
+          <DownloadImageBtn key="download" image={image} project={project} />,
+          <DeleteImageBtn key="delete" image={image} project={project} />,
+        ]}
+      />
+    );
+
+    const imageAlias = getImageAlias(image);
+    const imageName = getImageName(image);
+
+    const aliasItems =
+      image.aliases && Array.isArray(image.aliases)
+        ? image.aliases
+            .filter((alias) => alias && alias.name)
+            .map((alias) => (
+              <div key={alias.name} className="u-truncate" title={alias.name}>
+                {alias.name}
+              </div>
+            ))
+        : [];
+
+    return {
+      key: image.fingerprint,
+      name: image.fingerprint,
+      columns: [
+        {
+          content: imageName,
+          role: "rowheader",
+          "aria-label": "Name",
+        },
+        {
+          content:
+            aliasItems.length > 0 ? (
+              <ExpandableList items={aliasItems} displayCount={2} />
+            ) : null,
+          role: "cell",
+          "aria-label": "Aliases",
+          className: "aliases",
+        },
+        {
+          content: getArchitectureDisplayName(image.architecture),
+          role: "cell",
+          "aria-label": "Architecture",
+          className: "architecture",
+        },
+        {
+          content: image.cached ? "Yes" : "No",
+          role: "cell",
+          "aria-label": "Cached",
+          className: "cached",
+        },
+        {
+          content: getImageTypeDisplayName(image),
+          role: "cell",
+          "aria-label": "Type",
+          className: "type",
+        },
+        {
+          content: isoTimeToString(image.uploaded_at),
+          role: "cell",
+          "aria-label": "Import date",
+          className: "uploaded_at",
+        },
+        {
+          content: humanFileSize(image.size),
+          role: "cell",
+          "aria-label": "Size",
+          className: "u-align--right size",
+        },
+        {
+          content: actions,
+          role: "cell",
+          "aria-label": "Actions",
+          className: "u-align--right actions",
+        },
+      ],
+      sortData: {
+        name: imageName.toLowerCase(),
+        alias: imageAlias.toLowerCase(),
+        architecture: image.architecture,
+        cached: image.cached,
+        type: image.type,
+        size: +image.size,
+        uploaded_at: new Date(image.uploaded_at).getTime(),
+      },
+    };
+  });
+
+  const { rows: sortedRows, updateSort } = useSortTableData({ rows });
+
+  if (isLoading) {
+    return <Spinner className="u-loader" text="Loading..." isMainComponent />;
+  }
+
+  return (
+    <CustomLayout
+      mainClassName="images-list"
+      contentClassName="u-no-padding--bottom"
+      header={
+        <PageHeader>
+          <PageHeader.Left>
+            <PageHeader.Title>
+              <HelpLink
+                docPath="/image-handling/"
+                title="Learn more about local images"
+              >
+                Local images
+              </HelpLink>
+            </PageHeader.Title>
+            {selectedNames.length === 0 && images.length > 0 && (
+              <PageHeader.Search>
+                <SearchBox
+                  name="search-images"
+                  className="search-box u-no-margin--bottom"
+                  type="text"
+                  onChange={(value) => {
+                    setQuery(value);
+                  }}
+                  placeholder="Search"
+                  value={query}
+                  aria-label="Search for images"
+                />
+              </PageHeader.Search>
+            )}
+            {selectedImages.length > 0 && (
+              <BulkDeleteImageBtn
+                images={selectedImages}
+                project={project}
+                onStart={() => {
+                  setProcessingNames(selectedNames);
+                }}
+                onFinish={() => {
+                  setProcessingNames([]);
+                }}
+              />
+            )}
+          </PageHeader.Left>
+          <PageHeader.BaseActions>
+            <ImportImageBtn projectName={project} />
+            <CustomIsoBtn project={project} />
+          </PageHeader.BaseActions>
+        </PageHeader>
+      }
+    >
+      <NotificationRow />
+      <Row>
+        {images.length === 0 && (
+          <EmptyState
+            className="empty-state"
+            image={<Icon name="image" className="empty-state-icon" />}
+            title="No local images found in this project"
+          >
+            <p>
+              Local images will appear here, when launching an instance from a
+              remote.
+            </p>
+          </EmptyState>
+        )}
+        {images.length > 0 && (
+          <ScrollableTable
+            dependencies={[images]}
+            tableId="image-table"
+            belowIds={["status-bar"]}
+          >
+            <TablePagination
+              data={sortedRows}
+              id="pagination"
+              itemName="image"
+              className="u-no-margin--top"
+              aria-label="Table pagination control"
+              description={
+                selectedNames.length > 0 && (
+                  <SelectedTableNotification
+                    totalCount={deletableImages.length ?? 0}
+                    itemName="image"
+                    parentName="project"
+                    selectedNames={selectedNames}
+                    setSelectedNames={setSelectedNames}
+                    filteredNames={deletableImages}
+                  />
+                )
+              }
+            >
+              <SelectableMainTable
+                id="image-table"
+                headers={headers}
+                sortable
+                className="image-table"
+                defaultSortKey="uploaded_at"
+                emptyStateMsg="No images found matching this search"
+                onUpdateSort={updateSort}
+                selectedNames={selectedNames}
+                setSelectedNames={setSelectedNames}
+                itemName="image"
+                parentName="project"
+                filteredNames={filteredImages.map((item) => item.fingerprint)}
+                disabledNames={processingNames}
+                rows={[]}
+              />
+            </TablePagination>
+          </ScrollableTable>
+        )}
+      </Row>
+    </CustomLayout>
+  );
+};
+
+export default LocalImageList;

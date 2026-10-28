@@ -1,0 +1,229 @@
+import { useEffect, useState, type FC } from "react";
+import {
+  ActionButton,
+  Button,
+  useListener,
+  useNotify,
+  useToastNotification,
+} from "@canonical/react-components";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import {
+  checkDuplicateName,
+  getDefaultNetwork,
+  getDefaultStoragePool,
+} from "util/helpers";
+import { ROOT_PATH } from "util/rootPath";
+import { useNavigate } from "react-router-dom";
+import { updateMaxHeight } from "util/updateMaxHeight";
+import { createProject } from "api/projects";
+import { PROJECT_DETAILS } from "pages/projects/forms/ProjectFormMenu";
+import {
+  projectDetailPayload,
+  projectDetailRestrictionPayload,
+} from "pages/projects/forms/ProjectDetailsForm";
+import { resourceLimitsPayload } from "pages/projects/forms/ProjectResourceLimitsForm";
+import { clusterRestrictionPayload } from "pages/projects/forms/ClusterRestrictionForm";
+import { instanceRestrictionPayload } from "pages/projects/forms/InstanceRestrictionForm";
+import { deviceUsageRestrictionPayload } from "pages/projects/forms/DeviceUsageRestrictionForm";
+import { networkRestrictionPayload } from "pages/projects/forms/NetworkRestrictionForm";
+import ProjectForm from "pages/projects/forms/ProjectForm";
+import BaseLayout from "components/BaseLayout";
+import FormFooterLayout from "components/forms/FormFooterLayout";
+import { slugify } from "util/slugify";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+import { fetchProfile, updateProfile } from "api/profiles";
+import { useProfile } from "context/useProfiles";
+import { useAuth } from "context/auth";
+import ProjectRichChip from "pages/projects/ProjectRichChip";
+import type { ProjectFormValues } from "types/forms/project";
+import { imageRestrictionPayload } from "pages/projects/forms/ImageRestrictionForm";
+import { replicaPayload } from "pages/projects/forms/ProjectReplicaForm";
+
+const CreateProject: FC = () => {
+  const navigate = useNavigate();
+  const notify = useNotify();
+  const toastNotify = useToastNotification();
+  const queryClient = useQueryClient();
+  const controllerState = useState<AbortController | null>(null);
+  const [section, setSection] = useState(slugify(PROJECT_DETAILS));
+  const { hasProjectsNetworksZones, hasStorageBuckets, hasReplicators } =
+    useSupportedFeatures();
+  const { isFineGrained } = useAuth();
+
+  const { data: defaultProjectDefaultProfile } = useProfile(
+    "default",
+    "default",
+  );
+
+  const ProjectSchema = Yup.object().shape({
+    name: Yup.string()
+      .test(
+        "deduplicate",
+        "A project with this name already exists",
+        async (value) =>
+          checkDuplicateName(value, "", controllerState, "projects"),
+      )
+      .required(),
+    replica_mode: Yup.string().oneOf(["", "leader", "standby"]).optional(),
+    replica_cluster: Yup.string().optional(),
+  });
+
+  const updateFormHeight = () => {
+    updateMaxHeight("form-contents", "p-bottom-controls");
+  };
+  useEffect(updateFormHeight, [notify.notification?.message, section]);
+  useListener(window, updateFormHeight, "resize", true);
+
+  const notifySuccess = (values: ProjectFormValues) => {
+    navigate(
+      `${ROOT_PATH}/ui/project/${encodeURIComponent(values.name)}/instances`,
+    );
+    toastNotify.success(
+      <>
+        Project{" "}
+        <ProjectRichChip projectName={values.name} urlSuffix="/instances" />{" "}
+        created.
+      </>,
+    );
+  };
+
+  const formik = useFormik<ProjectFormValues>({
+    initialValues: {
+      name: "",
+      restricted: false,
+      readOnly: false,
+      entityType: "project",
+      default_instance_storage_pool: defaultProjectDefaultProfile
+        ? getDefaultStoragePool(defaultProjectDefaultProfile)
+        : "",
+      default_project_network: defaultProjectDefaultProfile
+        ? getDefaultNetwork(defaultProjectDefaultProfile)
+        : "",
+      features_images: true,
+      features_profiles: true,
+      features_networks: false,
+      features_networks_zones: false,
+      features_storage_buckets: true,
+      features_storage_volumes: true,
+    },
+    enableReinitialize: true,
+    validationSchema: ProjectSchema,
+    onSubmit: (values) => {
+      const restrictions = values.restricted
+        ? {
+            ...clusterRestrictionPayload(values),
+            ...instanceRestrictionPayload(values),
+            ...deviceUsageRestrictionPayload(values),
+            ...networkRestrictionPayload(values),
+            ...imageRestrictionPayload(values),
+          }
+        : {};
+
+      if (!hasProjectsNetworksZones) {
+        values.features_networks_zones = undefined;
+      }
+
+      if (!hasStorageBuckets) {
+        values.features_storage_buckets = undefined;
+      }
+
+      const hasNetwork = values.default_project_network !== "none";
+
+      createProject(
+        JSON.stringify({
+          ...projectDetailPayload(values),
+          config: {
+            ...projectDetailRestrictionPayload(values),
+            ...resourceLimitsPayload(values),
+            ...restrictions,
+            ...(hasReplicators ? replicaPayload(values) : {}),
+          },
+        }),
+      )
+        .then(async () => {
+          if (
+            (!values.default_instance_storage_pool && !hasNetwork) ||
+            values.features_profiles === false
+          ) {
+            notifySuccess(values);
+            return;
+          }
+          const profile = await fetchProfile(
+            "default",
+            values.name,
+            isFineGrained,
+          );
+          profile.devices = {
+            root: {
+              path: "/",
+              pool: values.default_instance_storage_pool,
+              type: "disk",
+            },
+            ...(hasNetwork && {
+              eth0: {
+                name: "eth0",
+                network: values.default_project_network,
+                type: "nic",
+              },
+            }),
+          };
+
+          updateProfile(profile, values.name)
+            .then(() => {
+              notifySuccess(values);
+            })
+            .catch((e: Error) => {
+              navigate(
+                `${ROOT_PATH}/ui/project/${encodeURIComponent(values.name)}/instances`,
+              );
+              toastNotify.failure(
+                `Successfully created ${values.name} project. Failed to attach storage pool${hasNetwork ? " and network" : ""}.`,
+                e,
+              );
+            });
+        })
+        .catch((e: Error) => {
+          notify.failure("Project creation failed", e);
+        })
+        .finally(() => {
+          formik.setSubmitting(false);
+          queryClient.invalidateQueries({
+            queryKey: [queryKeys.projects],
+          });
+        });
+    },
+  });
+
+  return (
+    <BaseLayout title="Create a project" contentClassName="create-project">
+      <ProjectForm
+        formik={formik}
+        section={section}
+        updateSection={(newSection: string) => {
+          setSection(slugify(newSection));
+        }}
+        isEdit={false}
+      />
+      <FormFooterLayout>
+        <Button appearance="base" onClick={async () => navigate(-1)}>
+          Cancel
+        </Button>
+        <ActionButton
+          appearance="positive"
+          loading={formik.isSubmitting}
+          disabled={
+            !formik.isValid || formik.isSubmitting || !formik.values.name
+          }
+          onClick={() => void formik.submitForm()}
+        >
+          Create
+        </ActionButton>
+      </FormFooterLayout>
+    </BaseLayout>
+  );
+};
+
+export default CreateProject;

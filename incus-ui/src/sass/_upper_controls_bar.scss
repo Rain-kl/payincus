@@ -1,0 +1,21 @@
+.upper-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $sph--large;
+  justify-content: flex-end;
+
+  .search-box-wrapper {
+    display: flex;
+    flex-grow: 1;
+    min-width: 10rem;
+
+    .search-box {
+      max-width: 25rem;
+      width: 100%;
+
+      @media screen and (width <= 1070px) {
+        display: flex;
+      }
+    }
+  }
+}

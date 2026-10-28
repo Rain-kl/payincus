@@ -1,0 +1,28 @@
+@import "vanilla-framework/scss/vanilla";
+
+button.form-link {
+  display: flex;
+  width: 100%;
+
+  .form-link__column {
+    align-self: center;
+    flex: 1 1 auto;
+    text-align: left;
+  }
+
+  .form-link__count {
+    margin-right: $sph--large;
+  }
+
+  .form-link__title {
+    margin-top: -$spv--large;
+    vertical-align: middle;
+  }
+
+  [class*="p-icon"].form-link__icon {
+    height: $sp-x-large;
+    margin-right: $sph--x-large;
+    vertical-align: middle;
+    width: $sp-x-large;
+  }
+}

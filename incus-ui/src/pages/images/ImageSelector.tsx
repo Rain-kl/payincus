@@ -1,0 +1,517 @@
+import { useState, type FC, type OptionHTMLAttributes } from "react";
+import {
+  Button,
+  CheckboxInput,
+  Col,
+  Icon,
+  Input,
+  MainTable,
+  Modal,
+  Notification,
+  Row,
+  ScrollableTable,
+  SearchBox,
+  Select,
+  Spinner,
+} from "@canonical/react-components";
+import type { LxdImageType, RemoteImage } from "types/image";
+import { capitalizeFirstLetter } from "util/helpers";
+import type { MainTableRow } from "@canonical/react-components/dist/components/MainTable/MainTable";
+import {
+  byOSRelease,
+  localLxdToRemoteImage,
+  isContainerOnlyImage,
+  isVmOnlyImage,
+  LOCAL_ISO,
+  LOCAL_IMAGE,
+} from "util/images";
+import { getArchitectureAliases } from "util/architectures";
+import { instanceCreationTypes } from "util/instanceOptions";
+import { useSettings } from "context/useSettings";
+import { useParams } from "react-router-dom";
+import { useRemoteImages, useLocalImagesInProject } from "context/useImages";
+import { linuxContainersServer } from "util/imageLegacy";
+
+interface Props {
+  onSelect: (image: RemoteImage, type?: LxdImageType) => void;
+  onClose: () => void;
+  imageType?: LxdImageType;
+  excludeLocalIso?: boolean;
+  onUseImageReference?: () => void;
+}
+
+const ANY = "any";
+const CONTAINER = "container";
+const VM = "virtual-machine";
+
+const ImageSelector: FC<Props> = ({
+  onSelect,
+  onClose,
+  imageType,
+  excludeLocalIso = false,
+  onUseImageReference,
+}) => {
+  const [query, setQuery] = useState<string>("");
+  const [os, setOs] = useState<string>("");
+  const [release, setRelease] = useState<string>("");
+  const [arch, setArch] = useState<string>("amd64");
+  const [type, setType] = useState<LxdImageType | undefined>(imageType);
+  const [variant, setVariant] = useState<string>(ANY);
+  const [hideRemote, setHideRemote] = useState(false);
+  const [error, setError] = useState("");
+  const [hideError, setHideError] = useState(false);
+  const { project } = useParams<{ project: string }>();
+
+  const { data: settings, isLoading: isSettingsLoading } = useSettings();
+  const { data: remoteImages, isLoading: isRemoteImagesLoading } =
+    useRemoteImages();
+  const { data: localImages = [], isLoading: isLocalImageLoading } =
+    useLocalImagesInProject(project ?? "default");
+
+  if (remoteImages?.error && remoteImages?.error !== error) {
+    setError(remoteImages?.error ?? "");
+    setHideError(false);
+  }
+
+  const isWaitingForRemoteImages = !hideRemote && isRemoteImagesLoading;
+  const isLoading =
+    isWaitingForRemoteImages || isLocalImageLoading || isSettingsLoading;
+
+  const archSupported = getArchitectureAliases(
+    settings?.environment?.architectures ?? [],
+  );
+  const images = isLoading
+    ? []
+    : localImages
+        .map(localLxdToRemoteImage)
+        .sort(byOSRelease)
+        .concat(remoteImages?.images ?? [])
+        .filter((image) => !excludeLocalIso || image.server !== LOCAL_ISO)
+        .filter((image) => archSupported.includes(image.arch));
+
+  const archAll = [...new Set(images.map((item) => item.arch))]
+    .filter((arch) => arch !== "")
+    .sort();
+  const variantAll = [...new Set(images.map((item) => item.variant))].sort();
+
+  if (!isLoading && !archAll.includes(arch) && archAll.length > 0) {
+    setArch(archAll[0]);
+  }
+
+  const getOptionList: (
+    mapper: (item: RemoteImage) => string,
+    filter?: (item: RemoteImage) => boolean,
+  ) => OptionHTMLAttributes<HTMLOptionElement>[] = (
+    mapper,
+    filter = () => true,
+  ) => {
+    const options = [...new Set(images.filter(filter).map(mapper))]
+      .sort()
+      .map((item: string) => {
+        return {
+          label: item,
+          value: item,
+        };
+      });
+    options.unshift({
+      label: "Any",
+      value: "",
+    });
+    return options;
+  };
+
+  const rows: MainTableRow[] = images
+    .filter((item) => {
+      const isLocalIso = item.server === LOCAL_ISO;
+      if (type === VM && isContainerOnlyImage(item)) {
+        return false;
+      }
+      if (type === CONTAINER && isVmOnlyImage(item)) {
+        return false;
+      }
+      if (arch !== item.arch && !isLocalIso) {
+        return false;
+      }
+      if (variant !== ANY && variant !== item.variant) {
+        return false;
+      }
+      if (os && item.os !== os) {
+        return false;
+      }
+      if (release && item.release !== release) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return (
+        item.aliases.toLowerCase().includes(query) ||
+        item.arch.toLowerCase().includes(query) ||
+        item.os.toLowerCase().includes(query) ||
+        item.release.toLowerCase().includes(query)
+      );
+    })
+    .filter((item) => {
+      if (!hideRemote) {
+        return true;
+      }
+      return item.server === LOCAL_IMAGE || item.cached;
+    })
+    .map((item) => {
+      const figureType = () => {
+        if (item.type) {
+          return item.type;
+        }
+        if (isVmOnlyImage(item)) {
+          return VM;
+        }
+        if (isContainerOnlyImage(item)) {
+          return CONTAINER;
+        }
+        return "all";
+      };
+      const itemType = figureType();
+
+      const selectImage = () => {
+        onSelect(item, item.type ?? type);
+      };
+
+      const displayRelease =
+        item.os === "Ubuntu" &&
+        item.release_title &&
+        !item.release.includes(item.release_title)
+          ? item.release_title
+          : item.release;
+
+      const displayVariant =
+        item.os === "Ubuntu" &&
+        item.release_title &&
+        !item.variant &&
+        !item.release.includes(item.release_title)
+          ? item.release
+          : item.variant;
+
+      const getSource = () => {
+        let source = "Custom";
+        if (!item.cached && item.created_at) {
+          source = "Local";
+        }
+        if (item.registryName) {
+          source = item.registryBuiltIn
+            ? item.registryName.split("-").map(capitalizeFirstLetter).join(" ")
+            : item.registryName;
+        }
+        const isKnownRegistry = [
+          "images",
+          "ubuntu",
+          "ubuntu-minimal",
+          "",
+        ].includes(item.registryName ?? "");
+        if (item.server === linuxContainersServer) {
+          source = "Linux Containers";
+        }
+        if (item.serverName) {
+          source = item.serverName;
+        }
+        return source;
+      };
+
+      return {
+        key:
+          itemType +
+          item.os +
+          displayRelease +
+          displayVariant +
+          item.server +
+          item.fingerprint +
+          item.registryName,
+        className: "u-row",
+        columns: [
+          {
+            content: item.os,
+            role: "rowheader",
+            "aria-label": "Distribution",
+            onClick: selectImage,
+          },
+          {
+            content: displayRelease,
+            role: "cell",
+            "aria-label": "Release",
+            onClick: selectImage,
+          },
+          {
+            content: displayVariant,
+            role: "cell",
+            "aria-label": "Variant",
+            onClick: selectImage,
+          },
+          {
+            content: itemType,
+            role: "cell",
+            "aria-label": "Type",
+            onClick: selectImage,
+          },
+          {
+            className: "u-hide--small u-hide--medium",
+            content: item.aliases.split(",").pop(),
+            title: item.aliases.split(",").pop(),
+            role: "cell",
+            "aria-label": "Alias",
+            onClick: selectImage,
+          },
+          {
+            content: getSource(),
+            role: "cell",
+            "aria-label": "Source",
+            onClick: selectImage,
+          },
+          {
+            className: "u-hide--small u-hide--medium",
+            content: item.cached ? "Cached" : "Remote",
+            role: "cell",
+            "aria-label": "Cached",
+            onClick: selectImage,
+          },
+          {
+            className: "u-hide--small u-hide--medium",
+            content: (
+              <Button
+                onClick={selectImage}
+                type="button"
+                dense
+                className="u-no-margin--bottom"
+                appearance={
+                  item.cached || item.server === LOCAL_IMAGE
+                    ? "positive"
+                    : "default"
+                }
+              >
+                Select
+              </Button>
+            ),
+            role: "cell",
+            "aria-label": "Action",
+            onClick: selectImage,
+          },
+        ],
+        sortData: {
+          os: item.os.toLowerCase(),
+          release: displayRelease.toLowerCase(),
+          variant: displayVariant?.toLowerCase(),
+          type: itemType,
+          alias: item.aliases,
+        },
+      };
+    });
+
+  const headers = [
+    { content: "Distribution", sortKey: "os" },
+    { content: "Release", sortKey: "release" },
+    { content: "Variant", sortKey: "variant" },
+    { content: "Type", sortKey: "type" },
+    {
+      content: "Alias",
+      sortKey: "alias",
+      className: "u-hide--small u-hide--medium",
+    },
+    {
+      content: "Source",
+    },
+    {
+      className: "u-hide--small u-hide--medium",
+      content: "Cached",
+    },
+    {
+      className: "u-hide--small u-hide--medium",
+      content: "",
+      "aria-label": "Actions",
+    },
+  ];
+
+  return (
+    <Modal
+      close={onClose}
+      title="Select base image"
+      className="image-select-modal"
+    >
+      <Row className="u-no-padding--left u-no-padding--right">
+        <Col size={3}>
+          <div className="image-select-filters">
+            <Select
+              id="imageFilterDistribution"
+              label="Distribution"
+              name="distribution"
+              onChange={(v) => {
+                setOs(v.target.value);
+                setRelease("");
+              }}
+              options={getOptionList((item: RemoteImage) => item.os)}
+              value={os}
+            />
+            <Select
+              id="imageFilterRelease"
+              label="Release"
+              name="release"
+              onChange={(v) => {
+                setRelease(v.target.value);
+              }}
+              options={getOptionList(
+                (item) => item.release,
+                (item) => item.os === os,
+              )}
+              value={release}
+              disabled={os === ""}
+            />
+            <Select
+              id="imageFilterVariant"
+              label="Variant"
+              name="variant"
+              onChange={(v) => {
+                setVariant(v.target.value);
+              }}
+              options={[
+                {
+                  label: "Any",
+                  value: ANY,
+                },
+              ].concat(
+                variantAll
+                  .filter((item) => Boolean(item))
+                  .map((item) => {
+                    return {
+                      label: item ?? "",
+                      value: item ?? "",
+                    };
+                  }),
+              )}
+              value={variant}
+            />
+            <Select
+              id="imageFilterArchitecture"
+              label="Architecture"
+              name="architecture"
+              onChange={(v) => {
+                setArch(v.target.value);
+              }}
+              options={archAll.map((item) => {
+                return {
+                  label: item,
+                  value: item,
+                };
+              })}
+              value={arch}
+            />
+            {imageType ? (
+              <Input
+                id="imageFilterType"
+                label="Compatible with"
+                name="type"
+                readOnly
+                type="text"
+                value={
+                  instanceCreationTypes.find(
+                    (option) => option.value === imageType,
+                  )?.label ?? imageType
+                }
+              />
+            ) : (
+              <Select
+                id="imageFilterType"
+                label="Type"
+                name="type"
+                onChange={(v) => {
+                  setType(
+                    v.target.value === ANY
+                      ? undefined
+                      : (v.target.value as LxdImageType),
+                  );
+                }}
+                options={[
+                  {
+                    label: "Any",
+                    value: ANY,
+                  },
+                  ...instanceCreationTypes,
+                ]}
+                value={type ?? ""}
+              />
+            )}
+            <CheckboxInput
+              aria-label="Only show cached images"
+              checked={hideRemote}
+              label="Show only cached images"
+              onChange={() => {
+                setHideRemote((prev) => !prev);
+              }}
+            />
+          </div>
+        </Col>
+        <Col size={9}>
+          <div className="image-select-header">
+            {error && !hideError ? (
+              <Notification
+                severity="negative"
+                title="Failed loading images"
+                onDismiss={() => {
+                  setHideError(true);
+                }}
+              >
+                {error}
+              </Notification>
+            ) : (
+              <div>
+                <SearchBox
+                  autoFocus
+                  className="search-image"
+                  name="search-image"
+                  type="text"
+                  onChange={(value) => {
+                    setQuery(value.toLowerCase());
+                    setOs("");
+                    setRelease("");
+                  }}
+                  placeholder="Search an image"
+                />
+              </div>
+            )}
+            {onUseImageReference && (
+              <Button
+                appearance="default"
+                className="has-icon image-reference-button"
+                onClick={onUseImageReference}
+                type="button"
+              >
+                <Icon name="image" />
+                <span>Use image reference</span>
+              </Button>
+            )}
+          </div>
+          <div className="image-list">
+            <ScrollableTable
+              dependencies={[images]}
+              tableId="image-selector-table"
+            >
+              <MainTable
+                id="image-selector-table"
+                className="table-image-select"
+                emptyStateMsg={
+                  isLoading ? (
+                    <Spinner className="u-loader" text="Loading images..." />
+                  ) : (
+                    "No matching images found"
+                  )
+                }
+                headers={headers}
+                rows={rows}
+                paginate={null}
+                sortable
+              />
+            </ScrollableTable>
+          </div>
+        </Col>
+      </Row>
+    </Modal>
+  );
+};
+
+export default ImageSelector;

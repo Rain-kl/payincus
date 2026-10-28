@@ -1,0 +1,35 @@
+.instance-console-tab {
+  .p-panel__controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: $spv--large;
+    padding-top: 0;
+
+    .console-radio-wrapper {
+      align-items: flex-end;
+      display: flex;
+
+      .right-margin {
+        margin-right: $sph--x-large;
+      }
+    }
+
+    .control-button {
+      margin-left: auto;
+    }
+  }
+
+  .spice-wrapper {
+    overflow: auto;
+  }
+
+  #spice-screen canvas {
+    background: black;
+    margin-bottom: 0;
+  }
+}
+
+.instance-console-shortcut-dropdown {
+  max-height: 300px;
+  overflow-y: scroll;
+}

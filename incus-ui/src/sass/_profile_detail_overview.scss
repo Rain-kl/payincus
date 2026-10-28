@@ -1,0 +1,73 @@
+.profile-overview-tab {
+  overflow: auto;
+
+  .p-notification--caution {
+    background-image: none;
+    border: 0;
+    padding-left: $spv--large;
+  }
+
+  .row:first-of-type {
+    margin-top: $spv--x-large;
+  }
+
+  .row:not(:first-of-type) {
+    margin-top: $spv--large;
+  }
+
+  .section {
+    border-bottom: $border-thin;
+
+    table {
+      margin-bottom: $spv--large;
+    }
+  }
+
+  .section,
+  .usage {
+    tr {
+      border: none;
+    }
+
+    td,
+    th {
+      padding-bottom: $spv--x-small;
+      padding-left: 0;
+      padding-top: $spv--x-small;
+    }
+
+    th {
+      width: 30%;
+    }
+
+    td:first-of-type,
+    th:first-of-type {
+      padding-top: $spv--small;
+    }
+  }
+
+  .devices {
+    border-bottom: $border-thin;
+  }
+
+  .networks {
+    border-bottom: $border-thin;
+  }
+
+  .view-config {
+    margin-top: $spv--x-small;
+  }
+
+  .no-instances {
+    display: block;
+    padding-bottom: $spv--small;
+  }
+
+  .instances-by-project:not(:last-of-type) {
+    border-bottom: $border-thin !important;
+  }
+
+  .non-default-project-item:first-of-type {
+    margin-top: $spv--small;
+  }
+}

@@ -1,0 +1,104 @@
+import {
+  Form,
+  Input,
+  OutputField,
+  PrefixedInput,
+} from "@canonical/react-components";
+import type { FC } from "react";
+import type { FormikProps } from "formik/dist/types";
+import type { ImageRegistryFormValues } from "types/forms/image";
+import { ImageRegistryClusterLinkSelector } from "./ImageRegistryClusterLinkSelector";
+import { ImageRegistryProtocolSelector } from "./ImageRegistryProtocolSelector";
+
+interface Props {
+  formik: FormikProps<ImageRegistryFormValues>;
+}
+
+export const ImageRegistryForm: FC<Props> = ({ formik }) => {
+  const isSimpleStreams = formik.values.protocol === "simplestreams";
+  const stripProtocol = (value: string) => value.replace(/^https?:\/\//i, "");
+  const isEdit = !formik.values.isCreating;
+
+  const getFieldError = (fieldName: keyof ImageRegistryFormValues) => {
+    return formik.touched[fieldName] ? formik.errors[fieldName] : undefined;
+  };
+
+  return (
+    <Form onSubmit={formik.handleSubmit}>
+      {/* hidden submit to enable enter key in inputs */}
+      <Input type="submit" hidden value="Hidden input" />
+      {isEdit ? (
+        <OutputField
+          id="Name"
+          label="Name"
+          value={formik.values.name}
+          help={"Click the name in the page header to rename the registry."}
+        />
+      ) : (
+        <Input
+          {...formik.getFieldProps("name")}
+          type="text"
+          autoFocus
+          label="Name"
+          required
+          error={getFieldError("name")}
+          placeholder="Enter name"
+        />
+      )}
+      <Input
+        {...formik.getFieldProps("description")}
+        type="text"
+        autoFocus={isEdit}
+        label="Description"
+        placeholder="Enter description"
+        error={getFieldError("description")}
+      />
+      {isEdit ? (
+        <OutputField
+          id="Protocol"
+          label="Protocol"
+          value={formik.values.protocol}
+          help="Protocol cannot be changed."
+        />
+      ) : (
+        <ImageRegistryProtocolSelector formik={formik} />
+      )}
+      {isSimpleStreams && (
+        <PrefixedInput
+          {...formik.getFieldProps("url")}
+          immutableText="https://"
+          value={formik.values.url ? stripProtocol(formik.values.url) : ""}
+          label="Server"
+          placeholder="example.org/releases"
+          error={getFieldError("url")}
+          onChange={(e) => {
+            const normalizedUrl = stripProtocol(e.target.value);
+            formik.setFieldValue(
+              "url",
+              normalizedUrl ? `https://${normalizedUrl}` : "",
+            );
+          }}
+          help={
+            <>
+              Enter the base folder for <code>streams/v1</code>, such as{" "}
+              https://cloud-images.ubuntu.com/releases/
+            </>
+          }
+        />
+      )}
+      {!isSimpleStreams && (
+        <>
+          <ImageRegistryClusterLinkSelector formik={formik} required />
+          <Input
+            {...formik.getFieldProps("sourceProject")}
+            type="text"
+            label="Source project"
+            placeholder="Enter source project"
+            error={getFieldError("sourceProject")}
+            help="Project with images on the remote cluster."
+          />
+        </>
+      )}
+    </Form>
+  );
+};

@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
 
-export type ActionTicketType = 'oauth-bind' | 'terminal' | 'agent-log-stream'
+export type ActionTicketType = 'oauth-bind' | 'terminal' | 'agent-log-stream' | 'incus-ui'
 
 interface BaseActionTicket {
   type: ActionTicketType
@@ -27,14 +27,20 @@ interface AgentLogStreamTicket extends BaseActionTicket {
   hostId: number
 }
 
-type ActionTicket = OAuthBindTicket | TerminalTicket | AgentLogStreamTicket
+interface IncusUiTicket extends BaseActionTicket {
+  type: 'incus-ui'
+  hostId: number
+}
+
+type ActionTicket = OAuthBindTicket | TerminalTicket | AgentLogStreamTicket | IncusUiTicket
 
 const actionTickets = new Map<string, ActionTicket>()
 
 const ACTION_TICKET_TTL_MS = {
   'oauth-bind': 60 * 1000,
   terminal: 60 * 1000,
-  'agent-log-stream': 60 * 1000
+  'agent-log-stream': 60 * 1000,
+  'incus-ui': 5 * 60 * 1000
 } as const
 
 setInterval(() => {
@@ -244,4 +250,67 @@ export function revokeActionTicketsForSession(sessionId: string): number {
     }
   }
   return revoked
+}
+
+export interface IncusUiTicketVerifyResult {
+  valid: boolean
+  userId?: number
+  hostId?: number
+  issuedAt?: number
+  sessionId?: string
+  error?: string
+}
+
+export function generateIncusUiAccessTicket(
+  userId: number,
+  hostId: number,
+  issuedAt: number,
+  sessionId?: string
+): string {
+  const now = Date.now()
+  return createTicket({
+    type: 'incus-ui',
+    userId,
+    hostId,
+    issuedAt,
+    sessionId,
+    expiresAt: now + ACTION_TICKET_TTL_MS['incus-ui'],
+    createdAt: now,
+    usageCount: 0,
+    maxUsage: 256
+  })
+}
+
+export function verifyIncusUiAccessTicket(
+  token: string,
+  expectedHostId?: number
+): IncusUiTicketVerifyResult {
+  const ticket = actionTickets.get(token)
+  if (!ticket || ticket.type !== 'incus-ui') {
+    return { valid: false, error: 'Ticket not found or expired' }
+  }
+
+  if (Date.now() > ticket.expiresAt) {
+    actionTickets.delete(token)
+    return { valid: false, error: 'Ticket expired' }
+  }
+
+  if (expectedHostId !== undefined && ticket.hostId !== expectedHostId) {
+    return { valid: false, error: 'Host mismatch' }
+  }
+
+  ticket.usageCount += 1
+  if (ticket.usageCount >= ticket.maxUsage) {
+    actionTickets.delete(token)
+  } else {
+    actionTickets.set(token, ticket)
+  }
+
+  return {
+    valid: true,
+    userId: ticket.userId,
+    hostId: ticket.hostId,
+    issuedAt: ticket.issuedAt,
+    sessionId: ticket.sessionId
+  }
 }

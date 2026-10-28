@@ -1,0 +1,17 @@
+.member-selection-table {
+  .selected-row {
+    background-color: $colors--theme--background-default;
+  }
+
+  .select {
+    max-width: 50px;
+  }
+
+  .groups {
+    max-width: 90px;
+  }
+
+  .modified-status {
+    max-width: 50px;
+  }
+}

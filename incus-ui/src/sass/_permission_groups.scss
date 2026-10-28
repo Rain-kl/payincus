@@ -1,0 +1,250 @@
+@import "./helpers";
+
+.permission-groups-list {
+  .permission-groups {
+    .groups-table {
+      .name {
+        width: 30%;
+      }
+
+      .description {
+        width: 30%;
+
+        span {
+          @include u-line-clamp-truncate(2);
+        }
+      }
+
+      .identities,
+      .permissions {
+        width: 7rem;
+      }
+
+      .actions {
+        width: 8.5rem;
+      }
+
+      @media screen and (width < 1000px) {
+        .description {
+          display: none;
+        }
+      }
+
+      @media screen and (width < 900px) {
+        .identities,
+        .permissions {
+          display: none;
+        }
+      }
+
+      @media screen and (width < 600px) {
+        .select {
+          display: none;
+        }
+      }
+    }
+  }
+
+  @media screen and (width < 500px) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}
+
+.show-menu-above {
+  bottom: 1.8rem;
+}
+
+#group-identities-table {
+  .selected-row {
+    background-color: $colors--theme--background-default;
+  }
+
+  .modified-status {
+    width: 50px;
+  }
+}
+
+.delete-group-confirm-modal {
+  .p-modal__footer {
+    display: flex;
+    gap: $sph--large;
+
+    .confirm-input {
+      flex-grow: 1;
+    }
+  }
+}
+
+.edit-permissions-panel {
+  width: min(100%, 46rem) !important;
+
+  .p-card__title {
+    font-size: #{map-get($font-sizes, h3)}rem;
+  }
+
+  .permission-selector {
+    align-items: flex-end;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-evenly;
+
+    .dropdown-disabled * {
+      cursor: not-allowed;
+    }
+
+    // wrap the permission input to columnar on small screens
+    @media screen and (width < 730px) {
+      align-items: inherit;
+      flex-direction: column;
+
+      .p-form__group {
+        width: inherit !important;
+      }
+    }
+
+    &:focus {
+      outline: none;
+    }
+
+    .p-form__group {
+      flex-shrink: 0; // avoid flex items from dynamic width adjustments
+      width: 26%;
+
+      &:has(button.is-disabled) {
+        .p-form__label,
+        .is-disabled {
+          cursor: not-allowed;
+        }
+
+        .p-form__label {
+          color: var(--vf-color-text-muted);
+        }
+
+        .p-custom-select__wrapper .p-custom-select__toggle:focus {
+          box-shadow: none;
+        }
+      }
+    }
+
+    .add-entitlement {
+      flex-grow: 1;
+
+      button {
+        width: 100%;
+      }
+    }
+  }
+
+  .hide-modified-status {
+    opacity: 0;
+  }
+
+  .permissions-table {
+    td.resource-type,
+    th.resource-type {
+      width: 20%;
+    }
+
+    td.resource,
+    th.resource {
+      width: 35%;
+    }
+
+    td.entitlement,
+    th.entitlement {
+      width: 30%;
+    }
+
+    tr.strikeout {
+      td:not(.actions) {
+        opacity: 0.6;
+        text-decoration: line-through;
+      }
+
+      @media screen and (width > $breakpoint-large) {
+        td {
+          position: relative;
+          text-decoration: none;
+        }
+
+        td:not(.actions)::before {
+          border-bottom: 1px solid $colors--theme--border-high-contrast;
+          content: "";
+          left: 0;
+          position: absolute;
+          top: 1rem;
+          width: 100%;
+        }
+      }
+    }
+  }
+}
+
+.permissions-select-dropdown {
+  max-width: 50rem;
+
+  .p-list {
+    width: auto;
+  }
+
+  .header {
+    background-color: $colors--theme--background-alt;
+    display: flex;
+    gap: $sph--small;
+    padding: $sph--x-small $sph--small;
+    position: sticky;
+    top: 0;
+
+    span {
+      @extend %table-header-label;
+
+      color: $colors--theme--text-default;
+    }
+
+    .resource {
+      width: 8rem;
+    }
+  }
+
+  .label {
+    display: flex;
+    gap: $sph--small;
+
+    .resource {
+      width: 8rem;
+    }
+
+    .entitlement {
+      width: 10rem;
+    }
+
+    .entitlement-description {
+      width: 25rem;
+    }
+  }
+
+  // only show first column in dropdown selections for resources and entitlements in small screens
+  @include mobile {
+    .header,
+    .label {
+      .entitlement {
+        width: 100%;
+      }
+
+      .entitlement-description {
+        display: none;
+      }
+
+      .resource {
+        display: none;
+      }
+
+      .resource:first-child {
+        display: block;
+        width: 100%;
+      }
+    }
+  }
+}

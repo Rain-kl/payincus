@@ -1,0 +1,34 @@
+.operation-list {
+  .status-header {
+    padding-left: 1.8rem;
+  }
+
+  @media screen and (min-width: $breakpoint-large) {
+    .time {
+      width: 320px;
+    }
+  }
+
+  .date-pair {
+    text-wrap: auto; // overriding text-wrap-mode: pretty to ensure on small screens the date pair is not cut off
+  }
+
+  .status {
+    width: 120px;
+  }
+
+  .action,
+  .info {
+    white-space: break-spaces;
+  }
+
+  .cancel {
+    width: 110px;
+  }
+
+  @media screen and (width < $breakpoint-large) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}

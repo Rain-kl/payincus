@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { extname, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
 function findMatchingBrace(source: string, openIndex: number): number {
@@ -386,6 +388,51 @@ export default defineConfig(({ mode }) => {
           handler(html: string) {
             return html.replace('/src/main.ts', entryScript)
           }
+        }
+      },
+      appEntry === 'admin' && {
+        name: 'payincus-admin-incus-ui-dev',
+        configureServer(server: any) {
+          const incusUiDistDir = fileURLToPath(new URL('../incus-ui/dist', import.meta.url))
+          const mimeTypes: Record<string, string> = {
+            '.html': 'text/html; charset=utf-8',
+            '.js': 'application/javascript; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.svg': 'image/svg+xml',
+            '.png': 'image/png',
+            '.ico': 'image/x-icon',
+            '.woff2': 'font/woff2',
+            '.json': 'application/json; charset=utf-8'
+          }
+          server.middlewares.use((req: any, res: any, next: any) => {
+            const rawUrl = req.url || ''
+            const pathname = rawUrl.split('?')[0]
+            if (!pathname.startsWith('/incus-ui')) {
+              return next()
+            }
+            const subPath = pathname.replace(/^\/incus-ui\/?/, '')
+            const candidateFile = subPath ? resolve(incusUiDistDir, subPath) : ''
+            if (
+              candidateFile &&
+              candidateFile.startsWith(incusUiDistDir) &&
+              existsSync(candidateFile) &&
+              statSync(candidateFile).isFile()
+            ) {
+              const ext = extname(candidateFile).toLowerCase()
+              res.statusCode = 200
+              res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
+              res.end(readFileSync(candidateFile))
+              return
+            }
+            const indexHtml = resolve(incusUiDistDir, 'index.html')
+            if (existsSync(indexHtml)) {
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'text/html; charset=utf-8')
+              res.end(readFileSync(indexHtml))
+              return
+            }
+            return next()
+          })
         }
       },
       appEntry === 'admin' && {

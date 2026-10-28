@@ -1,0 +1,75 @@
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import { useAuth } from "./auth";
+import type {
+  LxdStoragePool,
+  LXDStoragePoolOnClusterMember,
+  LxdStoragePoolResources,
+} from "types/storage";
+import {
+  fetchClusteredStoragePoolResources,
+  fetchPoolFromClusterMembers,
+  fetchStoragePool,
+  fetchStoragePools,
+} from "api/storage-pools";
+import { useClusterMembers } from "./useClusterMembers";
+import type { LxdClusterMember } from "types/cluster";
+
+export const useStoragePool = (
+  pool: string,
+  target?: string,
+  enabled?: boolean,
+): UseQueryResult<LxdStoragePool> => {
+  const { isFineGrained } = useAuth();
+  return useQuery({
+    queryKey: [queryKeys.storage, pool, target],
+    queryFn: async () => fetchStoragePool(pool, isFineGrained, target),
+    enabled: (enabled ?? true) && isFineGrained !== null,
+  });
+};
+
+export const useStoragePools = (
+  enabled: boolean,
+  project?: string,
+): UseQueryResult<LxdStoragePool[]> => {
+  const { isFineGrained } = useAuth();
+  return useQuery({
+    queryKey: [queryKeys.storage, project],
+    queryFn: async () => fetchStoragePools(isFineGrained, project),
+    enabled: enabled && isFineGrained !== null,
+  });
+};
+
+export const usePoolFromClusterMembers = (
+  pool: string,
+): UseQueryResult<LXDStoragePoolOnClusterMember[]> => {
+  const { isFineGrained } = useAuth();
+  const { data: clusterMembers = [] } = useClusterMembers();
+  return useQuery({
+    queryKey: [queryKeys.storage, pool, queryKeys.cluster],
+    queryFn: async () =>
+      fetchPoolFromClusterMembers(pool, clusterMembers, isFineGrained),
+    enabled: isFineGrained !== null && clusterMembers.length > 0,
+  });
+};
+
+export const useClusteredStoragePoolResources = (
+  pool?: string,
+  member?: LxdClusterMember,
+  enabled = true,
+): UseQueryResult<LxdStoragePoolResources[]> => {
+  const { data: clusterMembers = [] } = useClusterMembers();
+  const members = member ? [member] : clusterMembers;
+  return useQuery({
+    queryKey: [
+      queryKeys.storage,
+      pool,
+      queryKeys.cluster,
+      queryKeys.resources,
+      members,
+    ],
+    queryFn: async () =>
+      fetchClusteredStoragePoolResources(pool ?? "", members),
+    enabled: enabled && !!pool && members.length > 0,
+  });
+};

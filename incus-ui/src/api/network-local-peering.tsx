@@ -1,0 +1,111 @@
+import type { LxdApiResponse } from "types/apiResponse";
+import type { LxdNetworkPeer } from "types/network";
+import type { LxdOperationResponse } from "types/operation";
+import { handleResponse } from "util/helpers";
+import { ROOT_PATH } from "util/rootPath";
+
+export const fetchNetworkPeers = async (
+  network: string,
+  project: string,
+): Promise<LxdNetworkPeer[]> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  params.set("recursion", "1");
+
+  return fetch(
+    `${ROOT_PATH}/1.0/networks/${encodeURIComponent(network)}/peers?${params.toString()}`,
+  )
+    .then(handleResponse)
+    .then((data: LxdApiResponse<LxdNetworkPeer[]>) => {
+      data.metadata.sort((a, b) => a.name.localeCompare(b.name));
+      return data.metadata;
+    });
+};
+
+export const fetchNetworkPeer = async (
+  network: string,
+  project: string,
+  localPeering: string,
+): Promise<LxdNetworkPeer> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/networks/${encodeURIComponent(network)}/peers/${encodeURIComponent(localPeering)}?${params.toString()}`,
+  )
+    .then(handleResponse)
+    .then((data: LxdApiResponse<LxdNetworkPeer>) => {
+      return data.metadata;
+    });
+};
+
+export const createNetworkPeer = async (
+  network: string,
+  project: string,
+  body: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/networks/${encodeURIComponent(network)}/peers?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: body,
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const deleteNetworkPeer = async (
+  network: string,
+  project: string,
+  localPeering: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/networks/${encodeURIComponent(
+      network,
+    )}/peers/${encodeURIComponent(localPeering)}?${params.toString()}`,
+    {
+      method: "DELETE",
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const updateNetworkPeer = async (
+  network: string,
+  localPeering: string,
+  project: string,
+  body: LxdNetworkPeer,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/networks/${encodeURIComponent(network)}/peers/${encodeURIComponent(localPeering)}?${params.toString()}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};

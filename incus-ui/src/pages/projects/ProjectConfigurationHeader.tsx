@@ -1,0 +1,143 @@
+import { useState, type FC } from "react";
+import { useNavigate } from "react-router-dom";
+import RenameHeader, { type RenameHeaderValues } from "components/RenameHeader";
+import type { LxdProject } from "types/project";
+import { renameProject } from "api/projects";
+import * as Yup from "yup";
+import { useFormik } from "formik";
+import { checkDuplicateName } from "util/helpers";
+import { ROOT_PATH } from "util/rootPath";
+import DeleteProjectBtn from "./actions/DeleteProjectBtn";
+import HelpLink from "components/HelpLink";
+import { useEventQueue } from "context/eventQueue";
+import ProjectRichChip from "pages/projects/ProjectRichChip";
+import { useProjectEntitlements } from "util/entitlements/projects";
+import { useToastNotification } from "@canonical/react-components";
+
+interface Props {
+  project: LxdProject;
+}
+
+const ProjectConfigurationHeader: FC<Props> = ({ project }) => {
+  const eventQueue = useEventQueue();
+  const navigate = useNavigate();
+  const toastNotify = useToastNotification();
+  const controllerState = useState<AbortController | null>(null);
+  const { canEditProject } = useProjectEntitlements();
+
+  const RenameSchema = Yup.object().shape({
+    name: Yup.string()
+      .test(
+        "deduplicate",
+        "A project with this name already exists",
+        async (value) =>
+          project.name === value ||
+          checkDuplicateName(value, "", controllerState, "projects"),
+      )
+      .required("Project name is required"),
+  });
+
+  const formik = useFormik<RenameHeaderValues>({
+    initialValues: {
+      name: project.name,
+      isRenaming: false,
+    },
+    validationSchema: RenameSchema,
+    onSubmit: (values) => {
+      if (project.name === values.name) {
+        formik.setFieldValue("isRenaming", false);
+        formik.setSubmitting(false);
+        return;
+      }
+      const oldProjectLink = (
+        <ProjectRichChip
+          projectName={project.name}
+          urlSuffix="/configuration"
+        />
+      );
+      renameProject(project.name, values.name)
+        .then((operation) => {
+          eventQueue.set(
+            operation.metadata.id,
+            () => {
+              const url = `${ROOT_PATH}/ui/project/${encodeURIComponent(values.name)}/configuration`;
+              navigate(url);
+              toastNotify.success(
+                <>
+                  Project <strong>{project.name}</strong> renamed to{" "}
+                  <ProjectRichChip
+                    projectName={values.name}
+                    urlSuffix="/configuration"
+                  />
+                  .
+                </>,
+              );
+              formik.setFieldValue("isRenaming", false);
+            },
+            (msg) =>
+              toastNotify.failure(
+                `Renaming project ${project.name} failed`,
+                new Error(msg),
+                oldProjectLink,
+              ),
+            () => {
+              formik.setSubmitting(false);
+            },
+          );
+        })
+        .catch((e) => {
+          formik.setSubmitting(false);
+          toastNotify.failure(
+            `Renaming project ${project.name} failed`,
+            e,
+            oldProjectLink,
+          );
+        });
+    },
+  });
+
+  const getRenameDisabledReason = () => {
+    if (!canEditProject(project)) {
+      return "You do not have permission to rename this project";
+    }
+
+    if (project.name === "default") {
+      return "Cannot rename the default project";
+    }
+
+    if (
+      project.used_by &&
+      project.used_by.length === 1 &&
+      project.used_by[0].split("?")[0] === "/1.0/profiles/default"
+    ) {
+      return undefined;
+    }
+
+    if (project.used_by && project.used_by.length > 0) {
+      return "Cannot rename a non-empty project.";
+    }
+
+    return undefined;
+  };
+
+  return (
+    <RenameHeader
+      name={project.name}
+      parentItems={[
+        <HelpLink
+          key="project-configuration"
+          docPath="/reference/projects/"
+          title="Learn more about project configuration"
+        >
+          Project configuration
+        </HelpLink>,
+      ]}
+      renameDisabledReason={getRenameDisabledReason()}
+      controls={<DeleteProjectBtn project={project} />}
+      isLoaded={Boolean(project)}
+      formik={formik}
+    />
+  );
+};
+
+export default ProjectConfigurationHeader;

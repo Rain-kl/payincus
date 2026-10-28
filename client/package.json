@@ -9,7 +9,7 @@
     "dev:admin": "VITE_APP_ENTRY=admin vite",
     "build": "pnpm build:user && pnpm build:admin",
     "build:user": "VITE_APP_ENTRY=user vue-tsc && VITE_APP_ENTRY=user vite build",
-    "build:admin": "VITE_APP_ENTRY=admin vue-tsc && VITE_APP_ENTRY=admin vite build",
+    "build:admin": "VITE_APP_ENTRY=admin vue-tsc && VITE_APP_ENTRY=admin vite build && node ../scripts/build-incus-ui.mjs",
     "preview": "vite preview",
     "lint": "eslint src --fix",
     "lint:check": "eslint src",

@@ -1,0 +1,784 @@
+import {
+  handleBlobResponse,
+  handleEtagResponse,
+  handleResponse,
+  handleTextResponse,
+} from "util/helpers";
+import {
+  continueOrFinish,
+  pushFailure,
+  pushSuccess,
+  type BulkOperationItem,
+  type BulkOperationResult,
+} from "util/promises";
+import type {
+  LxdInstance,
+  LxdInstanceAction,
+  LxdInstanceSource,
+} from "types/instance";
+import type { LxdTerminal, TerminalConnectPayload } from "types/terminal";
+import type { LxdApiResponse } from "types/apiResponse";
+import type { LxdOperationResponse } from "types/operation";
+import type { EventQueue } from "context/eventQueue";
+import axios, { type AxiosResponse } from "axios";
+import type { UploadState } from "types/upload";
+import type { InstanceMigrationBundle } from "types/migration";
+import { addEntitlements } from "util/entitlements/api";
+import { addTarget } from "util/target";
+import { getInstanceDetailUrl } from "util/instances";
+import { ROOT_PATH } from "util/rootPath";
+import type { LxdFileExplorerItem, LxdFileMetadata } from "types/fileExplorer";
+
+export const instanceEntitlements = [
+  "can_access_console",
+  "can_access_files",
+  "can_delete",
+  "can_edit",
+  "can_exec",
+  "can_manage_backups",
+  "can_manage_snapshots",
+  "can_update_state",
+];
+
+// Only state.disk and state.network are valid selective recursion fields.
+// Other state fields (cpu, memory, pid, processes, status) are always included.
+export const instanceFields = ["state.disk", "state.network"];
+
+export const addRecursion = (
+  params: URLSearchParams,
+  hasSelectiveRecursion: boolean,
+  isFineGrained: boolean | null,
+): void => {
+  // Server doesn't support selective recursion with entitlements,
+  // so only use selective recursion when not requesting entitlements
+  if (hasSelectiveRecursion && isFineGrained !== true) {
+    params.set("recursion", `2;fields=${instanceFields.join(",")}`);
+  } else {
+    params.set("recursion", "2");
+  }
+};
+
+export const fetchInstance = async (
+  name: string,
+  project: string,
+  isFineGrained: boolean | null,
+  hasSelectiveRecursion: boolean,
+): Promise<LxdInstance> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  addRecursion(params, hasSelectiveRecursion, isFineGrained);
+  addEntitlements(params, isFineGrained, instanceEntitlements);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}?${params.toString()}`,
+  )
+    .then(handleEtagResponse)
+    .then((data) => {
+      return data as LxdInstance;
+    });
+};
+
+export const fetchInstances = async (
+  project: string | null,
+  isFineGrained: boolean | null,
+  hasSelectiveRecursion: boolean,
+  filter?: string,
+): Promise<LxdInstance[]> => {
+  const params = new URLSearchParams();
+  addRecursion(params, hasSelectiveRecursion, isFineGrained);
+  params.set("filter", filter);
+  if (project) {
+    params.set("project", project);
+  } else {
+    params.set("all-projects", "true");
+  }
+  addEntitlements(params, isFineGrained, instanceEntitlements);
+
+  return fetch(`${ROOT_PATH}/1.0/instances?${params.toString()}`)
+    .then(handleResponse)
+    .then((data: LxdApiResponse<LxdInstance[]>) => {
+      return data.metadata;
+    });
+};
+
+export const createInstance = async (
+  body: string,
+  project: string,
+  target?: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  addTarget(params, target);
+
+  return fetch(`${ROOT_PATH}/1.0/instances?${params.toString()}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: body,
+  })
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const updateInstance = async (
+  instance: LxdInstance,
+  project: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance.name)}?${params.toString()}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(instance),
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": instance.etag ?? "invalid-etag",
+      },
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const rebuildInstance = async (
+  instance: LxdInstance,
+  source: LxdInstanceSource,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", instance.project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance.name)}/rebuild?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ source }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const renameInstance = async (
+  oldName: string,
+  newName: string,
+  project: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(oldName)}?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: newName,
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const migrateInstance = async (
+  instance: LxdInstance,
+  target?: string,
+  pool?: string,
+  targetProject?: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", instance.project);
+  addTarget(params, target);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance.name)}?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        migration: true,
+        live: instance.type === "virtual-machine" && instance.status === "Running",
+        pool,
+        project: targetProject,
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const migrateInstanceBulk = async (
+  instances: LxdInstance[],
+  target: string,
+  pool: string,
+  targetProject: string,
+  eventQueue: EventQueue,
+): Promise<BulkOperationResult[]> => {
+  const results: BulkOperationResult[] = [];
+  return new Promise((resolve, reject) => {
+    Promise.allSettled(
+      instances.map(async (instance) => {
+        const item: BulkOperationItem = {
+          name: instance.name,
+          type: "instance",
+          href: getInstanceDetailUrl(instance.name, instance.project),
+        };
+        await migrateInstance(instance, target, pool, targetProject)
+          .then((operation) => {
+            eventQueue.set(
+              operation.metadata.id,
+              () => {
+                pushSuccess(results, item);
+              },
+              (msg) => {
+                pushFailure(results, msg, item);
+              },
+              () => {
+                continueOrFinish(results, instances.length, resolve);
+              },
+            );
+          })
+          .catch((e) => {
+            pushFailure(results, e instanceof Error ? e.message : "", item);
+            continueOrFinish(results, instances.length, resolve);
+          });
+      }),
+    ).catch(reject);
+  });
+};
+
+// Cross-cluster migration, source side: start a migration operation without a
+// target. The returned websocket operation stays open waiting for a remote
+// server to connect.
+export const startInstanceMigration = async (
+  instance: LxdInstance,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", instance.project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance.name)}?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        migration: true,
+        live:
+          instance.type === "virtual-machine" && instance.status === "Running",
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+// Cross-cluster migration, target side: create a new instance by pulling from
+// the source migration operation described in the bundle.
+export const createInstanceFromMigration = async (
+  bundle: InstanceMigrationBundle,
+  project: string,
+  name: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  const operationUrl = `https://${bundle.addresses[0]}${bundle.operation}`;
+
+  return fetch(`${ROOT_PATH}/1.0/instances?${params.toString()}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name,
+      type: bundle.instanceType,
+      architecture: bundle.architecture,
+      config: bundle.config,
+      devices: bundle.devices,
+      profiles: bundle.profiles,
+      ephemeral: bundle.ephemeral,
+      description: bundle.description,
+      source: {
+        type: "migration",
+        mode: "pull",
+        operation: operationUrl,
+        certificate: bundle.certificate,
+        secrets: bundle.secrets,
+        live: bundle.live,
+      },
+    }),
+  })
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const startInstance = async (
+  instance: LxdInstance,
+): Promise<LxdOperationResponse> => {
+  return putInstanceAction(instance.name, instance.project, "start");
+};
+
+export const stopInstance = async (
+  instance: LxdInstance,
+  isForce: boolean,
+): Promise<LxdOperationResponse> => {
+  return putInstanceAction(instance.name, instance.project, "stop", isForce);
+};
+
+export const freezeInstance = async (
+  instance: LxdInstance,
+): Promise<LxdOperationResponse> => {
+  return putInstanceAction(instance.name, instance.project, "freeze");
+};
+
+export const unfreezeInstance = async (
+  instance: LxdInstance,
+): Promise<LxdOperationResponse> => {
+  return putInstanceAction(instance.name, instance.project, "unfreeze");
+};
+
+export const restartInstance = async (
+  instance: LxdInstance,
+  isForce: boolean,
+): Promise<LxdOperationResponse> => {
+  return putInstanceAction(instance.name, instance.project, "restart", isForce);
+};
+
+const putInstanceAction = async (
+  instance: string,
+  project: string,
+  action: LxdInstanceAction,
+  isForce?: boolean,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance)}/state?${params.toString()}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: action,
+        force: isForce,
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export interface InstanceBulkAction {
+  name: string;
+  project: string;
+  action: LxdInstanceAction;
+}
+
+export const updateInstanceBulkAction = async (
+  actions: InstanceBulkAction[],
+  isForce: boolean,
+  eventQueue: EventQueue,
+): Promise<BulkOperationResult[]> => {
+  const results: BulkOperationResult[] = [];
+  return new Promise((resolve, reject) => {
+    Promise.allSettled(
+      actions.map(async ({ name, project, action }) => {
+        const item: BulkOperationItem = {
+          name,
+          type: "instance",
+          href: getInstanceDetailUrl(name, project),
+        };
+        await putInstanceAction(name, project, action, isForce)
+          .then((operation) => {
+            eventQueue.set(
+              operation.metadata.id,
+              () => {
+                pushSuccess(results, item);
+              },
+              (msg) => {
+                pushFailure(results, msg, item);
+              },
+              () => {
+                continueOrFinish(results, actions.length, resolve);
+              },
+            );
+          })
+          .catch((e) => {
+            pushFailure(results, e instanceof Error ? e.message : "", item);
+            continueOrFinish(results, actions.length, resolve);
+          });
+      }),
+    ).catch(reject);
+  });
+};
+
+export const deleteInstance = async (
+  instance: LxdInstance,
+  force?: boolean,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", instance.project);
+
+  if (force) {
+    params.set("force", "1");
+  }
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance.name)}?${params.toString()}`,
+    {
+      method: "DELETE",
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const deleteInstanceBulk = async (
+  instances: LxdInstance[],
+  eventQueue: EventQueue,
+): Promise<BulkOperationResult[]> => {
+  const results: BulkOperationResult[] = [];
+  return new Promise((resolve, reject) => {
+    Promise.allSettled(
+      instances.map(async (instance) => {
+        const item: BulkOperationItem = {
+          name: instance.name,
+          type: "instance",
+          href: getInstanceDetailUrl(instance.name, instance.project),
+        };
+        await deleteInstance(instance)
+          .then((operation) => {
+            eventQueue.set(
+              operation.metadata.id,
+              () => {
+                pushSuccess(results, item);
+              },
+              (msg) => {
+                pushFailure(results, msg, item);
+              },
+              () => {
+                continueOrFinish(results, instances.length, resolve);
+              },
+            );
+          })
+          .catch((e) => {
+            pushFailure(results, e instanceof Error ? e.message : "", item);
+            continueOrFinish(results, instances.length, resolve);
+          });
+      }),
+    ).catch(reject);
+  });
+};
+
+export const connectInstanceExec = async (
+  name: string,
+  project: string,
+  payload: TerminalConnectPayload,
+  interactive = true,
+): Promise<LxdTerminal> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  params.set("wait", "10");
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/exec?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        command: payload.command.split(" "),
+        "wait-for-websocket": true,
+        environment: payload.environment.reduce(
+          (a, v) => ({ ...a, [v.key]: v.value }),
+          {},
+        ),
+        interactive: interactive,
+        group: payload.group,
+        user: payload.user,
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdTerminal) => {
+      return data;
+    });
+};
+
+export const connectInstanceVga = async (
+  name: string,
+  project: string,
+  force: boolean,
+): Promise<LxdTerminal> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  params.set("wait", "10");
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/console?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "vga",
+        force: force,
+        width: 0,
+        height: 0,
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdTerminal) => {
+      return data;
+    });
+};
+
+export const connectInstanceConsole = async (
+  name: string,
+  project: string,
+  force: boolean,
+): Promise<LxdTerminal> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  params.set("wait", "10");
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/console?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "wait-for-websocket": true,
+        type: "console",
+        force: force,
+      }),
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdTerminal) => {
+      return data;
+    });
+};
+
+export const fetchInstanceConsoleBuffer = async (
+  name: string,
+  project: string,
+): Promise<string> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/console?${params.toString()}`,
+  )
+    .then(handleTextResponse)
+    .then((data: string) => {
+      return data;
+    });
+};
+
+export const fetchInstanceLogs = async (
+  name: string,
+  project: string,
+): Promise<string[]> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/logs?${params.toString()}`,
+  )
+    .then(handleResponse)
+    .then((data: LxdApiResponse<string[]>) => {
+      return data.metadata;
+    });
+};
+
+export const fetchInstanceLogFile = async (
+  name: string,
+  project: string,
+  file: string,
+): Promise<string> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/logs/${encodeURIComponent(file)}?${params.toString()}`,
+  )
+    .then(handleTextResponse)
+    .then((data: string) => {
+      return data;
+    });
+};
+
+export const uploadInstance = async (
+  file: File | null,
+  name: string,
+  project: string | undefined,
+  pool: string | undefined,
+  setUploadState: (value: UploadState) => void,
+  uploadController: AbortController,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  if (project) {
+    params.set("project", project);
+  }
+
+  return axios
+    .post(`${ROOT_PATH}/1.0/instances?${params.toString()}`, file, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-LXD-name": name,
+        "X-LXD-pool": pool,
+      },
+      onUploadProgress: (event) => {
+        setUploadState({
+          percentage: event.progress ? Math.floor(event.progress * 100) : 0,
+          loaded: event.loaded,
+          total: event.total,
+        });
+      },
+      signal: uploadController.signal,
+    })
+    .then((response: AxiosResponse<LxdOperationResponse>) => response.data);
+};
+
+export const createInstanceBackup = async (
+  instanceName: string,
+  project: string,
+  payload: string,
+): Promise<LxdOperationResponse> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instanceName)}/backups?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: payload,
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdOperationResponse) => {
+      return data;
+    });
+};
+
+export const fetchInstanceDirectory = async (
+  name: string,
+  project: string,
+  path: string,
+): Promise<LxdFileExplorerItem> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  params.set("path", path);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(name)}/files?${params.toString()}`,
+    {
+      method: "GET",
+    },
+  )
+    .then(handleResponse)
+    .then((data: LxdFileExplorerItem) => {
+      return data;
+    });
+};
+
+export const fetchInstanceFileHeader = async (
+  instanceName: string,
+  project: string,
+  path: string,
+): Promise<LxdFileMetadata> => {
+  const params = new URLSearchParams();
+  params.set("project", project);
+  params.set("path", path);
+
+  return fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instanceName)}/files?${params.toString()}`,
+    {
+      method: "HEAD",
+    },
+  ).then((response: Response) => {
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch instance file header: ${response.status} ${response.statusText}`,
+      );
+    }
+    return {
+      type: response.headers.get("x-lxd-type") ?? "unknown",
+      modified: response.headers.get("x-lxd-modified") ?? "-",
+    };
+  });
+};
+
+export const deleteInstanceFile = async (
+  instance: LxdInstance,
+  path: string,
+): Promise<void> => {
+  const params = new URLSearchParams();
+  params.set("project", instance.project);
+  params.set("path", path);
+
+  await fetch(
+    `${ROOT_PATH}/1.0/instances/${encodeURIComponent(instance.name)}/files?${params.toString()}`,
+    {
+      method: "DELETE",
+    },
+  ).then(handleResponse);
+};
+
+export const fetchInstancePreview = (
+  instance: LxdInstance,
+): Promise<string> => {
+  const params = new URLSearchParams();
+  params.set("project", instance.project);
+  params.set("type", "vga");
+
+  return new Promise((resolve, reject) => {
+    fetch(
+      `/1.0/instances/${encodeURIComponent(instance.name)}/console?${params.toString()}`,
+    )
+      .then(handleBlobResponse)
+      .then((data) => resolve(URL.createObjectURL(data)))
+      .catch(reject);
+  });
+};

@@ -193,6 +193,10 @@ server {
     proxy_send_timeout 300s;
   }
 
+  location ^~ /incus-ui/ {
+    try_files $uri $uri/ /incus-ui/index.html;
+  }
+
   location / {
     try_files $uri $uri/ /index.html;
   }

@@ -4554,6 +4554,8 @@ export default {
             hasInstances: '该节点上还有 {count} 个实例，请先删除或迁移实例',
             checkFailed: '检查失败',
             // 批量延期
+            incusUi: 'IncusUI',
+            incusUiTunnelOffline: '宿主机反向隧道未连接（Agent 离线），无法打开 IncusUI',
             batchExtend: '赠送时长',
             extendHint: '该节点下共有 {count} 个付费实例将被延期',
             extendDaysLabel: '延期天数',

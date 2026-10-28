@@ -1,0 +1,117 @@
+@use "sass:map";
+
+.cluster-list {
+  .status-header {
+    padding-left: 1.33rem;
+  }
+
+  .name {
+    width: 15rem;
+  }
+
+  .status {
+    width: 10rem;
+  }
+
+  .actions {
+    width: 10rem;
+  }
+
+  .groups {
+    width: 6rem;
+  }
+
+  .members {
+    width: 6rem;
+  }
+
+  .actions-list {
+    min-width: 5rem;
+  }
+
+  @media screen and (width <= 1300px) {
+    .memory,
+    .description {
+      display: none;
+    }
+  }
+}
+
+.cluster-member-details {
+  .row {
+    padding-right: 0;
+  }
+
+  th {
+    width: 33%;
+  }
+
+  .aside {
+    display: none;
+    min-width: 12rem;
+    position: absolute;
+    right: 1rem;
+    top: 154px;
+
+    ul {
+      border-left: $border-thin;
+      margin-left: 0;
+      padding-left: 0;
+    }
+
+    .p-side-navigation__link {
+      background: $colors--theme--background-default;
+      margin-bottom: 0;
+      padding-bottom: 0;
+      padding-left: 0.5rem;
+
+      &[aria-current="page"] {
+        font-weight: bold;
+      }
+
+      &::before {
+        width: 0;
+      }
+    }
+  }
+
+  .hardware-section {
+    border-bottom: $border-thin;
+  }
+
+  .usb {
+    margin-bottom: 100dvh;
+  }
+
+  @media screen and (width > 1150px) {
+    .hardware-section {
+      max-width: 42rem !important;
+    }
+
+    .aside {
+      display: block;
+    }
+  }
+
+  @include extra-large {
+    .hardware-section {
+      max-width: 60rem !important;
+    }
+  }
+}
+
+.cluster-link-table {
+  .status-header {
+    padding-left: 1.8rem;
+  }
+}
+
+.server {
+  .p-panel__title {
+    display: none;
+  }
+
+  .pagination {
+    margin-right: $sph--x-large;
+  }
+}

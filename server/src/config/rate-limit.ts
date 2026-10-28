@@ -642,7 +642,9 @@ export const rateLimitRules: RateLimitRule[] = [
 export const rateLimitWhitelist = {
     /** 跳过速率限制的路径前缀 */
     pathPrefixes: [
-        '/api/ws/instances/*/terminal'  // WebSocket 终端
+        '/api/ws/instances/*/terminal',  // WebSocket 终端
+        '/api/admin/hosts/*/incus-proxy/*', // 管理员 Incus UI 反向隧道代理
+        '/api/ws/hosts/*/incus-proxy/*'     // 管理员 Incus UI WebSocket 隧道桥接
     ],
     /** 跳过速率限制的完整路径 */
     exactPaths: [

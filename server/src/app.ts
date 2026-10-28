@@ -107,6 +107,7 @@ import orderRoutes from './routes/orders.js'
 import giftCardsRoutes from './routes/gift-cards.js'
 import promoCodesRoutes from './routes/promo-codes.js'
 import adminPromoCodesRoutes from './routes/admin-promo-codes.js'
+import adminIncusUiRoutes from './routes/admin-incus-ui.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -572,6 +573,7 @@ await fastify.register(promoCodesRoutes, { prefix: '/api/coupon' })
 await fastify.register(promoCodesRoutes, { prefix: '/api/promos' })
 await fastify.register(adminPromoCodesRoutes, { prefix: '/api/admin/coupon' })
 await fastify.register(adminPromoCodesRoutes, { prefix: '/api/admin/promos' })
+await fastify.register(adminIncusUiRoutes)
 
 const shouldServeStaticClient = process.env.NODE_ENV === 'production' && process.env.SERVE_STATIC_CLIENT !== 'false'
 

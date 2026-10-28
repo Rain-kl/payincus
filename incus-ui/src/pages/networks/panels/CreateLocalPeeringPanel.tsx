@@ -1,0 +1,296 @@
+import {
+  ActionButton,
+  Button,
+  ScrollableContainer,
+  SidePanel,
+  useNotify,
+  useToastNotification,
+} from "@canonical/react-components";
+import { useState, type FC } from "react";
+import usePanelParams from "util/usePanelParams";
+import * as Yup from "yup";
+import { useFormik } from "formik";
+import NotificationRow from "components/NotificationRow";
+import ResourceLink from "components/ResourceLink";
+import { queryKeys } from "util/queryKeys";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCurrentProject } from "context/useCurrentProject";
+import type { LxdNetwork } from "types/network";
+import { createNetworkPeer } from "api/network-local-peering";
+import NetworkLocalPeeringForm from "../forms/NetworkLocalPeeringForm";
+import type { LocalPeeringFormValues } from "types/forms/localPeering";
+import { testDuplicateLocalPeeringName } from "util/networks";
+import NetworkRichChip from "../NetworkRichChip";
+import { ROOT_PATH } from "util/rootPath";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+import { useEventQueue } from "context/eventQueue";
+import ResourceLabel from "components/ResourceLabel";
+
+interface Props {
+  network: LxdNetwork;
+}
+
+const CreateLocalPeeringPanel: FC<Props> = ({ network }) => {
+  const panelParams = usePanelParams();
+  const { projectName: project } = useCurrentProject();
+  const notify = useNotify();
+  const toastNotify = useToastNotification();
+  const queryClient = useQueryClient();
+  const controllerState = useState<AbortController | null>(null);
+  const { hasStorageAndNetworkOperations } = useSupportedFeatures();
+  const eventQueue = useEventQueue();
+  const closePanel = () => {
+    panelParams.clear();
+    notify.clear();
+  };
+  const networkURL = `${ROOT_PATH}/ui/project/${encodeURIComponent(project)}/network/${encodeURIComponent(network.name)}`;
+  const projectOtherLabel = "Manually enter project";
+  const networkOtherLabel = "Manually enter network";
+
+  const localPeeringSchema = Yup.object().shape({
+    targetProject: Yup.string().required("Target project is required"),
+
+    customTargetProject: Yup.string()
+      .nullable()
+      .when("targetProject", {
+        is: (v: string) => v === projectOtherLabel,
+        then: (schema) => schema.required("Please enter a project name"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
+
+    targetNetwork: Yup.string().when("targetProject", {
+      is: (v: string) => v !== projectOtherLabel,
+      then: (schema) => schema.required("Target network is required"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
+
+    customTargetNetwork: Yup.string()
+      .nullable()
+      .when("targetNetwork", {
+        is: (v: string) => v === networkOtherLabel,
+        then: (schema) => schema.required("Please enter a network name"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
+
+    name: Yup.string()
+      .test(
+        ...testDuplicateLocalPeeringName(
+          project,
+          network.name,
+          controllerState,
+        ),
+      )
+      .required("Local peering name is required"),
+  });
+
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({
+      queryKey: [
+        queryKeys.projects,
+        project,
+        queryKeys.networks,
+        network.name,
+        queryKeys.peers,
+      ],
+    });
+  };
+
+  const onSuccess = (peerName: string) => {
+    invalidateQueries();
+    toastNotify.success(
+      <>
+        Local peering{" "}
+        <ResourceLink
+          type={"peering"}
+          value={peerName}
+          to={`${networkURL}/local-peerings`}
+        />{" "}
+        created for network{" "}
+        <NetworkRichChip networkName={network.name} projectName={project} />
+      </>,
+    );
+    closePanel();
+  };
+
+  const onFailure = (isLocal: boolean, peerName: string, e: unknown) => {
+    invalidateQueries();
+    formik.setSubmitting(false);
+    notify.failure(
+      `Creation of ${isLocal ? "local" : "mutual"} peering ${peerName} for network ${network.name} failed`,
+      e,
+    );
+  };
+
+  const createMutualPeering = (
+    network: string,
+    peerProject: string,
+    payload: object,
+    localPeeringName: string,
+  ) => {
+    createNetworkPeer(network, peerProject, JSON.stringify(payload))
+      .then((mutualOperation) => {
+        if (hasStorageAndNetworkOperations) {
+          eventQueue.set(
+            mutualOperation.metadata.id,
+            () => {
+              onSuccess(localPeeringName);
+            },
+            (msg) => {
+              onFailure(false, localPeeringName, new Error(msg));
+            },
+          );
+        } else {
+          onSuccess(localPeeringName);
+        }
+      })
+      .catch((e) => {
+        onFailure(false, localPeeringName, e);
+      });
+  };
+
+  const formik = useFormik<LocalPeeringFormValues>({
+    initialValues: {
+      name: "",
+      description: "",
+      targetProject: project,
+      targetNetwork: "",
+      customTargetNetwork: "",
+      customTargetProject: "",
+      createMutualPeering: false,
+    },
+    validationSchema: localPeeringSchema,
+    validateOnMount: true,
+    validateOnChange: true,
+    validateOnBlur: true,
+    onSubmit: (values) => {
+      const targetProject =
+        values.targetProject === projectOtherLabel
+          ? values.customTargetProject || ""
+          : values.targetProject;
+
+      const targetNetwork =
+        values.targetNetwork === networkOtherLabel
+          ? values.customTargetNetwork || ""
+          : values.targetNetwork;
+
+      const localPeeringPayload = {
+        name: values.name,
+        description: values.description,
+        target_project: targetProject,
+        target_network: targetNetwork,
+      };
+
+      createNetworkPeer(
+        network.name,
+        project,
+        JSON.stringify(localPeeringPayload),
+      )
+        .then((operation) => {
+          if (formik.values.createMutualPeering) {
+            const mutualPeeringPayload = {
+              name: values.name,
+              description: values.description,
+              target_project: project,
+              target_network: network.name,
+            };
+
+            if (hasStorageAndNetworkOperations) {
+              toastNotify.info(
+                <>
+                  Creation of mutual peering{" "}
+                  <ResourceLabel bold type="peering" value={values.name} /> has
+                  started.
+                </>,
+              );
+              eventQueue.set(
+                operation.metadata.id,
+                () => {
+                  createMutualPeering(
+                    targetNetwork,
+                    targetProject,
+                    mutualPeeringPayload,
+                    values.name,
+                  );
+                },
+                (msg) => {
+                  onFailure(true, values.name, new Error(msg));
+                },
+              );
+            } else {
+              createMutualPeering(
+                targetNetwork,
+                targetProject,
+                mutualPeeringPayload,
+                values.name,
+              );
+            }
+          } else {
+            if (hasStorageAndNetworkOperations) {
+              toastNotify.info(
+                <>
+                  Creation of local peering{" "}
+                  <ResourceLabel bold type="peering" value={values.name} /> has
+                  started.
+                </>,
+              );
+              eventQueue.set(
+                operation.metadata.id,
+                () => {
+                  onSuccess(values.name);
+                },
+                (msg) => {
+                  onFailure(true, values.name, new Error(msg));
+                },
+              );
+            } else {
+              onSuccess(values.name);
+            }
+          }
+        })
+        .catch((e) => {
+          onFailure(true, values.name, e);
+        });
+    },
+  });
+
+  return (
+    <>
+      <SidePanel>
+        <SidePanel.Header>
+          <SidePanel.HeaderTitle>Create local peering</SidePanel.HeaderTitle>
+        </SidePanel.Header>
+        <NotificationRow className="u-no-padding" />
+        <SidePanel.Content className="u-no-padding">
+          <ScrollableContainer
+            dependencies={[notify.notification]}
+            belowIds={["panel-footer"]}
+          >
+            <NetworkLocalPeeringForm formik={formik} network={network} />
+          </ScrollableContainer>
+        </SidePanel.Content>
+        <SidePanel.Footer className="u-align--right">
+          <Button
+            appearance="base"
+            onClick={closePanel}
+            className="u-no-margin--bottom"
+          >
+            Cancel
+          </Button>
+          <ActionButton
+            appearance="positive"
+            loading={formik.isSubmitting}
+            onClick={() => void formik.submitForm()}
+            className="u-no-margin--bottom"
+            disabled={
+              !formik.isValid || formik.isSubmitting || !formik.values.name
+            }
+          >
+            Create local peering
+          </ActionButton>
+        </SidePanel.Footer>
+      </SidePanel>
+    </>
+  );
+};
+
+export default CreateLocalPeeringPanel;

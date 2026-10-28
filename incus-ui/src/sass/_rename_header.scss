@@ -1,0 +1,71 @@
+.rename-header {
+  .p-panel__title {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    min-width: 0;
+
+    @include extra-large {
+      align-items: center;
+      flex-direction: row;
+    }
+
+    .breadcrumb-wrapper {
+      display: flex !important;
+    }
+
+    .name {
+      flex-shrink: 1;
+      margin-right: $sph--large;
+      min-width: 0;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+
+      > span > span {
+        display: inherit !important;
+      }
+
+      &:hover {
+        background: linear-gradient(
+            45deg,
+            $colors--theme--background-hover,
+            $colors--theme--background-hover
+          )
+          no-repeat;
+      }
+    }
+
+    .rename {
+      display: inline-flex;
+      min-width: 33rem;
+      white-space: nowrap;
+
+      .name-input {
+        margin-left: -1rem;
+      }
+
+      .cancel {
+        margin-right: $sph--small;
+      }
+
+      .p-form-validation__message {
+        font-variant-caps: initial;
+        font-variant-numeric: initial;
+        font-weight: initial;
+        letter-spacing: initial;
+        text-indent: initial;
+      }
+    }
+  }
+
+  .instance-header-state-controls {
+    flex-shrink: 0;
+    white-space: nowrap !important;
+  }
+
+  .p-panel__controls {
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+  }
+}

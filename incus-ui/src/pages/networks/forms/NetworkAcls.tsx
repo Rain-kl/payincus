@@ -1,0 +1,113 @@
+import { useId, type FC } from "react";
+import ExpandableList from "components/ExpandableList";
+import type { FormikProps } from "formik/dist/types";
+import type { NetworkFormValues } from "types/forms/network";
+import ResourceLink from "components/ResourceLink";
+import FormEditButton from "components/FormEditButton";
+import { ensureEditMode } from "util/editMode";
+import NetworkAclSelector from "pages/networks/forms/NetworkAclSelector";
+import { Label } from "@canonical/react-components";
+import NetworkDefaultACLSelector, {
+  type Direction,
+} from "./NetworkDefaultACLSelector";
+import NetworkDefaultACLRead from "./NetworkDefaultACLRead";
+import { ROOT_PATH } from "util/rootPath";
+import { useNetworkAcls } from "context/useNetworkAcls";
+
+interface Props {
+  project: string;
+  formik: FormikProps<NetworkFormValues>;
+}
+
+const NetworkAcls: FC<Props> = ({ formik, project }) => {
+  const networlAclSelectorId = useId();
+  const { data: acls = [], isLoading } = useNetworkAcls(project);
+
+  const disableReason = isLoading
+    ? "Loading ACLs..."
+    : formik.values.editRestriction;
+
+  const defaultEgressIngress = {
+    Egress: formik.values.security_acls_default_egress ?? "",
+    Ingress: formik.values.security_acls_default_ingress ?? "",
+  };
+
+  const directionField: Record<Direction, string> = {
+    Egress: "security_acls_default_egress",
+    Ingress: "security_acls_default_ingress",
+  };
+
+  return (
+    <div className="general-field">
+      <div className="general-field-label can-edit">
+        <Label forId={networlAclSelectorId}>Access Control Lists</Label>
+      </div>
+      <div
+        className="general-field-content"
+        key={formik.values.readOnly ? "read" : "edit"}
+      >
+        {formik.values.readOnly && (
+          <>
+            {formik.values.security_acls.length === 0 ? (
+              "-"
+            ) : (
+              <ExpandableList
+                items={formik.values.security_acls.map((aclName) => (
+                  <ResourceLink
+                    key={aclName}
+                    type="network-acl"
+                    value={aclName}
+                    to={`${ROOT_PATH}/ui/project/${encodeURIComponent(project)}/network-acl/${encodeURIComponent(aclName)}`}
+                  />
+                ))}
+              />
+            )}
+            <FormEditButton
+              toggleReadOnly={() => {
+                ensureEditMode(formik);
+                setTimeout(() => {
+                  const aclSelector =
+                    document.getElementById(networlAclSelectorId);
+                  // open multi select dropdown
+                  aclSelector?.scrollIntoView({
+                    block: "nearest",
+                    inline: "nearest",
+                  });
+                  aclSelector?.click();
+                }, 100);
+              }}
+              disableReason={disableReason}
+            />
+          </>
+        )}
+        {!formik.values.readOnly && (
+          <NetworkAclSelector
+            project={project}
+            selectedAcls={formik.values.security_acls}
+            setSelectedAcls={(selectedItems) => {
+              formik.setFieldValue("security_acls", selectedItems);
+            }}
+            id={networlAclSelectorId}
+            availableAcls={acls}
+          />
+        )}
+        {formik.values.readOnly ? (
+          formik.values.security_acls.length !== 0 && (
+            <NetworkDefaultACLRead values={defaultEgressIngress} />
+          )
+        ) : (
+          <NetworkDefaultACLSelector
+            onChange={(fieldValue, value) => {
+              formik.setFieldValue(fieldValue, value);
+            }}
+            values={defaultEgressIngress}
+            disabled={formik.values.security_acls.length === 0}
+            directionField={directionField}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default NetworkAcls;

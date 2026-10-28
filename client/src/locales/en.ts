@@ -4371,6 +4371,8 @@ export default {
             hasInstances: 'This host still has {count} instance(s), please delete or migrate them first',
             checkFailed: 'Check failed',
             // Batch extend
+            incusUi: 'IncusUI',
+            incusUiTunnelOffline: 'Host reverse tunnel is offline (Agent disconnected), cannot open IncusUI',
             batchExtend: 'Gift Time',
             extendHint: '{count} paid instance(s) on this host will be extended',
             extendDaysLabel: 'Days to extend',

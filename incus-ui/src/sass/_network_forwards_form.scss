@@ -1,0 +1,46 @@
+.network-forwards-form {
+  .form-contents > div,
+  .content-details {
+    margin-left: 0;
+    max-width: 67rem !important;
+  }
+
+  .target-address-family-radio-wrapper {
+    gap: $sph--x-large;
+    margin-bottom: $spv--large;
+
+    .p-radio {
+      margin-top: 0;
+    }
+  }
+
+  .forward-ports {
+    .listen-port,
+    .protocol,
+    .target-address,
+    .target-port {
+      width: 15rem;
+    }
+
+    .listen-port {
+      padding-left: 0;
+    }
+
+    @media screen and (width <= 1337px) {
+      .listen-port,
+      .protocol,
+      .target-address,
+      .target-port {
+        width: 13rem;
+      }
+    }
+
+    @media screen and (width <= 1190px) {
+      .listen-port,
+      .protocol,
+      .target-port {
+        width: 8rem;
+      }
+    }
+  }
+}

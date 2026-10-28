@@ -1,0 +1,90 @@
+import type { FC } from "react";
+import { isRootDisk, isHostDiskDevice } from "util/devices";
+import type { FormDevice } from "types/formDevice";
+import type { LxdDeviceValue } from "types/device";
+import ResourceLink from "components/ResourceLink";
+import StoragePoolRichChip from "pages/storage/StoragePoolRichChip";
+import { ROOT_PATH } from "util/rootPath";
+
+interface Props {
+  device: LxdDeviceValue;
+  project: string;
+  location?: string;
+}
+
+const DeviceDetails: FC<Props> = ({ device, project, location }) => {
+  if (device.type === "disk") {
+    if (isRootDisk(device as FormDevice)) {
+      return (
+        <>
+          Pool{" "}
+          <StoragePoolRichChip
+            poolName={device.pool ?? ""}
+            projectName={project}
+            location={location}
+          />
+        </>
+      );
+    }
+
+    if (isHostDiskDevice(device)) {
+      return device.source;
+    }
+
+    return (
+      <>
+        Volume{" "}
+        <ResourceLink
+          type="volume"
+          value={device.source as string}
+          to={`${ROOT_PATH}/ui/project/${encodeURIComponent(project)}/storage/pool/${encodeURIComponent(device.pool ?? "")}/volumes/custom/${encodeURIComponent(device.source ?? "")}`}
+        />{" "}
+        on pool{" "}
+        <StoragePoolRichChip
+          poolName={device.pool ?? ""}
+          projectName={project}
+          location={location}
+        />
+      </>
+    );
+  }
+
+  if (device.type === "gpu") {
+    const gpuIdentifier = (() => {
+      if (device.pci) {
+        return `PCI  ${device.pci}`;
+      }
+      if (device.id) {
+        return `ID ${device.id}`;
+      }
+      return [
+        device.vendorid ? `Vendor ${device.vendorid}` : "",
+        device.productid ? `Product ${device.productid}` : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+    })();
+
+    return (
+      <span title={gpuIdentifier} className="u-truncate">
+        {gpuIdentifier || "-"}
+      </span>
+    );
+  }
+
+  if (device.type === "proxy") {
+    return (
+      <>
+        <div title={device.listen} className="u-truncate">
+          Listen: {device.listen}
+        </div>
+        <div title={device.connect} className="u-truncate">
+          Connect: {device.connect}
+        </div>
+      </>
+    );
+  }
+  return "-";
+};
+
+export default DeviceDetails;

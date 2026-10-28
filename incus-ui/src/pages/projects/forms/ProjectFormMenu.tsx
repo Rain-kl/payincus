@@ -1,0 +1,77 @@
+import type { FC } from "react";
+import MenuItem from "components/forms/FormMenuItem";
+import { Button } from "@canonical/react-components";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+import { useIsClustered } from "context/useIsClustered";
+
+export const PROJECT_DETAILS = "Project details";
+export const RESOURCE_LIMITS = "Resource limits";
+export const REPLICATION = "Replication";
+export const CLUSTERS = "Clusters";
+export const INSTANCES = "Instances";
+export const DEVICE_USAGE = "Device usage";
+export const NETWORKS = "Networks";
+export const IMAGES = "Images";
+
+interface Props {
+  isRestrictionsOpen: boolean;
+  toggleRestrictionsOpen: () => void;
+  isRestrictionsDisabled: boolean;
+  active: string;
+  setActive: (val: string) => void;
+}
+
+const ProjectFormMenu: FC<Props> = ({
+  isRestrictionsOpen,
+  toggleRestrictionsOpen,
+  isRestrictionsDisabled,
+  active,
+  setActive,
+}) => {
+  const { hasImageRegistries, hasReplicators } = useSupportedFeatures();
+  const isClustered = useIsClustered();
+
+  const menuItemProps = {
+    active,
+    setActive,
+  };
+
+  return (
+    <div className="p-side-navigation--accordion form-navigation">
+      <nav aria-label="Project form navigation">
+        <ul className="p-side-navigation__list">
+          <MenuItem label={PROJECT_DETAILS} {...menuItemProps} />
+          {hasReplicators && (
+            <MenuItem label={REPLICATION} {...menuItemProps} />
+          )}
+          <MenuItem label={RESOURCE_LIMITS} {...menuItemProps} />
+          <li className="p-side-navigation__item">
+            <Button
+              type="button"
+              className="p-side-navigation__accordion-button"
+              aria-expanded={isRestrictionsOpen ? "true" : "false"}
+              onClick={toggleRestrictionsOpen}
+              disabled={isRestrictionsDisabled}
+            >
+              Restrictions
+            </Button>
+            <ul
+              className="p-side-navigation__list"
+              aria-expanded={isRestrictionsOpen ? "true" : "false"}
+            >
+              {isClustered && <MenuItem label={CLUSTERS} {...menuItemProps} />}
+              <MenuItem label={INSTANCES} {...menuItemProps} />
+              <MenuItem label={DEVICE_USAGE} {...menuItemProps} />
+              <MenuItem label={NETWORKS} {...menuItemProps} />
+              {hasImageRegistries && (
+                <MenuItem label={IMAGES} {...menuItemProps} />
+              )}
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  );
+};
+
+export default ProjectFormMenu;

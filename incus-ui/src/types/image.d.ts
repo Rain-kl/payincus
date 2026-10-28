@@ -1,0 +1,105 @@
+import type { LxdStorageVolume } from "types/storage";
+
+export type LxdImageType = "container" | "virtual-machine";
+export type LxdImageRegistryProtocol = "lxd" | "oci" | "simplestreams";
+
+interface LxdImageAlias {
+  name: string;
+  description: string;
+}
+
+export interface LxdImage {
+  fingerprint: string;
+  public: boolean;
+  properties?: {
+    description?: string;
+    os: string;
+    release: string;
+    type?: string;
+    variant?: string;
+    version?: string;
+  };
+  update_source?: {
+    alias: string;
+    protocol: LxdImageRegistryProtocol;
+    server: string;
+  };
+  architecture: string;
+  type: LxdImageType;
+  size: number;
+  uploaded_at: string;
+  aliases: LxdImageAlias[];
+  cached: boolean;
+  profiles: string[];
+  name?: string;
+  access_entitlements?: string[];
+}
+
+export interface LxdImageRegistry {
+  name: string;
+  description: string;
+  protocol: LxdImageRegistryProtocol;
+  builtin: boolean;
+  config?: LxdImageRegistryConfig;
+  access_entitlements?: string[];
+}
+
+export interface LxdImageRegistryConfig {
+  url?: string;
+  public?: string;
+  cluster?: string;
+  source_project?: string;
+}
+
+export interface ImportImage {
+  aliases: string;
+  server: string;
+}
+
+export interface RemoteImage {
+  aliases: string;
+  arch: string;
+  created_at: number;
+  lxd_requirements?: {
+    secureboot: boolean;
+  };
+  os: string;
+  pool?: string;
+  release: string;
+  release_title?: string;
+  variant?: string;
+  versions?: Record<
+    string,
+    {
+      items: Record<
+        string,
+        {
+          ftype: string;
+        }
+      >;
+    }
+  >;
+  server?: string;
+  protocol?: string;
+  volume?: LxdStorageVolume;
+  type?: LxdImageType;
+  fingerprint?: string;
+  profiles?: string[];
+  cached?: boolean;
+  isLts?: boolean;
+  registryBuiltIn?: boolean;
+  registryName?: string;
+  serverName?: string;
+  title?: string;
+}
+
+export interface RemoteImagesResult {
+  images: RemoteImage[];
+  error: string;
+}
+
+export interface RemoteImageList {
+  products: {
+    key: RemoteImage;
+  };
+}

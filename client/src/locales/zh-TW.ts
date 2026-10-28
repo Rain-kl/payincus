@@ -5258,6 +5258,8 @@ const zhTW = {
             hasInstances: '該節點上還有 {count} 個實例，請先刪除或遷移實例',
             checkFailed: '檢查失敗',
             // 批次延期
+            incusUi: 'IncusUI',
+            incusUiTunnelOffline: '宿主機反向隧道未連接（Agent 離線），無法開啟 IncusUI',
             batchExtend: '贈送時長',
             extendHint: '該節點下共有 {count} 個付費實例將被延期',
             extendDaysLabel: '延期天數',

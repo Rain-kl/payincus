@@ -1,0 +1,14 @@
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import { useAuth } from "./auth";
+import type { IdpGroup } from "types/permissions";
+import { fetchIdpGroups } from "api/auth-idp-groups";
+
+export const useIdpGroups = (): UseQueryResult<IdpGroup[]> => {
+  const { isFineGrained } = useAuth();
+  return useQuery({
+    queryKey: [queryKeys.idpGroups],
+    queryFn: async () => fetchIdpGroups(isFineGrained),
+    enabled: isFineGrained !== null,
+  });
+};

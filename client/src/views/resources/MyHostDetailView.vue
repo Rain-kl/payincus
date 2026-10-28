@@ -319,6 +319,15 @@ function openNodeInstall() {
   showReinstallModal.value = true
 }
 
+function openIncusUi() {
+  if (!host.value || !isAdmin.value) return
+  if (!host.value.tunnelOnline) {
+    toast.error(t('admin.hosts.incusUiTunnelOffline'))
+    return
+  }
+  window.open(`/incus-ui/${host.value.id}/ui`, '_blank', 'noopener,noreferrer')
+}
+
 // 用户确认后再生成命令，打开抽屉不会轮换节点凭据。
 async function regenerateInstall() {
   if (!host.value || actionLoading.value) return
@@ -421,6 +430,16 @@ const tabs = computed(() => [
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
+          <!-- IncusUI 内网穿透控制面板入口（仅管理员可见） -->
+          <button
+            v-if="isAdmin"
+            :disabled="!!actionLoading || needsVerification || !host.tunnelOnline"
+            :title="!host.tunnelOnline ? t('admin.hosts.incusUiTunnelOffline') : t('admin.hosts.incusUi')"
+            class="btn-secondary btn-sm sm:btn"
+            @click="openIncusUi"
+          >
+            <span>{{ t('admin.hosts.incusUi') }}</span>
+          </button>
           <!-- 批量延期按钮（仅管理员可见） -->
           <button
             v-if="isAdmin"

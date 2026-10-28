@@ -1,0 +1,66 @@
+.migrate-instance-modal {
+  .choose-migration-type {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: $spv--large;
+    min-height: 10rem;
+
+    @include large {
+      width: 40rem;
+    }
+  }
+
+  .migrate-instance-table {
+    .storage-pools {
+      .size {
+        padding-right: 5%;
+        width: 25%;
+      }
+
+      .p-meter {
+        margin-top: $spv--x-small;
+      }
+
+      .clustered-resource-link {
+        height: 2.25rem;
+      }
+    }
+
+    @include large {
+      min-width: 45rem;
+    }
+  }
+
+  .migrate-instance-summary {
+    align-items: center;
+    display: flex;
+
+    @include large {
+      min-width: 45rem;
+    }
+  }
+
+  .migrate-instance-remote {
+    align-items: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: $spv--small;
+
+    .p-form,
+    .p-form__group,
+    .migration-code {
+      width: 100%;
+    }
+
+    @include large {
+      min-width: 45rem;
+    }
+  }
+
+  .migrate-instance-name {
+    display: inline;
+    max-width: 20rem;
+  }
+}

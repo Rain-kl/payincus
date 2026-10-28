@@ -1,0 +1,139 @@
+import type { FC, ReactNode } from "react";
+import { Form, Input } from "@canonical/react-components";
+import type { FormikProps } from "formik/dist/types";
+import AutoExpandingTextArea from "components/AutoExpandingTextArea";
+import {
+  type GroupSubForm,
+  type PermissionGroupFormValues,
+} from "types/forms/permissionGroup";
+import FormLink from "components/FormLink";
+import { pluralize } from "util/helpers";
+import type { LxdAuthGroup } from "types/permissions";
+import { useGroupEntitlements } from "util/entitlements/groups";
+import { isAdminGroup } from "util/permissionGroups";
+
+interface Props {
+  formik: FormikProps<PermissionGroupFormValues>;
+  setSubForm: (subForm: GroupSubForm) => void;
+  identityCount: number;
+  identityModifyCount: number;
+  permissionCount: number;
+  permissionModifyCount: number;
+  isEditing?: boolean;
+  group?: LxdAuthGroup;
+}
+
+const GroupForm: FC<Props> = ({
+  formik,
+  setSubForm,
+  identityCount,
+  identityModifyCount,
+  permissionCount,
+  permissionModifyCount,
+  isEditing = true,
+  group,
+}) => {
+  const { canEditGroup } = useGroupEntitlements();
+  const getFormProps = (id: "name" | "description") => {
+    return {
+      id: id,
+      name: id,
+      onBlur: formik.handleBlur,
+      onChange: formik.handleChange,
+      value: formik.values[id] ?? "",
+      error: formik.touched[id] ? (formik.errors[id] as ReactNode) : null,
+      placeholder: `Enter ${id.replaceAll("_", " ")}`,
+    };
+  };
+
+  const groupEditRestriction =
+    !isEditing || canEditGroup(group)
+      ? ""
+      : "You do not have permission to modify this group";
+
+  const isNameInvalid = !formik.values.name || !!formik.errors.name;
+  const isFieldDisabled = !!groupEditRestriction || isNameInvalid;
+  const isPermissionDisabled = isNameInvalid;
+
+  const getDisableReason = () => {
+    if (groupEditRestriction) {
+      return groupEditRestriction;
+    }
+
+    if (group && isAdminGroup(group)) {
+      return "Admins group cannot be modified";
+    }
+
+    if (isNameInvalid) {
+      return "Enter a valid group name first";
+    }
+
+    return undefined;
+  };
+
+  const disableReason = getDisableReason();
+
+  const getPermissionsTitle = () => {
+    if (group && !canEditGroup(group)) {
+      return "View ";
+    }
+    if (isEditing) {
+      return "Edit ";
+    }
+    return "Add ";
+  };
+
+  return (
+    <Form onSubmit={formik.handleSubmit}>
+      {/* hidden submit to enable enter key in inputs */}
+      <Input type="submit" hidden value="Hidden input" />
+      <Input
+        {...getFormProps("name")}
+        type="text"
+        label="Name"
+        required
+        autoFocus
+        disabled={!!groupEditRestriction || isAdminGroup(group)}
+        title={groupEditRestriction || disableReason}
+      />
+      <AutoExpandingTextArea
+        {...getFormProps("description")}
+        label="Description"
+        disabled={isFieldDisabled || isAdminGroup(group)}
+        title={disableReason}
+      />
+      <FormLink
+        title={(isEditing ? "Edit " : "Add ") + pluralize("identity", 2)}
+        icon="user-group"
+        onClick={() => {
+          setSubForm("identity");
+        }}
+        isModified={identityModifyCount > 0}
+        subText={
+          identityCount === 0
+            ? `No ${pluralize("identity", 2)}`
+            : `${identityCount} ${pluralize("identity", identityCount)}`
+        }
+        disabled={isFieldDisabled}
+        onHoverText={disableReason}
+      />
+      <FormLink
+        title={getPermissionsTitle() + pluralize("permission", 2)}
+        icon="lock-locked"
+        onClick={() => {
+          setSubForm("permission");
+        }}
+        isModified={permissionModifyCount > 0}
+        subText={
+          permissionCount === 0
+            ? `No ${pluralize("permission", 2)}`
+            : `${permissionCount} ${pluralize("permission", permissionCount)}`
+        }
+        disabled={isPermissionDisabled}
+        onHoverText={disableReason}
+      />
+    </Form>
+  );
+};
+
+export default GroupForm;

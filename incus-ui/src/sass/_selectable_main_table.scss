@@ -1,0 +1,54 @@
+.select-header {
+  padding-bottom: 0;
+  padding-top: 4px;
+
+  .multiselect-checkbox {
+    display: inline-block;
+
+    // fix for alignment of the select all checkbox in safari
+    // @see https://github.com/canonical/lxd-ui/issues/1246
+    // @see https://warthogs.atlassian.net/browse/WD-7486
+    .p-checkbox__label {
+      display: contents;
+    }
+  }
+
+  &.no-menu {
+    padding-top: 0.75rem;
+  }
+}
+
+// fix for safari https://warthogs.atlassian.net/browse/WD-7486
+.multiselect-checkbox span.p-checkbox__label {
+  padding-left: 0;
+
+  // applying the above style breaks the checkbox in firefox
+  @-moz-document url-prefix() {
+    padding-left: 2rem;
+  }
+}
+
+.selected-row {
+  background-color: $colors--theme--background-active;
+}
+
+.select {
+  padding-right: 0;
+  width: 70px;
+
+  button {
+    margin-left: -15px;
+  }
+
+  label {
+    padding-top: 0.2rem !important;
+  }
+}
+
+.disabled-row {
+  opacity: 0.5;
+
+  .actions > * {
+    display: none;
+  }
+}

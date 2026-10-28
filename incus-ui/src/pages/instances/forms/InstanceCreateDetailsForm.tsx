@@ -1,0 +1,162 @@
+import type { FC } from "react";
+import {
+  Button,
+  Col,
+  Icon,
+  Input,
+  Row,
+  Select,
+} from "@canonical/react-components";
+import ProfileSelector from "pages/profiles/ProfileSelector";
+import SelectImageBtn from "pages/images/actions/SelectImageBtn";
+import { isContainerOnlyImage, isVmOnlyImage } from "util/images";
+import { instanceCreationTypes } from "util/instanceOptions";
+import type { FormikProps } from "formik/dist/types";
+import type { CreateInstanceFormValues } from "types/forms/instanceAndProfile";
+import type { LxdImageType, RemoteImage } from "types/image";
+import InstanceTargetSelect from "pages/instances/forms/InstanceTargetSelect";
+import UseCustomIsoBtn from "pages/images/actions/UseCustomIsoBtn";
+import AutoExpandingTextArea from "components/AutoExpandingTextArea";
+import ScrollableForm from "components/ScrollableForm";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+import UploadInstanceFileBtn from "../actions/UploadInstanceFileBtn";
+import SshKeyForm from "components/forms/SshKeyForm";
+
+interface Props {
+  formik: FormikProps<CreateInstanceFormValues>;
+  onSelectImage: (image: RemoteImage, type?: LxdImageType) => void;
+  project: string;
+}
+
+const InstanceCreateDetailsForm: FC<Props> = ({
+  formik,
+  onSelectImage,
+  project,
+}) => {
+  const { hasCustomVolumeIso } = useSupportedFeatures();
+
+  const figureBaseImageName = () => {
+    const image = formik.values.image;
+
+    if (!image) return "";
+
+    if (image.title) {
+      return image.title;
+    }
+
+    if (image.protocol === "oci") {
+      return `${image.aliases.split(",")[0]}`;
+    }
+
+    if (image.variant?.toLocaleLowerCase().includes("desktop")) {
+      return `${image.os} ${image.release} ${image.aliases.split(",")[0]}`;
+    }
+
+    if (image.variant === "iso") {
+      return `${image.os} - ${image.aliases.split(",")[0]}`;
+    }
+
+    return `${image.os} ${image.release} ${image.release_title}`;
+  };
+
+  return (
+    <ScrollableForm>
+      <Row>
+        <Col size={12}>
+          <Input
+            id="name"
+            name="name"
+            type="text"
+            label="Instance name"
+            placeholder="Enter name"
+            onBlur={formik.handleBlur}
+            onChange={formik.handleChange}
+            value={formik.values.name}
+            error={formik.touched.name ? formik.errors.name : null}
+          />
+          <AutoExpandingTextArea
+            id="description"
+            name="description"
+            label="Description"
+            placeholder="Enter description"
+            onBlur={formik.handleBlur}
+            onChange={formik.handleChange}
+            value={formik.values.description}
+          />
+        </Col>
+      </Row>
+      <Row>
+        <Col size={12}>
+          <p className="p-form__label">Base Image*</p>
+          <div className="p-form__control u-clearfix base-image">
+            {formik.values.image ? (
+              <>
+                <span className="u-text--muted u-truncate u-sv3 image-name">
+                  {figureBaseImageName()}
+                </span>
+                <Button
+                  appearance="base"
+                  type="button"
+                  onClick={async () => formik.setFieldValue("image", undefined)}
+                  title="Clear"
+                  hasIcon
+                >
+                  <Icon name="close" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <SelectImageBtn onSelect={onSelectImage} />
+                {hasCustomVolumeIso && (
+                  <UseCustomIsoBtn onSelect={onSelectImage} />
+                )}
+                <UploadInstanceFileBtn name={formik.values.name} />
+              </>
+            )}
+          </div>
+          <Select
+            id="instanceType"
+            label="Instance type"
+            name="instanceType"
+            onBlur={formik.handleBlur}
+            onChange={formik.handleChange}
+            options={instanceCreationTypes}
+            value={formik.values.instanceType}
+            disabled={
+              !formik.values.image ||
+              isContainerOnlyImage(formik.values.image) ||
+              isVmOnlyImage(formik.values.image)
+            }
+            title={
+              !formik.values.image
+                ? "Please select an image before adding a type"
+                : ""
+            }
+          />
+          <InstanceTargetSelect formik={formik} />
+        </Col>
+      </Row>
+      <ProfileSelector
+        project={project}
+        selected={formik.values.profiles}
+        setSelected={(value) => void formik.setFieldValue("profiles", value)}
+        readOnly={!formik.values.image}
+        title={
+          !formik.values.image
+            ? "Please select an image before adding profiles"
+            : ""
+        }
+      />
+      <SshKeyForm
+        formik={formik}
+        disabledReason={
+          !formik.values.image
+            ? "Please select an image before adding SSH Keys"
+            : ""
+        }
+      />
+    </ScrollableForm>
+  );
+};
+
+export default InstanceCreateDetailsForm;

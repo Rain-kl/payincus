@@ -1,0 +1,70 @@
+import type { FC } from "react";
+import { Button, Icon, Label, Select } from "@canonical/react-components";
+import { ensureEditMode } from "util/editMode";
+import { focusField } from "util/formFields";
+import type { FormikProps } from "formik/dist/types";
+import type { NetworkFormValues } from "types/forms/network";
+
+interface Props {
+  formik: FormikProps<NetworkFormValues>;
+}
+
+const NetworkGARPField: FC<Props> = ({ formik }) => {
+  return (
+    <div className="general-field">
+      <div className="general-field-label can-edit">
+        <Label forId="gvrp">GARP Registration</Label>
+      </div>
+      <div
+        className="general-field-content"
+        key={formik.values.readOnly ? "read" : "edit"}
+      >
+        {formik.values.readOnly ? (
+          <>
+            {(formik.values.gvrp?.length ?? 0 > 0)
+              ? formik.values.gvrp === "true"
+                ? "Yes"
+                : "No"
+              : "-"}
+            <Button
+              onClick={() => {
+                ensureEditMode(formik);
+                focusField("gvrp");
+              }}
+              className="u-no-margin--bottom"
+              type="button"
+              appearance="base"
+              title={formik.values.editRestriction ?? "Edit"}
+              hasIcon
+              disabled={!!formik.values.editRestriction}
+            >
+              <Icon name="edit" />
+            </Button>
+          </>
+        ) : (
+          <Select
+            {...formik.getFieldProps("gvrp")}
+            id={"gvrp"}
+            options={[
+              {
+                label: "Select option",
+                value: "",
+              },
+              {
+                label: "Yes",
+                value: "true",
+              },
+              {
+                label: "No",
+                value: "false",
+              },
+            ]}
+            help="Register VLAN using GARP VLAN Registration Protocol"
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default NetworkGARPField;

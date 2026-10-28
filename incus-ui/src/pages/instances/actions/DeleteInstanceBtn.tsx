@@ -1,0 +1,210 @@
+import { useState, type FC } from "react";
+import { deleteInstance, stopInstance } from "api/instances";
+import type { LxdInstance } from "types/instance";
+import { useNavigate } from "react-router-dom";
+import { deletableStatuses } from "util/instanceDelete";
+import {
+  ConfirmationButton,
+  Icon,
+  useToastNotification,
+  Notification,
+} from "@canonical/react-components";
+import classnames from "classnames";
+import { useEventQueue } from "context/eventQueue";
+import { queryKeys } from "util/queryKeys";
+import { useQueryClient } from "@tanstack/react-query";
+import { useInstanceLoading } from "context/instanceLoading";
+import ResourceLabel from "components/ResourceLabel";
+import { useInstanceEntitlements } from "util/entitlements/instances";
+import { isInstanceFrozen, isInstanceRunning } from "util/instanceStatus";
+import { InstanceRichChip } from "../InstanceRichChip";
+import ConfirmationCheckbox from "components/ConfirmationCheckbox";
+import { ROOT_PATH } from "util/rootPath";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+
+interface Props {
+  instance: LxdInstance;
+  classname?: string;
+  onClose?: () => void;
+  label?: string;
+}
+
+const DeleteInstanceBtn: FC<Props> = ({
+  instance,
+  classname,
+  onClose,
+  label = "Delete",
+}) => {
+  const eventQueue = useEventQueue();
+  const toastNotify = useToastNotification();
+  const queryClient = useQueryClient();
+  const instanceLoading = useInstanceLoading();
+  const [isLoading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { canDeleteInstance } = useInstanceEntitlements();
+  const { hasInstanceForceDelete } = useSupportedFeatures();
+  const [isForce, setForce] = useState(false);
+
+  const isRunningOrFrozen =
+    isInstanceRunning(instance) || isInstanceFrozen(instance);
+
+  const doDelete = () => {
+    const instanceLink = (
+      <InstanceRichChip
+        instanceName={instance.name}
+        projectName={instance.project}
+      />
+    );
+
+    deleteInstance(instance, hasInstanceForceDelete && isForce)
+      .then((operation) => {
+        eventQueue.set(
+          operation.metadata.id,
+          () => {
+            queryClient.invalidateQueries({
+              queryKey: [queryKeys.projects, instance.project],
+            });
+            navigate(
+              `${ROOT_PATH}/ui/project/${encodeURIComponent(instance.project)}/instances`,
+            );
+            toastNotify.success(
+              <>
+                Instance{" "}
+                <ResourceLabel
+                  bold
+                  type={instance.type}
+                  value={instance.name}
+                />{" "}
+                deleted.
+              </>,
+            );
+          },
+          (msg) =>
+            toastNotify.failure(
+              "Instance deletion failed",
+              new Error(msg),
+              instanceLink,
+            ),
+          () => {
+            setLoading(false);
+          },
+        );
+      })
+      .catch((e) => {
+        toastNotify.failure("Instance deletion failed", e, instanceLink);
+        setLoading(false);
+      });
+  };
+
+  const handleDelete = () => {
+    if (isRunningOrFrozen && !isForce) {
+      return;
+    }
+
+    setLoading(true);
+
+    // If backend doesn't support force delete, stop the instance first
+    if (isRunningOrFrozen && !hasInstanceForceDelete) {
+      const instanceLink = (
+        <InstanceRichChip
+          instanceName={instance.name}
+          projectName={instance.project}
+        />
+      );
+
+      stopInstance(instance, true)
+        .then((operation) => {
+          eventQueue.set(operation.metadata.id, doDelete, (msg) => {
+            toastNotify.failure(
+              "Instance stop failed",
+              new Error(msg),
+              instanceLink,
+            );
+            setLoading(false);
+          });
+        })
+        .catch((e) => {
+          toastNotify.failure("Instance stop failed", e, instanceLink);
+          setLoading(false);
+        });
+    } else {
+      doDelete();
+    }
+  };
+
+  const isDeletableStatus = deletableStatuses.includes(instance.status);
+  const isProtectedFromDelete =
+    instance.expanded_config["security.protection.delete"] === "true";
+  const isDisabled =
+    isLoading ||
+    !isDeletableStatus ||
+    instanceLoading.getType(instance) === "Migrating" ||
+    !canDeleteInstance(instance) ||
+    isProtectedFromDelete;
+
+  const getHoverText = () => {
+    if (!canDeleteInstance(instance)) {
+      return "You do not have permission to delete this instance";
+    }
+    if (!isDeletableStatus) {
+      return "Stop the instance to delete it";
+    }
+    if (isProtectedFromDelete) {
+      return "Update security policies to remove the delete protection.";
+    }
+    return "Delete instance";
+  };
+
+  return (
+    <ConfirmationButton
+      onHoverText={getHoverText()}
+      appearance="default"
+      className={classnames("u-no-margin--bottom has-icon", classname)}
+      loading={isLoading}
+      confirmationModalProps={{
+        close: () => {
+          setForce(false);
+          onClose?.();
+        },
+        title: "Confirm delete",
+        children: (
+          <div>
+            This will permanently delete instance{" "}
+            <ResourceLabel type={instance.type} value={instance.name} bold />.
+            <br />
+            This action cannot be undone, and can result in data loss.
+            {isRunningOrFrozen && (
+              <>
+                <br />
+                <br />
+                <Notification
+                  severity="caution"
+                  title={`The instance is currently ${isInstanceFrozen(instance) ? "frozen" : "running"}.`}
+                >
+                  Confirm to force delete it.
+                </Notification>
+              </>
+            )}
+          </div>
+        ),
+        onConfirm: handleDelete,
+        confirmButtonLabel: "Delete",
+        confirmExtra: isRunningOrFrozen ? (
+          <ConfirmationCheckbox
+            label="Force delete"
+            confirmed={[isForce, setForce]}
+          />
+        ) : undefined,
+        confirmButtonDisabled: isRunningOrFrozen && !isForce,
+      }}
+      disabled={isDisabled || isLoading}
+      shiftClickEnabled={!isRunningOrFrozen}
+      showShiftClickHint={!isRunningOrFrozen}
+    >
+      <Icon name="delete" />
+      {label && <span>{label}</span>}
+    </ConfirmationButton>
+  );
+};
+
+export default DeleteInstanceBtn;

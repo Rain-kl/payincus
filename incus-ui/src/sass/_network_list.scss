@@ -1,0 +1,40 @@
+.network-list {
+  .network-list-table {
+    .type {
+      width: 5rem;
+    }
+
+    .managed {
+      width: 6rem;
+    }
+
+    .forwards {
+      width: 6rem;
+    }
+
+    .used-by {
+      width: 5rem;
+    }
+
+    .state {
+      width: 5rem;
+    }
+  }
+
+  @media screen and (width < 500px) {
+    .page-header__search {
+      display: none;
+    }
+  }
+}
+
+.network-peer-list {
+  .status-header {
+    padding-left: 1.33rem;
+    pointer-events: none;
+
+    > * {
+      pointer-events: all;
+    }
+  }
+}

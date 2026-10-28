@@ -1,0 +1,116 @@
+import type { LxdProject, ProjectReplicaMode } from "types/project";
+import { slugify } from "./slugify";
+import { ROOT_PATH } from "util/rootPath";
+import { updateProjectReplicaMode } from "api/projects";
+import { waitForOperation } from "api/operations";
+
+export const ALL_PROJECTS = "All projects";
+
+export const storageTabs: string[] = [
+  "Pools",
+  "Volumes",
+  "Custom ISOs",
+  "Buckets",
+];
+export const storageTabPaths = storageTabs.map((tab) => slugify(tab));
+export const projectSubpages = [
+  "instances",
+  "profiles",
+  "network-acls",
+  "network-ipam",
+  "networks",
+  "local-images",
+  "storage",
+  "operations",
+  "configuration",
+];
+
+export const getSubpageFromUrl = (url: string): string | undefined => {
+  const urlWithoutQuery = url.split("?")[0];
+  const normalizedPath = urlWithoutQuery.replace(ROOT_PATH, "");
+  const parts = normalizedPath.split("/");
+
+  const mainSubpage = parts[4];
+  const tabSubpage = parts[5];
+
+  if (mainSubpage === "storage" && storageTabPaths.includes(tabSubpage)) {
+    return `${encodeURIComponent(mainSubpage)}/${encodeURIComponent(tabSubpage)}`;
+  }
+
+  if (mainSubpage === "network") {
+    return "networks";
+  }
+
+  if (mainSubpage === "storage") {
+    return "storage/pools";
+  }
+
+  if (projectSubpages.includes(mainSubpage)) {
+    return encodeURIComponent(mainSubpage);
+  }
+
+  return undefined;
+};
+
+export const getProjectSwitchTarget = (
+  url: string,
+  projectName: string,
+): string => {
+  const urlWithoutQuery = url.split("?")[0];
+
+  if (
+    urlWithoutQuery.includes("/ui/image-registry/") ||
+    urlWithoutQuery.includes("/ui/image-registries")
+  ) {
+    return `${ROOT_PATH}/ui/project/${encodeURIComponent(projectName)}/instances`;
+  }
+
+  const targetSection = getSubpageFromUrl(url) ?? "instances";
+  return `${ROOT_PATH}/ui/project/${encodeURIComponent(projectName)}/${targetSection}`;
+};
+
+export const isProjectEmpty = (project: LxdProject): boolean => {
+  if (!project.used_by) {
+    return true;
+  }
+
+  const defaultProfile = `/1.0/profiles/default?project=${project.name}`;
+  return !project.used_by.some((item) => item !== defaultProfile);
+};
+
+export const isProjectWithProfiles = (project?: LxdProject): boolean =>
+  project?.config["features.profiles"] === "true";
+
+export const isProjectWithVolumes = (project?: LxdProject): boolean =>
+  project?.config["features.storage.volumes"] === "true";
+
+export const isProjectReplicaModeStandby = (project?: LxdProject): boolean =>
+  project?.replica_mode === "standby";
+
+export const getInstancesUsedByProject = (project: LxdProject): string[] => {
+  if (!project.used_by) {
+    return [];
+  }
+
+  return project.used_by.filter((item) => item.startsWith("/1.0/instances/"));
+};
+
+export const updateReplicaMode = async (
+  project: string,
+  mode: ProjectReplicaMode,
+  onSuccess: () => void,
+  onFailure: (e: unknown) => void,
+) => {
+  try {
+    const operation = await updateProjectReplicaMode(project, mode);
+    const operationId = operation?.metadata?.id;
+    if (!operationId) {
+      onFailure(new Error("Operation id missing"));
+      return;
+    }
+    await waitForOperation(operationId);
+    onSuccess();
+  } catch (e) {
+    onFailure(e as Error);
+  }
+};

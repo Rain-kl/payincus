@@ -1,0 +1,262 @@
+import { useEffect, useState, type FC } from "react";
+import type { LxdEvent } from "types/event";
+import { useEventQueue } from "context/eventQueue";
+import { useAuth } from "context/auth";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "util/queryKeys";
+import { useOperations } from "context/operationsProvider";
+import { useListener, useNotify } from "@canonical/react-components";
+import { useMemberLoading } from "context/memberLoading";
+import { ROOT_PATH } from "util/rootPath";
+import type { LxdOperation } from "types/operation";
+import { useSupportedFeatures } from "context/useSupportedFeatures";
+
+const EVENT_HANDLER_DELAY = 250;
+const WS_RETRY_DELAY_MULTIPLIER = 250;
+const OPERATION_RETRY_DELAY = 500;
+const MAX_WS_CONNECTION_RETRIES = 5;
+const EVENT_WS_STALE_TIMEOUT_MS = 3_600_000;
+
+const Events: FC = () => {
+  const { isAuthenticated } = useAuth();
+  const eventQueue = useEventQueue();
+  const queryClient = useQueryClient();
+  const notify = useNotify();
+  const [eventWs, setEventWs] = useState<WebSocket | null>(null);
+  const [reconnectWsId, setReconnectWsId] = useState(0);
+  const [wsOpenTime, setWsOpenTime] = useState(0);
+  const {
+    operations,
+    refetchOperations,
+    updateOperationProgress,
+    clearOperationProgress,
+  } = useOperations();
+  const memberLoading = useMemberLoading();
+  const { hasBulkOperations } = useSupportedFeatures();
+
+  const getCurrentTime = () => {
+    return new Date().getTime();
+  };
+
+  const reconnectWsOnFocusTab = () => {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+    // Force reconnect if the ws is not open.
+    if (!eventWs) {
+      setReconnectWsId((prevId) => prevId + 1);
+      return;
+    }
+    // If the ws was open for more than EVENT_WS_STALE_TIMEOUT_MS, close it to
+    // trigger a reconnect. In some proxy setups, the ws connection can
+    // become stale and stop receiving messages, but the browser still thinks
+    // the connection is open. This time based reconnect is a workaround.
+    const timeSinceOpen = getCurrentTime() - wsOpenTime;
+    const isStale = timeSinceOpen > EVENT_WS_STALE_TIMEOUT_MS;
+    if (isStale && eventWs) {
+      eventWs.close();
+    }
+  };
+  useListener(window, reconnectWsOnFocusTab, "visibilitychange");
+
+  const handleEvent = (
+    operationId: string,
+    status: string,
+    err: string | undefined,
+    result: LxdEvent | LxdOperation,
+  ) => {
+    const eventCallback = eventQueue.get(operationId);
+    if (!eventCallback) {
+      return;
+    }
+    if (status === "Success") {
+      eventCallback.onSuccess(result);
+      eventCallback.onFinish?.();
+      eventQueue.remove(operationId);
+    }
+    if (status === "Failure") {
+      eventCallback.onFailure(err ?? "");
+      eventCallback.onFinish?.();
+      eventQueue.remove(operationId);
+    }
+  };
+
+  const getLifecycleRootQueryKey = (event: LxdEvent) => {
+    if (event.metadata.action.startsWith("auth-group-")) {
+      return queryKeys.authGroups;
+    }
+    if (event.metadata.action.startsWith("config-")) {
+      return queryKeys.settings;
+    }
+    if (event.metadata.action.startsWith("identity-provider-group-")) {
+      return queryKeys.idpGroups;
+    }
+    if (event.metadata.action.startsWith("instance-")) {
+      return queryKeys.instances;
+    }
+    if (event.metadata.action.startsWith("project-")) {
+      return queryKeys.projects;
+    }
+    if (event.metadata.action.startsWith("profile-")) {
+      return queryKeys.profiles;
+    }
+    if (event.metadata.action.startsWith("network-")) {
+      return queryKeys.networks;
+    }
+    if (event.metadata.action.startsWith("storage-pool-")) {
+      return queryKeys.storage;
+    }
+    if (event.metadata.action.startsWith("storage-volume-")) {
+      return queryKeys.storage;
+    }
+    if (event.metadata.action.startsWith("image-")) {
+      return queryKeys.images;
+    }
+    return "undefined";
+  };
+
+  const updateClusterMemberLoading = (event: LxdEvent) => {
+    const description = event.metadata.description;
+    const isEvacuating = description === "Evacuating cluster member";
+    const isRestoring = description === "Restoring cluster member";
+    if (!isEvacuating && !isRestoring) {
+      return;
+    }
+
+    if (event.metadata.status === "Running") {
+      const loadingType = isRestoring ? "Restoring" : "Evacuating";
+      memberLoading.setLoading(event.metadata.location as string, loadingType);
+    } else {
+      memberLoading.setFinish(event.metadata.location as string);
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === queryKeys.cluster,
+      });
+    }
+  };
+
+  const updateReplicators = (event: LxdEvent) => {
+    const isReplicatorOperation =
+      event.type === "operation" &&
+      event.metadata.description.toLowerCase().includes("replicator");
+
+    if (!isReplicatorOperation) {
+      return;
+    }
+
+    queryClient.invalidateQueries({
+      predicate: (query) => query.queryKey[2] === queryKeys.replicators,
+    });
+  };
+
+  const reEvaluateOperations = () => {
+    operations.forEach((operation) => {
+      handleEvent(operation.id, operation.status, operation.err, operation);
+    });
+  };
+
+  useEffect(() => {
+    // When the ws connection is broken, we might have finished operations with pending callbacks.
+    // Re-evaluate those operations to ensure the UI is up to date, and callbacks are cleared.
+    const checkOperations = () => {
+      if (!eventWs) {
+        refetchOperations();
+      }
+      setTimeout(reEvaluateOperations, OPERATION_RETRY_DELAY);
+    };
+
+    checkOperations();
+    const intervalId = setInterval(checkOperations, 3000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [operations, eventWs, eventQueue]);
+
+  const connectEventWs = (retryCount = 0) => {
+    try {
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const wsUrl = `${protocol}://${location.host}${ROOT_PATH}/1.0/events?type=operation,lifecycle&all-projects=true`;
+      const ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        setEventWs(ws);
+        setWsOpenTime(getCurrentTime());
+      };
+      ws.onclose = () => {
+        setEventWs(null);
+      };
+      ws.onerror = () => {
+        setEventWs(null);
+      };
+      ws.onmessage = (message: MessageEvent<Blob | string | null>) => {
+        if (typeof message.data !== "string") {
+          console.log("Invalid format on event api: ", message.data);
+          return;
+        }
+        const event = JSON.parse(message.data) as LxdEvent;
+        if (event.type === "operation") {
+          const isInstanceCreationUpdate =
+            hasBulkOperations &&
+            event.metadata.status === "Running" &&
+            event.metadata.description === "Creating instance" &&
+            Object.keys(event.metadata.metadata ?? {}).length > 1;
+
+          // On instance launch, receive the progress updates through this event
+          // and update the UI without refetching.
+          // For other events, just refetch the operations to get the updated data.
+          if (isInstanceCreationUpdate) {
+            updateOperationProgress(event.metadata.id, event.metadata.metadata);
+          } else {
+            clearOperationProgress(event.metadata.id);
+            queryClient.invalidateQueries({
+              queryKey: [queryKeys.operations, event.project],
+            });
+            refetchOperations();
+          }
+        }
+        if (
+          event.type === "lifecycle" &&
+          event.metadata.action !== "instance-file-retrieved"
+        ) {
+          const rootQueryKey = getLifecycleRootQueryKey(event);
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === rootQueryKey,
+          });
+        }
+        updateClusterMemberLoading(event);
+        updateReplicators(event);
+        // ensure open requests that reply with an operation and register
+        // new handlers in the eventQueue are closed before handling the event
+        setTimeout(() => {
+          handleEvent(
+            event.metadata.id,
+            event.metadata.status,
+            event.metadata.err,
+            event,
+          );
+        }, EVENT_HANDLER_DELAY);
+      };
+    } catch (e) {
+      if (retryCount < MAX_WS_CONNECTION_RETRIES) {
+        setTimeout(() => {
+          connectEventWs(retryCount + 1);
+        }, WS_RETRY_DELAY_MULTIPLIER * retryCount);
+      } else {
+        notify.failure("Failed to connect to event api", e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!eventWs && isAuthenticated) {
+      connectEventWs();
+    }
+    return () => {
+      if (eventWs) {
+        eventWs.close();
+      }
+    };
+  }, [eventWs, isAuthenticated, reconnectWsId]);
+  return <></>;
+};
+
+export default Events;
