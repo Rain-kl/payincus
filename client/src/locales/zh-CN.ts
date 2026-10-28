@@ -20,13 +20,13 @@ export default {
         "newVersion": "发布新版本",
         "name": "策略名称",
         "node": "代理节点",
-        "hosts": "授权母机",
+        "hosts": "授权宿主机",
         "save": "保存",
         "cancel": "取消",
         "version": "版本",
         "empty": "暂无出口策略",
         "loadFailed": "加载出口策略失败",
-        "hostsRequired": "请选择代理和至少一台授权母机"
+        "hostsRequired": "请选择代理和至少一台授权宿主机"
     },
     spice: {
         title: '图形控制台',
@@ -4636,7 +4636,7 @@ export default {
             agentLatestVersion: '最新版本：{version}',
             agentAlreadyLatest: 'Agent 已是最新版本',
             agentInstallCommand: '安装 Incus 节点',
-            nodeInstallConfigure: '安装 / 配置 Incus 节点',
+            nodeInstallConfigure: '安装 Incus',
             nodeGenerateCommand: '生成接入命令',
             nodeInstallUnifiedHint: 'Incus 节点包已集成连接器，无需单独安装 Agent。运行接入命令安装或更新节点包，并在 incus-tui 中确认面板连接配置。',
             agentInstallCommandTitle: 'Incus 节点安装命令',
