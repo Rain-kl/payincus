@@ -4,17 +4,11 @@ import { prisma } from '../../db/prisma.js'
 import { fingerprint, seal, unseal } from '../node-security/vault.js'
 import { withStorageSession } from './session.js'
 import { StorageEncryptionError, poolEncryption } from './encryption.js'
+import { isValidPoolDirectory } from './pool-directory.js'
 
 export interface EncryptedPoolOptions {
   name: string; source?: string; size?: string; directory?: string; preallocate?: boolean; useLoop?: boolean; zfsPoolName?: string
   purpose?: 'instance_data' | 'instance_storage'; description?: string
-}
-
-/** 文件池目录：规范绝对路径（无空段、`.`、`..`、尾部斜杠），且不在 /dev、/proc、/sys 下。 */
-export function isValidPoolDirectory(directory: string): boolean {
-  if (!/^\/[A-Za-z0-9_.\/-]+$/.test(directory) || directory.length > 255 || directory.endsWith('/')) return false
-  if (directory.split('/').slice(1).some(seg => seg === '' || seg === '.' || seg === '..')) return false
-  return !/^\/(dev|proc|sys)(\/|$)/.test(directory)
 }
 
 export async function provisionEncryptedPool(hostId: number, input: EncryptedPoolOptions) {

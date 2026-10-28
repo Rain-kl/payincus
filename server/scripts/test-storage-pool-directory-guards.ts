@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { isValidPoolDirectory } from '../src/lib/storage/provision.js'
+import { isValidPoolDirectory } from '../src/lib/storage/pool-directory.js'
 
 const cases: Record<string, boolean> = {
   '/home/docker_data/incus': true, '/mnt/data': true, '/devices': true,
