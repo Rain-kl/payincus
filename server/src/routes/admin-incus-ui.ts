@@ -151,12 +151,12 @@ export function extractIncusUiTicketFromSubprotocols(headerValue: string | strin
 const INCUS_UI_MAX_WS_PER_USER = 64
 const incusUiUserConnections = new Map<number, number>()
 
-/** ws 只允许发送 1000-1003、1007-1014、3000-4999；1005/1006 等保留码直接 close 会抛错导致另一端永不关闭。 */
-function toSendableCloseCode(code: number): number {
+/** ws 只允许发送 1000-1003、1007-1014、3000-4999；1005 等无状态码关闭应以空 close 帧转发，避免前端误判非 1005 为异常。 */
+function toSendableCloseCode(code: number): number | undefined {
   if (code === 1000 || code === 1001 || code === 1002 || code === 1003) return code
   if (code >= 1007 && code <= 1014) return code
   if (code >= 3000 && code <= 4999) return code
-  return 1000
+  return undefined
 }
 
 interface CachedTunnelDispatcher {
@@ -687,7 +687,12 @@ export default async function adminIncusUiRoutes(fastify: FastifyInstance) {
     upstream.once('close', (code) => {
       try {
         if (socket.readyState === WebSocket.OPEN) {
-          socket.close(toSendableCloseCode(code))
+          const sendableCode = toSendableCloseCode(code)
+          if (sendableCode !== undefined) {
+            socket.close(sendableCode)
+          } else {
+            socket.close()
+          }
         }
       } catch {
         // ignore

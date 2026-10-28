@@ -558,6 +558,11 @@ export default defineConfig(({ mode }) => {
                 console.log(`[Proxy] ${req.method} ${req.url} -> ${proxyReq.path}`)
               }
             })
+            proxy.on('proxyReqWs', (proxyReq) => {
+              // http-proxy 开启 changeOrigin: true 时只重写 Host，不重写 WebSocket 的 Origin。
+              // 局域网/Tailscale IP 访问 Vite dev server 时需同步对齐 Origin，避免后端 WS Origin 校验拦截。
+              proxyReq.setHeader('origin', devProxyTarget)
+            })
           }
         }
       }

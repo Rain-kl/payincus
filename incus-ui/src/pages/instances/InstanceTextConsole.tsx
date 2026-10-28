@@ -103,7 +103,7 @@ const InstanceTextConsole: FC<Props> = ({
     control.onerror = handleError;
 
     control.onclose = (event) => {
-      if (1005 !== event.code && isMounted.current) {
+      if (1005 !== event.code && 1000 !== event.code && isMounted.current) {
         onFailure("Error", event.reason, getWsErrorMsg(event.code));
       }
     };
@@ -115,7 +115,7 @@ const InstanceTextConsole: FC<Props> = ({
     data.onerror = handleError;
 
     data.onclose = (event) => {
-      if (1005 !== event.code && isMounted.current) {
+      if (1005 !== event.code && 1000 !== event.code && isMounted.current) {
         onFailure("Error", event.reason, getWsErrorMsg(event.code));
       }
       setDataWs(null);

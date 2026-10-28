@@ -160,7 +160,9 @@ const InstanceTerminal: FC<Props> = ({ instance, refreshInstance }) => {
     const sockets = [data, control, stdout, stderr].filter(
       (socket): socket is WebSocket => socket !== null,
     );
+    let isClosingAll = false;
     const closeAll = () => {
+      isClosingAll = true;
       sockets.forEach((socket) => {
         socket.close();
       });
@@ -173,11 +175,13 @@ const InstanceTerminal: FC<Props> = ({ instance, refreshInstance }) => {
     };
 
     control.onerror = (e) => {
-      setError(failure("Error", e));
+      if (!isClosingAll) {
+        setError(failure("Error", e));
+      }
     };
 
     control.onclose = (event) => {
-      if (1005 !== event.code) {
+      if (!isClosingAll && 1005 !== event.code && 1000 !== event.code) {
         setError(failure("Error", event.reason, getWsErrorMsg(event.code)));
       }
       closeAll();
@@ -190,11 +194,13 @@ const InstanceTerminal: FC<Props> = ({ instance, refreshInstance }) => {
     };
 
     data.onerror = (e) => {
-      setError(failure("Error", e));
+      if (!isClosingAll) {
+        setError(failure("Error", e));
+      }
     };
 
     data.onclose = (event) => {
-      if (1005 !== event.code) {
+      if (!isClosingAll && 1005 !== event.code && 1000 !== event.code) {
         setError(failure("Error", event.reason, getWsErrorMsg(event.code)));
       }
       closeAll();
