@@ -27,15 +27,42 @@
 | **Wave 2 地基（已完成）** | `src/lib/security.go`（1753 行，含 AES-GCM 加解密/2FA/登录锁/审计/refresh token）、`src/lib/security_config.go`、`src/lib/runtime_settings.go`、`src/lib/turnstile.go`、`src/lib/distributed_lock.go`、`src/lib/outbound_security.go`、`src/lib/public_api_auth.go` | 鉴权与安全地基，`go test -race ./...` 全绿 |
 | **Wave 2 首批模块（已完成）** | `src/services/vip_levels.go` + `src/routes/vip_levels.go`、`src/db/images.go` + `src/routes/images.go`、`src/db/terminal_saved_commands.go` + `src/routes/terminal_saved_commands.go` | 端到端路由模块，含对拍用例 |
 | **Wave 3 地基 + 模块（已完成）** | `src/lib/mailer.go`（SMTP/模板/13 类邮件，已接线 `OperationVerificationEmailSender`）、`src/lib/notifier.go`、`src/db/inbox.go`、`src/db/notifications.go`、`src/routes/notifications.go`、`src/routes/api_tokens.go`、`src/routes/admin_notification_channels.go`、`src/db/ssh_keys.go` + `src/routes/ssh_keys.go`、`src/db/storage_configs.go` + `src/routes/storage_configs.go` | 邮件/通知/凭证/存储配置；对拍 122 例全绿 |
+| **Wave 4 模块（已完成）** | `src/db/friendships.go` + `src/routes/friends.go`、`src/db/gift_cards.go` + `src/routes/gift_cards.go`、`src/routes/inbox.go`、`src/routes/balance.go`、`src/routes/verification.go`、`src/db/redeem_codes.go` + `src/routes/redeem_codes.go`、`src/db/help.go` + `src/routes/help.go`、`src/routes/orders.go` | 好友/礼品卡/站内信/余额/验证/兑换/帮助/订单 |
+
+### 对拍基线（真实双跑，同一 PostgreSQL，2026-10-29）
+
+建独立库 `payincus_goparity` → `prisma migrate deploy` → Node:3101 + Go:3102 → 逐组对拍：
+
+| 组 | 结果 |
+|---|---|
+| requests-vip-levels | 10/10 |
+| requests-ssh-keys-storage | 53/53 |
+| requests-api-tokens | 31/31 |
+| requests-admin-notification-channels | 38/38 |
+| requests-notifications | 35/35 |
+| requests-inbox-balance | 73/83（10 skipped：限流分歧，见下） |
+| requests-verification-redeem | 59/59 |
+| requests-help-orders | 96/96 |
+| requests-friends-gift-cards | 92/92 |
+
+**全部 487 例零 FAIL**。跑了 9 组后临时库与进程已清理，dev 库未被触碰。
+
+> 注意：对拍必须在**每组前重启 Go**。限流是进程内固定窗口，连续跑多组会把窗口打满导致假 429（真实踩过）。
 
 ### 已确认的关键事实（勿再重复踩）
 
 - **Fastify AJV 默认值**（`@fastify/ajv-compiler/lib/default-ajv-options.js`，已实测核对）：`coerceTypes:'array'`、`useDefaults:true`、`removeAdditional:true`、`allErrors:false`。含义：标量会被字符串化、单元素数组会解包、**只报第一个校验错误**。注意：`removeAdditional` **只在 schema 写了 `additionalProperties:false` 时才丢弃未知字段**；没写则未知字段保留给 handler（storage-configs 的 PATCH 因此会把未知字段透传给 Prisma 并 500，Go 侧已按真实行为复刻）。
+  **统计（已核）**：`server/src/routes/*.ts` 里 **42 个文件有 `schema`，但只有 13 个写了 `additionalProperties:false`**。所以「未知字段被丢弃」是**少数情况**，不要默认套用——必须逐个路由看它自己的 schema。
+- **Tri-state 布尔是高频陷阱（已抓到两个真实 bug）**：TS 里 `options.foo ?? true` / `?? false` 表示「未提供时取默认值」。Go 的 `bool` 零值是 `false`，**无法区分「未提供」与「显式 false」**。凡是 TS 有 `?? true` 的字段，Go 必须用 `*bool` + 显式默认 helper。
+  已知需处理：`getHelpArticles` 的 `publishedOnly ?? true`、`pinnedOnly ?? false`，`instance-billing` 的 `preciseRemainingDays ?? true`。
+- **空更新必须早返回**：TS 里 `if (Object.keys(updateData).length === 0) return` 的分支，Go 侧不能照样写库（会误改 `updated_at`、且对不存在行误报 404）。`db/help.go` 的 `UpdateHelpArticle` 已按此修。translate 每个 update 函数时都要找这个早返回。
 - **404 形态（已实测）**：`setNotFoundHandler` 只在 `NODE_ENV=production && SERVE_STATIC_CLIENT!=false` 时注册，而**生产部署固定 `SERVE_STATIC_CLIENT=false`**（`scripts/init-env.sh`、`install-panel.sh`、`verify-production-readiness.sh` 都强制该值）。所以线上 404 是 Fastify 内置形态：
   `{"message":"Route GET:/api/nope not found","error":"Not Found","statusCode":404}`
   Go 侧已按此实现（`app.go` 的 `NoRoute`）。
 - **Node 的每路由限流实际未生效（已实测，Node 侧既有缺陷）**：`@fastify/rate-limit` 在 `app.ts:308` 注册，而 `addHook('onRoute')` 在 `:341` 才添加；插件注册时的封装上下文导致该 hook 不作用于后续业务路由。实测 `/api/auth/login`（规则 5/min）与 `/api/ssh-keys`（30/min）返回的 `x-ratelimit-limit` 均为 **300**（全局值）。
   **后果**：登录暴力破解防护实际只有 300/min。Go 侧按生成的规则表正确执行（5/min），因此**此处 Go 与 Node 行为不同**。这是 Go 更正确的一处，需要 owner 决策：修 Node 还是让 Go 对齐现状。
+  **对拍处理**：对拍用例可设 `"ignoreRateLimit": true`，当且仅当两侧只有一侧返回 429 时记为 `skip`（不计失败）。已经用在 `requests-inbox-balance.json` 的 `/api/inbox/hosts/:hostId/notify`（5/min）上。
+- **Gin 默认信任所有代理（已修）**：需显式 `router.SetTrustedProxies(nil)`，否则 `c.ClientIP()` 会采信任何调用方伪造的 `X-Forwarded-For`——而客户端 IP 是限流键和 Turnstile 送验值。现统一走 `middleware.ClientIP`（复刻 fastify 的 `TRUST_PROXY` 语义）。
 - **AES-GCM 互通已实证**：key=`sha256(ENCRYPTION_KEY || (prod ? "" : JWT_SECRET || 'default-encryption-key'))`，16B IV，密文 `iv:tag:ct`（hex）；Go 加密 → Node 解密、Node 加密 → Go 解密均已实测通过。
 - **TOTP/otpauth URI 已实测比对** otplib v12（`window:0`，拒绝上一周期令牌）。
 - **双跑对拍已真实跑通**：ssh-keys/storage-configs（53/53）、api-tokens（31/31）、admin-notification-channels（38/38）在同一 PostgreSQL 上状态码与 JSON 逐字段一致。

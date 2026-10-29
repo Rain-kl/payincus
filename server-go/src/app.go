@@ -24,6 +24,15 @@ func NewRouter() *gin.Engine {
 	// Fastify does not redirect trailing slashes; keep Gin's behaviour identical.
 	router.RedirectTrailingSlash = false
 
+	// Gin trusts every proxy by default, which would make c.ClientIP() honour a
+	// forged X-Forwarded-For from any caller. The caller IP feeds the rate-limit
+	// key and the Turnstile siteverify payload, so disable Gin's resolution and
+	// rely on middleware.ClientIP, which implements the same TRUST_PROXY rules as
+	// fastify's request.ip.
+	if err := router.SetTrustedProxies(nil); err != nil {
+		panic(err)
+	}
+
 	// fastify request.ip is trust-proxy aware, so every consumer of the caller IP
 	// must resolve it the same way. Turnstile needs it for Cloudflare's siteverify.
 	lib.SetTurnstileClientIPResolver(middleware.ClientIP)

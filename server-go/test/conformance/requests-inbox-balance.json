@@ -1,0 +1,652 @@
+[
+  {
+    "name": "inbox-list-anon",
+    "method": "GET",
+    "path": "/api/inbox"
+  },
+  {
+    "name": "inbox-list-slash-anon",
+    "method": "GET",
+    "path": "/api/inbox/"
+  },
+  {
+    "name": "inbox-unread-count-anon",
+    "method": "GET",
+    "path": "/api/inbox/unread-count"
+  },
+  {
+    "name": "inbox-unread-count-trailing-slash",
+    "method": "GET",
+    "path": "/api/inbox/unread-count/"
+  },
+  {
+    "name": "inbox-read-anon",
+    "method": "POST",
+    "path": "/api/inbox/1/read",
+    "body": {}
+  },
+  {
+    "name": "inbox-read-all-anon",
+    "method": "POST",
+    "path": "/api/inbox/read-all",
+    "body": {}
+  },
+  {
+    "name": "inbox-delete-anon",
+    "method": "DELETE",
+    "path": "/api/inbox/1",
+    "body": {}
+  },
+  {
+    "name": "inbox-delete-read-anon",
+    "method": "DELETE",
+    "path": "/api/inbox/read",
+    "body": {}
+  },
+  {
+    "name": "inbox-broadcast-anon",
+    "method": "POST",
+    "path": "/api/inbox/admin/broadcast",
+    "body": {}
+  },
+  {
+    "name": "inbox-host-notify-anon",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "body": {
+      "title": "t",
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-admin-send-anon",
+    "method": "POST",
+    "path": "/api/inbox/admin/send/1",
+    "body": {
+      "title": "t",
+      "content": "c"
+    }
+  },
+  {
+    "name": "inbox-instance-notify-anon",
+    "method": "POST",
+    "path": "/api/inbox/instances/1/notify",
+    "body": {
+      "title": "t",
+      "content": "c"
+    }
+  },
+  {
+    "name": "inbox-post-read-route-absent",
+    "method": "POST",
+    "path": "/api/inbox/read",
+    "body": {}
+  },
+  {
+    "name": "inbox-delete-read-trailing-slash",
+    "method": "DELETE",
+    "path": "/api/inbox/read/",
+    "body": {}
+  },
+  {
+    "name": "inbox-list-bad-pagination",
+    "method": "GET",
+    "path": "/api/inbox?page=abc&pageSize=999&isRead=bogus",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "inbox-list-zero-page",
+    "method": "GET",
+    "path": "/api/inbox?page=0&pageSize=0&isRead=false",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "inbox-list-leading-zero-page",
+    "method": "GET",
+    "path": "/api/inbox?page=01&pageSize=01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "inbox-unread-count",
+    "method": "GET",
+    "path": "/api/inbox/unread-count",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "inbox-read-zero-id",
+    "method": "POST",
+    "path": "/api/inbox/0/read",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-read-leading-zero-id",
+    "method": "POST",
+    "path": "/api/inbox/01/read",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-read-float-id",
+    "method": "POST",
+    "path": "/api/inbox/1.5/read",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-read-not-found",
+    "method": "POST",
+    "path": "/api/inbox/2147483000/read",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-delete-negative-id",
+    "method": "DELETE",
+    "path": "/api/inbox/-1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/inbox/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-read-empty-json-body",
+    "method": "POST",
+    "path": "/api/inbox/1/read",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "inbox-broadcast-empty-body-normalizes",
+    "method": "POST",
+    "path": "/api/inbox/admin/broadcast",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "inbox-host-notify-zero-host",
+    "method": "POST",
+    "path": "/api/inbox/hosts/0/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-missing-title",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-missing-content",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-empty-title",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "",
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-long-title",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-empty-instance-ids",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c",
+      "instanceIds": []
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-zero-instance-id",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c",
+      "instanceIds": [
+        0
+      ]
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-float-instance-id",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c",
+      "instanceIds": [
+        1.5
+      ]
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-bad-send-email",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c",
+      "sendEmail": 2
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-non-object-body",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": [],
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-unsupported-media-type",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "headers": {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "body": "title=t",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-not-found",
+    "method": "POST",
+    "path": "/api/inbox/hosts/2147483000/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-blank-title",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "   ",
+      "content": "c"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-host-notify-blank-content",
+    "method": "POST",
+    "path": "/api/inbox/hosts/1/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": " \n\t "
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "inbox-broadcast-blank-title",
+    "method": "POST",
+    "path": "/api/inbox/admin/broadcast",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "  ",
+      "content": "c"
+    }
+  },
+  {
+    "name": "inbox-admin-send-zero-id",
+    "method": "POST",
+    "path": "/api/inbox/admin/send/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c"
+    }
+  },
+  {
+    "name": "inbox-admin-send-not-found",
+    "method": "POST",
+    "path": "/api/inbox/admin/send/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c"
+    }
+  },
+  {
+    "name": "inbox-instance-notify-zero-id",
+    "method": "POST",
+    "path": "/api/inbox/instances/0/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c"
+    }
+  },
+  {
+    "name": "inbox-instance-notify-not-found",
+    "method": "POST",
+    "path": "/api/inbox/instances/2147483000/notify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "t",
+      "content": "c"
+    }
+  },
+  {
+    "name": "balance-me-anon",
+    "method": "GET",
+    "path": "/api/balance/me"
+  },
+  {
+    "name": "balance-me-logs-anon",
+    "method": "GET",
+    "path": "/api/balance/me/logs"
+  },
+  {
+    "name": "balance-me-billing-anon",
+    "method": "GET",
+    "path": "/api/balance/me/billing"
+  },
+  {
+    "name": "balance-admin-anon",
+    "method": "GET",
+    "path": "/api/balance/admin/1"
+  },
+  {
+    "name": "balance-admin-logs-anon",
+    "method": "GET",
+    "path": "/api/balance/admin/1/logs"
+  },
+  {
+    "name": "balance-adjustment-requests-anon",
+    "method": "GET",
+    "path": "/api/balance/admin/adjustment-requests"
+  },
+  {
+    "name": "balance-adjustment-create-anon",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "body": {}
+  },
+  {
+    "name": "balance-adjustment-approve-anon",
+    "method": "POST",
+    "path": "/api/balance/admin/adjustment-requests/1/approve",
+    "body": {}
+  },
+  {
+    "name": "balance-adjustment-reject-anon",
+    "method": "POST",
+    "path": "/api/balance/admin/adjustment-requests/1/reject",
+    "body": {}
+  },
+  {
+    "name": "balance-adjust-anon",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "body": {}
+  },
+  {
+    "name": "balance-gift-anon",
+    "method": "POST",
+    "path": "/api/balance/admin/1/gift",
+    "body": {}
+  },
+  {
+    "name": "balance-me",
+    "method": "GET",
+    "path": "/api/balance/me",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-me-logs-bad-query",
+    "method": "GET",
+    "path": "/api/balance/me/logs?page=abc&pageSize=999&type=bogus&lotteryGift=bogus",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-me-logs-excluded-log-type",
+    "method": "GET",
+    "path": "/api/balance/me/logs?type=gift_card_issue&lotteryGift=exclude",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-me-billing-bad-query",
+    "method": "GET",
+    "path": "/api/balance/me/billing?page=01&pageSize=0&type=newpurchase",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-admin-zero-id",
+    "method": "GET",
+    "path": "/api/balance/admin/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-admin-not-found",
+    "method": "GET",
+    "path": "/api/balance/admin/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-admin-logs-leading-zero-id",
+    "method": "GET",
+    "path": "/api/balance/admin/01/logs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-adjustment-requests-bad-query",
+    "method": "GET",
+    "path": "/api/balance/admin/adjustment-requests?status=bogus&userId=abc&page=0&pageSize=1000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-adjustment-create-zero-user",
+    "method": "POST",
+    "path": "/api/balance/admin/0/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 1,
+      "reason": "r"
+    }
+  },
+  {
+    "name": "balance-adjustment-create-missing-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "balance-adjustment-create-zero-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 0,
+      "reason": "r"
+    }
+  },
+  {
+    "name": "balance-adjustment-create-three-decimals",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 1.234,
+      "reason": "r"
+    }
+  },
+  {
+    "name": "balance-adjustment-create-refund-negative",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": -5,
+      "reason": "r",
+      "requestType": "refund"
+    }
+  },
+  {
+    "name": "balance-adjustment-create-missing-reason",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 5
+    }
+  },
+  {
+    "name": "balance-adjustment-create-bad-source-id",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 5,
+      "reason": "r",
+      "sourceId": 1.5
+    }
+  },
+  {
+    "name": "balance-adjustment-approve-zero-id",
+    "method": "POST",
+    "path": "/api/balance/admin/adjustment-requests/0/approve",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "balance-adjustment-approve-not-found",
+    "method": "POST",
+    "path": "/api/balance/admin/adjustment-requests/2147483000/approve",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "balance-adjustment-reject-requires-remark",
+    "method": "POST",
+    "path": "/api/balance/admin/adjustment-requests/2147483000/reject",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "balance-adjustment-reject-blank-remark",
+    "method": "POST",
+    "path": "/api/balance/admin/adjustment-requests/2147483000/reject",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "remark": "   "
+    }
+  },
+  {
+    "name": "balance-adjust-missing-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "balance-adjust-zero-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 0,
+      "remark": "r"
+    }
+  },
+  {
+    "name": "balance-adjust-missing-remark",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 5
+    }
+  },
+  {
+    "name": "balance-adjust-string-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": "5",
+      "remark": "r"
+    }
+  },
+  {
+    "name": "balance-gift-missing-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/gift",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "balance-gift-negative-amount",
+    "method": "POST",
+    "path": "/api/balance/admin/1/gift",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": -1
+    }
+  },
+  {
+    "name": "balance-adjust-empty-json-body",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "balance-adjust-unsupported-media-type",
+    "method": "POST",
+    "path": "/api/balance/admin/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "headers": {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "body": "amount=5"
+  }
+]

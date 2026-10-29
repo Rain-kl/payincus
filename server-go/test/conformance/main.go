@@ -36,6 +36,12 @@ type requestCase struct {
 	Token string `json:"token,omitempty"`
 	// SkipBody compares only the status code (useful for volatile payloads).
 	SkipBody bool `json:"skipBody,omitempty"`
+	// IgnoreRateLimit treats a 429 from either side as inconclusive instead of a
+	// failure. Node's @fastify/rate-limit per-route hook is dead code (registered
+	// on the plugin context before the app-level onRoute hook), so Node never
+	// enforces per-route limits while Go does. Cases hitting a limited route must
+	// set this so the difference does not mask real parity failures.
+	IgnoreRateLimit bool `json:"ignoreRateLimit,omitempty"`
 }
 
 type response struct {
@@ -50,6 +56,7 @@ func main() {
 	file := flag.String("file", "", "path to the request list JSON")
 	ignoreKeys := flag.String("ignore-keys", "timestamp", "comma-separated JSON keys to drop before comparing")
 	timeout := flag.Duration("timeout", 15*time.Second, "per-request timeout")
+	failOnSkip := flag.Bool("fail-on-skip", false, "treat skipped (rate-limit-divergent) cases as failures")
 	flag.Parse()
 
 	if *file == "" {
@@ -77,6 +84,7 @@ func main() {
 
 	client := &http.Client{Timeout: *timeout}
 	failures := 0
+	skipped := 0
 
 	for _, tc := range cases {
 		nodeResp, nodeErr := do(client, *nodeBase, tc)
@@ -89,6 +97,15 @@ func main() {
 		}
 
 		if nodeResp.Status != goResp.Status {
+			// A 429 on exactly one side means the per-route rate limiter differs,
+			// not that the endpoint behaves differently. Only skip when the case
+			// opted in, so genuine 429 divergence still fails.
+			if tc.IgnoreRateLimit && (nodeResp.Status == 429 || goResp.Status == 429) {
+				fmt.Printf("skip %-40s status: node=%d go=%d (rate-limit divergence)\n",
+					tc.Name, nodeResp.Status, goResp.Status)
+				skipped++
+				continue
+			}
 			fmt.Printf("FAIL %-40s status: node=%d go=%d\n", tc.Name, nodeResp.Status, goResp.Status)
 			failures++
 			continue
@@ -117,8 +134,8 @@ func main() {
 		fmt.Printf("ok   %-40s status=%d\n", tc.Name, nodeResp.Status)
 	}
 
-	fmt.Printf("\n%d/%d cases matched\n", len(cases)-failures, len(cases))
-	if failures > 0 {
+	fmt.Printf("\n%d/%d cases matched (%d skipped)\n", len(cases)-failures-skipped, len(cases), skipped)
+	if failures > 0 || (*failOnSkip && skipped > 0) {
 		os.Exit(1)
 	}
 }

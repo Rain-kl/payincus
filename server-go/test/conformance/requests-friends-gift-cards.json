@@ -1,0 +1,601 @@
+[
+  {
+    "name": "friends-list-anon",
+    "method": "GET",
+    "path": "/api/friends"
+  },
+  {
+    "name": "friends-list-anon-trailing-slash",
+    "method": "GET",
+    "path": "/api/friends/"
+  },
+  {
+    "name": "friends-request-anon",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/json" },
+    "body": { "username": "someone" }
+  },
+  {
+    "name": "friends-requests-anon",
+    "method": "GET",
+    "path": "/api/friends/requests"
+  },
+  {
+    "name": "friends-requests-sent-anon",
+    "method": "GET",
+    "path": "/api/friends/requests/sent"
+  },
+  {
+    "name": "friends-cancel-anon",
+    "method": "DELETE",
+    "path": "/api/friends/request/1"
+  },
+  {
+    "name": "friends-accept-anon",
+    "method": "POST",
+    "path": "/api/friends/1/accept"
+  },
+  {
+    "name": "friends-reject-anon",
+    "method": "POST",
+    "path": "/api/friends/1/reject"
+  },
+  {
+    "name": "friends-delete-anon",
+    "method": "DELETE",
+    "path": "/api/friends/1"
+  },
+  {
+    "name": "friends-history-anon",
+    "method": "GET",
+    "path": "/api/friends/history"
+  },
+  {
+    "name": "friends-search-anon",
+    "method": "GET",
+    "path": "/api/friends/search?username=x"
+  },
+  {
+    "name": "friends-resources-anon",
+    "method": "GET",
+    "path": "/api/friends/1/resources"
+  },
+
+  {
+    "name": "friends-list",
+    "method": "GET",
+    "path": "/api/friends",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-requests",
+    "method": "GET",
+    "path": "/api/friends/requests",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-requests-sent",
+    "method": "GET",
+    "path": "/api/friends/requests/sent",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-history-default",
+    "method": "GET",
+    "path": "/api/friends/history",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-history-all",
+    "method": "GET",
+    "path": "/api/friends/history?filter=all",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-history-accepted",
+    "method": "GET",
+    "path": "/api/friends/history?filter=accepted",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-history-invalid-filter",
+    "method": "GET",
+    "path": "/api/friends/history?filter=pending",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-history-invalid-filter-case",
+    "method": "GET",
+    "path": "/api/friends/history?filter=ALL",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "friends-search-missing-username",
+    "method": "GET",
+    "path": "/api/friends/search",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-search-empty-username",
+    "method": "GET",
+    "path": "/api/friends/search?username=",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-search-unknown-user",
+    "method": "GET",
+    "path": "/api/friends/search?username=__definitely_no_such_user__",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "friends-request-missing-username",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "remark": "hi" }
+  },
+  {
+    "name": "friends-request-empty-username",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "username": "" }
+  },
+  {
+    "name": "friends-request-remark-too-long",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "username": "someone", "remark": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+  },
+  {
+    "name": "friends-request-unknown-user",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "username": "__definitely_no_such_user__" }
+  },
+  {
+    "name": "friends-request-empty-json-body",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-request-invalid-media-type",
+    "method": "POST",
+    "path": "/api/friends/request",
+    "headers": { "content-type": "application/x-www-form-urlencoded" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "friends-cancel-invalid-id-zero",
+    "method": "DELETE",
+    "path": "/api/friends/request/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-cancel-invalid-id-leading-zero",
+    "method": "DELETE",
+    "path": "/api/friends/request/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-cancel-invalid-id-negative",
+    "method": "DELETE",
+    "path": "/api/friends/request/-1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-cancel-invalid-id-text",
+    "method": "DELETE",
+    "path": "/api/friends/request/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-cancel-missing",
+    "method": "DELETE",
+    "path": "/api/friends/request/999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "friends-accept-invalid-id-zero",
+    "method": "POST",
+    "path": "/api/friends/0/accept",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-accept-invalid-id-leading-zero",
+    "method": "POST",
+    "path": "/api/friends/01/accept",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-accept-missing",
+    "method": "POST",
+    "path": "/api/friends/999999999/accept",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-reject-invalid-id-zero",
+    "method": "POST",
+    "path": "/api/friends/0/reject",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-reject-missing",
+    "method": "POST",
+    "path": "/api/friends/999999999/reject",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-delete-invalid-id-zero",
+    "method": "DELETE",
+    "path": "/api/friends/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-delete-missing",
+    "method": "DELETE",
+    "path": "/api/friends/999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-resources-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/friends/0/resources",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "friends-resources-missing",
+    "method": "GET",
+    "path": "/api/friends/999999999/resources",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "gift-cards-admin-generate-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/generate",
+    "headers": { "content-type": "application/json" },
+    "body": { "faceValue": 10 }
+  },
+  {
+    "name": "gift-cards-admin-batch-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch",
+    "headers": { "content-type": "application/json" },
+    "body": { "faceValue": 10, "count": 2 }
+  },
+  {
+    "name": "gift-cards-admin-list-anon",
+    "method": "GET",
+    "path": "/api/gift-cards/admin/list"
+  },
+  {
+    "name": "gift-cards-admin-stats-anon",
+    "method": "GET",
+    "path": "/api/gift-cards/admin/stats"
+  },
+  {
+    "name": "gift-cards-admin-enable-anon",
+    "method": "PATCH",
+    "path": "/api/gift-cards/admin/1/enable"
+  },
+  {
+    "name": "gift-cards-admin-disable-anon",
+    "method": "PATCH",
+    "path": "/api/gift-cards/admin/1/disable"
+  },
+  {
+    "name": "gift-cards-admin-delete-anon",
+    "method": "DELETE",
+    "path": "/api/gift-cards/admin/1"
+  },
+  {
+    "name": "gift-cards-admin-batch-disable-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch-disable",
+    "headers": { "content-type": "application/json" },
+    "body": { "ids": [1, 2] }
+  },
+  {
+    "name": "gift-cards-admin-batch-delete-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch-delete",
+    "headers": { "content-type": "application/json" },
+    "body": { "ids": [1, 2] }
+  },
+  {
+    "name": "gift-cards-user-redeem-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/user/redeem",
+    "headers": { "content-type": "application/json" },
+    "body": { "code": "gc-abcdefghijklmnopqrstuvwx" }
+  },
+  {
+    "name": "gift-cards-user-generate-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/user/generate",
+    "headers": { "content-type": "application/json" },
+    "body": { "faceValue": 10 }
+  },
+  {
+    "name": "gift-cards-user-revoke-anon",
+    "method": "POST",
+    "path": "/api/gift-cards/user/1/revoke"
+  },
+  {
+    "name": "gift-cards-user-mine-anon",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine"
+  },
+
+  {
+    "name": "gift-cards-admin-list-non-admin",
+    "method": "GET",
+    "path": "/api/gift-cards/admin/list",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-stats-non-admin",
+    "method": "GET",
+    "path": "/api/gift-cards/admin/stats",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-generate-missing-face-value",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "balanceValue": 5 }
+  },
+  {
+    "name": "gift-cards-admin-generate-face-value-below-minimum",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 0 }
+  },
+  {
+    "name": "gift-cards-admin-generate-face-value-above-maximum",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 10001 }
+  },
+  {
+    "name": "gift-cards-admin-generate-balance-exceeds-face",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 10, "balanceValue": 11 }
+  },
+  {
+    "name": "gift-cards-admin-generate-invalid-expiry",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 10, "expiresAt": "not a date" }
+  },
+  {
+    "name": "gift-cards-admin-batch-count-missing",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 10 }
+  },
+  {
+    "name": "gift-cards-admin-batch-count-above-maximum",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 1, "count": 501 }
+  },
+  {
+    "name": "gift-cards-admin-batch-total-face-value-too-large",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 5000, "count": 21 }
+  },
+  {
+    "name": "gift-cards-admin-batch-disable-empty-ids",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch-disable",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [] }
+  },
+  {
+    "name": "gift-cards-admin-batch-disable-missing-ids",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch-disable",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "gift-cards-admin-batch-disable-zero-id",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch-disable",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [0] }
+  },
+  {
+    "name": "gift-cards-admin-batch-delete-duplicate-ids",
+    "method": "POST",
+    "path": "/api/gift-cards/admin/batch-delete",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [1, 1] }
+  },
+  {
+    "name": "gift-cards-admin-enable-invalid-id",
+    "method": "PATCH",
+    "path": "/api/gift-cards/admin/0/enable",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-disable-invalid-id",
+    "method": "PATCH",
+    "path": "/api/gift-cards/admin/01/disable",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/gift-cards/admin/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-enable-missing",
+    "method": "PATCH",
+    "path": "/api/gift-cards/admin/999999999/enable",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-disable-missing",
+    "method": "PATCH",
+    "path": "/api/gift-cards/admin/999999999/disable",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-admin-delete-missing",
+    "method": "DELETE",
+    "path": "/api/gift-cards/admin/999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "gift-cards-user-mine-defaults",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-mine-paged",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine?page=1&pageSize=10",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-mine-status-filter",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine?status=active",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-mine-invalid-status",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine?status=pending",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-mine-page-size-too-large",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine?pageSize=101",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-mine-page-not-integer",
+    "method": "GET",
+    "path": "/api/gift-cards/user/mine?page=abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-redeem-missing-code",
+    "method": "POST",
+    "path": "/api/gift-cards/user/redeem",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "gift-cards-user-redeem-empty-code",
+    "method": "POST",
+    "path": "/api/gift-cards/user/redeem",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "code": "" }
+  },
+  {
+    "name": "gift-cards-user-redeem-malformed-code",
+    "method": "POST",
+    "path": "/api/gift-cards/user/redeem",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "code": "not-a-gift-card" }
+  },
+  {
+    "name": "gift-cards-user-redeem-unknown-code",
+    "method": "POST",
+    "path": "/api/gift-cards/user/redeem",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "code": "gc-zzzzzzzzzzzzzzzzzzzzzzzz" }
+  },
+  {
+    "name": "gift-cards-user-generate-missing-face-value",
+    "method": "POST",
+    "path": "/api/gift-cards/user/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "gift-cards-user-generate-zero-face-value",
+    "method": "POST",
+    "path": "/api/gift-cards/user/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 0 }
+  },
+  {
+    "name": "gift-cards-user-generate-insufficient-balance",
+    "method": "POST",
+    "path": "/api/gift-cards/user/generate",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "faceValue": 9999.99 }
+  },
+  {
+    "name": "gift-cards-user-revoke-invalid-id",
+    "method": "POST",
+    "path": "/api/gift-cards/user/0/revoke",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-revoke-missing",
+    "method": "POST",
+    "path": "/api/gift-cards/user/999999999/revoke",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "gift-cards-user-redeem-proto-poisoning",
+    "method": "POST",
+    "path": "/api/gift-cards/user/redeem",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "__proto__": { "admin": true }, "code": "gc-abcdefghijklmnopqrstuvwx" }
+  }
+]

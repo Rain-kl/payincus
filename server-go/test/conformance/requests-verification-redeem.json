@@ -1,0 +1,382 @@
+[
+  {
+    "name": "verification-request-anon",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "body": { "operationType": "change_password" }
+  },
+  {
+    "name": "verification-request-missing-operation-type-anon",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "body": {}
+  },
+  {
+    "name": "verification-verify-anon",
+    "method": "POST",
+    "path": "/api/verification/verify",
+    "body": { "operationType": "change_password", "code": "123456" }
+  },
+  {
+    "name": "verification-check-anon",
+    "method": "GET",
+    "path": "/api/verification/check?operationType=change_password"
+  },
+  {
+    "name": "verification-operation-types-anon",
+    "method": "GET",
+    "path": "/api/verification/operation-types"
+  },
+
+  {
+    "name": "verification-operation-types",
+    "method": "GET",
+    "path": "/api/verification/operation-types",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "verification-request-missing-operation-type",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "verification-request-unknown-operation-type",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "nope" }
+  },
+  {
+    "name": "verification-request-account-with-resource-id",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "change_password", "resourceId": 5 }
+  },
+  {
+    "name": "verification-request-resource-without-resource-id",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "delete_instance" }
+  },
+  {
+    "name": "verification-request-resource-id-below-minimum",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "delete_instance", "resourceId": 0 }
+  },
+  {
+    "name": "verification-request-non-object-body",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "verification-request-resource-single-element-array",
+    "method": "POST",
+    "path": "/api/verification/request",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": ["delete_instance"], "resourceId": [1] }
+  },
+  {
+    "name": "verification-verify-missing-code",
+    "method": "POST",
+    "path": "/api/verification/verify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "change_password" }
+  },
+  {
+    "name": "verification-verify-code-too-short",
+    "method": "POST",
+    "path": "/api/verification/verify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "change_password", "code": "12345" }
+  },
+  {
+    "name": "verification-verify-code-too-long",
+    "method": "POST",
+    "path": "/api/verification/verify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "change_password", "code": "1234567" }
+  },
+  {
+    "name": "verification-verify-resource-without-resource-id",
+    "method": "POST",
+    "path": "/api/verification/verify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "delete_snapshot", "code": "123456" }
+  },
+  {
+    "name": "verification-verify-invalid-code",
+    "method": "POST",
+    "path": "/api/verification/verify",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "operationType": "change_password", "code": "000000" }
+  },
+  {
+    "name": "verification-check-missing-operation-type",
+    "method": "GET",
+    "path": "/api/verification/check",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "verification-check-unknown-operation-type",
+    "method": "GET",
+    "path": "/api/verification/check?operationType=nope",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "verification-check-account-operation",
+    "method": "GET",
+    "path": "/api/verification/check?operationType=delete_account",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "verification-check-resource-operation-without-resource-id",
+    "method": "GET",
+    "path": "/api/verification/check?operationType=delete_backup",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "verification-check-resource-operation-bad-resource-id",
+    "method": "GET",
+    "path": "/api/verification/check?operationType=delete_backup&resourceId=01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "verification-check-account-operation-with-resource-id",
+    "method": "GET",
+    "path": "/api/verification/check?operationType=change_email&resourceId=1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "redeem-code-options-anon",
+    "method": "GET",
+    "path": "/api/redeem-code-options"
+  },
+  {
+    "name": "redeem-code-options",
+    "method": "GET",
+    "path": "/api/redeem-code-options",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-list-anon",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes"
+  },
+  {
+    "name": "redeem-codes-list-bad-host-id",
+    "method": "GET",
+    "path": "/api/hosts/abc/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-list-zero-host-id",
+    "method": "GET",
+    "path": "/api/hosts/0/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-list-limit-above-max",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes?limit=101",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-list-limit-zero",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes?limit=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-list-negative-offset",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes?offset=-1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-list-bad-enabled",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes?enabled=yes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-create-anon",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "body": { "codeType": "c", "codeValue": 1 }
+  },
+  {
+    "name": "redeem-codes-create-missing-required",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c" }
+  },
+  {
+    "name": "redeem-codes-create-points-type",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "p", "codeValue": 5 }
+  },
+  {
+    "name": "redeem-codes-create-value-below-minimum",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 0 }
+  },
+  {
+    "name": "redeem-codes-create-value-above-type-range",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 101 }
+  },
+  {
+    "name": "redeem-codes-create-max-uses-above-max",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 5, "maxUses": 1001 }
+  },
+  {
+    "name": "redeem-codes-create-batch-count-above-max",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 5, "batchCount": 101 }
+  },
+  {
+    "name": "redeem-codes-create-remark-too-long",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 5, "remark": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  },
+  {
+    "name": "redeem-codes-create-remark-control-character",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 5, "remark": "a\u0001b" }
+  },
+  {
+    "name": "redeem-codes-create-invalid-expiry",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "codeType": "c", "codeValue": 5, "expiresAt": "not-a-date" }
+  },
+  {
+    "name": "redeem-codes-create-non-object-body",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "redeem-codes-update-anon",
+    "method": "PATCH",
+    "path": "/api/hosts/1/redeem-codes/1",
+    "body": { "enabled": false }
+  },
+  {
+    "name": "redeem-codes-update-enabled-not-boolean",
+    "method": "PATCH",
+    "path": "/api/hosts/1/redeem-codes/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": "yes" }
+  },
+  {
+    "name": "redeem-codes-update-invalid-expiry",
+    "method": "PATCH",
+    "path": "/api/hosts/1/redeem-codes/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "expiresAt": "not-a-date" }
+  },
+  {
+    "name": "redeem-codes-update-max-uses-above-max",
+    "method": "PATCH",
+    "path": "/api/hosts/1/redeem-codes/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "maxUses": 1001 }
+  },
+  {
+    "name": "redeem-codes-delete-anon",
+    "method": "DELETE",
+    "path": "/api/hosts/1/redeem-codes/1"
+  },
+  {
+    "name": "redeem-codes-delete-bad-code-id",
+    "method": "DELETE",
+    "path": "/api/hosts/1/redeem-codes/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-batch-delete-anon",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes/batch-delete",
+    "body": { "ids": [1] }
+  },
+  {
+    "name": "redeem-codes-batch-delete-missing-ids",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes/batch-delete",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "redeem-codes-batch-delete-empty-ids",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes/batch-delete",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [] }
+  },
+  {
+    "name": "redeem-codes-batch-delete-zero-id",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes/batch-delete",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [0] }
+  },
+  {
+    "name": "redeem-codes-batch-delete-duplicate-ids",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes/batch-delete",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [1, 1] }
+  },
+  {
+    "name": "redeem-codes-batch-delete-fractional-id",
+    "method": "POST",
+    "path": "/api/hosts/1/redeem-codes/batch-delete",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "ids": [1.5] }
+  },
+  {
+    "name": "redeem-codes-usages-anon",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes/1/usages"
+  },
+  {
+    "name": "redeem-codes-usages-limit-above-max",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes/1/usages?limit=101",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "redeem-codes-usages-unknown-code",
+    "method": "GET",
+    "path": "/api/hosts/1/redeem-codes/999999999/usages",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]
