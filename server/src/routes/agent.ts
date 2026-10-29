@@ -1,3 +1,5 @@
+import { withStorageSession } from '../lib/storage/session.js'
+import { grantStartupKeys } from '../lib/node-security/startup.js'
 import { processAgentStorageReport } from '../services/agent-storage-report.js'
 import { recordHostSuccess } from '../lib/incus/host-health.js'
 import { recordReport } from '../lib/node-security/report.js'
@@ -821,6 +823,21 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     })
   })
 
+  fastify.post<{ Body: unknown }>('/startup-keys', { bodyLimit: 16 * 1024 }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store').header('Pragma', 'no-cache')
+    const agent = await authenticateAgentRequest(request, reply)
+    if (!agent) return
+    const secret = decryptSensitiveData(agent.secretEncrypted ?? '')
+    if (!secret) return reply.code(503).send({ error: 'Startup service unavailable' })
+    const result = await grantStartupKeys(agent, secret, request.body)
+    if ('unavailable' in result) return reply.code(503).send({ error: 'Startup service unavailable' })
+    if ('invalid' in result) {
+      void withStorageSession(agent.hostId, false, node => node.request('POST', '/1.0/payincus/security/lock', { generation: result.generation })).catch(() => fastify.log.warn({ hostId: agent.hostId }, 'Node action pending'))
+      return reply.code(409).send({ error: 'Internal service unavailable' })
+    }
+    if ('replay' in result) return reply.code(409).send({ error: 'Request could not be completed' })
+    return result.envelope
+  })
   fastify.post<{ Body: unknown }>('/security-report', { bodyLimit: 128 * 1024 }, async (request, reply) => {
     // Event batches must bind the actual body, independently of the GET WebSocket handshake.
     const signed = readAgentAuthHeaders(request.headers)
@@ -828,7 +845,11 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     const agent = await authenticateAgentRequest(request, reply)
     if (!agent) return
     reply.header('Cache-Control', 'no-store')
-    try { return { ack: await recordReport(agent.hostId, request.body) } }
+    try {
+      const ack = await recordReport(agent.hostId, request.body)
+      const state = await prisma.nodeSecurityState.findUnique({ where: { hostId: agent.hostId }, select: { recoveryBlocked: true, recoveryGeneration: true } })
+      return { ack, recoveryBlocked: state?.recoveryBlocked === true, recoveryGeneration: state?.recoveryGeneration ?? 0 }
+    }
     catch { return reply.code(503).send({ error: 'Report unavailable' }) }
   })
 

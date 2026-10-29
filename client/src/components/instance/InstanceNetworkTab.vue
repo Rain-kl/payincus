@@ -195,8 +195,8 @@ watch(portMappings, (newMappings) => {
       <div class="flex items-center justify-between gap-3"><h2 class="text-sm font-medium text-themed">{{ t('packageEgress.title') }}</h2><button type="button" class="btn-ghost text-sm" @click="loadEgress">{{ t('packageEgress.refresh') }}</button></div>
       <p v-if="egressError" class="text-sm text-error" role="alert">{{ t('packageEgress.loadFailed') }}</p>
       <template v-else-if="egress">
-        <p class="text-sm text-themed">{{ t(`packageEgress.${egress.mode}`) }}<span v-if="egress.profileName"> · {{ egress.profileName }} · v{{ egress.version }}</span></p>
-        <p v-if="egress.mode !== 'legacy'" class="text-sm" :class="egress.state === 'ready' ? 'text-success' : 'text-warning'">{{ t(`packageEgress.state_${egress.state}`) }}</p>
+        <p class="text-sm text-themed">{{ t(`packageEgress.${egress.mode}`) }}<span v-if="egress.profileName"> · {{ egress.profileName }}</span></p>
+        <p v-if="egress.mode !== 'host'" class="text-sm" :class="egress.state === 'ready' ? 'text-success' : 'text-warning'">{{ t(`packageEgress.state_${egress.state}`) }}</p>
         <p class="text-xs text-themed-muted">{{ t('packageEgress.lastReport') }}: {{ egress.reportedAt ? new Date(egress.reportedAt).toLocaleString() : t('packageEgress.unreported') }}</p>
       </template>
     </section>

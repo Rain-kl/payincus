@@ -1,4 +1,4 @@
-import { snapshotPackageEgress } from '../lib/egress/package.js'
+import { bindPackageEgress } from '../lib/egress/package.js'
 import { GpuError } from '../lib/gpu.js'
 import { compensateGpuPreparationFailure, releaseFailedGpu, assertGpuPlanChange, reserveInstanceGpu, getInstanceGpuPcis } from '../db/gpus.js'
 import { currentOperationTask, runOperationTask, taskLog } from '../lib/operation-task-log.js'
@@ -3773,6 +3773,8 @@ if (provider.type === 'yipay') {
       }
 
       const result = await prisma.$transaction(async (tx) => {
+        // Serialize shared policy references before host resource locks.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
         // 使用行锁选择并预占宿主机资源
         const lockedHost = await db.selectAndReserveHostWithLock(tx, {
           packagePlanId: selectedPlan?.id,
@@ -3905,7 +3907,7 @@ if (provider.type === 'yipay') {
         // 创建实例记录
         const instance = await tx.instance.create({
           data: {
-            ...(await snapshotPackageEgress(tx, packageId, lockedHost.id)),
+            ...(await bindPackageEgress(tx, packageId, lockedHost.id)),
             ...(await reserveInstanceGpu(tx, { hostId: lockedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             name,

@@ -15,6 +15,11 @@ let report: any = state
 let nextId = 0
 let failCreate = false
 let failApproval = false
+let holdRecovery = false
+let beginHeldRecovery!: () => void
+let releaseHeldRecovery!: () => void
+let recoveryGeneration = 0
+let recoveryBlocked = true
 let starts = 0
 let approvals = 0
 let running = false
@@ -22,6 +27,8 @@ let releaseStart!: () => void
 let started!: () => void
 const starting = new Promise<void>(resolve => { started = resolve })
 const heldStart = new Promise<void>(resolve => { releaseStart = resolve })
+const heldRecovery = new Promise<void>(resolve => { releaseHeldRecovery = resolve })
+const recoveryStarted = new Promise<void>(resolve => { beginHeldRecovery = resolve })
 const tasks: any[] = [], logs: any[] = []
 const matches = (task: any, where: any) => Object.entries(where ?? {}).every(([key, value]) => task[key] === value)
 Object.assign(prisma.operationTask, {
@@ -40,8 +47,14 @@ Object.assign(prisma.operationTask, {
 Object.assign(prisma.operationTaskLog, { create: async ({ data }: any) => { const row = { id: logs.length + 1, ...data }; logs.push(row); return row } })
 Object.assign(prisma.host, { findUnique: async () => ({ id: 9, name: 'node', url: 'https://fixture.invalid' }), findMany: async () => [{ id: 9, name: 'node' }] })
 Object.assign(prisma.nodeSecurityState, {
-  findUnique: async () => ({ report, serverFingerprint: 'a'.repeat(64) }),
-  upsert: async ({ update }: any) => { report = update.report; return {} }
+  findUnique: async () => ({ report, serverFingerprint: 'a'.repeat(64), recoveryGeneration, recoveryBlocked }),
+  upsert: async ({ update }: any) => { report = update.report; return {} },
+  update: async ({ data }: any) => { report = data.report ?? report; return {} },
+  updateMany: async ({ where, data }: any) => {
+    if (where.recoveryGeneration !== recoveryGeneration) return { count: 0 }
+    if (typeof data.recoveryBlocked === 'boolean') recoveryBlocked = data.recoveryBlocked
+    return { count: 1 }
+  }
 })
 Object.assign(prisma.nodeCliEvent, { deleteMany: async () => ({ count: 0 }), findMany: async () => [] })
 Object.assign(prisma.nodeStorageKey, { findMany: async () => [] })
@@ -61,6 +74,7 @@ Object.assign(IncusClient.prototype, {
     if (path.endsWith('/recover')) {
       approvals++
       if (failApproval) throw new Error('approval refused')
+      if (holdRecovery) { beginHeldRecovery(); await heldRecovery; holdRecovery = false }
       assert.equal(body.revision, state.revision)
       state = { ...state, locked: false, revision: state.revision + 1 }
       return state
@@ -141,6 +155,15 @@ const orphan = await prisma.operationTask.create({ data: { hostId: 9, instanceNa
 await recoverInterruptedOperationTasks()
 assert.equal(tasks.find(task => task.id === orphan.id).status, 'interrupted')
 assert.equal(approvals, before, 'restart must not replay control-plane approval')
+recoveryBlocked = true
+holdRecovery = true
+assert.equal((await approve()).statusCode, 202)
+await Promise.race([recoveryStarted, delay(1500).then(() => { throw new Error('recovery generation race did not start') })])
+recoveryGeneration++ // A new bad proof arrived after this administrator's approval was captured.
+releaseHeldRecovery()
+await finished(5)
+assert.equal(tasks[4].status, 'failed')
+assert.equal(recoveryBlocked, true, 'a stale approval must not clear a newer sticky lock generation')
 await app.close()
 await closePrismaDatabase()
 console.log('Async 202 acceptance, deduplication, progress, failure/retry, DB failure, authorization and restart interruption passed')

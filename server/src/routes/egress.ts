@@ -8,7 +8,7 @@ import { parseProxyImport } from '../lib/egress/import.js'
 import { decodeProxyConfig } from '../lib/egress/sync.js'
 import { requireNetworkControl, pushNetworkPolicy, controlFailure, sanitizeProbeResults } from '../lib/egress/realtime.js'
 import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
-import { defaultEgress, defaultFirewall, validateEgress, validateFirewall, ids, probeUrl, NetworkInputError } from '../lib/egress/policy.js'
+import { defaultFirewall, validateFirewall, ids, probeUrl, NetworkInputError } from '../lib/egress/policy.js'
 
 const idSchema = { type: 'integer', minimum: 1, maximum: 2147483647 }
 const hostParams = { type: 'object', required: ['id'], properties: { id: idSchema } }
@@ -69,7 +69,7 @@ export default async function egressRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: number } }>('/admin/proxy-nodes/:id', { onRequest: admin, schema: { params: hostParams } }, async (request, reply) => {
     const state = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74201)`
-      if (await tx.hostNetworkPolicy.count({ where: { egress: { path: ['proxyNodeIds'], array_contains: [request.params.id] } } }) || await tx.egressProfileVersion.count({ where: { proxyNodeId: request.params.id } })) return 'used'
+      if (await tx.egressProfile.count({ where: { egress: { path: ['proxyNodeIds'], array_contains: [request.params.id] } } })) return 'used'
       return (await tx.proxyNode.deleteMany({ where: { id: request.params.id } })).count ? 'ok' : 'missing'
     })
     if (state === 'used') return reply.code(409).send({ error: '代理节点仍被节点出口或套餐出口策略引用，无法删除' })
@@ -80,15 +80,19 @@ export default async function egressRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: number } }>('/hosts/:id/network-policy', { onRequest: admin, schema: { params: hostParams } }, async (request, reply) => {
     const host = await prisma.host.findUnique({ where: { id: request.params.id }, select: { id: true, agent: { select: { enabled: true, version: true, capabilities: true, lastSeenAt: true } } } })
     if (!host) return reply.code(404).send({ error: '宿主节点不存在' })
-    return { policy: await prisma.hostNetworkPolicy.findUnique({ where: { hostId: host.id } }) ?? { hostId: host.id, revision: 0, appliedRevision: 0, egress: defaultEgress, firewall: defaultFirewall, status: {}, reportedAt: null }, agent: host.agent, networkControlReady: host.agent?.enabled === true && hostTunnelManager.supportsControl(host.id, 'network.apply') }
+    return { policy: await prisma.hostNetworkPolicy.findUnique({ where: { hostId: host.id } }) ?? { hostId: host.id, revision: 0, appliedRevision: 0, egressMode: 'off', egressProfileId: null, firewall: defaultFirewall, status: {}, reportedAt: null }, agent: host.agent, networkControlReady: host.agent?.enabled === true && hostTunnelManager.supportsControl(host.id, 'network.apply') }
   })
   for (const section of ['egress', 'firewall'] as const) app.put<{ Params: { id: number }; Body: { revision: number; value: unknown } }>(`/hosts/:id/network-policy/${section}`, {
     onRequest: admin, schema: { params: hostParams, body: { type: 'object', additionalProperties: false, required: ['revision', 'value'], properties: { revision: { type: 'integer', minimum: 0, maximum: 2147483646 }, value: { type: 'object', additionalProperties: true } } } }
   }, async (request, reply) => {
-    const value = section === 'egress' ? validateEgress(request.body.value) : validateFirewall(request.body.value)
-    if (section === 'egress' && (value as ReturnType<typeof validateEgress>).mode === 'proxy') {
-      try { await assertSafeHttpUrl((value as ReturnType<typeof validateEgress>).probeUrl, 'Probe URL') }
-      catch { throw new NetworkInputError('Probe URL must resolve to a public HTTP target') }
+    let selection: { egressMode: string; egressProfileId: number | null } | undefined
+    const value = section === 'firewall' ? validateFirewall(request.body.value) : undefined
+    if (section === 'egress') {
+      const input = request.body.value as { egressMode?: unknown; egressProfileId?: unknown }
+      if (!input || !['off', 'direct', 'profile'].includes(String(input.egressMode))) throw new NetworkInputError('Invalid egress binding')
+      const profileId = input.egressProfileId ?? null
+      if ((input.egressMode === 'profile' && (!Number.isSafeInteger(profileId) || Number(profileId) <= 0)) || (input.egressMode !== 'profile' && profileId !== null)) throw new NetworkInputError('Invalid egress profile')
+      selection = { egressMode: String(input.egressMode), egressProfileId: profileId as number | null }
     }
     const host = await prisma.host.findUnique({ where: { id: request.params.id }, select: { agent: { select: { enabled: true } } } })
     if (!host) return reply.code(404).send({ error: '宿主节点不存在' })
@@ -96,23 +100,22 @@ export default async function egressRoutes(app: FastifyInstance) {
     try { requireNetworkControl(request.params.id, 'network.apply') }
     catch (error) { const failure = controlFailure(error); return reply.code(failure.status).send({ error: failure.error }) }
     const state = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74201)`
       const hosts = await tx.$queryRaw<Array<{ id: number }>>`SELECT id FROM hosts WHERE id = ${request.params.id} FOR UPDATE`
       if (!hosts.length) return 'missing'
-      // Serialize references and deletion using the same advisory lock.
-      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74201)`
       const current = await tx.hostNetworkPolicy.findUnique({ where: { hostId: request.params.id } })
       if ((current?.revision ?? 0) !== request.body.revision) return 'conflict'
-      if (section === 'egress') {
-        const selected = (value as ReturnType<typeof validateEgress>).proxyNodeIds
-        if (await tx.proxyNode.count({ where: { id: { in: selected } } }) !== selected.length) return 'nodes'
+      if (selection?.egressProfileId) {
+        const profile = await tx.egressProfile.findUnique({ where: { id: selection.egressProfileId } })
+        if (!profile?.active || !profile.allowedHostIds.includes(request.params.id)) return 'nodes'
       }
-      const data = { [section]: value as unknown as Prisma.InputJsonValue, revision: { increment: 1 } }
-      await tx.hostNetworkPolicy.upsert({ where: { hostId: request.params.id }, create: { hostId: request.params.id, egress: (section === 'egress' ? value : defaultEgress) as unknown as Prisma.InputJsonValue, firewall: (section === 'firewall' ? value : defaultFirewall) as unknown as Prisma.InputJsonValue }, update: data })
+      const data = selection ?? { firewall: value as unknown as Prisma.InputJsonValue }
+      await tx.hostNetworkPolicy.upsert({ where: { hostId: request.params.id }, create: { hostId: request.params.id, firewall: defaultFirewall as unknown as Prisma.InputJsonValue, ...data }, update: { ...data, revision: { increment: 1 } } })
       return 'ok'
     })
     if (state === 'missing') return reply.code(404).send({ error: '宿主节点不存在' })
     if (state === 'conflict') return reply.code(409).send({ error: '配置已更新，请刷新后重试' })
-    if (state === 'nodes') return reply.code(400).send({ error: '所选代理节点不存在' })
+    if (state === 'nodes') return reply.code(400).send({ error: '出口策略不存在或未授权该宿主节点' })
     await createLog(request.user.id, 'host', `host.network.${section}`, `Updated host ${request.params.id} ${section} policy`, 'success')
     try {
       const applied = await pushNetworkPolicy(request.params.id)

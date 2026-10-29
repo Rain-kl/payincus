@@ -290,7 +290,7 @@ export async function getAllPackages(
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
     egress_mode: pkg.egressMode,
-    egress_profile_version_id: pkg.egressProfileVersionId,
+    egress_profile_id: pkg.egressProfileId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -375,7 +375,7 @@ export async function getPackageById(id: number): Promise<(Package & { host_ids?
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
     egress_mode: pkg.egressMode,
-    egress_profile_version_id: pkg.egressProfileVersionId,
+    egress_profile_id: pkg.egressProfileId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -440,7 +440,7 @@ export async function getPackageByName(name: string): Promise<Package | null> {
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
     egress_mode: pkg.egressMode,
-    egress_profile_version_id: pkg.egressProfileVersionId,
+    egress_profile_id: pkg.egressProfileId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -497,7 +497,7 @@ export async function getPackageByUserAndName(userId: number, name: string): Pro
     network_mode: pkg.networkMode,
     instance_type: pkg.instanceType,
     egress_mode: pkg.egressMode,
-    egress_profile_version_id: pkg.egressProfileVersionId,
+    egress_profile_id: pkg.egressProfileId,
     gpu_shared: pkg.gpuShared,
     gpu_device_ids: pkg.gpuDeviceIds,
     privileged: pkg.privileged ? 1 : 0,
@@ -549,7 +549,7 @@ export async function createPackage(data: {
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -589,6 +589,7 @@ export async function createPackage(data: {
 }, isAdmin?: boolean): Promise<number> {
   if (data.requiredPackageId !== null && data.requiredPackageId !== undefined) {
     return prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
       await acquirePackagePrerequisiteLock(tx)
 
       const prerequisiteValidation = await validatePackagePrerequisiteReferenceWithClient(
@@ -607,7 +608,10 @@ export async function createPackage(data: {
     })
   }
 
-  return createPackageUnchecked(data, isAdmin, prisma)
+  return prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
+    return createPackageUnchecked(data, isAdmin, tx)
+  })
 }
 
 async function createPackageUnchecked(data: {
@@ -624,7 +628,7 @@ async function createPackageUnchecked(data: {
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -685,8 +689,8 @@ async function createPackageUnchecked(data: {
   await validatePackageEgress(client, data)
   const pkg = await client.package.create({
     data: {
-      egressMode: data.egressMode ?? 'legacy',
-      egressProfileVersionId: data.egressProfileVersionId ?? null,
+      egressMode: data.egressMode ?? 'host',
+      egressProfileId: data.egressProfileId ?? null,
       userId: data.userId,
       name: data.name,
       description: data.description ?? null,
@@ -763,7 +767,7 @@ export async function updatePackage(id: number, data: {
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -803,6 +807,7 @@ export async function updatePackage(id: number, data: {
 }, isAdmin?: boolean): Promise<void> {
   if (data.requiredPackageId !== undefined) {
     await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
       await acquirePackagePrerequisiteLock(tx)
 
       const pkg = await tx.package.findUnique({
@@ -830,7 +835,10 @@ export async function updatePackage(id: number, data: {
     return
   }
 
-  await updatePackageUnchecked(id, data, isAdmin, prisma)
+  await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
+    return updatePackageUnchecked(id, data, isAdmin, tx)
+  })
 }
 
 async function updatePackageUnchecked(id: number, data: {
@@ -846,7 +854,7 @@ async function updatePackageUnchecked(id: number, data: {
   hostStoragePools?: Record<string, string | null>
   hostTrafficMultipliers?: Record<string, number | string | null>
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   privileged?: boolean
@@ -894,7 +902,7 @@ async function updatePackageUnchecked(id: number, data: {
 
   await validatePackageEgress(client, {
     egressMode: data.egressMode ?? currentGpuPackage.egressMode,
-    egressProfileVersionId: data.egressProfileVersionId === undefined ? currentGpuPackage.egressProfileVersionId : data.egressProfileVersionId,
+    egressProfileId: data.egressProfileId === undefined ? currentGpuPackage.egressProfileId : data.egressProfileId,
     networkMode: data.networkMode ?? currentGpuPackage.networkMode,
     instanceType: data.instanceType ?? currentGpuPackage.instanceType,
     privileged: data.privileged ?? currentGpuPackage.privileged,
@@ -911,7 +919,7 @@ async function updatePackageUnchecked(id: number, data: {
     networkMode?: 'nat' | 'nat_ipv6' | 'nat_ipv6_nat' | 'ipv6_only' | 'ipv6_nat' | 'public_ipv4' | 'public_ipv4_ipv6'
     instanceType?: 'container' | 'vm'
     egressMode?: string
-    egressProfileVersionId?: number | null
+    egressProfileId?: number | null
     gpuShared?: boolean
     gpuDeviceIds?: number[]
     privileged?: boolean
@@ -958,7 +966,7 @@ async function updatePackageUnchecked(id: number, data: {
   if (data.networkMode !== undefined) updateData.networkMode = data.networkMode
   if (data.instanceType !== undefined) updateData.instanceType = data.instanceType
   if (data.egressMode !== undefined) updateData.egressMode = data.egressMode
-  if (data.egressProfileVersionId !== undefined) updateData.egressProfileVersionId = data.egressProfileVersionId
+  if (data.egressProfileId !== undefined) updateData.egressProfileId = data.egressProfileId
   if (data.gpuShared !== undefined) updateData.gpuShared = data.gpuShared
   if (data.gpuDeviceIds !== undefined) updateData.gpuDeviceIds = data.gpuDeviceIds
   if (data.privileged !== undefined) updateData.privileged = data.privileged

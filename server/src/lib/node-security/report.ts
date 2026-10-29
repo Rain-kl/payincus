@@ -16,14 +16,15 @@ export function parseReport(input: unknown): { state: Prisma.InputJsonObject; ev
   })
   // Status is allowlisted; never retain arbitrary agent-provided fields or command payloads.
   const results = Array.isArray(state.results) ? state.results.slice(0, 256).map((r: any) => ({ target: String(r.target || '').slice(0, 200), success: r.success === true, detail: r.detail === 'complete' || r.detail === 'not_configured' ? r.detail : 'failed' })) : []
-  return { state: { enabled: state.enabled, locked: state.locked, revision: Number(state.revision), results, resumeInstances: Array.isArray(state.resumeInstances) ? state.resumeInstances.slice(0, 10000).filter((item: any) => typeof item?.project === 'string' && typeof item?.name === 'string').map((item: any) => ({ project: item.project.slice(0, 255), name: item.name.slice(0, 255) })) : [], reason: typeof state.reason === 'string' && (state.reason === 'daemon_restart' || state.reason === 'panel_request' || state.reason === 'state_unavailable' || state.reason === 'audit_unavailable' || /^cli:[a-z_]+$/.test(state.reason)) ? state.reason.slice(0, 64) : '' }, events }
+  return { state: { enabled: state.enabled, locked: state.locked, recoveryPending: state.recoveryPending === true, startupRecovering: state.startupRecovering === true, revision: Number(state.revision), results, resumeInstances: Array.isArray(state.resumeInstances) ? state.resumeInstances.slice(0, 10000).filter((item: any) => typeof item?.project === 'string' && typeof item?.name === 'string').map((item: any) => ({ project: item.project.slice(0, 255), name: item.name.slice(0, 255) })) : [], reason: typeof state.reason === 'string' && (state.reason === 'startup_verification' || state.reason === 'daemon_restart' || state.reason === 'panel_request' || state.reason === 'state_unavailable' || state.reason === 'audit_unavailable' || /^cli:[a-z_]+$/.test(state.reason)) ? state.reason.slice(0, 64) : '' }, events }
 }
 export async function recordReport(hostId: number, input: unknown): Promise<string[]> {
-  const { state, events } = parseReport(input)
+  let { state, events } = parseReport(input)
   await prisma.$transaction(async tx => {
     // Serialize this node's reports and preserve a newer durable lock revision during delayed delivery.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(700260, ${hostId})`
     const previous = await tx.nodeSecurityState.findUnique({ where: { hostId } })
+    if (previous?.recoveryBlocked) state = { ...state, locked: true, reason: 'startup_verification' }
     const previousRevision = previous?.report && typeof previous.report === 'object' && !Array.isArray(previous.report) ? Number(previous.report.revision ?? 0) : 0
     if (Number(state.revision) >= previousRevision || state.reason === 'state_unavailable' || state.reason === 'audit_unavailable') {
       await tx.nodeSecurityState.upsert({ where: { hostId }, create: { hostId, report: state }, update: { report: state, reportedAt: new Date() } })

@@ -1,4 +1,4 @@
-import { snapshotPackageEgress } from '../lib/egress/package.js'
+import { bindPackageEgress } from '../lib/egress/package.js'
 /**
  * 实例相关数据库操作
  * 使用 Prisma ORM
@@ -314,7 +314,7 @@ export async function createInstance(data: {
 }): Promise<number> {
   const instance = await prisma.$transaction(async tx => tx.instance.create({
     data: {
-      ...(await snapshotPackageEgress(tx, data.packageId, data.hostId, data.egressSourceInstanceId)),
+      ...(await bindPackageEgress(tx, data.packageId, data.hostId, data.egressSourceInstanceId)),
       incusId: data.incusId,
       name: data.name,
       userId: data.userId,

@@ -91,6 +91,7 @@ jobs:
           pnpm --filter server test:node-security:db
           pnpm --filter server test:instance-advanced-config:db
           DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test pnpm --filter server exec prisma db push
+          DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test RUN_PACKAGE_EGRESS_DB_TESTS=1 pnpm --filter server test:package-egress
           DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test pnpm --filter server test:storage-telemetry:db
           DATABASE_URL=postgresql://validation:validation@localhost:5432/storage_test RUN_STORAGE_DB_TESTS=1 pnpm --filter server test:storage-capacity
 

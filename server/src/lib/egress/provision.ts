@@ -2,7 +2,7 @@ import { preparePackageEgress } from './attachments.js'
 import { createHash } from 'node:crypto'
 import { prisma } from '../../db/prisma.js'
 import type { IncusClient } from '../incus/incus-client.js'
-import type { EgressPolicy, FirewallPolicy } from './policy.js'
+import type { FirewallPolicy } from './policy.js'
 
 // Apply protection before a new NIC can send its first packet. Network ACLs
 // cover Internet traffic; per-NIC ACLs also cover same-bridge communication.
@@ -13,8 +13,8 @@ export async function protectProvisionedNetwork(client: IncusClient, value: unkn
   const packageManaged = value !== originalValue
   const policy = await prisma.hostNetworkPolicy.findUnique({ where: { hostId: client.options.hostId } })
   if (!policy) return value
-  const firewall = policy.firewall as unknown as FirewallPolicy, egress = policy.egress as unknown as EgressPolicy
-  if (!firewall.enabled && (egress.mode === 'off' || packageManaged)) return value
+  const firewall = policy.firewall as unknown as FirewallPolicy
+  if (!firewall.enabled && (policy.egressMode === 'off' || packageManaged)) return value
   const status = policy.status as Record<string, unknown>
   if (policy.appliedRevision !== policy.revision || status.state !== 'applied') throw new Error('Host network policy is pending or failed; retry after the Agent confirms application')
   const config = structuredClone(value) as { name?: string; config?: Record<string, string>; devices?: Record<string, Record<string, string>>; profiles?: string[] }

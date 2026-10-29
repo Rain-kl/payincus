@@ -1,6 +1,6 @@
 import type { StorageEncryptionState } from './storage-encryption-types'
 import type { NodeSecurityOverview, NodeSecurityState } from './node-security-types'
-import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
+import type { ProxyNode, EgressSelection, EgressProfile, EgressProfileInput, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
 import type { GpuConfiguration } from '@/types/api'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
@@ -734,10 +734,11 @@ const api = {
   },
 
   egress: {
-    instance: (id: number): Promise<{ mode: string; profileName: string | null; version: number | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
-    profiles: (): Promise<{ profiles: Array<{ id: number; profileId: number; version: number; name: string; active: boolean; proxyNodeId?: number; hostIds: number[] }> }> => http.get('/egress/profiles'),
-    create: (data: { name: string; proxyNodeId: number; hostIds: number[] }): Promise<{ id: number; versionId: number }> => http.post('/admin/egress-profiles', data),
-    version: (id: number, data: { proxyNodeId: number; hostIds: number[] }): Promise<{ id: number; version: number }> => http.post(`/admin/egress-profiles/${id}/versions`, data)
+    instance: (id: number): Promise<{ mode: string; profileName: string | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
+    profiles: (): Promise<{ profiles: EgressProfile[] }> => http.get('/egress/profiles'),
+    create: (data: EgressProfileInput): Promise<{ id: number }> => http.post('/admin/egress-profiles', data),
+    update: (id: number, data: EgressProfileInput): Promise<{ id: number }> => http.put(`/admin/egress-profiles/${id}`, data),
+    remove: (id: number): Promise<{ success: boolean }> => http.delete(`/admin/egress-profiles/${id}`)
   },
   network: {
     probeHosts: (): Promise<{ hosts: Array<{ id: number; name: string }> }> => http.get('/admin/proxy-probe-hosts'),
@@ -745,7 +746,7 @@ const api = {
     importNodes: (data: { content?: string; subscriptionUrl?: string; confirm: boolean }): Promise<ProxyImportResult> => http.post('/admin/proxy-nodes/import', data),
     deleteNode: (id: number): Promise<{ success: boolean }> => http.delete(`/admin/proxy-nodes/${id}`),
     policy: (hostId: number): Promise<{ policy: NetworkPolicy; agent: { enabled: boolean; capabilities: string[]; lastSeenAt: string | null } | null; networkControlReady?: boolean }> => http.get(`/hosts/${hostId}/network-policy`),
-    updateEgress: (hostId: number, revision: number, value: EgressPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/egress`, { revision, value }, { timeout: 110_000 }),
+    updateEgress: (hostId: number, revision: number, value: EgressSelection): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/egress`, { revision, value }, { timeout: 110_000 }),
     updateFirewall: (hostId: number, revision: number, value: FirewallPolicy): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/network-policy/firewall`, { revision, value }, { timeout: 110_000 }),
     probe: (hostId: number, nodeIds: number[], probeUrl: string, signal?: AbortSignal): Promise<ProxyProbeResponse> => http.post('/admin/proxy-probes', { hostId, nodeIds, probeUrl }, { timeout: 60_000, signal })
   },

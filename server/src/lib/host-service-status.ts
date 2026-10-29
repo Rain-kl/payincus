@@ -13,13 +13,13 @@ export function evaluateHostService(host: {
   nodeSecurity?: { report: unknown } | null
   agent?: { status: string; lastSeenAt: Date | null; lastReport: unknown } | null
 }, now = Date.now()): HostServiceStatus {
-  const state = host.nodeSecurity?.report as { locked?: boolean; resumeInstances?: Array<{project: string; name: string}> } | undefined
+  const state = host.nodeSecurity?.report as { locked?: boolean; recoveryPending?: boolean; resumeInstances?: Array<{project: string; name: string}> } | undefined
   const report = host.agent?.lastReport as { incus?: { available?: boolean }; instances?: { available?: boolean }; metrics?: { heartbeatIntervalSeconds?: number } } | undefined
   const status = state?.locked === true ? 'locked' : deriveEffectiveHostStatus(host)
   const reportedInterval = Number(report?.metrics?.heartbeatIntervalSeconds)
   const interval = Number.isFinite(reportedInterval) && reportedInterval >= 5 && reportedInterval <= 3600 ? reportedInterval : 5
   const stale = host.agent && (host.agent.status !== 'online' || !host.agent.lastSeenAt || now - host.agent.lastSeenAt.getTime() > Math.max(120, interval * 3) * 1000)
-  return { status, pendingInstances: Array.isArray(state?.resumeInstances) ? state.resumeInstances.filter(item => item.project === 'default').map(item => item.name) : [], available: (status === 'online' || status === 'maintenance') && (!host.tunnelEnabled || hostTunnelManager.isTunnelOnline(host.id)) && !stale && (!host.agent || report?.incus?.available === true) && report?.instances?.available !== false && isHostHealthy(host.id) }
+  return { status, pendingInstances: Array.isArray(state?.resumeInstances) ? state.resumeInstances.filter(item => item.project === 'default').map(item => item.name) : [], available: !state?.recoveryPending && (status === 'online' || status === 'maintenance') && (!host.tunnelEnabled || hostTunnelManager.isTunnelOnline(host.id)) && !stale && (!host.agent || report?.incus?.available === true) && report?.instances?.available !== false && isHostHealthy(host.id) }
 }
 
 export async function loadHostServiceStatuses(ids?: number[]): Promise<Map<number, HostServiceStatus>> {

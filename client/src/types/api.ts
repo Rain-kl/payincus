@@ -1346,9 +1346,9 @@ export interface ChangeHostOptionsResponse {
 
 export interface Package {
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   egress_mode?: string
-  egress_profile_version_id?: number | null
+  egress_profile_id?: number | null
   gpu_shared?: boolean
   gpu_device_ids?: number[]
   id: number
@@ -1436,9 +1436,9 @@ export interface Package {
 
 export interface CreatePackageRequest {
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   egress_mode?: string
-  egress_profile_version_id?: number | null
+  egress_profile_id?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   name: string
@@ -1490,9 +1490,9 @@ export interface CreatePackageRequest {
 
 export interface UpdatePackageRequest {
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   egress_mode?: string
-  egress_profile_version_id?: number | null
+  egress_profile_id?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   name?: string

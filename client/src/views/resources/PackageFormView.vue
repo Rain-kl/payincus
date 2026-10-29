@@ -115,7 +115,7 @@ const storagePoolsLoadingByHost = ref<Record<number, boolean>>({})
 // Form data
 interface PackageForm {
   egressMode: string
-  egressProfileVersionId: number | null
+  egressProfileId: number | null
   gpuShared: boolean
   gpuDeviceIds: number[]
   name: string
@@ -251,8 +251,8 @@ watch(() => form.value.globalShared, (globalShared) => {
 
 function getDefaultForm(): PackageForm {
   return {
-    egressMode: 'legacy',
-    egressProfileVersionId: null,
+    egressMode: 'host',
+    egressProfileId: null,
     gpuShared: false,
     gpuDeviceIds: [],
     name: '',
@@ -614,8 +614,8 @@ async function loadPackage(id: number): Promise<void> {
     const egressParsed = parseNetworkValue(pkg.limits_egress)
     
     form.value = {
-      egressMode: pkg.egress_mode ?? 'legacy',
-      egressProfileVersionId: pkg.egress_profile_version_id ?? null,
+      egressMode: pkg.egress_mode ?? 'host',
+      egressProfileId: pkg.egress_profile_id ?? null,
       gpuShared: pkg.gpu_shared ?? false,
       gpuDeviceIds: pkg.gpu_device_ids ?? [],
       name: pkg.name || '',
@@ -795,7 +795,7 @@ async function savePackage(): Promise<void> {
     
     const data: CreatePackageRequest | UpdatePackageRequest = {
       egressMode: form.value.egressMode,
-      egressProfileVersionId: form.value.egressMode === 'profile' ? form.value.egressProfileVersionId : null,
+      egressProfileId: form.value.egressMode === 'profile' ? form.value.egressProfileId : null,
       gpuShared: form.value.gpuShared,
       gpuDeviceIds: form.value.gpuDeviceIds,
       name: form.value.name,
@@ -991,7 +991,7 @@ const goBack = closeDrawer
               </div>
             </div>
           </div>
-          <PackageEgressFields class="md:col-span-2" v-model:mode="form.egressMode" v-model:version-id="form.egressProfileVersionId" :host-ids="form.hostIds" :network-mode="form.networkMode" :instance-type="form.instanceType" :privileged="form.privileged" />
+          <PackageEgressFields class="md:col-span-2" v-model:mode="form.egressMode" v-model:profile-id="form.egressProfileId" :host-ids="form.hostIds" :network-mode="form.networkMode" :instance-type="form.instanceType" :privileged="form.privileged" />
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-themed-secondary mb-1.5">{{ t('packageForm.fields.networkMode') }} *</label>
             <select v-model="form.networkMode" class="input">

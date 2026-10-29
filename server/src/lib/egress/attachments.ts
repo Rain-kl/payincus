@@ -16,14 +16,14 @@ export async function preparePackageEgress(client: IncusClient, value: unknown, 
   const instance = instanceId
     ? await prisma.instance.findUnique({ where: { id: instanceId } })
     : await prisma.instance.findFirst({ where: { hostId: client.options.hostId, incusId: original.name } })
-  if (!instance || instance.egressMode === 'legacy') return value
+  if (!instance || instance.egressMode === 'host') return value
   const hostId = client.options.hostId
   if (original.type === 'virtual-machine' || original.config?.['security.privileged'] === 'true') throw new Error('Package egress requires an unprivileged container')
   if (instance.networkMode !== 'nat') throw new Error('Package egress currently requires IPv4 NAT')
   if (!hostTunnelManager.supportsControl(hostId, 'network.apply.v2')) throw new Error('Upgrade the online host Agent to support package egress')
-  if (instance.egressProfileVersionId) {
-    const version = await prisma.egressProfileVersion.findUnique({ where: { id: instance.egressProfileVersionId } })
-    if (!version?.allowedHostIds.includes(hostId)) throw new Error('Instance egress is not permitted on this host')
+  if (instance.egressProfileId) {
+    const profile = await prisma.egressProfile.findUnique({ where: { id: instance.egressProfileId } })
+    if (!profile?.active || !profile.allowedHostIds.includes(hostId)) throw new Error('Instance egress is not permitted on this host')
   }
   const config = structuredClone(original)
   if (!config.name) throw new Error('Missing instance name for egress binding')
@@ -47,10 +47,11 @@ export async function preparePackageEgress(client: IncusClient, value: unknown, 
   }
   if (!nics.length || nics.length > 4) throw new Error('Invalid package egress NIC inventory')
   const attachment = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74201)`
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74202, ${hostId})`
-    const groups = await tx.instanceEgressAttachment.findMany({ where: { hostId, profileVersionId: { not: null }, instance: { status: { not: 'deleted' } } }, select: { profileVersionId: true }, distinct: ['profileVersionId'] })
-    if (instance.egressProfileVersionId && !groups.some(group => group.profileVersionId === instance.egressProfileVersionId) && groups.length >= MAX_EGRESS_GROUPS) throw new Error('Host package egress group capacity exceeded')
-    const binding = await tx.instanceEgressAttachment.upsert({ where: { hostId_incusName: { hostId, incusName: config.name! } }, create: { hostId, instanceId: instance.id, incusName: config.name!, mode: instance.egressMode, profileVersionId: instance.egressProfileVersionId, nics: nics as unknown as Prisma.InputJsonValue }, update: { instanceId: instance.id, mode: instance.egressMode, profileVersionId: instance.egressProfileVersionId, nics: nics as unknown as Prisma.InputJsonValue, generation: { increment: 1 } } })
+    const groups = await tx.instanceEgressAttachment.findMany({ where: { hostId, profileId: { not: null }, instance: { status: { not: 'deleted' } } }, select: { profileId: true }, distinct: ['profileId'] })
+    if (instance.egressProfileId && !groups.some(group => group.profileId === instance.egressProfileId) && groups.length >= MAX_EGRESS_GROUPS) throw new Error('Host package egress group capacity exceeded')
+    const binding = await tx.instanceEgressAttachment.upsert({ where: { hostId_incusName: { hostId, incusName: config.name! } }, create: { hostId, instanceId: instance.id, incusName: config.name!, mode: instance.egressMode, profileId: instance.egressProfileId, nics: nics as unknown as Prisma.InputJsonValue }, update: { instanceId: instance.id, mode: instance.egressMode, profileId: instance.egressProfileId, nics: nics as unknown as Prisma.InputJsonValue, generation: { increment: 1 } } })
     await bumpEgressHost(tx, hostId)
     return binding
   })
@@ -58,8 +59,8 @@ export async function preparePackageEgress(client: IncusClient, value: unknown, 
   const applied = await pushNetworkPolicy(hostId)
   const bindings = applied?.status.bindings as Array<{ instanceName: string; generation: number }> | undefined
   const groups = applied?.status.groups as Array<{ key: string; state: string; error: string }> | undefined
-  const group = groups?.find(group => group.key === `v${attachment.profileVersionId}`)
-  if (!bindings?.some(binding => binding.instanceName === config.name && binding.generation === attachment.generation) || (attachment.profileVersionId && !groups?.some(group => group.key === `v${attachment.profileVersionId}` && group.state === 'ready'))) {
+  const group = groups?.find(group => group.key === `p${attachment.profileId}`)
+  if (!bindings?.some(binding => binding.instanceName === config.name && binding.generation === attachment.generation) || (attachment.profileId && !groups?.some(group => group.key === `p${attachment.profileId}` && group.state === 'ready'))) {
     throw new Error(`The instance egress binding is not ready${group ? ` (${group.key}: ${group.state}/${group.error})` : ''}; outbound access remains blocked`)
   }
   return config
@@ -68,7 +69,7 @@ export async function preparePackageEgress(client: IncusClient, value: unknown, 
 export async function ensurePackageEgressBeforeStart(client: IncusClient, name: string): Promise<void> {
   if (!client.options?.hostId) return
   const exact = await prisma.instance.findFirst({ where: { hostId: client.options.hostId, incusId: name }, select: { id: true, egressMode: true } })
-  if (exact?.egressMode === 'legacy') return
+  if (exact?.egressMode === 'host') return
   const current = await client.request<Config>('GET', `/1.0/instances/${encodeURIComponent(name)}`)
   const id = exact?.id ?? Number(current.config?.['user.incudal.egress-instance'])
   if (!Number.isSafeInteger(id) || id <= 0) return
@@ -83,7 +84,8 @@ export async function releasePackageEgress(client: IncusClient, name: string): P
   try {
     const hostId = client.options.hostId
     const changed = await prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74202, ${hostId})`
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74201)`
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(74202, ${hostId})`
       const result = await tx.instanceEgressAttachment.deleteMany({ where: { hostId, incusName: name } })
       if (result.count) await bumpEgressHost(tx, hostId)
       return result.count

@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto'
 import { prisma } from '../src/db/prisma.js'
 import { recordReport } from '../src/lib/node-security/report.js'
 import { fingerprint, seal, unseal } from '../src/lib/node-security/vault.js'
+import { openStartup, sealStartup } from '../src/lib/node-security/startup.js'
 
 if (!process.env.DATABASE_URL?.includes('/node_security_validation')) throw new Error('Requires dedicated node_security_validation database')
 const suffix = randomBytes(8).toString('hex')
@@ -71,7 +72,43 @@ try {
   const agent = await prisma.hostAgent.findUniqueOrThrow({ where: { agentId } })
   assert.deepEqual(agent.lastReport, { preserved: true })
   assert.equal(agent.status, 'online')
-  console.log('PostgreSQL + real HMAC route: envelope, ACK, deduplication, replay/body tampering, locked heartbeat and remote alarm passed')
+  const startupPath = '/api/agent/startup-keys'
+  await prisma.nodeSecurityState.update({ where: { hostId: host.id }, data: { recoveryBlocked: false, report: { enabled: true, locked: false, revision: 4 } } })
+  const innerNonce = `nonce-${randomBytes(12).toString('hex')}`
+  const inner = sealStartup(agentSecret, agentId, 'request', { token: agentSecret, timestamp: Date.now(), nonce: innerNonce })
+  const startup = await app.inject({ method: 'POST', url: startupPath, headers: headers(inner, startupPath), payload: inner })
+  assert.equal(startup.statusCode, 200)
+  assert.equal(startup.headers['cache-control'], 'no-store')
+  assert.deepEqual(openStartup(agentSecret, agentId, 'response', startup.json()), { nonce: innerNonce, locked: false, generation: 0, keys: [{ dataset: identity.dataset, key }] })
+  const replay = await app.inject({ method: 'POST', url: startupPath, headers: headers(inner, startupPath), payload: inner })
+  assert.equal(replay.statusCode, 409)
+  assert.equal((await prisma.nodeSecurityState.findUniqueOrThrow({ where: { hostId: host.id } })).recoveryBlocked, false)
+
+  const badInner = { ...inner, ciphertext: 'invalid-ciphertext' }
+  const badOuter = headers(badInner, startupPath)
+  badOuter['x-incudal-signature'] = '0'.repeat(64)
+  assert.equal((await app.inject({ method: 'POST', url: startupPath, headers: badOuter, payload: badInner })).statusCode, 401)
+  assert.equal((await prisma.nodeSecurityState.findUniqueOrThrow({ where: { hostId: host.id } })).recoveryBlocked, false, 'outer identity failure must never lock a node')
+
+  const authenticatedBadProof = await app.inject({ method: 'POST', url: startupPath, headers: headers(badInner, startupPath), payload: badInner })
+  assert.equal(authenticatedBadProof.statusCode, 409)
+  const blocked = await prisma.nodeSecurityState.findUniqueOrThrow({ where: { hostId: host.id } })
+  assert.equal(blocked.recoveryBlocked, true)
+  assert.equal(blocked.recoveryGeneration, 1)
+  assert.equal((blocked.report as any).locked, true)
+  const blockedReport = { state: blocked.report, events: [] }
+  const generationReport = await app.inject({ method: 'POST', url: path, headers: headers(blockedReport, path), payload: blockedReport })
+  assert.equal(generationReport.statusCode, 200)
+  assert.deepEqual(generationReport.json().ack, [])
+  assert.equal(generationReport.json().recoveryBlocked, true)
+  assert.equal(generationReport.json().recoveryGeneration, 1, 'security report did not relay the committed lock generation')
+  const lockedProof = sealStartup(agentSecret, agentId, 'request', { token: agentSecret, timestamp: Date.now(), nonce: `nonce-${randomBytes(12).toString('hex')}` })
+  const lockedGrant = await app.inject({ method: 'POST', url: startupPath, headers: headers(lockedProof, startupPath), payload: lockedProof })
+  assert.equal(lockedGrant.statusCode, 200)
+  const lockedGrantPayload = openStartup(agentSecret, agentId, 'response', lockedGrant.json())
+  assert.deepEqual(lockedGrantPayload.keys, [])
+  assert.equal(lockedGrantPayload.generation, 1)
+  console.log('PostgreSQL + real HMAC route: report ACK, sealed startup grant, nonce replay, outer-auth isolation, sticky inner-proof lock and locked key denial passed')
 
 } finally {
   await app.close()

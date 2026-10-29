@@ -73,10 +73,14 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
           const hostId = req.params.hostId
           const actorId = req.user.id
           const approvedRevision = req.body.revision!
+          const approval = await prisma.nodeSecurityState.findUnique({ where: { hostId }, select: { recoveryGeneration: true } })
+          if (!approval) return reply.code(409).send({ error: '节点状态不可用，请刷新后重试' })
           const task = await enqueueNodeRecovery(hostId, async () => {
             taskLog('info', `管理员 #${actorId} 已批准恢复，正在核验节点状态及存储`)
             await createLog(actorId, LogModule.SECURITY, 'node.recover', `节点 #${hostId} 管理员批准后台恢复`, LogResult.SUCCESS)
-            const state = await node.request<RecoveryState>('POST', '/1.0/payincus/security/recover', { revision: approvedRevision })
+            const state = await node.request<RecoveryState>('POST', '/1.0/payincus/security/recover', { revision: approvedRevision, controlGeneration: approval.recoveryGeneration })
+            const cleared = await prisma.nodeSecurityState.updateMany({ where: { hostId, recoveryGeneration: approval.recoveryGeneration }, data: { recoveryBlocked: false } })
+            if (cleared.count !== 1) throw new Error('恢复期间节点状态发生变化，请重新核验并批准')
             recordHostSuccess(hostId, 0)
             await recordReport(hostId, { state, events: [] })
             try {

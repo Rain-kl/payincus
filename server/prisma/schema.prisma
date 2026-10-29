@@ -796,7 +796,6 @@ model Host {
 }
 
 model ProxyNode {
-  egressVersions EgressProfileVersion[]
   id              Int      @id @default(autoincrement())
   name            String
   protocol        String
@@ -813,7 +812,9 @@ model ProxyNode {
 model HostNetworkPolicy {
   hostId          Int      @id @map("host_id")
   revision        Int      @default(1)
-  egress          Json
+  egressMode String @default("off") @map("egress_mode")
+  egressProfileId Int? @map("egress_profile_id")
+  egressProfile EgressProfile? @relation(fields: [egressProfileId], references: [id], onDelete: Restrict)
   firewall        Json
   appliedRevision Int      @default(0) @map("applied_revision")
   status          Json     @default("{}")
@@ -1021,9 +1022,9 @@ model PackageHost {
 }
 
 model Package {
-  egressMode String @default("legacy") @map("egress_mode")
-  egressProfileVersionId Int? @map("egress_profile_version_id")
-  egressProfileVersion EgressProfileVersion? @relation("PackageEgress", fields: [egressProfileVersionId], references: [id], onDelete: Restrict)
+  egressMode String @default("host") @map("egress_mode")
+  egressProfileId Int? @map("egress_profile_id")
+  egressProfile EgressProfile? @relation("PackageEgress", fields: [egressProfileId], references: [id], onDelete: Restrict)
   id                  Int          @id @default(autoincrement())
   userId              Int          @map("user_id") // 所有者
   name                String
@@ -1105,9 +1106,9 @@ model Package {
 // ==================== 实例相关模型 ====================
 
 model Instance {
-  egressMode String @default("legacy") @map("egress_mode")
-  egressProfileVersionId Int? @map("egress_profile_version_id")
-  egressProfileVersion EgressProfileVersion? @relation("InstanceEgress", fields: [egressProfileVersionId], references: [id], onDelete: Restrict)
+  egressMode String @default("host") @map("egress_mode")
+  egressProfileId Int? @map("egress_profile_id")
+  egressProfile EgressProfile? @relation("InstanceEgress", fields: [egressProfileId], references: [id], onDelete: Restrict)
   egressAttachments InstanceEgressAttachment[]
   id               Int            @id @default(autoincrement())
   incusId          String         @map("incus_id")
@@ -3805,24 +3806,15 @@ model EgressProfile {
   id Int @id @default(autoincrement())
   name String
   active Boolean @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  versions EgressProfileVersion[]
-  @@map("egress_profiles")
-}
-model EgressProfileVersion {
-  id Int @id @default(autoincrement())
-  profileId Int @map("profile_id")
-  version Int
-  proxyNodeId Int @map("proxy_node_id")
-  proxyNode ProxyNode @relation(fields: [proxyNodeId], references: [id], onDelete: Restrict)
+  egress Json
   allowedHostIds Int[] @map("allowed_host_ids")
   createdAt DateTime @default(now()) @map("created_at")
-  profile EgressProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  updatedAt DateTime @updatedAt @map("updated_at")
   packages Package[] @relation("PackageEgress")
   instances Instance[] @relation("InstanceEgress")
-  @@unique([profileId, version])
-  @@index([proxyNodeId])
-  @@map("egress_profile_versions")
+  hosts HostNetworkPolicy[]
+  attachments InstanceEgressAttachment[]
+  @@map("egress_profiles")
 }
 // Runtime intents also cover stopped replacement instances and migration targets.
 model InstanceEgressAttachment {
@@ -3831,7 +3823,8 @@ model InstanceEgressAttachment {
   hostId Int @map("host_id")
   incusName String @map("incus_name")
   mode String
-  profileVersionId Int? @map("profile_version_id")
+  profileId Int? @map("profile_id")
+  profile EgressProfile? @relation(fields: [profileId], references: [id], onDelete: Restrict)
   generation Int @default(1)
   nics Json
   instance Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
@@ -3843,6 +3836,8 @@ model InstanceEgressAttachment {
 
 // Node storage secrets are encrypted by a dedicated strict envelope in the control service.
 model NodeSecurityState {
+ recoveryBlocked Boolean @default(false) @map("recovery_blocked")
+ recoveryGeneration Int @default(0) @map("recovery_generation")
  serverFingerprint String? @map("server_fingerprint")
  hostId Int @id @map("host_id")
  host Host @relation(fields:[hostId], references:[id], onDelete:Cascade)

@@ -60,7 +60,7 @@ type NormalizedPackagePlanInput = {
 
 type NormalizedPackageInput = {
   egressMode?: string
-  egressProfileVersionId?: number | null
+  egressProfileId?: number | null
   gpuShared?: boolean
   gpuDeviceIds?: number[]
   name?: string
@@ -699,11 +699,11 @@ function normalizePublicPackageMaxInstances(value: unknown): number {
   return validatePublicPackageMaxInstances(value) ? value : PUBLIC_PACKAGE_MAX_INSTANCES_MIN
 }
 
-function getPackagePrerequisiteFields(pkg: { egressMode?: string; egressProfileVersionId?: number | null; egress_mode?: string; egress_profile_version_id?: number | null; gpuShared?: boolean; gpuDeviceIds?: number[]; gpu_shared?: boolean; gpu_device_ids?: number[]; requiredPackageId?: number | null; requiredPackageName?: string | null; required_package_id?: number | null; required_package_name?: string | null }) {
+function getPackagePrerequisiteFields(pkg: { egressMode?: string; egressProfileId?: number | null; egress_mode?: string; egress_profile_id?: number | null; gpuShared?: boolean; gpuDeviceIds?: number[]; gpu_shared?: boolean; gpu_device_ids?: number[]; requiredPackageId?: number | null; requiredPackageName?: string | null; required_package_id?: number | null; required_package_name?: string | null }) {
   return {
     gpu_shared: pkg.gpuShared ?? pkg.gpu_shared ?? false,
-    egress_mode: pkg.egressMode ?? pkg.egress_mode ?? 'legacy',
-    egress_profile_version_id: pkg.egressProfileVersionId ?? pkg.egress_profile_version_id ?? null,
+    egress_mode: pkg.egressMode ?? pkg.egress_mode ?? 'host',
+    egress_profile_id: pkg.egressProfileId ?? pkg.egress_profile_id ?? null,
     gpu_device_ids: pkg.gpuDeviceIds ?? pkg.gpu_device_ids ?? [],
     required_package_id: pkg.requiredPackageId ?? pkg.required_package_id ?? null,
     required_package_name: pkg.requiredPackageName ?? pkg.required_package_name ?? null
@@ -1656,8 +1656,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
             type: 'object',
             additionalProperties: { type: ['number', 'string', 'null'] }
           },
-          egressMode: { type: 'string', enum: ['legacy', 'direct', 'profile'] },
-          egressProfileVersionId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          egressMode: { type: 'string', enum: ['host', 'direct', 'profile'] },
+          egressProfileId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
           gpuShared: { type: 'boolean' },
           gpuDeviceIds: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } },
           privileged: { type: 'boolean' },
@@ -1761,7 +1761,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     try {
       id = await db.createPackage({
         egressMode: packageInput.egressMode,
-        egressProfileVersionId: packageInput.egressProfileVersionId,
+        egressProfileId: packageInput.egressProfileId,
         gpuShared: packageInput.gpuShared,
         gpuDeviceIds: packageInput.gpuDeviceIds,
         userId: request.user.id,  // 所有者为当前用户
@@ -1858,8 +1858,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
             type: 'object',
             additionalProperties: { type: ['number', 'string', 'null'] }
           },
-          egressMode: { type: 'string', enum: ['legacy', 'direct', 'profile'] },
-          egressProfileVersionId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          egressMode: { type: 'string', enum: ['host', 'direct', 'profile'] },
+          egressProfileId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
           gpuShared: { type: 'boolean' },
           gpuDeviceIds: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } },
           privileged: { type: 'boolean' },
@@ -1946,7 +1946,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     } = packageInput
     const updateData: Parameters<typeof db.updatePackage>[1] = {}
     if (packageInput.egressMode !== undefined) updateData.egressMode = packageInput.egressMode
-    if (packageInput.egressProfileVersionId !== undefined) updateData.egressProfileVersionId = packageInput.egressProfileVersionId
+    if (packageInput.egressProfileId !== undefined) updateData.egressProfileId = packageInput.egressProfileId
     if (packageInput.name !== undefined) updateData.name = packageInput.name
     if (packageInput.description !== undefined) updateData.description = packageInput.description
     if (packageInput.cpuMax !== undefined) updateData.cpuMax = packageInput.cpuMax

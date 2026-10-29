@@ -1,6 +1,6 @@
 import type { StorageEncryptionState } from './storage-encryption-types'
 import type { GpuConfiguration } from '@/types/api'
-import type { ProxyNode, EgressPolicy, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
+import type { ProxyNode, EgressSelection, EgressProfile, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
 import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
 import { useAuthStore } from '@/stores/auth'
@@ -588,8 +588,8 @@ http.interceptors.response.use(
 // API 模块
 const api = {
   egress: {
-    instance: (id: number): Promise<{ mode: string; profileName: string | null; version: number | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
-    profiles: (): Promise<{ profiles: Array<{ id: number; profileId: number; version: number; name: string; active: boolean; proxyNodeId?: number; hostIds: number[] }> }> => http.get('/egress/profiles')
+    instance: (id: number): Promise<{ mode: string; profileName: string | null; state: string; reportedAt: string | null }> => http.get(`/instances/${id}/egress`),
+    profiles: (): Promise<{ profiles: EgressProfile[] }> => http.get('/egress/profiles')
   },
   network: {
     probeHosts: (): Promise<{ hosts: Array<{ id: number; name: string }> }> => Promise.reject(new Error('Unavailable in this application')),
@@ -597,7 +597,7 @@ const api = {
     importNodes: (_data: { content?: string; subscriptionUrl?: string; confirm: boolean }): Promise<ProxyImportResult> => Promise.reject(new Error('Unavailable in this application')),
     deleteNode: (_id: number): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
     policy: (_hostId: number): Promise<{ policy: NetworkPolicy; agent: { enabled: boolean; capabilities: string[]; lastSeenAt: string | null } | null; networkControlReady?: boolean }> => Promise.reject(new Error('Unavailable in this application')),
-    updateEgress: (_hostId: number, _revision: number, _value: EgressPolicy): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
+    updateEgress: (_hostId: number, _revision: number, _value: EgressSelection): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
     updateFirewall: (_hostId: number, _revision: number, _value: FirewallPolicy): Promise<{ success: boolean }> => Promise.reject(new Error('Unavailable in this application')),
     probe: (_hostId: number, _nodeIds: number[], _probeUrl: string, _signal?: AbortSignal): Promise<ProxyProbeResponse> => Promise.reject(new Error('Unavailable in this application'))
   },

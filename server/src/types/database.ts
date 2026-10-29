@@ -138,7 +138,7 @@ export type NetworkMode =
 
 export interface Package {
   egress_mode?: string
-  egress_profile_version_id?: number | null
+  egress_profile_id?: number | null
   gpu_shared?: boolean
   gpu_device_ids?: number[]
   id: number

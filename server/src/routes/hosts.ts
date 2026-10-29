@@ -5,7 +5,7 @@ import { deleteManagedZfsPool } from '../lib/storage/delete.js'
 import { provisionEncryptedPool } from '../lib/storage/provision.js'
 import { StorageEncryptionError } from '../lib/storage/encryption.js'
 import { loadHostServiceStatuses } from '../lib/host-service-status.js'
-import { snapshotPackageEgress } from '../lib/egress/package.js'
+import { bindPackageEgress } from '../lib/egress/package.js'
 import { getStorageOverview } from '../lib/storage-capacity.js'
 import { GpuError } from '../lib/gpu.js'
 import { compensateGpuPreparationFailure, releaseFailedGpu, reserveInstanceGpu, assertGpuMigration } from '../db/gpus.js'
@@ -5395,9 +5395,11 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
         // 18. 在数据库中创建新实例记录，并暂时标记源实例 deleted
         const { createdInstance: newInstance, migratedBillingRecordCount } = await prisma.$transaction(async tx => {
+          // Serialize shared policy references before host resource locks.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
           const createdInstance = await tx.instance.create({
             data: {
-              ...(await snapshotPackageEgress(tx, finalPackageId, targetHostId, instance.id)),
+              ...(await bindPackageEgress(tx, finalPackageId, targetHostId, instance.id)),
               incusId: newIncusId,
               name: instance.name,
               userId: instance.userId,
@@ -5900,6 +5902,8 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         : null
 
       const txResult = await prisma.$transaction(async (tx) => {
+        // Serialize shared policy references before host resource locks.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(74201)`
         const reservedHost = await db.selectAndReserveHostWithLock(tx, {
           packagePlanId: selectedPlan?.id,
           packageHostIds: packageHostIds.length > 0 ? packageHostIds : undefined,
@@ -5970,7 +5974,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
 
         const instance = await tx.instance.create({
           data: {
-            ...(await snapshotPackageEgress(tx, packageId, reservedHost.id)),
+            ...(await bindPackageEgress(tx, packageId, reservedHost.id)),
             ...(await reserveInstanceGpu(tx, { hostId: reservedHost.id, packageId, planId: selectedPlan?.id })),
             incusId,
             name,

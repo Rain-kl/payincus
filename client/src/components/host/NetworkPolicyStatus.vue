@@ -15,7 +15,6 @@ const state = computed(() => {
 <template>
   <div class="space-y-1 text-sm" role="status">
     <span class="badge" :class="state === 'applied' ? 'badge-success' : state === 'error' ? 'badge-error' : 'badge-warning'">{{ t(`egress.states.${state}`) }}</span>
-    <span v-if="policy" class="ml-2 text-themed-muted">{{ t('egress.revision') }} {{ policy.appliedRevision }} / {{ policy.revision }}</span>
     <p v-if="state === 'error'" class="text-error">{{ t('egress.applyFailed') }}: {{ policy?.status.error }}</p>
     <p v-if="state === 'error' && policy?.status.errorStage" class="text-error">{{ t('egress.errorStage') }}: {{ t(`egress.errorStages.${policy.status.errorStage}`) }}</p>
     <p v-if="state === 'error' && policy?.status.errorDetail" class="text-error">{{ t(`egress.failureReasons.${policy.status.errorDetail}`) }}</p>
