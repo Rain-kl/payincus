@@ -242,7 +242,7 @@ const agentStatusDescription = computed(() => t('admin.hosts.agentStatusDesc', {
 }))
 
 const agentVersionInfo = computed(() => ({
-  label: agentStatus.value?.versionStatus === 'managed' ? 'Incus 软件包管理' : '需要安装 Incus 节点包',
+  label: agentStatus.value?.versionStatus === 'managed' ? '' : '需要安装 Incus 节点包',
   title: '连接器随 Incus 软件包安装与更新，请使用 incus-tui 或 apt',
   class: 'text-themed-muted border border-themed'
 }))
