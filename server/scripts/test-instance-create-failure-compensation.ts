@@ -210,11 +210,10 @@ assert.ok(
 )
 
 assert.ok(
-  compensationSection.includes('await tx.hostingBalanceLog.deleteMany({') &&
-    compensationSection.includes("type: 'income'") &&
-    compensationSection.includes("actionType: 'purchase'") &&
-    compensationSection.includes('frozen: true'),
-  'failed paid provisioning must remove unearned hosted-node frozen purchase income'
+  compensationSection.includes('await tx.affCode.updateMany({') &&
+    compensationSection.includes('usedCount: { decrement: 1 }') &&
+    compensationSection.includes('totalEarnings: { decrement: commissionAmount }'),
+  'failed paid provisioning must roll back AFF usage counters and earnings'
 )
 
 console.log('instance create failure compensation checks passed')

@@ -179,12 +179,6 @@ assert.ok(
   'instances.ts must invoke PromoCodeEngine.settleOnCreate within the creation transaction'
 )
 
-assert.ok(
-  instancesSource.includes("if ((validatedAffCode || promoValidation) && preCheckHost.name.toLowerCase().startsWith('peer')) {") &&
-    instancesSource.includes("apiError(ErrorCode.INVALID_PARAMS, '用户托管节点不支持使用优惠码')"),
-  'instances.ts must strictly forbid applying promo codes on peer hosts'
-)
-
 // 1.7 In-Site Notifications in server/src/services/promo/notifications.ts
 const notificationsSource = read('server/src/services/promo/notifications.ts')
 

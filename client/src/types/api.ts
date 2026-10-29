@@ -24,8 +24,6 @@ export interface LoginResponse {
     role: 'admin' | 'user'
     avatarStyle?: string
     avatarBadgeId?: string | null
-    hasCreatedHostBefore?: boolean
-    canAccessHostingFeature?: boolean
   }
 }
 
@@ -47,8 +45,6 @@ export interface RegisterResponse {
     role: 'admin' | 'user'
     avatarStyle?: string
     avatarBadgeId?: string | null
-    hasCreatedHostBefore?: boolean
-    canAccessHostingFeature?: boolean
   }
 }
 
@@ -375,8 +371,6 @@ export type PublicApiBalanceLogType =
   | 'gift'
   | 'transfer_fee'
   | 'transfer_refund'
-  | 'hosting_withdraw'
-  | 'hosting_deduction'
   | 'invite_generate'
 
 export interface PublicApiBalanceLog {
@@ -534,8 +528,6 @@ export interface User {
   status: 'active' | 'banned'
   avatarStyle?: string
   avatarBadgeId?: string | null
-  hasCreatedHostBefore?: boolean
-  canAccessHostingFeature?: boolean
   twoFAEnabled?: boolean
   instanceCount?: number
   hasGithubBinding?: boolean
@@ -823,7 +815,6 @@ export interface Instance {
   billingCycle?: number | null
   affDiscountRate?: number | null
   hasAffBinding?: boolean
-  isHostedInstance?: boolean
   instanceType?: 'container' | 'vm'  // 实例类型：容器或虚拟机
   iconBadgeId?: string | null
   allow_instance_deletion?: boolean  // 是否允许删除实例（来自套餐设置）
@@ -847,19 +838,6 @@ export interface Instance {
   suspend_reason?: string | null    // 封停原因
   // 自动续费
   autoRenew?: boolean
-  // 托管节点所有者信息（仅用户托管节点）
-  hostOwnerInfo?: {
-    id: number
-    username: string
-    email: string
-    avatarStyle: string
-    avatarBadgeId: string | null
-    hostCount: number
-    instanceCount: number
-    registeredDays: number
-    vipLevel: number
-    vipBadgeStyle?: VipBadgeStyle | null
-  } | null
   created_at: string
   createdAt?: string  // camelCase 别名
   updated_at: string
@@ -1122,14 +1100,6 @@ export interface HostWithDetails extends Host {
     portRangeStart: number | null
     portRangeEnd: number | null
     portsUsedCount?: number
-  }
-  // 托管节点所有者信息（管理员查看托管节点时返回）
-  owner?: {
-    id: number
-    username: string
-    email: string | null
-    avatarStyle: string
-    avatarBadgeId?: string | null
   }
 }
 
@@ -1399,10 +1369,7 @@ export interface Package {
   isGlobalShared?: boolean  // true = 全局共享的套餐
   ownerId?: number  // 套餐所有者ID
   ownerUsername?: string  // 套餐所有者用户名
-  sourceType?: 'official' | 'market' | 'zone' | 'friends' | 'own'  // 套餐来源类型
-  hostingZoneId?: number
-  hostingZoneName?: string
-  hostingZoneLogoUrl?: string
+  sourceType?: 'official' | 'friends' | 'own'  // 套餐来源类型
   soldOut?: boolean  // 是否售罄（所有宿主机都无法满足最低配置）
   // 全局共享配置（仅当 isGlobalShared = true 或套餐所有者查看时）
   global_shared?: boolean
@@ -1423,14 +1390,6 @@ export interface Package {
     maxMemory: number | null
     remainingMemory: number | null
     ownerUsername: string | null
-  }
-  // 托管套餐所有者信息（管理员查看托管套餐时返回）
-  owner?: {
-    id: number
-    username: string
-    email: string | null
-    avatarStyle: string
-    avatarBadgeId?: string | null
   }
 }
 
@@ -2221,10 +2180,7 @@ export interface InstanceBillingInfo {
   autoRenew: boolean
   renewPreview: RenewPreview[] | null
   affDiscount: AffDiscount | null
-  // 托管实例相关信息
-  isHostedInstance: boolean
   daysUntilExpire: number | null
-  hostingRenewRestriction: { monthsOnly: number; daysBeforeExpire: number } | null
 }
 
 export interface RenewPreview {

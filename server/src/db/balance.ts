@@ -23,8 +23,6 @@ const BALANCE_LOG_TYPES = new Set<BalanceLogType>([
   'gift',
   'transfer_fee',
   'transfer_refund',
-  'hosting_withdraw',
-  'hosting_deduction',
   'invite_generate'
 ])
 const MAX_BALANCE_AMOUNT = 99999999.99

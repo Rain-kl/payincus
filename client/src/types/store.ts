@@ -9,8 +9,6 @@ export interface AuthUser {
   role: 'admin' | 'user'
   avatarStyle: string
   avatarBadgeId?: string | null
-  hasCreatedHostBefore?: boolean
-  canAccessHostingFeature?: boolean
 }
 
 export interface ThemeMode {

@@ -6,7 +6,6 @@ import { invalidateCachedConfig } from '../lib/config-cache.js'
 
 export const MAX_VIP_LEVEL = 10
 const MAX_MONEY_THRESHOLD = 99999999.99
-const MAX_INSTANCE_THRESHOLD = 1000000
 const MAX_BENEFIT_POINTS = 1000000000
 const MAX_BENEFIT_INSTANCE_DAYS = 3650
 const MAX_BENEFIT_INSTANCE_QUANTITY = 10
@@ -23,8 +22,6 @@ export interface VipRuleInput {
   userMetric?: UserVipMetric
   minRecharge?: number | null
   minConsume?: number | null
-  minHostingIncome?: number | null
-  minHostingInstances?: number | null
   benefits?: Record<string, unknown> | null
 }
 
@@ -67,8 +64,6 @@ export interface NormalizedVipRule {
   conditionMode: VipConditionMode
   minRecharge: number | null
   minConsume: number | null
-  minHostingIncome: number | null
-  minHostingInstances: number | null
   benefits: Record<string, unknown>
   badgeStyle: VipBadgeStyle
 }
@@ -78,12 +73,7 @@ export interface UserVipStats {
   totalConsume: number
 }
 
-export interface HostingVipStats {
-  totalHostingIncome: number
-  instanceCount: number
-}
-
-export type VipProgressMetric = 'totalRecharge' | 'totalConsume' | 'totalHostingIncome' | 'instanceCount'
+export type VipProgressMetric = 'totalRecharge' | 'totalConsume' | 'instanceCount'
 
 export interface VipProgressCondition {
   metric: VipProgressMetric
@@ -106,14 +96,10 @@ export interface VipLevelProgress {
 
 export interface VipOverview {
   userVipLevel: number
-  hostingVipLevel: number
   userVipBadgeStyle: VipBadgeStyle | null
-  hostingVipBadgeStyle: VipBadgeStyle | null
   userVipMetric: UserVipMetric
   userStats: UserVipStats
-  hostingStats: HostingVipStats
   userVipProgress: VipLevelProgress
-  hostingVipProgress: VipLevelProgress
 }
 
 type DbClient = Prisma.TransactionClient | typeof prisma
@@ -133,18 +119,6 @@ function nullableMoney(value: unknown): number | null {
     throw new Error(`Money threshold must be between 0 and ${MAX_MONEY_THRESHOLD}`)
   }
   return Math.round(parsed * 100) / 100
-}
-
-function nullableCount(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_INSTANCE_THRESHOLD) {
-    throw new Error(`Instance threshold must be between 0 and ${MAX_INSTANCE_THRESHOLD}`)
-  }
-  if (!Number.isInteger(parsed)) {
-    throw new Error('Instance threshold must be an integer')
-  }
-  return parsed
 }
 
 function hasThreshold(value: number | null): boolean {
@@ -387,8 +361,6 @@ export function normalizeVipRule(rule: VipLevelRule): NormalizedVipRule {
     conditionMode: rule.conditionMode,
     minRecharge: rule.minRecharge === null ? null : toNumber(rule.minRecharge),
     minConsume: rule.minConsume === null ? null : toNumber(rule.minConsume),
-    minHostingIncome: rule.minHostingIncome === null ? null : toNumber(rule.minHostingIncome),
-    minHostingInstances: rule.minHostingInstances,
     benefits,
     badgeStyle: normalizeVipBadgeStyle(rule.level, benefits.badgeStyle)
   }
@@ -409,8 +381,6 @@ export function sanitizeVipRuleInput(type: VipRuleType, input: VipRuleInput, use
     conditionMode: type === 'user' ? 'any' : conditionMode,
     minRecharge: type === 'user' && userMetric === 'totalRecharge' ? nullableMoney(input.minRecharge) : null,
     minConsume: type === 'user' && userMetric === 'totalConsume' ? nullableMoney(input.minConsume) : null,
-    minHostingIncome: type === 'hosting' ? nullableMoney(input.minHostingIncome) : null,
-    minHostingInstances: type === 'hosting' ? nullableCount(input.minHostingInstances) : null,
     benefits: sanitizeBenefits(level, input.benefits, true),
     badgeStyle: getDefaultVipBadgeStyle(level)
   }
@@ -423,27 +393,22 @@ export function sanitizeVipRuleInput(type: VipRuleType, input: VipRuleInput, use
   return normalized
 }
 
-export function hasActiveCondition(type: VipRuleType, rule: Pick<NormalizedVipRule, 'minRecharge' | 'minConsume' | 'minHostingIncome' | 'minHostingInstances'>): boolean {
+export function hasActiveCondition(type: VipRuleType, rule: Pick<NormalizedVipRule, 'minRecharge' | 'minConsume'>): boolean {
   if (type === 'user') {
     return hasThreshold(rule.minRecharge) || hasThreshold(rule.minConsume)
   }
-  return hasThreshold(rule.minHostingIncome) || hasThreshold(rule.minHostingInstances)
+  return false
 }
 
-function getRuleChecks(type: VipRuleType, rule: NormalizedVipRule, stats: UserVipStats | HostingVipStats): boolean[] {
+function getRuleChecks(type: VipRuleType, rule: NormalizedVipRule, stats: UserVipStats): boolean[] {
   if (type === 'user') {
-    const userStats = stats as UserVipStats
     return [
-      hasThreshold(rule.minRecharge) ? userStats.totalRecharge >= rule.minRecharge! : null,
-      hasThreshold(rule.minConsume) ? userStats.totalConsume >= rule.minConsume! : null
+      hasThreshold(rule.minRecharge) ? stats.totalRecharge >= rule.minRecharge! : null,
+      hasThreshold(rule.minConsume) ? stats.totalConsume >= rule.minConsume! : null
     ].filter((value): value is boolean => value !== null)
   }
 
-  const hostingStats = stats as HostingVipStats
-  return [
-    hasThreshold(rule.minHostingIncome) ? hostingStats.totalHostingIncome >= rule.minHostingIncome! : null,
-    hasThreshold(rule.minHostingInstances) ? hostingStats.instanceCount >= rule.minHostingInstances! : null
-  ].filter((value): value is boolean => value !== null)
+  return []
 }
 
 function getUserRuleChecks(rule: NormalizedVipRule, stats: UserVipStats, userMetric: UserVipMetric): boolean[] {
@@ -457,7 +422,7 @@ function hasUserMetricCondition(rule: NormalizedVipRule, userMetric: UserVipMetr
   return userMetric === 'totalRecharge' ? hasThreshold(rule.minRecharge) : hasThreshold(rule.minConsume)
 }
 
-export function isVipRuleMatched(type: VipRuleType, rule: NormalizedVipRule, stats: UserVipStats | HostingVipStats): boolean {
+export function isVipRuleMatched(type: VipRuleType, rule: NormalizedVipRule, stats: UserVipStats): boolean {
   if (!rule.enabled || !hasActiveCondition(type, rule)) return false
   const checks = getRuleChecks(type, rule, stats)
   if (checks.length === 0) return false
@@ -472,7 +437,7 @@ export function isUserVipRuleMatched(rule: NormalizedVipRule, stats: UserVipStat
   return checks.length > 0 && checks.some(Boolean)
 }
 
-export function calculateVipLevel(type: VipRuleType, rules: NormalizedVipRule[], stats: UserVipStats | HostingVipStats): number {
+export function calculateVipLevel(type: VipRuleType, rules: NormalizedVipRule[], stats: UserVipStats): number {
   const matchedRules = rules
     .filter(rule => rule.type === type && isVipRuleMatched(type, rule, stats))
     .sort((a, b) => b.level - a.level)
@@ -504,37 +469,28 @@ function buildVipProgressCondition(metric: VipProgressMetric, current: number, t
 function getVipProgressConditions(
   type: VipRuleType,
   rule: NormalizedVipRule,
-  stats: UserVipStats | HostingVipStats,
+  stats: UserVipStats,
   userMetric: UserVipMetric = 'totalRecharge'
 ): VipProgressCondition[] {
   if (type === 'user') {
-    const userStats = stats as UserVipStats
     return [
       userMetric === 'totalRecharge' && hasThreshold(rule.minRecharge)
-        ? buildVipProgressCondition('totalRecharge', userStats.totalRecharge, rule.minRecharge!)
+        ? buildVipProgressCondition('totalRecharge', stats.totalRecharge, rule.minRecharge!)
         : null,
       userMetric === 'totalConsume' && hasThreshold(rule.minConsume)
-        ? buildVipProgressCondition('totalConsume', userStats.totalConsume, rule.minConsume!)
+        ? buildVipProgressCondition('totalConsume', stats.totalConsume, rule.minConsume!)
         : null
     ].filter((condition): condition is VipProgressCondition => condition !== null)
   }
 
-  const hostingStats = stats as HostingVipStats
-  return [
-    hasThreshold(rule.minHostingIncome)
-      ? buildVipProgressCondition('totalHostingIncome', hostingStats.totalHostingIncome, rule.minHostingIncome!)
-      : null,
-    hasThreshold(rule.minHostingInstances)
-      ? buildVipProgressCondition('instanceCount', hostingStats.instanceCount, rule.minHostingInstances!)
-      : null
-  ].filter((condition): condition is VipProgressCondition => condition !== null)
+  return []
 }
 
 export function calculateVipProgress(
   type: VipRuleType,
   rules: NormalizedVipRule[],
   currentLevel: number,
-  stats: UserVipStats | HostingVipStats,
+  stats: UserVipStats,
   userMetric: UserVipMetric = 'totalRecharge'
 ): VipLevelProgress {
   const nextRule = rules
@@ -641,8 +597,6 @@ export async function replaceVipRules(type: VipRuleType, inputs: VipRuleInput[],
           conditionMode: rule.conditionMode,
           minRecharge: rule.minRecharge,
           minConsume: rule.minConsume,
-          minHostingIncome: rule.minHostingIncome,
-          minHostingInstances: rule.minHostingInstances,
           benefits: rule.benefits as Prisma.InputJsonObject
         },
         update: {
@@ -650,8 +604,6 @@ export async function replaceVipRules(type: VipRuleType, inputs: VipRuleInput[],
           conditionMode: rule.conditionMode,
           minRecharge: rule.minRecharge,
           minConsume: rule.minConsume,
-          minHostingIncome: rule.minHostingIncome,
-          minHostingInstances: rule.minHostingInstances,
           benefits: rule.benefits as Prisma.InputJsonObject
         }
       })
@@ -682,26 +634,6 @@ export async function getUserVipStats(userId: number, client: DbClient = prisma)
   }
 }
 
-export async function getHostingVipStats(userId: number, client: DbClient = prisma): Promise<HostingVipStats> {
-  const [incomeResult, instanceCount] = await Promise.all([
-    client.hostingBalanceLog.aggregate({
-      where: { userId, type: 'income' },
-      _sum: { amount: true }
-    }),
-    client.instance.count({
-      where: {
-        host: { userId },
-        status: { not: 'deleted' }
-      }
-    })
-  ])
-
-  return {
-    totalHostingIncome: toNumber(incomeResult._sum.amount),
-    instanceCount
-  }
-}
-
 export async function calculateUserVipLevel(userId: number): Promise<{ level: number; stats: UserVipStats }> {
   const [rules, stats, userMetric] = await Promise.all([
     getVipRules('user'),
@@ -714,66 +646,20 @@ export async function calculateUserVipLevel(userId: number): Promise<{ level: nu
   }
 }
 
-export async function calculateHostingVipLevel(userId: number): Promise<{ level: number; stats: HostingVipStats }> {
-  const [rules, stats] = await Promise.all([
-    getVipRules('hosting'),
-    getHostingVipStats(userId)
-  ])
-  return {
-    level: calculateVipLevel('hosting', rules, stats),
-    stats
-  }
-}
-
 export async function getVipOverview(userId: number): Promise<VipOverview> {
-  const [userRules, hostingRules, userStats, hostingStats, userVipMetric] = await Promise.all([
+  const [userRules, userStats, userVipMetric] = await Promise.all([
     getVipRules('user'),
-    getVipRules('hosting'),
     getUserVipStats(userId),
-    getHostingVipStats(userId),
     getUserVipMetric()
   ])
 
   const userVipLevel = calculateUserVipLevelByMetric(userRules, userStats, userVipMetric)
-  const hostingVipLevel = calculateVipLevel('hosting', hostingRules, hostingStats)
 
   return {
     userVipLevel,
-    hostingVipLevel,
     userVipBadgeStyle: getVipBadgeStyleForLevel(userRules, 'user', userVipLevel),
-    hostingVipBadgeStyle: getVipBadgeStyleForLevel(hostingRules, 'hosting', hostingVipLevel),
     userVipMetric,
     userStats,
-    hostingStats,
-    userVipProgress: calculateVipProgress('user', userRules, userVipLevel, userStats, userVipMetric),
-    hostingVipProgress: calculateVipProgress('hosting', hostingRules, hostingVipLevel, hostingStats)
+    userVipProgress: calculateVipProgress('user', userRules, userVipLevel, userStats, userVipMetric)
   }
-}
-
-export function buildHostingVipSql(rules: NormalizedVipRule[]): Prisma.Sql {
-  const orderedRules = rules
-    .filter(rule => rule.enabled && hasActiveCondition('hosting', rule))
-    .sort((a, b) => b.level - a.level)
-
-  if (orderedRules.length === 0) {
-    return Prisma.sql`"id" * 0`
-  }
-
-  const cases = orderedRules.map((rule) => {
-    const conditions: Prisma.Sql[] = []
-    if (hasThreshold(rule.minHostingIncome)) {
-      conditions.push(Prisma.sql`"totalHostingIncome" >= ${rule.minHostingIncome}`)
-    }
-    if (hasThreshold(rule.minHostingInstances)) {
-      conditions.push(Prisma.sql`"instanceCount" >= ${rule.minHostingInstances}`)
-    }
-
-    const conditionSql = rule.conditionMode === 'all'
-      ? Prisma.join(conditions, ' AND ')
-      : Prisma.join(conditions, ' OR ')
-
-    return Prisma.sql`WHEN ${conditionSql} THEN ${rule.level}`
-  })
-
-  return Prisma.sql`CASE ${Prisma.join(cases, ' ')} ELSE 0 END`
 }

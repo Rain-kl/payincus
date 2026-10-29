@@ -40,12 +40,7 @@ const selectedInstance = computed(() => {
 })
 
 // 获取图标类型
-function getIconType(instance: Instance): 'prime' | 'pro' | 'peer' {
-  // 如果节点名称以 PEER 开头（不区分大小写），则是托管实例，显示 peer 图标
-  const hostName = instance.host?.name || ''
-  if (/^PEER\d/i.test(hostName)) {
-    return 'peer'
-  }
+function getIconType(instance: Instance): 'prime' | 'pro' {
   return instance.instanceType === 'vm' ? 'prime' : 'pro'
 }
 

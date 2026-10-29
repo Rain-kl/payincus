@@ -452,7 +452,7 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
     return { stats }
   })
 
-  // 获取所有全局通知渠道（托管用户用于绑定套餐）
+  // 获取所有全局通知渠道（用于绑定套餐）
   fastify.get('/global-channels', {
     onRequest: [fastify.authenticate]
   }, async () => {

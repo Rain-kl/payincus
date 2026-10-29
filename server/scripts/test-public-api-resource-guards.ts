@@ -278,16 +278,13 @@ assert.ok(
     route.includes('assertPublicServiceRenewAllowed(service, months)') &&
     route.includes('performRenewal(apiToken.userId, service, months)') &&
     route.includes("sendNotification(apiToken.userId, 'instance_renewed'") &&
-    route.includes('sendHostManagedInstanceNotification(') &&
     route.includes('sendRenewSuccessEmail(') &&
     route.includes("'public_api.service_renew'") &&
     route.includes("'public_api.service_renew_failed'") &&
     route.includes("code: 'SERVICE_RENEW_FAILED'") &&
-    route.includes("code: 'HOSTING_RENEW_TOO_EARLY'") &&
-    route.includes("code: 'HOSTING_MONTHLY_ONLY'") &&
     !route.includes('balanceLogId: result.balanceLogId') &&
     !route.includes('balance: { decrement'),
-  'public service renew API must require services:billing, stay user-scoped, reuse the internal renewal transaction, enforce hosted-node limits, notify users, and avoid exposing balance-log internals or direct balance writes'
+  'public service renew API must require services:billing, stay user-scoped, reuse the internal renewal transaction, notify users, and avoid exposing balance-log internals or direct balance writes'
 )
 
 assert.ok(

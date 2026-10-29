@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onErrorCaptured, onMounted, onUnmounted, watchEffect } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
@@ -13,19 +13,9 @@ import { buildApiUrl } from '@/utils/api-url'
 import { isStaleAssetLoadError, scheduleStaleAssetReload } from '@/utils/staleAssetRecovery'
 
 const route = useRoute()
-const router = useRouter()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 const { t, locale } = useI18n()
-const hiddenHostingRouteNames = new Set([
-  'my-hosts',
-  'my-host-create',
-  'my-host-detail',
-  'my-packages',
-  'my-package-create',
-  'my-package-edit',
-  'hosting-wallet'
-])
 
 // 不需要布局的页面
 const noLayoutRoutes: string[] = ['login', 'register', 'forgot-password']
@@ -57,17 +47,6 @@ let sessionCheckTimer: number | null = null
 let tokenRefreshTimer: number | null = null
 let lastVisibilityChange = Date.now()
 
-async function redirectIfHostingEntryHidden() {
-  if (
-    !authStore.isAdmin &&
-    typeof route.name === 'string' &&
-    hiddenHostingRouteNames.has(route.name) &&
-    authStore.user?.canAccessHostingFeature === false
-  ) {
-    await router.replace({ name: 'dashboard' })
-  }
-}
-
 async function handleVisibilityChange() {
   // 如果页面从隐藏变为可见，且距离上次检查超过2分钟，则检查会话
   // 放宽检测间隔，避免频繁跳转登录页
@@ -82,8 +61,6 @@ async function handleVisibilityChange() {
         if (!isValid && !noLayoutRoutes.some(name => route.name === name)) {
           // 会话已过期，跳转到登录页
           window.location.href = '/login'
-        } else if (isValid) {
-          await redirectIfHostingEntryHidden()
         }
       } catch {
         // 网络错误不跳转，继续使用当前状态
@@ -152,8 +129,6 @@ onMounted(() => {
         if (!isValid && !noLayoutRoutes.some(name => route.name === name)) {
           // 会话已过期，跳转到登录页
           window.location.href = '/login'
-        } else if (isValid) {
-          await redirectIfHostingEntryHidden()
         }
       } catch {
         // 网络错误不处理，等待下次检查

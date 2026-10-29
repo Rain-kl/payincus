@@ -52,7 +52,6 @@ import { createLoginRecord } from '../db/login-records.js'
 import { getUserLoginRecords } from '../db/login-records.js'
 import { closeSessionTerminalSessions, closeUserSessions } from '../lib/terminal-proxy.js'
 import { revokeActionTicketsForSession } from '../lib/action-ticket.js'
-import { getUserHostingFeatureStatus } from '../lib/hosting-access.js'
 import {
   DEMO_REDACTED_IP,
   redactDemoLoginRecord,
@@ -94,19 +93,14 @@ async function buildAuthUserPayload(user: {
   role: 'admin' | 'user'
   avatar_style: string
   avatar_badge_id?: string | null
-  has_created_host_before?: boolean
 }) {
-  const hostingFeatureStatus = await getUserHostingFeatureStatus(user.id)
-
   return {
     id: user.id,
     username: user.username,
     email: user.email,
     role: user.role,
     avatarStyle: user.avatar_style,
-    avatarBadgeId: user.avatar_badge_id ?? null,
-    hasCreatedHostBefore: hostingFeatureStatus.hasCreatedHostBefore,
-    canAccessHostingFeature: hostingFeatureStatus.canAccessHostingFeature
+    avatarBadgeId: user.avatar_badge_id ?? null
   }
 }
 

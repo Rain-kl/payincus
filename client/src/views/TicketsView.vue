@@ -63,7 +63,7 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 // Filters - 默认筛选活跃工单（排除已关闭）
 type StatusFilterType = TicketStatus | 'active' | 'all'
-type HostTicketSourceType = 'all' | 'user' | 'official' | 'hosted'
+type HostTicketSourceType = 'all' | 'user' | 'official'
 type TicketQueueFilter = 'all' | 'pending' | 'due_soon' | 'overdue' | 'waiting_user' | 'waiting_internal'
 const statusFilter = ref<StatusFilterType>('active')
 const hostFilter = ref<number | ''>('')
@@ -257,11 +257,6 @@ const hostEmptyState = computed(() => {
       return {
         title: t('tickets.noOfficialTickets'),
         hint: t('tickets.noOfficialTicketsHint')
-      }
-    case 'hosted':
-      return {
-        title: t('tickets.noHostedTickets'),
-        hint: t('tickets.noHostedTicketsHint')
       }
     default:
       return {
@@ -923,7 +918,7 @@ function formatDateShort(dateString: string) {
           <div v-if="activeTab === 'host' && authStore.isAdmin" class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 flex-shrink-0">
             <div class="inline-flex items-center gap-1 p-1 bg-themed-secondary rounded-lg">
               <button
-                v-for="sourceType in ['all', 'user', 'official', 'hosted']"
+                v-for="sourceType in ['all', 'user', 'official']"
                 :key="sourceType"
                 :class="[
                   'px-3 py-1.5 text-sm font-medium rounded-md transition-all whitespace-nowrap',
@@ -1521,23 +1516,6 @@ function formatDateShort(dateString: string) {
             </div>
 
             <TicketImageUploader v-model="createAttachments" :disabled="creating" />
-            
-            <!-- 托管实例提示 -->
-            <div class="flex items-start gap-3 p-4 rounded-xl bg-themed-secondary border border-themed">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-themed-tertiary">
-                <svg class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-themed">
-                  {{ t('tickets.hostedInstanceHintTitle') }}
-                </p>
-                <p class="text-xs mt-0.5 text-themed-muted">
-                  {{ t('tickets.hostedInstanceHint') }}
-                </p>
-              </div>
-            </div>
             
             <!-- Submit -->
             <div class="flex justify-end gap-3">

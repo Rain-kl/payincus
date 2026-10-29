@@ -271,14 +271,9 @@ assert.ok(
 )
 
 assert.ok(
-  countOccurrences(adminUsersViewSource, 'class="space-y-3 lg:hidden"') >= 3 &&
-    // 其中一张桌面表已迁到带主题描边的 `hidden overflow-hidden rounded-lg border border-themed lg:block`
-    // 定宽壳（见下方单独断言），故此处旧壳计数下调为 >= 1；两张表均为定宽表+移动卡、无横向滚动。
+  countOccurrences(adminUsersViewSource, 'class="space-y-3 lg:hidden"') >= 2 &&
     countOccurrences(adminUsersViewSource, 'class="card hidden overflow-hidden lg:block"') >= 1 &&
     adminUsersViewSource.includes('table class="w-full table-fixed"') &&
-    adminUsersViewSource.includes('table class="w-full table-fixed"') &&
-    adminUsersViewSource.includes('table class="w-full table-fixed text-sm"') &&
-    adminUsersViewSource.includes('class="hidden overflow-hidden rounded-lg border border-themed lg:block"') &&
     !adminUsersViewSource.includes('v-else class="card overflow-x-auto"') &&
     !adminUsersViewSource.includes('table class="w-full min-w-[800px]"'),
   'admin users UI must provide mobile cards and fixed desktop tables without the old horizontal overflow table shells'
@@ -287,7 +282,6 @@ assert.ok(
 for (const actionBinding of [
   '@click="openBalanceModal(user)"',
   '@click="openPointsModal(user)"',
-  '@click="openHostingBalanceModal(user)"',
   '@click="viewUserInstances(user)"',
   '@click="openLoginRecordsModal(user)"',
   '@click="openSendMessageModal(user)"',
@@ -296,9 +290,7 @@ for (const actionBinding of [
   '@click="openDisable2FAModal(user)"',
   '@click="openUnbindGitHubModal(user)"',
   '@click="toggleUserStatus(user)"',
-  '@click="deleteInvite(invite)"',
-  '@click="changeHostingBalanceLogsPage(hostingBalanceLogsPage - 1)"',
-  '@click="changeHostingBalanceLogsPage(hostingBalanceLogsPage + 1)"'
+  '@click="deleteInvite(invite)"'
 ] as const) {
   const activeActionBinding = actionBinding.replace('(user)', '(activeActionUser)')
   const altBinding = actionBinding.replace('@click="', '@click="closeActionMenu(); ')

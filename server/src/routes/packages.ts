@@ -17,7 +17,6 @@ import { prisma } from '../db/prisma.js'
 import { normalizeTrafficMultiplier } from '../lib/traffic-multiplier.js'
 import { parseNullablePostgresBigIntInput, parseRequiredPostgresBigIntInput } from '../lib/bigint-input.js'
 import { normalizePlanTrafficLimitSpeed } from '../services/traffic-bandwidth.js'
-import { calculateVipLevel, getVipBadgeStyleForLevel, getVipRules } from '../services/vip-levels.js'
 import { ACTIVE_PACKAGE_NETWORK_MODES } from '../lib/network-modes.js'
 
 const KVM_UNSUPPORTED_NETWORK_MODES = new Set(['nat_ipv6_nat', 'ipv6_nat'])
@@ -112,11 +111,6 @@ function parsePositiveRouteId(value: string): number | null {
   if (!POSITIVE_ROUTE_ID_PATTERN.test(value)) return null
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) ? parsed : null
-}
-
-function parseOptionalPositiveQueryInteger(value: string | undefined): number | null | undefined {
-  if (value === undefined || value === '') return undefined
-  return parsePositiveRouteId(value)
 }
 
 function validatePackagePlanName(value: unknown): { valid: boolean; message?: string; sanitized?: string } {
@@ -799,13 +793,12 @@ export default async function packageRoutes(fastify: FastifyInstance) {
   
   /**
    * 公开获取套餐列表（用于门户市场页面，未登录用户可访问）
-   * 只返回已启用的公开套餐（官方直营 + 托管市场）
+   * 只返回已启用的公开套餐（官方直营）
    */
   fastify.get<{ Querystring: { source?: string } }>('/public', {
     config: { rateLimit: { max: 60, timeWindow: '1 minute' } }  // 公开接口需要限流
   }, async (request: FastifyRequest<{ Querystring: { source?: string } }>) => {
     const source = request.query.source || 'all'
-    const zoneOwnerIds = await packageShares.getActiveHostingZoneOwnerIds()
     
     // 构建查询条件
     const where: any = {
@@ -816,13 +809,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     // 根据 source 过滤
     if (source === 'official') {
       where.user = { role: 'admin' }  // 管理员创建的套餐为官方直营
-    } else if (source === 'market') {
-      where.user = { role: { not: 'admin' } }  // 普通用户的套餐为托管市场
-      if (zoneOwnerIds.length > 0) {
-        where.userId = { notIn: zoneOwnerIds }
-      }
-    } else if (zoneOwnerIds.length > 0) {
-      where.userId = { notIn: zoneOwnerIds }
     }
     
     const packages = await prisma.package.findMany({
@@ -892,8 +878,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       const hostIds = pkg.packageHosts.map(ph => ph.hostId)
       const soldOut = stockByPackage.get(pkg.id) ?? true
 
-      // 判断是否为托管市场套餐
-      const sourceType = pkg.user.role === 'admin' ? 'official' : 'market'
+      // 公开套餐均为官方直营
+      const sourceType = 'official'
       
       return {
         id: pkg.id,
@@ -959,7 +945,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
   }, async (request: FastifyRequest<{ Querystring: { source?: string } }>) => {
     const source = request.query.source || 'all'
-    const zoneOwnerIds = await packageShares.getActiveHostingZoneOwnerIds()
     
     // 构建查询条件
     const where: any = {
@@ -969,13 +954,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     
     if (source === 'official') {
       where.user = { role: 'admin' }
-    } else if (source === 'market') {
-      where.user = { role: { not: 'admin' } }
-      if (zoneOwnerIds.length > 0) {
-        where.userId = { notIn: zoneOwnerIds }
-      }
-    } else if (zoneOwnerIds.length > 0) {
-      where.userId = { notIn: zoneOwnerIds }
     }
     
     // 获取所有符合条件的套餐及其绑定的宿主机
@@ -1048,20 +1026,16 @@ export default async function packageRoutes(fastify: FastifyInstance) {
   // 获取套餐列表
   // 查询参数：
   // - all=true: 返回所有套餐（包括停用/归档的），用于套餐管理页面
-  // - source: 套餐来源过滤，可选值：official（面板直营）、zone（托管专区）、market（托管市场）、friends（好友共享）
-  // - zoneId: source=zone 时指定托管专区 ID
-  //           不传或传 all 时返回全部（保持向后兼容）
-  // - scope: 管理员专用，mine(我的) / official(自营) / hosted(托管的)
-  // - userId: 管理员专用，筛选特定用户（仅 scope=hosted 时有效）
-  fastify.get<{ Querystring: { all?: string; source?: string; zoneId?: string; scope?: string; userId?: string } }>('/', {
+  // - source: 套餐来源过滤，可选值：official（面板直营）、friends（好友共享）
+  // - scope: 管理员专用，mine(我的) / official(自营)
+  fastify.get<{ Querystring: { all?: string; source?: string; scope?: string } }>('/', {
     onRequest: [fastify.authenticate]
-  }, async (request: FastifyRequest<{ Querystring: { all?: string; source?: string; zoneId?: string; scope?: string; userId?: string } }>, reply: FastifyReply) => {
+  }, async (request: FastifyRequest<{ Querystring: { all?: string; source?: string; scope?: string } }>) => {
     const { user } = request
     // all=true 时返回所有套餐（用于套餐管理页面），否则只返回启用的套餐（用于创建实例页面）
     const activeOnly = request.query.all !== 'true'
     const source = request.query.source || 'all'
     const scope = request.query.scope
-    const filterUserId = request.query.userId
     const isAdmin = user.role === 'admin'
 
     // 管理员专用：scope 参数处理
@@ -1104,73 +1078,10 @@ export default async function packageRoutes(fastify: FastifyInstance) {
           })),
           total: officialPackages.length
         }
-      } else if (scope === 'hosted') {
-        // 查看托管套餐：仅显示普通用户的套餐
-        let queryOptions: { userId?: number; ownerRole?: 'admin' | 'user'; includeOwnerEmail: boolean } = {
-          includeOwnerEmail: true,
-          ownerRole: 'user'
-        }
-        
-        const parsedFilterUserId = parseOptionalPositiveQueryInteger(filterUserId)
-        if (parsedFilterUserId === null) {
-          return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, 'Invalid package owner filter'))
-        }
-        if (parsedFilterUserId && parsedFilterUserId !== user.id) {
-          queryOptions.userId = parsedFilterUserId
-        }
-        
-        const hostedPackages = await db.getAllPackages(activeOnly, queryOptions)
-        const hostedPackageIds = hostedPackages.map(p => p.id)
-        const [hostedSoldOutMap, hostedInstanceCountMap] = await Promise.all([
-          db.checkPackagesSoldOut(hostedPackageIds),
-          db.getNormalInstanceCountsByPackages(hostedPackageIds)
-        ])
-        return {
-          packages: hostedPackages.map(p => ({
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            cpu_max: p.cpu_max,
-            memory_max: p.memory_max,
-            disk_max: p.disk_max,
-            bandwidth_max: p.bandwidth_max,
-            network_mode: p.network_mode,
-            instance_type: p.instance_type,
-            host_ids: p.host_ids || [],
-            host_storage_pools: (p as any).host_storage_pools || {},
-            host_traffic_multipliers: (p as any).host_traffic_multipliers || {},
-            privileged: p.privileged,
-            nested: p.nested,
-            active: p.active,
-            monthly_traffic_limit: p.monthly_traffic_limit,
-            port_limit: p.port_limit,
-            snapshot_limit: p.snapshot_limit,
-            backup_limit: p.backup_limit,
-            site_limit: p.site_limit,
-            global_shared: p.global_shared,
-            allow_instance_deletion: p.allow_instance_deletion,
-            required_package_id: (p as any).required_package_id ?? null,
-            required_package_name: (p as any).required_package_name ?? null,
-            sourceType: 'hosted',
-            isOwn: false,
-            isShared: false,
-            soldOut: hostedSoldOutMap.get(p.id) ?? false,
-            instance_count: hostedInstanceCountMap.get(p.id) ?? 0,
-            // 所有者信息
-            owner: {
-              id: p.user_id,
-              username: p.owner_username,
-              email: p.owner_email,
-              avatarStyle: p.owner_avatar_style || '',
-              avatarBadgeId: (p as any).owner_avatar_badge_id || null
-            }
-          })),
-          total: hostedPackages.length
-        }
       }
     }
     // 用于转换共享套餐为响应格式的辅助函数
-    const formatSharedPackage = async (p: any, isGlobalShared: boolean, sourceType: 'official' | 'market' | 'friends' | 'zone', zone?: packageShares.HostingZoneInfo) => ({
+    const formatSharedPackage = async (p: any, isGlobalShared: boolean, sourceType: 'official' | 'friends') => ({
       id: p.id,
       name: p.name,
       description: p.description,
@@ -1217,12 +1128,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       sourceType,
       has_required_package_instance: p.requiredPackageId
         ? await db.userHasNormalInstanceForPackage(user.id, p.requiredPackageId)
-        : true,
-      ...(zone ? {
-        hostingZoneId: zone.id,
-        hostingZoneName: zone.name,
-        hostingZoneLogoUrl: zone.logoUrl
-      } : {})
+        : true
     })
 
     // 根据 source 参数返回对应的套餐
@@ -1237,52 +1143,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
           soldOut: officialSoldOutMap.get(p.id) ?? false
         }))),
         total: globalPackages.length
-      }
-    }
-
-    if (source === 'market') {
-      // 托管市场：仅返回用户托管的全局共享套餐
-      const zoneOwnerIds = await packageShares.getActiveHostingZoneOwnerIds()
-      const marketPackages = await packageShares.getHostedMarketPackages(user.id, {
-        excludeOwnerIds: zoneOwnerIds
-      })
-      const marketIds = marketPackages.map(p => p.id)
-      const marketSoldOutMap = await db.checkPackagesSoldOut(marketIds)
-      return {
-        packages: await Promise.all(marketPackages.map(async p => ({
-          ...await formatSharedPackage(p, true, 'market'),
-          soldOut: marketSoldOutMap.get(p.id) ?? false
-        }))),
-        total: marketPackages.length
-      }
-    }
-
-    if (source === 'zone') {
-      const zoneId = parseOptionalPositiveQueryInteger(request.query.zoneId)
-      if (zoneId === null) {
-        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, 'Invalid hosting zone filter'))
-      }
-      if (zoneId === undefined) {
-        return { packages: [], total: 0 }
-      }
-
-      const zone = await packageShares.getActiveHostingZoneById(zoneId, user.id)
-      if (!zone) {
-        return { packages: [], total: 0 }
-      }
-
-      const zonePackages = await packageShares.getHostedMarketPackages(user.id, {
-        ownerId: zone.ownerId
-      })
-      const zonePackageIds = zonePackages.map(p => p.id)
-      const zoneSoldOutMap = await db.checkPackagesSoldOut(zonePackageIds)
-
-      return {
-        packages: await Promise.all(zonePackages.map(async p => ({
-          ...await formatSharedPackage(p, true, 'zone', zone),
-          soldOut: zoneSoldOutMap.get(p.id) ?? false
-        }))),
-        total: zonePackages.length
       }
     }
 
@@ -1314,23 +1174,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     // 获取全局共享的套餐（官方）
     const globalPackages = await packageShares.getGlobalSharedPackages()
 
-    // 获取托管市场套餐
-    const hostingZones = await packageShares.getHostingZonesForViewer(user.id)
-    const zoneOwnerIds = hostingZones.map(zone => zone.ownerId)
-    const marketPackages = await packageShares.getHostedMarketPackages(user.id, {
-      excludeOwnerIds: zoneOwnerIds
-    })
-
-    const zonePackagesByZone = await Promise.all(
-      hostingZones.map(async zone => ({
-        zone,
-        packages: await packageShares.getHostedMarketPackages(user.id, {
-          ownerId: zone.ownerId
-        })
-      }))
-    )
-
-    // 合并并去重，优先级：自己的 > 好友分享 > 托管专区 > 托管市场 > 官方直营
+    // 合并并去重，优先级：自己的 > 好友分享 > 官方直营
     // 使用 Set 记录已添加的套餐 ID，避免重复
     const addedPackageIds = new Set<number>()
     const allPackages: any[] = []
@@ -1401,34 +1245,18 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       allPackages.push(await formatSharedPackage(p, false, 'friends'))
     }
 
-    // 3. 添加托管专区套餐（跳过已有的）
-    for (const group of zonePackagesByZone) {
-      for (const p of group.packages) {
-        if (addedPackageIds.has(p.id)) continue
-        addedPackageIds.add(p.id)
-        allPackages.push(await formatSharedPackage(p, true, 'zone', group.zone))
-      }
-    }
-
-    // 4. 添加托管市场套餐（跳过已有的）
-    for (const p of marketPackages) {
-      if (addedPackageIds.has(p.id)) continue
-      addedPackageIds.add(p.id)
-      allPackages.push(await formatSharedPackage(p, true, 'market'))
-    }
-
-    // 5. 添加官方直营套餐（跳过已有的）
+    // 3. 添加官方直营套餐（跳过已有的）
     for (const p of globalPackages) {
       if (addedPackageIds.has(p.id)) continue
       addedPackageIds.add(p.id)
       allPackages.push(await formatSharedPackage(p, true, 'official'))
     }
 
-    // 6. 批量计算售罄状态
+    // 4. 批量计算售罄状态
     const packageIds = allPackages.map(p => p.id)
     const soldOutMap = await db.checkPackagesSoldOut(packageIds)
 
-    // 7. 添加 soldOut 字段到每个套餐
+    // 5. 添加 soldOut 字段到每个套餐
     const packagesWithSoldOut = allPackages.map(p => ({
       ...p,
       soldOut: soldOutMap.get(p.id) ?? false
@@ -1438,14 +1266,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       packages: packagesWithSoldOut,
       total: packagesWithSoldOut.length
     }
-  })
-
-  // 获取当前用户可见的托管专区列表
-  fastify.get('/hosting-zones', {
-    onRequest: [fastify.authenticate]
-  }, async (request) => {
-    const zones = await packageShares.getHostingZonesForViewer(request.user.id)
-    return { zones }
   })
 
   // 获取套餐详情
@@ -2351,98 +2171,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     }
   })
 
-  // 获取套餐所有者的托管信息（用于创建实例页面显示托管者详情）
-  fastify.get<{ Params: { id: string } }>('/:id/owner-info', {
-    onRequest: [fastify.authenticateUser]
-  }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const { id } = request.params
-    const { user } = request
-    const packageId = parsePositiveRouteId(id)
-
-    if (!packageId) {
-      return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
-    }
-
-    const pkg = await db.getPackageById(packageId)
-    if (!pkg) {
-      return reply.code(404).send(apiError(ErrorCode.PACKAGE_NOT_FOUND))
-    }
-
-    // 套餐必须有所有者，且必须是普通用户的托管套餐
-    if (!pkg.user_id) {
-      return reply.code(404).send(apiError(ErrorCode.NOT_FOUND, '该套餐不是托管套餐'))
-    }
-
-    if (pkg.user_id !== user.id && await db.isUserBlockedFromPackage(user.id, packageId)) {
-      return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
-    }
-
-    const owner = await prisma.user.findUnique({
-      where: { id: pkg.user_id },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        avatarStyle: true,
-        avatarBadgeId: true,
-        createdAt: true,
-        role: true
-      }
-    })
-
-    if (!owner || !owner.email || owner.role === 'admin') {
-      return reply.code(404).send(apiError(ErrorCode.NOT_FOUND, '该套餐不是托管套餐'))
-    }
-
-    // 获取所有者详细信息
-    const [hostCount, instanceCount, totalHostingIncome] = await Promise.all([
-      // 该用户持有的托管节点数
-      prisma.host.count({
-        where: { userId: pkg.user_id }
-      }),
-      // 该用户托管节点的总实例数（不含已删除）
-      prisma.instance.count({
-        where: {
-          host: { userId: pkg.user_id },
-          status: { not: 'deleted' }
-        }
-      }),
-      // 计算历史托管总收入（用于VIP等级）
-      prisma.hostingBalanceLog.aggregate({
-        where: {
-          userId: pkg.user_id,
-          type: 'income'  // 只计算收入记录
-        },
-        _sum: { amount: true }
-      })
-    ])
-
-    // 计算注册天数
-    const registeredDays = Math.floor((Date.now() - owner.createdAt.getTime()) / (1000 * 60 * 60 * 24))
-
-    // 计算VIP等级（基于后台配置的托管 VIP 规则）
-    const totalIncome = Number(totalHostingIncome._sum.amount || 0)
-    const vipRules = await getVipRules('hosting')
-    const vipLevel = calculateVipLevel('hosting', vipRules, {
-      totalHostingIncome: totalIncome,
-      instanceCount
-    })
-    const vipBadgeStyle = getVipBadgeStyleForLevel(vipRules, 'hosting', vipLevel)
-
-    return {
-      id: owner.id,
-      username: owner.username,
-      email: owner.email,
-      avatarStyle: owner.avatarStyle,
-      avatarBadgeId: owner.avatarBadgeId,
-      hostCount,
-      instanceCount,
-      registeredDays,
-      vipLevel,
-      vipBadgeStyle
-    }
-  })
-
 
   // 释放配额
   fastify.post<{
@@ -2555,11 +2283,8 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         ).join('\n')
 
         const notifyTitle = `📦 资源释放 - ${pkg.name}`
-        // 判断套餐来源：管理员创建的套餐为 official，普通用户创建的为 market
-        const pkgOwner = await prisma.user.findUnique({ where: { id: pkg.user_id }, select: { role: true } })
-        const pkgSource = pkgOwner?.role === 'admin' ? 'official' : 'market'
         const buyLink = process.env.SITE_URL
-          ? { label: '🛒 立即开通', url: `${process.env.SITE_URL}/instances/create?source=${pkgSource}&package=${packageId}` }
+          ? { label: '🛒 立即开通', url: `${process.env.SITE_URL}/instances/create?source=official&package=${packageId}` }
           : undefined
         const notifyMessage = [
           `+${cpuAdd}% CPU / +${formatMemory(memoryAdd)} 内存`,
@@ -2714,17 +2439,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: '该套餐下已存在同名方案' })
     }
 
-    // 用户托管节点的方案只能按月计费
-    if (user.role !== 'admin') {
-      const actualBillingCycle = planInput.billingCycle ?? 1
-      if (actualBillingCycle !== 1) {
-        return reply.code(400).send({
-          error: '用户托管节点的方案仅支持按月计费',
-          code: 'HOSTING_MONTHLY_ONLY'
-        })
-      }
-    }
-
     try {
       const parsedTrafficLimit = parseRequiredPostgresBigIntInput(planInput.trafficLimit)
       if (parsedTrafficLimit === undefined) {
@@ -2855,14 +2569,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       if (!isUnique) {
         return reply.code(400).send({ error: '该套餐下已存在同名方案' })
       }
-    }
-
-    // 用户托管节点的方案只能按月计费
-    if (user.role !== 'admin' && planInput.billingCycle !== undefined && planInput.billingCycle !== 1) {
-      return reply.code(400).send({
-        error: '用户托管节点的方案仅支持按月计费',
-        code: 'HOSTING_MONTHLY_ONLY'
-      })
     }
 
     try {
@@ -3005,10 +2711,10 @@ export default async function packageRoutes(fastify: FastifyInstance) {
 
   // 获取可用地区列表（拥有付费方案的公开套餐所在的国家/地区）
   fastify.get<{
-    Querystring: { source?: 'official' | 'market' | 'friends' | 'zone'; zoneId?: string }
+    Querystring: { source?: 'official' | 'friends' }
   }>('/regions', {
     onRequest: [fastify.authenticate]
-  }, async (request, reply) => {
+  }, async (request) => {
     const { source = 'official' } = request.query
     const user = request.user
     
@@ -3065,7 +2771,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       return { regions }
     }
     
-    // 官方/托管市场/托管专区：使用统一公开套餐逻辑
+    // 官方套餐：使用统一公开套餐逻辑
     let whereCondition: any = {
       active: true,
       plans: {
@@ -3079,33 +2785,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       // 官方套餐：管理员创建的公开套餐（不再排除用户自己的，与套餐列表保持一致）
       whereCondition.globalShared = true
       whereCondition.user = { role: 'admin' }
-    } else if (source === 'market') {
-      // 托管市场：非管理员创建的公开套餐（不再排除用户自己的，与套餐列表保持一致）
-      const blockerIds = await db.getBlockerIdsForUser(user.id)
-      const zoneOwnerIds = await packageShares.getActiveHostingZoneOwnerIds()
-      const excludedOwnerIds = Array.from(new Set([...blockerIds, ...zoneOwnerIds]))
-      whereCondition.globalShared = true
-      whereCondition.user = { role: { not: 'admin' } }
-      if (excludedOwnerIds.length > 0) {
-        whereCondition.userId = { notIn: excludedOwnerIds }
-      }
-    } else if (source === 'zone') {
-      const zoneId = parseOptionalPositiveQueryInteger(request.query.zoneId)
-      if (zoneId === null) {
-        return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, 'Invalid hosting zone filter'))
-      }
-      if (zoneId === undefined) {
-        return { regions: [] }
-      }
-
-      const zone = await packageShares.getActiveHostingZoneById(zoneId, user.id)
-      if (!zone) {
-        return { regions: [] }
-      }
-
-      whereCondition.globalShared = true
-      whereCondition.userId = zone.ownerId
-      whereCondition.user = { role: { not: 'admin' } }
     }
     
     // 1. 获取所有有活跃方案的套餐，并包含它们绑定的宿主机信息

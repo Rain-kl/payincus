@@ -39,7 +39,6 @@ https://panel.example.com
 - Mail: `/mail` and `/mail/domains/:id`.
 - Hosted resources: `/resources/hosts`.
 - Hosted plans: `/resources/packages`.
-- Hosting wallet: `/hosting-wallet`.
 - Entertainment: `/entertainment`.
 
 ## Gift Cards

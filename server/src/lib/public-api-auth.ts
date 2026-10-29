@@ -69,7 +69,7 @@ export const PUBLIC_API_SCOPE_METADATA: Record<PublicApiScope, PublicApiScopeMet
     access: 'read',
     resources: ['/api/v1/balance', '/api/v1/balance/logs'],
     implemented: true,
-    notes: ['不暴露支付 provider payload、调账对象、托管余额、AFF 余额或其他用户数据。']
+    notes: ['不暴露支付 provider payload、调账对象、AFF 余额或其他用户数据。']
   },
   'balance:write': {
     scope: 'balance:write',
@@ -129,7 +129,7 @@ export const PUBLIC_API_SCOPE_METADATA: Record<PublicApiScope, PublicApiScopeMet
     access: 'write',
     resources: ['/api/v1/services/:id/renew'],
     implemented: true,
-    notes: ['仅允许续费；余额扣减、账单记录、托管收益和过期服务解封由内部续费事务处理。']
+    notes: ['仅允许续费；余额扣减、账单记录和过期服务解封由内部续费事务处理。']
   },
   'orders:read': {
     scope: 'orders:read',

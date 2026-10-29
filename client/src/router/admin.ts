@@ -100,12 +100,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.users', title: '用户' }
   },
   {
-    path: '/admin/hosting',
-    name: 'admin-hosting',
-    component: () => import('@/views/admin/HostingView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'nav.hosting', title: '托管' }
-  },
-  {
     path: '/admin/statistics',
     name: 'admin-statistics',
     component: () => import('@/views/admin/StatisticsView.vue'),
@@ -431,7 +425,6 @@ router.isReady().then(() => {
     import('@/views/admin/BillingView.vue')
     import('@/views/admin/OrdersView.vue')
     import('@/views/admin/SystemConfigView.vue')
-    import('@/views/admin/HostingView.vue')
   }, 1000)
 })
 

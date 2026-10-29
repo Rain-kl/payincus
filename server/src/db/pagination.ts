@@ -231,7 +231,7 @@ export async function getUsersPaginated(options: PaginationOptions = {}): Promis
 /**
  * 获取宿主机分页列表
  * @param options.userId - 筛选指定用户的节点
- * @param options.excludeUserId - 排除指定用户的节点（用于获取托管节点）
+ * @param options.excludeUserId - 排除指定用户的节点
  * @param options.ownerRole - 按所有者角色过滤节点
  * @param options.includeOwner - 是否包含所有者信息
  */
@@ -254,7 +254,7 @@ export async function getHostsPaginated(options: PaginationOptions = {}): Promis
     where.userId = userId
   }
 
-  // 排除指定用户的节点（用于获取托管节点）
+  // 排除指定用户的节点
   if (excludeUserId) {
     where.userId = { not: excludeUserId }
   }

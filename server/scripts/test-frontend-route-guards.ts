@@ -105,7 +105,6 @@ const logsViewSource = readRepoFile('client/src/views/LogsView.vue')
 const ordersViewSource = readRepoFile('client/src/views/OrdersView.vue')
 const invitesViewSource = readRepoFile('client/src/views/InvitesView.vue')
 const entertainmentViewSource = readRepoFile('client/src/views/EntertainmentView.vue')
-const hostingWalletViewSource = readRepoFile('client/src/views/HostingWalletView.vue')
 const userApiSource = readRepoFile('client/src/api/index.ts')
 const adminApiSource = readRepoFile('client/src/api/admin.ts')
 const appPathsSource = readRepoFile('client/src/utils/app-paths.ts')
@@ -186,10 +185,6 @@ const adminApiForbiddenCustomerSelfServiceMarkers = [
   'getPublicRegions:',
   "http.get(queryString ? `/packages/public?",
   "http.get(queryString ? `/packages/public/regions?",
-  "http.get('/packages/hosting-zones",
-  "http.get(`/packages/${packageId}/owner-info`",
-  "source?: 'official' | 'market' | 'friends' | 'zone'",
-  'zoneId?: number',
   "http.get('/transfers",
   "http.post(`/transfers",
   "http.get('/checkin",
@@ -220,15 +215,6 @@ const adminApiForbiddenCustomerSelfServiceMarkers = [
   "http.get('/entertainment/lotteries",
   "http.post(`/entertainment/lotteries",
   "http.get('/entertainment/lottery-records",
-  "http.get('/hosting/balance",
-  "http.get('/hosting/stats",
-  "http.get('/hosting/logs",
-  "http.post('/hosting/withdraw",
-  "http.get('/hosting/withdrawals",
-  "http.get('/hosting/blocks",
-  "http.post('/hosting/blocks",
-  "http.delete(`/hosting/blocks",
-  "http.get('/hosting/access-check"
 ]
 
 const adminReachablePackageViewForbiddenCustomerShareMarkers = [
@@ -526,7 +512,7 @@ assert.deepEqual(
 assert.deepEqual(
   adminApiForbiddenCustomerSelfServiceMarkers.filter(marker => adminApiSource.includes(marker)),
   [],
-  'admin API client must not expose customer-only invite, friend, transfer, check-in, billing, VIP, resource-pool, AFF, mail, entertainment, or hosting-balance self-service modules'
+  'admin API client must not expose customer-only invite, friend, transfer, check-in, billing, VIP, resource-pool, AFF, mail, or entertainment self-service modules'
 )
 assert.deepEqual(
   adminReachablePackageViewForbiddenCustomerShareMarkers.filter(marker => myPackagesViewSource.includes(marker)),
@@ -804,7 +790,7 @@ assert.ok(
     ticketInstanceOwnerCardSource.includes('instanceDetailPath(props.instanceSummary.id)') &&
     myPackagesViewSource.includes("import { instanceCreatePath, isAdminEntry } from '@/utils/app-paths'") &&
     myPackagesViewSource.includes('if (isAdminEntry) return') &&
-    myPackagesViewSource.includes('${window.location.origin}${instanceCreatePath()}?source=${source}&package=${pkg.id}') &&
+    myPackagesViewSource.includes('${window.location.origin}${instanceCreatePath()}?source=official&package=${pkg.id}') &&
     myPackagesViewSource.includes('v-if="!isAdminEntry"') &&
     myPackagesViewSource.includes('class="space-y-3 p-4 lg:hidden"') &&
     myPackagesViewSource.includes('class="hidden overflow-hidden lg:block"') &&
@@ -1011,22 +997,6 @@ assert.ok(
     !entertainmentPoolLogsSection.includes('class="w-full min-w-[900px] table-fixed"') &&
     !entertainmentPoolLogsSection.includes('v-else class="overflow-x-auto"'),
   'Entertainment resource pool logs must render mobile cards and a fixed-layout desktop table without PC horizontal overflow while preserving pagination'
-)
-assert.ok(
-  countOccurrences(hostingWalletViewSource, 'class="w-full table-fixed"') >= 2 &&
-    hostingWalletViewSource.includes('class="p-4 space-y-2 lg:hidden"') &&
-    hostingWalletViewSource.includes('class="p-4 space-y-3 lg:hidden"') &&
-    hostingWalletViewSource.includes('class="grid grid-cols-1 gap-3 p-4 border-t border-themed sm:grid-cols-[auto_1fr] sm:items-center"') &&
-    hostingWalletViewSource.includes('class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex sm:justify-center"') &&
-    hostingWalletViewSource.includes('@click="loadLogs(logsPage - 1)"') &&
-    hostingWalletViewSource.includes('@click="loadLogs(logsPage + 1)"') &&
-    hostingWalletViewSource.includes('@click="loadWithdrawals(withdrawalsPage - 1)"') &&
-    hostingWalletViewSource.includes('@click="loadWithdrawals(withdrawalsPage + 1)"') &&
-    !hostingWalletViewSource.includes('class="w-full min-w-[1040px] table-fixed"') &&
-    !hostingWalletViewSource.includes('class="w-full min-w-[860px] table-fixed"') &&
-    !hostingWalletViewSource.includes('class="hidden md:block overflow-x-auto"') &&
-    !hostingWalletViewSource.includes('class="md:hidden p-4'),
-  'HostingWalletView must keep mobile wallet cards until lg and render fixed-layout desktop log/withdrawal tables without PC horizontal overflow'
 )
 assert.ok(
   instanceDetailViewSource.includes("import { helpPath, hostDetailPath, instancesPath, isAdminEntry } from '@/utils/app-paths'") &&

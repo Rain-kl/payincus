@@ -203,7 +203,7 @@ function validateHostTrafficMultipliers(
  * 注意：共享套餐通过 package-shares.ts 的 getSharedToUser 获取
  * @param activeOnly - 是否只返回启用的套餐
  * @param options.userId - 如果提供，只返回用户自己的套餐
- * @param options.excludeUserId - 排除指定用户的套餐（用于获取托管套餐）
+ * @param options.excludeUserId - 排除指定用户的套餐
  * @param options.ownerRole - 按所有者角色过滤套餐
  * @param options.includeOwnerEmail - 是否包含所有者邮箱
  */

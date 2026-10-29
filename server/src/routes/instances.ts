@@ -61,10 +61,9 @@ import {
 } from '../db/images.js'
 import { generateRandomIPv6 } from '../lib/ip-calculator.js'
 import { getProxySitesByInstanceId, deleteProxySite } from '../db/proxy-sites.js'
-import { calculateVipLevel, getVipBadgeStyleForLevel, getVipRules } from '../services/vip-levels.js'
 import { ProxyStrategyFactory } from '../lib/proxy/index.js'
 import { getCaddyClientForHost } from '../lib/caddy-client.js'
-import { sendHostManagedInstanceNotification, sendNotification } from '../lib/notifier.js'
+import { sendNotification } from '../lib/notifier.js'
 import {
   createInstanceTask,
   InstanceTaskConflictError,
@@ -1606,11 +1605,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: nameValidation.message })
     }
 
-    // 用户托管节点不允许使用优惠码（托管节点命名前四位固定为 peer）
-    if ((validatedAffCode || promoValidation) && preCheckHost.name.toLowerCase().startsWith('peer')) {
-      return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, '用户托管节点不支持使用优惠码'))
-    }
-
     // 镜像别名直接使用（数据库中已包含完整路径如 images:almalinux/8/cloud）
     const actualImageAlias = imageAlias
 
@@ -1956,19 +1950,10 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
             )
           }
 
-          // 处理托管收入结算（用户托管节点）
-          const hostingIncomeResult = await db.processHostingIncome(
-            lockedHost.id,
-            actualPrice,
-            instance.id,
-            'purchase',
-            tx
-          )
-
-          return { instanceId: instance.id, host: lockedHost, hostingIncomeResult, actualPrice, planBandwidthLimit }
+          return { instanceId: instance.id, host: lockedHost, actualPrice, planBandwidthLimit }
         }
 
-        return { instanceId: instance.id, host: lockedHost, hostingIncomeResult: null, actualPrice: 0, planBandwidthLimit }
+        return { instanceId: instance.id, host: lockedHost, actualPrice: 0, planBandwidthLimit }
       }, {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
         timeout: 15000  // 增加超时时间，因为包含行锁操作
@@ -1977,21 +1962,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       instanceId = result.instanceId
       host = result.host
       planBandwidthLimit = result.planBandwidthLimit
-
-      // 事务完成后，发送托管收入通知（仅发送到外部渠道，不创建站内信）
-      if (result.hostingIncomeResult) {
-        sendHostManagedInstanceNotification(
-          result.host.id,
-          'purchase',
-          {
-            username: user.username,
-            instanceName: name,
-            amount: result.actualPrice
-          }
-        ).catch(err => {
-          console.error('[Provisioning] 发送托管收入通知失败:', err)
-        })
-      }
 
       // 事务完成后，向套餐绑定的通知渠道发送"新购到达"通知
       if (packageId && selectedPlan) {
@@ -2461,7 +2431,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     let trafficResetPrice: number = Number((pkg as any)?.traffic_reset_price ?? 0)
     let affDiscountRate: number | null = null  // AFF优惠码折扣率
     let hasAffBinding = false
-    let isHostedInstance = false
     let nextRenewPrice: number | null = null
     let activePromoBinding: any = null
     if ((instance as any).package_plan_id) {
@@ -2538,8 +2507,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
       affDiscountRate = discountRate > 0 ? discountRate : null
     }
-
-    isHostedInstance = Boolean(host?.name.toLowerCase().startsWith('peer'))
 
     const effectivePortLimit = instance.port_limit ?? 20
     const effectiveSnapshotLimit = instance.snapshot_limit ?? 5
@@ -2620,7 +2587,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       } | null
       affDiscountRate?: number | null  // AFF优惠码折扣率
       hasAffBinding?: boolean  // 是否已绑定 AFF 优惠码
-      isHostedInstance?: boolean  // 是否为用户托管节点实例
       hostAnnouncement?: string | null  // 节点公告
       limitsIngress?: string | null  // 入栈带宽限制
       limitsEgress?: string | null  // 出栈带宽限制
@@ -2633,22 +2599,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       suspend_reason?: string | null
       // 自动续费
       autoRenew?: boolean
-      // 托管节点所有者信息（仅用户托管节点）
-      hostOwnerInfo?: {
-        id: number
-        username: string
-        email: string
-        avatarStyle: string
-        avatarBadgeId: string | null
-        hostCount: number
-        instanceCount: number
-        registeredDays: number
-        vipLevel: number
-        vipBadgeStyle?: {
-          backgroundColor: string
-          textColor: string
-        } | null
-      } | null
     } = {
       id: instance.id,
       incusId: instance.incus_id,
@@ -2713,7 +2663,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           (activePromoBinding.durationType === 'FOREVER' || (activePromoBinding.remainingCycles ?? 1) > 0 || !activePromoBinding.promoCode.expiresAt || activePromoBinding.promoCode.expiresAt > new Date())
         )
       } : null,
-      isHostedInstance,
       hostAnnouncement: host?.announcement || null,
       limitsIngress: (instance as any).limits_ingress ?? pkg?.limits_ingress ?? null,
       limitsEgress: (instance as any).limits_egress ?? pkg?.limits_egress ?? null,
@@ -2724,72 +2673,6 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       suspend_reason: instance.suspend_reason,
       // 自动续费（仅付费实例有意义）
       autoRenew: (instance as any).auto_renew ?? false
-    }
-
-    // 用户托管节点：获取节点所有者详细信息
-    if (host) {
-      const hostOwner = await prisma.user.findUnique({
-        where: { id: host.user_id },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          avatarStyle: true,
-          avatarBadgeId: true,
-          createdAt: true,
-          role: true
-        }
-      })
-
-      isHostedInstance = isHostedInstance || hostOwner?.role === 'user'
-      response.isHostedInstance = isHostedInstance
-
-      if (hostOwner && hostOwner.role !== 'admin' && hostOwner.email) {
-        const [hostCount, instanceCount, totalHostingIncome] = await Promise.all([
-          // 该用户持有的托管节点数
-          prisma.host.count({
-            where: { userId: host.user_id }
-          }),
-          // 该用户托管节点的总实例数（不含已删除）
-          prisma.instance.count({
-            where: {
-              host: { userId: host.user_id },
-              status: { not: 'deleted' }
-            }
-          }),
-          // 计算历史托管总收入（用于VIP等级）
-          prisma.hostingBalanceLog.aggregate({
-            where: {
-              userId: host.user_id,
-              type: 'income'
-            },
-            _sum: { amount: true }
-          })
-        ])
-
-        // 计算注册天数
-        const registeredDays = Math.floor((Date.now() - hostOwner.createdAt.getTime()) / (1000 * 60 * 60 * 24))
-        // 计算VIP等级（基于后台配置的托管 VIP 规则）
-        const totalIncome = Number(totalHostingIncome._sum.amount || 0)
-        const vipRules = await getVipRules('hosting')
-        const vipLevel = calculateVipLevel('hosting', vipRules, {
-          totalHostingIncome: totalIncome,
-          instanceCount
-        })
-        const vipBadgeStyle = getVipBadgeStyleForLevel(vipRules, 'hosting', vipLevel)
-        response.hostOwnerInfo = {
-          id: hostOwner.id,
-          username: hostOwner.username,
-          email: hostOwner.email,
-          avatarStyle: hostOwner.avatarStyle,
-          avatarBadgeId: hostOwner.avatarBadgeId,
-          hostCount,
-          instanceCount,
-          registeredDays,
-          vipLevel,
-          vipBadgeStyle
-        }
-      }
     }
 
     // Check if current user is the host owner or admin
@@ -4272,17 +4155,9 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
                 balanceBefore: oldBalance,
                 balanceAfter: newBalance,
                 instanceId: instance.id,
-                remark: `托管实例被删除退款：${instance.name}`
+                remark: `实例被删除退款：${instance.name}`
               }
             })
-
-            await db.deductHostingBalance(
-              instance.host_id,
-              hostOwnerRefundAmount,
-              instance.id,
-              `删除托管实例退款扣除：${instance.name}`,
-              tx
-            )
           })
         }
       }

@@ -17,7 +17,7 @@ assert.ok(
 
 assert.equal(
   source.match(/const packageId = parsePositiveRouteId\(id\)/g)?.length ?? 0,
-  14,
+  13,
   'all package :id routes must strictly validate package route IDs'
 )
 
@@ -37,16 +37,6 @@ assert.equal(
   source.match(/const planIdNum = parsePositiveRouteId\(planId\)/g)?.length ?? 0,
   2,
   'package plan update/delete routes must strictly validate plan route IDs'
-)
-
-assert.ok(
-  source.includes('function parseOptionalPositiveQueryInteger(value: string | undefined): number | null | undefined') &&
-    source.includes('const parsedFilterUserId = parseOptionalPositiveQueryInteger(filterUserId)') &&
-    source.includes('parsedFilterUserId === null') &&
-    source.match(/const zoneId = parseOptionalPositiveQueryInteger\(request\.query\.zoneId\)/g)?.length === 2 &&
-    source.match(/zoneId === null/g)?.length === 2 &&
-    source.match(/zoneId === undefined/g)?.length === 2,
-  'package routes must strictly validate optional owner and hosting zone query IDs'
 )
 
 for (const forbiddenPattern of [

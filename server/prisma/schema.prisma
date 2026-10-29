@@ -250,8 +250,6 @@ enum BalanceLogType {
   gift              // 赠送
   transfer_fee      // 转移手续费
   transfer_refund   // 转移手续费退还
-  hosting_withdraw  // 托管余额提现
-  hosting_deduction // 托管实例销毁扣款（从面板余额补扣）
   invite_generate   // 生成邀请码扣款
   exchange_purchase // 交易所购买扣款
   exchange_refund   // 交易所退款
@@ -311,7 +309,6 @@ enum RechargeStatus {
 
 enum VipLevelRuleType {
   user
-  hosting
 }
 
 enum VipLevelConditionMode {
@@ -410,7 +407,6 @@ model User {
   balance      Decimal    @default(0) @db.Decimal(10, 2)
   avatarStyle  String     @default("bigSmile") @map("avatar_style") // bigSmile, croodles, notionists, lorelei
   avatarBadgeId String?   @map("avatar_badge_id")
-  hasCreatedHostBefore Boolean @default(false) @map("has_created_host_before")
 
   // 2FA 双因素认证
   twoFactorEnabled       Boolean @default(false) @map("two_factor_enabled")
@@ -516,14 +512,6 @@ model User {
   // 统一优惠码系统
   promoCodes          PromoCode[]
   promoRedemptionLogs PromoRedemptionLog[]
-
-  // 托管余额系统
-  hostingBalance      Decimal              @default(0) @map("hosting_balance") @db.Decimal(10, 2) // 可用托管余额
-  hostingBalanceLogs  HostingBalanceLog[]
-  hostingWithdrawals  HostingWithdrawal[]
-  hostingBlocksCreated  HostingUserBlock[] @relation("HostingBlocker")
-  hostingBlocksReceived HostingUserBlock[] @relation("HostingBlockedUser")
-  hostingZone         HostingZone?         @relation("HostingZoneOwner")
 
   // 域名邮箱系统
   mailSubscriptions   MailSubscription[]
@@ -2826,8 +2814,6 @@ model VipLevelRule {
   conditionMode       VipLevelConditionMode @default(any) @map("condition_mode")
   minRecharge         Decimal?              @map("min_recharge") @db.Decimal(10, 2)
   minConsume          Decimal?              @map("min_consume") @db.Decimal(10, 2)
-  minHostingIncome    Decimal?              @map("min_hosting_income") @db.Decimal(10, 2)
-  minHostingInstances Int?                  @map("min_hosting_instances")
   benefits            Json                  @default("{}")
   createdAt           DateTime              @default(now()) @map("created_at")
   updatedAt           DateTime              @updatedAt @map("updated_at")
@@ -3381,38 +3367,6 @@ model UserDestroyRecord {
   @@map("user_destroy_records")
 }
 
-// ==================== 托管余额系统模型 ====================
-
-enum HostingBalanceType {
-  income    // 收入（用户购买/续费）
-  unfreeze  // 解冻
-  withdraw  // 提现
-  deduction // 扣除（用户销毁托管实例）
-}
-
-// 托管收支操作类型（用于区分具体操作）
-enum HostingActionType {
-  purchase     // 用户开通实例
-  renew        // 用户续费实例
-  upgrade      // 用户升级方案
-  destroy      // 用户销毁实例
-  unfreeze     // 自动解冻
-  withdraw     // 提现
-  admin_adjust // 管理员调整
-}
-
-enum WithdrawalStatus {
-  pending   // 待审核
-  approved  // 已通过
-  rejected  // 已拒绝
-  completed // 已完成
-}
-
-enum WithdrawalTarget {
-  balance // 提现到面板余额
-  usdt    // 提现到USDT
-}
-
 // ==================== 域名邮箱模块 ====================
 
 // 域名验证状态
@@ -3546,91 +3500,6 @@ model MailAccount {
   @@map("mail_accounts")
 }
 
-// 托管余额变动日志
-model HostingBalanceLog {
-  id         Int                 @id @default(autoincrement())
-  userId     Int                 @map("user_id")
-  type       HostingBalanceType
-  actionType HostingActionType?  @map("action_type") // 具体操作类型（开通/续费/升级/销毁等）
-  amount     Decimal             @db.Decimal(10, 2) // 金额（正数）
-  frozen     Boolean             @default(true)     // 是否冻结状态
-  unfreezeAt DateTime?           @map("unfreeze_at") // 解冻时间
-  relatedId  Int?                @map("related_id") // 关联ID（实例ID/提现ID）
-  remark     String?
-
-  // Snapshot fields for data persistence
-  snapshotBuyerName    String?   @map("snapshot_buyer_name")
-  snapshotBuyerEmail   String?   @map("snapshot_buyer_email")
-  snapshotBuyerAvatar  String?   @map("snapshot_buyer_avatar")
-  snapshotInstanceName String?   @map("snapshot_instance_name")
-  snapshotHostName     String?   @map("snapshot_host_name")
-  snapshotPackageName  String?   @map("snapshot_package_name")
-  snapshotPlanName     String?   @map("snapshot_plan_name")
-
-  createdAt  DateTime            @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, frozen])
-  @@index([unfreezeAt])
-  @@map("hosting_balance_logs")
-}
-
-// 托管余额提现记录
-model HostingWithdrawal {
-  id           Int              @id @default(autoincrement())
-  userId       Int              @map("user_id")
-  amount       Decimal          @db.Decimal(10, 2) // 提现金额
-  feeRate      Decimal          @map("fee_rate") @db.Decimal(5, 4)  // 手续费率（如 0.1000 表示 10%）
-  feeAmount    Decimal          @map("fee_amount") @db.Decimal(10, 2) // 手续费金额
-  actualAmount Decimal          @map("actual_amount") @db.Decimal(10, 2) // 实际到账金额
-  target       WithdrawalTarget
-  usdtAddress  String?          @map("usdt_address") // USDT地址（仅USDT提现）
-  status       WithdrawalStatus @default(pending)
-  rejectReason String?          @map("reject_reason")
-  processedAt  DateTime?        @map("processed_at")
-  processedBy  Int?             @map("processed_by") // 处理的管理员ID
-  createdAt    DateTime         @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status])
-  @@map("hosting_withdrawals")
-}
-
-// 托管用户拉黑关系
-model HostingUserBlock {
-  id            Int      @id @default(autoincrement())
-  blockerId     Int      @map("blocker_id") // 托管用户
-  blockedUserId Int      @map("blocked_user_id") // 被拉黑用户
-  remark        String?
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  blocker     User @relation("HostingBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blockedUser User @relation("HostingBlockedUser", fields: [blockedUserId], references: [id], onDelete: Cascade)
-
-  @@unique([blockerId, blockedUserId])
-  @@index([blockedUserId])
-  @@index([blockerId])
-  @@map("hosting_user_blocks")
-}
-
-// 托管专区机主
-model HostingZone {
-  id        Int      @id @default(autoincrement())
-  name      String
-  ownerId   Int      @unique @map("owner_id")
-  logoUrl   String   @map("logo_url") @db.Text
-  sortOrder Int      @default(0) @map("sort_order")
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  owner User @relation("HostingZoneOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-
-  @@index([active, sortOrder])
-  @@map("hosting_zones")
-}
 // ==================== 礼品卡兑换码系统 ====================
 
 enum GiftCardStatus {

@@ -520,8 +520,6 @@ function getLogTypeName(type: string): string {
     gift: t('wallet.logTypes.gift'),
     transfer_fee: t('wallet.logTypes.transferFee'),
     transfer_refund: t('wallet.logTypes.transferRefund'),
-    hosting_withdraw: t('wallet.logTypes.hostingWithdraw'),
-    hosting_deduction: t('wallet.logTypes.hostingDeduction'),
     invite_generate: '生成邀请码'
   }
   return map[type] || type
@@ -627,8 +625,6 @@ function getLogTypeTagClass(type: string): string {
     transfer_refund: 'blue',
     consume: 'rose',
     transfer_fee: 'slate',
-    hosting_withdraw: 'slate',
-    hosting_deduction: 'rose',
     invite_generate: 'violet'
   }
 

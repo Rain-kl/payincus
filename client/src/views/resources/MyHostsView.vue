@@ -4,9 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
+import IconButton from '@/components/IconButton.vue'
+import { Activity, Trash2 } from 'lucide-vue-next'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { translateError } from '@/utils/errorHandler'
@@ -19,32 +19,8 @@ defineOptions({ name: 'MyHostsView' })
 const { t, locale } = useI18n()
 const router = useRouter()
 const toast = useToast()
-const themeStore = useThemeStore()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
-
-// 管理员专用：节点范围切换器
-const scope = ref('mine') // 'mine' | 'hosted'
-const filterUserId = ref('')  // 用于筛选特定用户的托管节点
-
-// 托管准入检查
-const showAccessDeniedModal = ref(false)
-const accessDeniedDetails = ref(null)
-const accessDeniedConditionText = computed(() =>
-  accessDeniedDetails.value?.hiddenBySystemSetting
-    ? t('hosting.accessDenied.featureHiddenCondition')
-    : t('hosting.accessDenied.condition')
-)
-const accessDeniedStatusText = computed(() =>
-  accessDeniedDetails.value?.hiddenBySystemSetting
-    ? t('hosting.accessDenied.featureHiddenCurrent')
-    : t('hosting.accessDenied.currentInstances', { count: accessDeniedDetails.value?.instanceCount || 0 })
-)
-const accessDeniedHintText = computed(() =>
-  accessDeniedDetails.value?.hiddenBySystemSetting
-    ? t('hosting.accessDenied.featureHiddenHint')
-    : t('hosting.accessDenied.hint')
-)
 
 // 宿主机列表
 const hosts = ref([])
@@ -55,7 +31,6 @@ const page = ref(1)
 const pageSize = ref(100)
 const total = ref(0)
 const totalPages = ref(0)
-const takingOverHostId = ref(null)
 
 // 在线节点数量（用于校对按钮禁用状态）
 const onlineHostsCount = computed(() => hosts.value.filter(h => h.status === 'online' && (!h.tunnelEnabled || h.tunnelOnline)).length)
@@ -110,15 +85,7 @@ async function loadHosts() {
   loading.value = true
   try {
     let res
-    if (isAdmin.value && scope.value === 'hosted') {
-      // 管理员查看托管节点
-      res = await api.hosts.listHosted({
-        page: page.value,
-        pageSize: pageSize.value,
-        search: search.value,
-        ...(filterUserId.value ? { userId: parseInt(filterUserId.value, 10) } : {})
-      })
-    } else if (isAdmin.value && scope.value === 'mine') {
+    if (isAdmin.value) {
       // 管理员查看自己的节点（传 scope: 'mine'）
       res = await api.hosts.list({
         page: page.value,
@@ -145,24 +112,6 @@ async function loadHosts() {
   }
 }
 
-// 切换范围时重新加载
-function switchScope(newScope) {
-  scope.value = newScope
-  filterUserId.value = ''
-  page.value = 1
-  loadHosts()
-}
-
-// 按用户ID筛选时重新加载
-let filterTimer = null
-watch(filterUserId, () => {
-  clearTimeout(filterTimer)
-  filterTimer = setTimeout(() => {
-    page.value = 1
-    loadHosts()
-  }, 300)
-})
-
 // 搜索防抖
 let searchTimer = null
 watch(search, () => {
@@ -175,24 +124,9 @@ watch(search, () => {
 
 const showCreateDrawer = ref(false)
 
-// 打开创建抽屉（需检查托管准入条件）
-async function goToCreate() {
-  // 管理员直接放行
+// 打开创建抽屉（仅管理员可创建节点）
+function goToCreate() {
   if (isAdminEntry || authStore.user?.role === 'admin') {
-    showCreateDrawer.value = true
-    return
-  }
-
-  try {
-    const res = await api.hosting.checkAccess()
-    if (res.allowed) {
-      showCreateDrawer.value = true
-    } else {
-      accessDeniedDetails.value = res.details || null
-      showAccessDeniedModal.value = true
-    }
-  } catch {
-    // 检查失败时也允许打开，让后端再次校验
     showCreateDrawer.value = true
   }
 }
@@ -253,46 +187,6 @@ function formatLocalizedNameList(names, max = 3) {
     }).format(visibleNames)
   } catch {
     return visibleNames.join(', ')
-  }
-}
-
-async function takeoverHost(host) {
-  if (!isAdmin.value || scope.value !== 'hosted') return
-
-  const confirmed = confirm(t('resources.hosts.takeoverOfficialConfirm', { name: host.name }))
-  if (!confirmed) return
-
-  takingOverHostId.value = host.id
-  try {
-    const res = await api.hosts.takeoverOfficial(host.id)
-    const summary = res.summary
-    toast.success(t('resources.hosts.takeoverOfficialSuccess', {
-      name: summary.newHostName,
-      packages: summary.transferredPackageCount,
-      instances: summary.instanceCount
-    }))
-    if (summary.detachedPackageCount > 0) {
-      const detachedNames = formatLocalizedNameList(summary.detachedPackageNames)
-      toast.info(t('resources.hosts.takeoverOfficialDetached', {
-        count: summary.detachedPackageCount,
-        names: detachedNames || '-'
-      }))
-    }
-    await loadHosts()
-  } catch (err) {
-    const takeoverError = err && typeof err === 'object' ? err : null
-    if (takeoverError?.code === 'HOST_TAKEOVER_PACKAGE_BINDING_CONFLICT') {
-      const packageNames = Array.isArray(takeoverError.packageNames) ? takeoverError.packageNames : []
-      toast.error(t('resources.hosts.takeoverOfficialBlocked', {
-        count: takeoverError.count || packageNames.length,
-        names: formatLocalizedNameList(packageNames)
-      }))
-      return
-    }
-
-    toast.error(translateError(err))
-  } finally {
-    takingOverHostId.value = null
   }
 }
 
@@ -384,7 +278,7 @@ onActivated(() => {
         <h1 class="page-title">{{ t('resources.hosts.title') }}</h1>
         <p class="page-description">{{ t('resources.hosts.description') }}</p>
       </div>
-      <div v-if="scope === 'mine'" class="flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <button
           class="btn-secondary btn-sm sm:btn"
           :disabled="calibratingAll || onlineHostsCount === 0"
@@ -418,35 +312,6 @@ onActivated(() => {
           v-model="search"
           type="text"
           :placeholder="t('admin.hosts.searchPlaceholder')"
-          class="input pl-9 w-full"
-        />
-      </div>
-      <!-- 管理员专用：节点范围切换器 -->
-      <div v-if="isAdmin" class="inline-flex rounded-lg border border-themed bg-themed-secondary p-1">
-        <button
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="scope === 'mine' ? 'bg-themed-surface text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-          @click="switchScope('mine')"
-        >
-          {{ t('resources.hosts.mine') }}
-        </button>
-        <button
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="scope === 'hosted' ? 'bg-themed-surface text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-          @click="switchScope('hosted')"
-        >
-          {{ t('resources.hosts.hosted') }}
-        </button>
-      </div>
-      <!-- 托管节点用户ID筛选 -->
-      <div v-if="isAdmin && scope === 'hosted'" class="relative sm:w-40">
-        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-        <input
-          v-model="filterUserId"
-          type="text"
-          :placeholder="t('resources.hosts.filterByUserId')"
           class="input pl-9 w-full"
         />
       </div>
@@ -498,20 +363,6 @@ onActivated(() => {
             </span>
           </div>
 
-          <div v-if="isAdmin && scope === 'hosted'" class="mt-4 rounded-lg border border-themed bg-themed-secondary px-3 py-2">
-            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-themed-muted">
-              {{ t('resources.hosts.owner') }}
-            </div>
-            <div v-if="host.owner" class="flex items-center gap-2">
-              <UserAvatar :avatar-style="host.owner.avatarStyle" :badge-id="host.owner.avatarBadgeId || null" :size="28" :username="host.owner.username" />
-              <div class="min-w-0">
-                <div class="truncate text-sm font-medium text-themed">{{ host.owner.username }}</div>
-                <div class="font-mono text-xs text-themed-muted">UID: {{ host.owner.id }}</div>
-              </div>
-            </div>
-            <span v-else class="text-sm text-themed-muted">-</span>
-          </div>
-
           <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div class="rounded-lg border border-themed bg-themed-secondary px-3 py-2">
               <div class="text-[11px] font-medium uppercase tracking-wide text-themed-muted">{{ t('admin.hosts.cpu') }}</div>
@@ -527,20 +378,10 @@ onActivated(() => {
             </div>
           </div>
 
-          <div v-if="scope === 'mine' || (isAdmin && scope === 'hosted')" class="mt-4 flex items-center justify-end gap-2 border-t border-themed pt-3" @click.stop>
-            <template v-if="scope === 'mine'">
+          <div class="mt-4 flex items-center justify-end gap-2 border-t border-themed pt-3" @click.stop>
+            <template>
               <button type="button" class="btn-ghost btn-sm" @click.stop="testHost(host)">{{ t('admin.hosts.test') }}</button>
               <button type="button" class="btn-ghost btn-sm text-error" @click.stop="deleteHost(host)">{{ t('admin.hosts.delete') }}</button>
-            </template>
-            <template v-else-if="isAdmin && scope === 'hosted'">
-              <button
-                type="button"
-                class="btn-ghost btn-sm text-primary"
-                :disabled="takingOverHostId === host.id"
-                @click.stop="takeoverHost(host)"
-              >
-                {{ takingOverHostId === host.id ? t('resources.hosts.takeoverOfficialLoading') : t('resources.hosts.takeoverOfficial') }}
-              </button>
             </template>
           </div>
         </div>
@@ -551,11 +392,10 @@ onActivated(() => {
           <thead class="border-b border-themed bg-themed-secondary">
             <tr>
               <th class="text-left text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('admin.hosts.name') }}</th>
-              <th v-if="isAdmin && scope === 'hosted'" class="text-left text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('resources.hosts.owner') }}</th>
               <th class="text-left text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('admin.hosts.status') }}</th>
               <th class="text-left text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('admin.hosts.resources') }}</th>
               <th class="text-left text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('admin.hosts.instances') }}</th>
-              <th v-if="scope === 'mine' || (isAdmin && scope === 'hosted')" class="text-right text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('admin.hosts.actions') }}</th>
+              <th class="text-right text-xs font-medium text-themed-muted uppercase tracking-wider px-4 py-3 whitespace-nowrap">{{ t('admin.hosts.actions') }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-themed">
@@ -578,17 +418,6 @@ onActivated(() => {
                   </div>
                 </div>
               </td>
-              <!-- 托管节点所有者信息 -->
-              <td v-if="isAdmin && scope === 'hosted'" class="px-4 py-3 whitespace-nowrap">
-                <div v-if="host.owner" class="flex items-center gap-2">
-                  <UserAvatar :avatar-style="host.owner.avatarStyle" :badge-id="host.owner.avatarBadgeId || null" :size="28" :username="host.owner.username" />
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-medium text-themed">{{ host.owner.username }}</div>
-                    <div class="font-mono text-xs text-themed-muted">UID: {{ host.owner.id }}</div>
-                  </div>
-                </div>
-                <span v-else class="text-themed-muted">-</span>
-              </td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <span class="inline-flex items-center gap-1.5 rounded-full border border-themed px-2 py-0.5 text-xs font-mono text-themed-secondary">
                   <span :class="['h-1.5 w-1.5 rounded-full', getStatusClass(host.status, host)]"></span>
@@ -604,21 +433,10 @@ onActivated(() => {
                 </div>
               </td>
               <td class="px-4 py-3 text-sm font-mono tabular-nums text-themed-secondary whitespace-nowrap">{{ host.instanceCount }}</td>
-              <td v-if="scope === 'mine' || (isAdmin && scope === 'hosted')" class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
-                <div class="flex items-center justify-end gap-2">
-                  <template v-if="scope === 'mine'">
-                    <button class="btn-ghost btn-sm" @click.stop="testHost(host)">{{ t('admin.hosts.test') }}</button>
-                    <button class="btn-ghost btn-sm text-error" @click.stop="deleteHost(host)">{{ t('admin.hosts.delete') }}</button>
-                  </template>
-                  <template v-else-if="isAdmin && scope === 'hosted'">
-                    <button
-                      class="btn-ghost btn-sm text-primary"
-                      :disabled="takingOverHostId === host.id"
-                      @click.stop="takeoverHost(host)"
-                    >
-                      {{ takingOverHostId === host.id ? t('resources.hosts.takeoverOfficialLoading') : t('resources.hosts.takeoverOfficial') }}
-                    </button>
-                  </template>
+              <td class="px-4 py-3 text-right whitespace-nowrap" @click.stop>
+                <div class="flex items-center justify-end gap-1">
+                  <IconButton :label="t('admin.hosts.test')" @click.stop="testHost(host)"><Activity /></IconButton>
+                  <IconButton :label="t('admin.hosts.delete')" variant="danger" @click.stop="deleteHost(host)"><Trash2 /></IconButton>
                 </div>
               </td>
             </tr>
@@ -680,63 +498,6 @@ onActivated(() => {
       </div>
     </div>
   </div>
-
-  <!-- 托管准入条件不满足抽屉 -->
-  <DrawerModal
-    v-model:show="showAccessDeniedModal"
-    max-width="max-w-md"
-    raw
-    @close="showAccessDeniedModal = false"
-  >
-    <div class="modal-header">
-      <div class="flex items-center gap-3">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-full"
-          :class="themeStore.isDark ? 'bg-amber-500/15' : 'bg-amber-100'"
-        >
-          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <h3 class="modal-title">{{ t('hosting.accessDenied.title') }}</h3>
-      </div>
-      <button type="button" class="btn btn-ghost btn-sm p-1.5 -mr-1" aria-label="close" @click="showAccessDeniedModal = false">
-        <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <div class="modal-body space-y-4">
-      <p class="text-sm text-themed-muted">{{ t('hosting.accessDenied.description') }}</p>
-
-      <div class="space-y-3">
-        <!-- 条件：至少拥有过1台实例 -->
-        <div class="flex items-center gap-3 rounded-lg border border-themed bg-themed-secondary p-3">
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-themed-hover text-themed-muted">
-            <span class="text-xs font-medium">!</span>
-          </div>
-          <div class="flex-1">
-            <div class="text-sm font-medium text-themed">{{ accessDeniedConditionText }}</div>
-            <div class="text-xs text-themed-muted">
-              {{ accessDeniedStatusText }}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <p class="text-xs text-themed-muted">{{ accessDeniedHintText }}</p>
-    </div>
-
-    <div class="modal-footer">
-      <button
-        class="btn-primary w-full"
-        @click="showAccessDeniedModal = false"
-      >
-        {{ t('common.confirm') }}
-      </button>
-    </div>
-  </DrawerModal>
 
   <!-- 创建节点抽屉 -->
   <MyHostCreateView

@@ -69,7 +69,7 @@ const BILLING_RECORD_TYPES = new Set(['newPurchase', 'renew', 'upgrade', 'downgr
 const INSTANCE_STATUSES = new Set(['creating', 'running', 'stopped', 'suspended', 'error', 'deleted'])
 const RECHARGE_STATUSES = new Set(['pending', 'paid', 'completed', 'failed', 'cancelled', 'refunded'])
 const RECONCILIATION_ITEM_STATUSES = new Set<FinancialReconciliationStatus>(['discrepancy', 'confirmed', 'ignored'])
-const RECONCILIATION_EXPORT_TYPES = new Set(['orders', 'balance_logs', 'hosting_income', 'adjustments'])
+const RECONCILIATION_EXPORT_TYPES = new Set(['orders', 'balance_logs', 'adjustments'])
 const BUSINESS_TIMEZONE_OFFSET_MINUTES = 8 * 60
 const FINANCIAL_NOTE_MAX_LENGTH = 500
 
@@ -692,50 +692,12 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
       const revenueBaseWhere: Prisma.InstanceBillingRecordWhereInput = {
         type: { in: revenueTypes }
       }
-      const directRevenueWhere: Prisma.InstanceBillingRecordWhereInput = {
-        ...revenueBaseWhere,
-        instance: {
-          is: {
-            host: {
-              is: {
-                user: {
-                  is: {
-                    role: 'admin'
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-      const hostedRevenueWhere: Prisma.InstanceBillingRecordWhereInput = {
-        ...revenueBaseWhere,
-        instance: {
-          is: {
-            host: {
-              is: {
-                user: {
-                  is: {
-                    role: { not: 'admin' }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
 
       const [
         totalRevenue,
         thisMonthRevenue,
         lastMonthRevenue,
         todayRevenue,
-        totalDirectRevenue,
-        totalHostedRevenue,
-        thisMonthDirectRevenue,
-        thisMonthHostedRevenue,
-        todayDirectRevenue,
-        todayHostedRevenue,
         totalRefunds,
         paidInstancesCount,
         activePaidInstancesCount,
@@ -770,42 +732,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
         prisma.instanceBillingRecord.aggregate({
           where: {
             ...revenueBaseWhere,
-            createdAt: { gte: today, lt: tomorrow }
-          },
-          _sum: { amount: true }
-        }),
-        prisma.instanceBillingRecord.aggregate({
-          where: directRevenueWhere,
-          _sum: { amount: true }
-        }),
-        prisma.instanceBillingRecord.aggregate({
-          where: hostedRevenueWhere,
-          _sum: { amount: true }
-        }),
-        prisma.instanceBillingRecord.aggregate({
-          where: {
-            ...directRevenueWhere,
-            createdAt: { gte: thisMonthStart }
-          },
-          _sum: { amount: true }
-        }),
-        prisma.instanceBillingRecord.aggregate({
-          where: {
-            ...hostedRevenueWhere,
-            createdAt: { gte: thisMonthStart }
-          },
-          _sum: { amount: true }
-        }),
-        prisma.instanceBillingRecord.aggregate({
-          where: {
-            ...directRevenueWhere,
-            createdAt: { gte: today, lt: tomorrow }
-          },
-          _sum: { amount: true }
-        }),
-        prisma.instanceBillingRecord.aggregate({
-          where: {
-            ...hostedRevenueWhere,
             createdAt: { gte: today, lt: tomorrow }
           },
           _sum: { amount: true }
@@ -910,14 +836,9 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
           expiringCount,
           revenueMix: {
             direct: {
-              totalAmount: toNumber(totalDirectRevenue._sum?.amount),
-              thisMonthAmount: toNumber(thisMonthDirectRevenue._sum?.amount),
-              todayAmount: toNumber(todayDirectRevenue._sum?.amount)
-            },
-            hosted: {
-              totalAmount: toNumber(totalHostedRevenue._sum?.amount),
-              thisMonthAmount: toNumber(thisMonthHostedRevenue._sum?.amount),
-              todayAmount: toNumber(todayHostedRevenue._sum?.amount)
+              totalAmount: toNumber(totalRevenue._sum?.amount),
+              thisMonthAmount: toNumber(thisMonthRevenue._sum?.amount),
+              todayAmount: toNumber(todayRevenue._sum?.amount)
             }
           },
           // 充值统计
@@ -1048,7 +969,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
       return {
         run: serializeReconciliationRun(run),
         date: parsed.dateString,
-        exports: ['orders', 'balance_logs', 'hosting_income', 'adjustments']
+        exports: ['orders', 'balance_logs', 'adjustments']
       }
     } catch (error) {
       request.log.error(error, '获取财务对账结果失败')
@@ -1080,8 +1001,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
           rechargeSummary,
           balanceSummary,
           billingSummary,
-          adjustmentSummary,
-          hostingSummary
+          adjustmentSummary
         ] = await Promise.all([
           tx.rechargeRecord.findMany({
             where: {
@@ -1097,7 +1017,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
           tx.balanceLog.findMany({
             where: {
               createdAt: { gte: parsed.start, lt: parsed.end },
-              type: { in: ['recharge', 'consume', 'refund', 'transfer_fee', 'transfer_refund', 'hosting_deduction'] }
+              type: { in: ['recharge', 'consume', 'refund', 'transfer_fee', 'transfer_refund'] }
             },
             select: { id: true, userId: true, type: true, amount: true, balanceBefore: true, balanceAfter: true, orderId: true, instanceId: true, remark: true, createdAt: true }
           }),
@@ -1151,11 +1071,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
                 { reviewedAt: null, updatedAt: { gte: parsed.start, lt: parsed.end } }
               ]
             },
-            _sum: { amount: true },
-            _count: { id: true }
-          }),
-          tx.hostingBalanceLog.aggregate({
-            where: { createdAt: { gte: parsed.start, lt: parsed.end } },
             _sum: { amount: true },
             _count: { id: true }
           })
@@ -1268,10 +1183,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
           approvedAdjustments: {
             count: adjustmentSummary._count.id,
             amount: Number(adjustmentSummary._sum.amount ?? 0)
-          },
-          hostingIncome: {
-            count: hostingSummary._count.id,
-            amount: Number(hostingSummary._sum.amount ?? 0)
           },
           discrepancies: {
             total: candidates.length,
@@ -1521,32 +1432,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
             maskExportIdentifier(log.orderId),
             log.instanceId ?? '',
             log.remark ?? '',
-            log.createdAt
-          ])
-        ]
-      } else if (exportType === 'hosting_income') {
-        const logs = await prisma.hostingBalanceLog.findMany({
-          where: { createdAt: { gte: parsed.start, lt: parsed.end } },
-          include: { user: { select: { id: true, username: true } } },
-          orderBy: { createdAt: 'asc' }
-        })
-        rows = [
-          ['托管流水ID', '机主ID', '机主用户名', '类型', '动作', '金额', '冻结', '解冻时间', '关联ID', '买家昵称', '实例名', '节点名', '套餐', '方案', '创建时间'],
-          ...logs.map(log => [
-            log.id,
-            log.userId,
-            log.user?.username ?? '',
-            log.type,
-            log.actionType ?? '',
-            Number(log.amount),
-            log.frozen ? '是' : '否',
-            log.unfreezeAt ?? '',
-            log.relatedId ?? '',
-            log.snapshotBuyerName ?? '',
-            log.snapshotInstanceName ?? '',
-            log.snapshotHostName ?? '',
-            log.snapshotPackageName ?? '',
-            log.snapshotPlanName ?? '',
             log.createdAt
           ])
         ]
@@ -2029,14 +1914,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
           refundAmount: amount,
           remark: `管理员退款返利冲正：${instance.name}`
         })
-
-        await db.deductHostingBalance(
-          instance.hostId,
-          amount,
-          instanceId,
-          `管理员退款扣除托管收入：${instance.name}`,
-          tx
-        )
       })
 
       await createLog(
@@ -2195,14 +2072,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
               refundAmount,
               remark: `管理员删除并退款返利冲正：${instance.name}`
             })
-
-            await db.deductHostingBalance(
-              instance.hostId,
-              refundAmount,
-              instanceId,
-              `管理员删除托管实例退款扣除：${instance.name}`,
-              tx
-            )
           })
         } catch (refundError) {
           await prisma.instance.updateMany({
@@ -3096,9 +2965,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
             ? Number(affBinding.affCode.discountRate) || 0
             : 0
 
-          // 判断是否为托管实例（userId=1 是管理员/直营）
-          const isHostedInstance = (inst.host as { user?: { role?: string } })?.user?.role === 'user'
-
           return {
             id: inst.id,
             incusId: inst.incusId,
@@ -3122,7 +2988,6 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
             createdAt: inst.createdAt.toISOString(),
             remainingDays,
             instanceTypeLabel,
-            isHostedInstance,
             autoRenew: inst.autoRenew,
             suspendedAt: inst.suspendedAt?.toISOString(),
             suspendReason: inst.suspendReason,

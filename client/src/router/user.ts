@@ -8,15 +8,6 @@ import { isStaleAssetLoadError, scheduleStaleAssetReload } from '@/utils/staleAs
 // OAuth 登录码处理状态
 let oauthProcessing = false
 let oauthProcessed = false
-const hiddenHostingRouteNames = new Set([
-  'my-hosts',
-  'my-host-create',
-  'my-host-detail',
-  'my-packages',
-  'my-package-create',
-  'my-package-edit',
-  'hosting-wallet'
-])
 const hiddenMailRouteNames = new Set(['mail', 'mail-domain'])
 
 // 处理 OAuth 登录码的函数
@@ -204,44 +195,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TransfersView.vue'),
     meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.transfers', title: '转移' }
   },
-  // 用户资源管理路由（开放给满足条件的用户）
-  {
-    path: '/resources/hosts',
-    name: 'my-hosts',
-    component: () => import('@/views/resources/MyHostsView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.myHosts', title: '我的节点' }
-  },
-  {
-    path: '/resources/hosts/create',
-    redirect: '/resources/hosts'
-  },
-  {
-    path: '/resources/hosts/:id',
-    name: 'my-host-detail',
-    component: () => import('@/views/resources/MyHostDetailView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.myHostDetail', title: '节点详情' }
-  },
-  {
-    path: '/resources/packages',
-    name: 'my-packages',
-    component: () => import('@/views/resources/MyPackagesView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.myPackages', title: '我的套餐' }
-  },
-  {
-    path: '/resources/packages/create',
-    redirect: '/resources/packages'
-  },
-  {
-    path: '/resources/packages/:id/edit',
-    redirect: '/resources/packages'
-  },
-  // 托管余额页面
-  {
-    path: '/hosting-wallet',
-    name: 'hosting-wallet',
-    component: () => import('@/views/HostingWalletView.vue'),
-    meta: { requiresAuth: true, requiresUser: true, titleKey: 'nav.hostingWallet', title: '托管收益' }
-  },
 
   // 工单系统路由
   {
@@ -377,16 +330,6 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
   if ((to.meta.requiresAuth || to.meta.requiresUser) && authStore.isAdmin) {
     authStore.clearInMemoryAuth()
     next({ name: 'login', query: { adminOnly: '1' } })
-    return
-  }
-
-  if (
-    !authStore.isAdmin &&
-    typeof to.name === 'string' &&
-    hiddenHostingRouteNames.has(to.name) &&
-    authStore.user?.canAccessHostingFeature === false
-  ) {
-    next({ name: 'dashboard' })
     return
   }
 

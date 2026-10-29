@@ -8,7 +8,7 @@ import { addTicketMessage, createTicket, type CreateTicketMessageAttachmentData 
 import { createBalanceAdjustmentRequest } from '../db/balance.js'
 import { findUserById, getSystemConfigBoolean, performRenewal } from '../db/index.js'
 import { getAllAdminUserIds } from '../db/users.js'
-import { sendHostManagedInstanceNotification, sendNotification } from '../lib/notifier.js'
+import { sendNotification } from '../lib/notifier.js'
 import { sendRenewSuccessEmail } from '../lib/mailer.js'
 import { cancelInstanceTask, createInstanceTask, getTaskQueuePosition, InstanceTaskConflictError } from '../db/instance-tasks.js'
 import {
@@ -65,8 +65,6 @@ const PUBLIC_BALANCE_LOG_TYPES = new Set<BalanceLogType>([
   'gift',
   'transfer_fee',
   'transfer_refund',
-  'hosting_withdraw',
-  'hosting_deduction',
   'invite_generate'
 ])
 const PUBLIC_PROFILE_AVATAR_STYLES = [
@@ -668,41 +666,10 @@ async function assertPublicServiceRenewAllowed(
     packagePlanId: number | null
     expiresAt: Date | null
   },
-  months: number
+  _months: number
 ): Promise<{ ok: true } | { ok: false; status: number; code: string; message: string; details?: Record<string, unknown> }> {
   if (!service.packagePlanId) {
     return { ok: false, status: 400, code: 'FREE_SERVICE', message: 'Free services do not need renewal' }
-  }
-
-  const host = await prisma.host.findUnique({
-    where: { id: service.hostId },
-    select: { user: { select: { role: true } } }
-  })
-  const isHostedInstance = host?.user.role === 'user'
-  if (!isHostedInstance) {
-    return { ok: true }
-  }
-
-  if (months !== 1) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'HOSTING_MONTHLY_ONLY',
-      message: 'Hosted user services can only be renewed monthly'
-    }
-  }
-
-  if (service.expiresAt) {
-    const daysUntilExpire = Math.ceil((service.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    if (daysUntilExpire > 7) {
-      return {
-        ok: false,
-        status: 400,
-        code: 'HOSTING_RENEW_TOO_EARLY',
-        message: 'Hosted user services can only be renewed within 7 days before expiry',
-        details: { daysUntilExpire }
-      }
-    }
   }
 
   return { ok: true }
@@ -1771,20 +1738,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
         newExpiresAt: result.newExpiresAt.toISOString()
       })
 
-      if (result.hostingIncomeResult) {
-        sendHostManagedInstanceNotification(
-          service.hostId,
-          'renew',
-          {
-            username: apiToken.user.username,
-            instanceName: service.name,
-            amount: result.amount
-          }
-        ).catch(error => {
-          console.warn('[Public API renew] Failed to send hosted income notification:', error)
-        })
-      }
-
       try {
         const userInfo = await findUserById(apiToken.userId)
         if (userInfo?.email) {
@@ -2283,22 +2236,13 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
         : []
 
       try {
-        const hostedTicketHost = ticket.host?.user.role === 'user' ? ticket.host : null
-        if (hostedTicketHost?.userId) {
-          await sendNotification(hostedTicketHost.userId, 'ticket_replied', {
+        const adminIds = await getAllAdminUserIds()
+        for (const adminId of adminIds) {
+          await sendNotification(adminId, 'ticket_replied', {
             subject: ticket.subject,
             hostName: ticket.host?.name || '系统',
             replyFrom: apiToken.user.username
           })
-        } else {
-          const adminIds = await getAllAdminUserIds()
-          for (const adminId of adminIds) {
-            await sendNotification(adminId, 'ticket_replied', {
-              subject: ticket.subject,
-              hostName: ticket.host?.name || '系统',
-              replyFrom: apiToken.user.username
-            })
-          }
         }
       } catch (error) {
         console.error('[PublicAPI] Failed to send ticket reply notification:', error)

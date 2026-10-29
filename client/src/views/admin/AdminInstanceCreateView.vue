@@ -22,8 +22,6 @@ interface ImageOption {
   icon: string | null
 }
 
-type PackageScope = 'official' | 'hosted'
-
 const { t } = useI18n()
 const toast = useToast()
 const themeStore = useThemeStore()
@@ -47,7 +45,6 @@ const targetUser = ref<{ id: number; username: string; balance?: number } | null
 
 // 实例类型选择：免费/付费
 const instanceType = ref<'free' | 'paid'>('free')
-const packageScope = ref<PackageScope>('official')
 
 // 付费方案相关
 const plans = ref<PackagePlan[]>([])
@@ -148,7 +145,7 @@ const hostsInsufficient = computed<boolean>(() => {
 onMounted(async (): Promise<void> => {
   loading.value = true
   try {
-    await loadPackagesForScope(packageScope.value)
+    await loadPackagesForScope('official')
   } catch (err: any) {
     error.value = t('instance.createPage.loadFailed') + ': ' + (err?.message || String(err))
   } finally {
@@ -212,7 +209,7 @@ function clearImages(): void {
   imagesLoading.value = false
 }
 
-async function loadPackagesForScope(scope: PackageScope): Promise<void> {
+async function loadPackagesForScope(scope: 'official'): Promise<void> {
   const requestSeq = ++packageRequestSeq
   packagesLoading.value = true
   resetPackageDependentState()
@@ -232,20 +229,6 @@ async function loadPackagesForScope(scope: PackageScope): Promise<void> {
     if (requestSeq === packageRequestSeq) {
       packagesLoading.value = false
     }
-  }
-}
-
-async function switchPackageScope(scope: PackageScope): Promise<void> {
-  if (scope === packageScope.value || packagesLoading.value) return
-
-  packageScope.value = scope
-  error.value = ''
-
-  try {
-    await loadPackagesForScope(scope)
-  } catch (err: any) {
-    packages.value = []
-    error.value = t('instance.createPage.loadFailed') + ': ' + (err?.message || String(err))
   }
 }
 
@@ -661,34 +644,7 @@ async function handleSubmit(): Promise<void> {
         :selected-package-id="form.packageId"
         :loading="packagesLoading"
         @select="selectPackage"
-      >
-        <template #header-actions>
-          <div class="inline-flex rounded-lg p-1" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-100'">
-            <button
-              type="button"
-              class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              :class="packageScope === 'official'
-                ? (themeStore.isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-900 shadow-sm')
-                : (themeStore.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')"
-              :disabled="packagesLoading"
-              @click="switchPackageScope('official')"
-            >
-              {{ $t('admin.instanceCreate.packageScope.official') }}
-            </button>
-            <button
-              type="button"
-              class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-              :class="packageScope === 'hosted'
-                ? (themeStore.isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-900 shadow-sm')
-                : (themeStore.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')"
-              :disabled="packagesLoading"
-              @click="switchPackageScope('hosted')"
-            >
-              {{ $t('admin.instanceCreate.packageScope.hosted') }}
-            </button>
-          </div>
-        </template>
-      </PackageSelector>
+      />
 
       <!-- 实例类型选择 -->
       <section class="card p-6">

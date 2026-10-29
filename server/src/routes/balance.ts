@@ -23,8 +23,6 @@ const BALANCE_LOG_TYPES = new Set<BalanceLogType>([
   'gift',
   'transfer_fee',
   'transfer_refund',
-  'hosting_withdraw',
-  'hosting_deduction',
   'invite_generate'
 ])
 const BILLING_RECORD_TYPES = new Set<BillingRecordType>([

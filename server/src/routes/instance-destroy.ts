@@ -10,7 +10,7 @@ import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
 import { createLog } from '../db/logs.js'
 import { apiError, ErrorCode } from '../lib/errors.js'
-import { sendHostManagedInstanceNotification, sendNotification } from '../lib/notifier.js'
+import { sendNotification } from '../lib/notifier.js'
 import { sendInstanceDestroyRefundEmail } from '../lib/mailer.js'
 import { sendReleaseNotification } from '../lib/release-notifier.js'
 import { collectTrafficForRunningInstance } from '../services/instance-traffic-collector.js'
@@ -390,14 +390,6 @@ async function settleUserDestroyBilling(params: {
         refundAmount,
         remark: `用户销毁实例返利冲正：${instance.name}`
       })
-
-      await db.deductHostingBalance(
-        instance.hostId,
-        refundableValue,
-        instanceId,
-        `用户销毁托管实例退款扣除：${instance.name}`,
-        tx
-      )
     }
 
     await tx.userDestroyRecord.create({
@@ -827,19 +819,6 @@ async function executeDestroyForUser(
         logger.warn(emailErr, '发送销毁退款邮件失败')
       }
     }
-
-    sendHostManagedInstanceNotification(
-      instance.hostId,
-      'destroy',
-      {
-        username: user.username,
-        instanceName: instance.name,
-        refundAmount,
-        feeAmount
-      }
-    ).catch(err => {
-      logger.warn(err, '发送节点销毁通知失败')
-    })
 
     if (instance.packageId) {
       sendReleaseNotification({
@@ -1329,19 +1308,6 @@ export default async function instanceDestroyRoutes(fastify: FastifyInstance) {
           request.log.warn(emailErr, '发送销毁退款邮件失败')
         }
       }
-
-      sendHostManagedInstanceNotification(
-        instance.hostId,
-        'destroy',
-        {
-          username: user.username,
-          instanceName: instance.name,
-          refundAmount,
-          feeAmount
-        }
-      ).catch(err => {
-        request.log.warn(err, '发送节点销毁通知失败')
-      })
 
       // 10. 向套餐绑定的通知渠道发送"资源释放"通知
       if (instance.packageId) {

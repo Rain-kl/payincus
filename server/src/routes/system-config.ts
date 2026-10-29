@@ -38,7 +38,7 @@ interface PublicPromoPackage {
     id: number
     name: string
     description: string | null
-    source: 'official' | 'market'
+    source: 'official'
     plans: PublicPromoPackagePlan[]
 }
 
@@ -125,7 +125,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
     fastify.get('/public', {
         config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
     }, async (_request: FastifyRequest, _reply: FastifyReply) => {
-        const [registrationEnabled, requireInviteCode, ticketCreationEnabled, freeSiteMode, mailAvailable, turnstileEnabled, turnstileSiteKey, avatarApiBase, smtpEnabled, emailDomainWhitelistEnabled, emailAllowedDomains, transferFee, footerContactEmail, footerTelegramLink, hostingMarketEntryEnabled, hostingNotice, brandName, brandSubtitle, brandLogoUrl, brandCopyright, popupAnnouncementConfig, popupPromoImageUrlConfig, popupPromoPackageIdConfig] = await Promise.all([
+        const [registrationEnabled, requireInviteCode, ticketCreationEnabled, freeSiteMode, mailAvailable, turnstileEnabled, turnstileSiteKey, avatarApiBase, smtpEnabled, emailDomainWhitelistEnabled, emailAllowedDomains, transferFee, footerContactEmail, footerTelegramLink, brandName, brandSubtitle, brandLogoUrl, brandCopyright, popupAnnouncementConfig, popupPromoImageUrlConfig, popupPromoPackageIdConfig] = await Promise.all([
             db.isRegistrationEnabled(),
             db.isInviteCodeRequired(),
             db.getSystemConfigBoolean('ticket_enabled', true),
@@ -140,8 +140,6 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             db.getSystemConfigFloat('transfer_fee', 0),
             db.getSystemConfig('footer_contact_email'),
             db.getSystemConfig('footer_telegram_link'),
-            db.getSystemConfigBoolean('hosting_market_entry_enabled', true),
-            db.getSystemConfig('hosting_notice'),
             db.getSystemConfig('brand_name'),
             db.getSystemConfig('brand_subtitle'),
             db.getSystemConfig('brand_logo_url'),
@@ -213,7 +211,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
                         id: pkg.id,
                         name: pkg.name,
                         description: pkg.description,
-                        source: pkg.user.role === 'admin' ? 'official' : 'market',
+                        source: 'official',
                         plans: pkg.plans.map(plan => ({
                             id: plan.id,
                             name: plan.name,
@@ -247,8 +245,6 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             transferFee,
             footerContactEmail,
             footerTelegramLink,
-            hostingMarketEntryEnabled,
-            hostingNotice,
             brandName: brandName || 'Incudal',
             brandSubtitle: brandSubtitle || '基于 Incus 的低价 NAT VPS',
             brandLogoUrl: (brandLogoUrl && brandLogoUrl !== '/incudal_logo.webp') ? brandLogoUrl : '/logo.svg',
@@ -402,9 +398,6 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             'require_invite_code',
             'invite_generation_costs',
             'invite_default_expire_days',
-            'hosting_feature_enabled',
-            'hosting_market_entry_enabled',
-            'hosting_notice',
             'ticket_enabled',
             TICKET_AUTO_CLOSE_ENABLED_CONFIG_KEY,
             TICKET_AUTO_CLOSE_HOURS_CONFIG_KEY,
@@ -471,7 +464,7 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
         ]
 
         // 布尔类型配置键
-        const booleanKeys = ['registration_enabled', 'require_invite_code', 'hosting_feature_enabled', 'hosting_market_entry_enabled', 'ticket_enabled', TICKET_AUTO_CLOSE_ENABLED_CONFIG_KEY, 'free_site_mode', 'free_site_register_gift_enabled', 'turnstile_enabled', 'telegram_bot_enabled', 'telegram_group_join_enabled', 'telegram_vip_group_join_enabled', 'smtp_enabled', 'smtp_secure', 'email_domain_whitelist_enabled']
+        const booleanKeys = ['registration_enabled', 'require_invite_code', 'ticket_enabled', TICKET_AUTO_CLOSE_ENABLED_CONFIG_KEY, 'free_site_mode', 'free_site_register_gift_enabled', 'turnstile_enabled', 'telegram_bot_enabled', 'telegram_group_join_enabled', 'telegram_vip_group_join_enabled', 'smtp_enabled', 'smtp_secure', 'email_domain_whitelist_enabled']
         // 字符串类型配置键
         const stringKeys = [
             'turnstile_site_key',
@@ -490,7 +483,6 @@ export default async function systemConfigRoutes(fastify: FastifyInstance) {
             'telegram_group_join_mode',
             'telegram_vip_group_chat_id',
             'telegram_vip_group_join_mode',
-            'hosting_notice',
             'popup_announcement',
             'popup_promo_image_url',
             'popup_promo_package_id',

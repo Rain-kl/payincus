@@ -35,7 +35,6 @@ function assertStartGuard(path: string, startFunctionName: string, guardDeclarat
 
 assertStartGuard('server/src/services/auto-policy-scheduler.ts', 'startAutoPolicyScheduler', 'let schedulerStarted = false')
 assertStartGuard('server/src/services/billing-scheduler.ts', 'startBillingScheduler', 'let schedulerStarted = false')
-assertStartGuard('server/src/services/hosting-scheduler.ts', 'startHostingScheduler', 'let schedulerStarted = false')
 assertStartGuard('server/src/services/status-scheduler.ts', 'startStatusScheduler', 'let schedulerStarted = false')
 assertStartGuard('server/src/services/system-monitor.ts', 'startSystemMonitor', 'let schedulerStarted = false')
 assertStartGuard('server/src/services/traffic-scheduler.ts', 'startTrafficScheduler', 'let schedulerStarted = false')

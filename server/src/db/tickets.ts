@@ -796,7 +796,7 @@ export async function getOwnerAllTickets(
   options: {
     status?: TicketStatus | 'active'
     hostId?: number
-    sourceType?: 'user' | 'official' | 'hosted'
+    sourceType?: 'user' | 'official'
     queue?: 'pending' | 'due_soon' | 'overdue' | 'waiting_user' | 'waiting_internal'
     search?: string
     page?: number
@@ -823,8 +823,6 @@ export async function getOwnerAllTickets(
     where.hostId = null
   } else if (options.sourceType === 'official') {
     where.host = { user: { role: 'admin' } }
-  } else if (options.sourceType === 'hosted') {
-    where.host = { user: { role: { not: 'admin' } } }
   }
   
   // 状态筛选

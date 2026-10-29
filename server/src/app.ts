@@ -80,13 +80,11 @@ import redeemCodesRoutes from './routes/redeem-codes.js'
 import customInitCommandRoutes from './routes/custom-init-commands.js'
 import batchConfigRoutes from './routes/batch-config.js'
 import balanceRoutes from './routes/balance.js'
-import hostingRoutes from './routes/hosting.js'
 import instanceBillingRoutes from './routes/instance-billing.js'
 import instanceDestroyRoutes from './routes/instance-destroy.js'
 import rechargeRoutes from './routes/recharge.js'
 import adminBillingRoutes from './routes/admin-billing.js'
 import adminStatisticsRoutes from './routes/admin-statistics.js'
-import adminHostingRoutes from './routes/admin-hosting.js'
 import affRoutes from './routes/aff.js'
 import entertainmentRoutes from './routes/entertainment.js'
 import adminEntertainmentRoutes from './routes/admin-entertainment.js'
@@ -543,7 +541,6 @@ await fastify.register(redeemCodesRoutes, { prefix: '/api' })
 await fastify.register(customInitCommandRoutes, { prefix: '/api/init-commands' })
 await fastify.register(batchConfigRoutes, { prefix: '/api/hosts' })
 await fastify.register(balanceRoutes, { prefix: '/api/balance' })
-await fastify.register(hostingRoutes, { prefix: '/api/hosting' })
 await fastify.register(instanceBillingRoutes, { prefix: '/api/instances' })
 await fastify.register(instanceDestroyRoutes, { prefix: '/api/instances' })
 await fastify.register(rechargeRoutes)
@@ -551,7 +548,6 @@ await fastify.register(adminBillingRoutes)
 await fastify.register(adminStatisticsRoutes)
 await fastify.register(adminTaskRoutes)
 await fastify.register(egressProfileRoutes)
-await fastify.register(adminHostingRoutes)
 await fastify.register(affRoutes, { prefix: '/api/aff' })
 await fastify.register(entertainmentRoutes, { prefix: '/api/entertainment' })
 await fastify.register(adminEntertainmentRoutes, { prefix: '/api/admin/entertainment' })
@@ -784,10 +780,6 @@ const start = async (): Promise<void> => {
     // 启动邮箱上游实际用量同步调度器
     const { startMailUsageScheduler } = await import('./services/mail-usage-scheduler.js')
     startMailUsageScheduler()
-
-    // 启动托管余额调度器（解冻）
-    const { startHostingScheduler } = await import('./services/hosting-scheduler.js')
-    startHostingScheduler()
 
     // 启动实例状态同步调度器
     const { startStatusScheduler } = await import('./services/status-scheduler.js')

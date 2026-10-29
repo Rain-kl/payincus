@@ -49,14 +49,8 @@ function formatImageName(image: string, imageName?: string | null): string {
 }
 
 // 获取付费实例的图标类型
-function getInstanceIconType(inst: { instanceType?: string; host?: { name?: string } } | null): 'pro' | 'prime' | 'peer' {
+function getInstanceIconType(inst: { instanceType?: string } | null): 'pro' | 'prime' {
   if (!inst) return 'pro'
-
-  // 如果节点名称以 PEER 开头（不区分大小写），则是托管实例，显示 peer 图标
-  const hostName = inst.host?.name || ''
-  if (/^PEER\d/i.test(hostName)) {
-    return 'peer'
-  }
 
   // 根据实例类型判断：虚拟机显示 prime，容器显示 pro
   return inst.instanceType === 'vm' ? 'prime' : 'pro'
@@ -2343,19 +2337,11 @@ function getAffDiscountText(inst: InstanceWithDetails | null): string {
   return ''
 }
 
-function isHostedInstanceForAff(inst: InstanceWithDetails | null): boolean {
-  if (!inst) return false
-  const instAny = inst as any
-  const hostName = instAny.host?.name || ''
-  return instAny.isHostedInstance === true || hostName.toLowerCase().startsWith('peer')
-}
-
 function canApplyAffCode(inst: InstanceWithDetails | null): boolean {
   if (!inst || isHostOwnerOnly.value) return false
   const instAny = inst as any
   return Boolean(instAny.packagePlanId && instAny.expires_at)
     && !hasAffBinding(inst)
-    && !isHostedInstanceForAff(inst)
 }
 
 // 获取计费周期文本

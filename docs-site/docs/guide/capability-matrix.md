@@ -22,7 +22,7 @@
 | Telegram 集成 | 基础可用 | `/admin/settings/telegram` | 个人资料绑定 | `server/src/routes/telegram.ts`、`client/src/views/admin/TelegramConfigView.vue` | 已有 Bot、Webhook、绑定用户和群准入。 |
 | 邮件与 Lsky 附件 | 基础可用 | `/admin/settings/mail`、`/admin/settings/tickets` | 注册验证、工单附件 | `server/src/routes/system-config.ts`、`server/src/lib/lsky.ts` | SMTP/Lsky 已有配置和预检。 |
 | Public API / OAuth | 基础可用 | `/admin/oauth` | `/api/v1/*`、OAuth Provider | `server/src/routes/public-api.ts`、`server/src/lib/public-api-openapi.ts` | 已有 token、scope、分页、排序、错误模型和 SDK；服务创建、退款、余额直写、迁移等高风险能力仍保持关闭。 |
-| 托管与资源池 | 基础可用 | `/admin/hosting`、资源页 | 我的节点、我的套餐、托管收益 | `server/src/routes/hosting.ts`、`server/src/routes/packages.ts` | 已有托管专区、收益、套餐和节点绑定；需要继续完善商业运营验收和异常通知。 |
+| 资源池与套餐 | 基础可用 | 资源页 | 套餐列表 | `server/src/routes/packages.ts` | 已有套餐、节点绑定和资源池能力；托管子系统已整体移除。 |
 | 娱乐、签到与会员权益 | 基础可用 | `/admin/entertainment` | `/entertainment`、签到/权益入口 | `server/src/routes/admin-entertainment.ts`、`server/src/routes/checkin.ts` | 基础能力存在；需要明确产品定位、入口可见性和配置边界。 |
 
 ## 下一批必须补齐的闭环

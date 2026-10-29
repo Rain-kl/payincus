@@ -84,7 +84,6 @@ const freeSiteCopyKeys = [
   'createOrderSummary',
   'createPromoCode',
   'createPromoPlaceholder',
-  'createPromoHostedDisabled',
   'createPromoValid',
   'createPromoUsing',
   'createPromoBenefit',

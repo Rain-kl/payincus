@@ -11,6 +11,8 @@ import api, {
 import { useToast } from '@/stores/toast'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import IconButton from '@/components/IconButton.vue'
+import { RefreshCw } from 'lucide-vue-next'
 import BillingOverviewIcon from '@/components/admin/BillingOverviewIcon.vue'
 import { calculateDiscountedPrice } from '@/utils/billing'
 import { instanceDetailPath } from '@/utils/app-paths'
@@ -104,7 +106,6 @@ interface BillingOverview {
   expiringCount: number
   revenueMix: {
     direct: BillingRevenueBucket
-    hosted: BillingRevenueBucket
   }
   recharge: {
     totalAmount: number
@@ -137,9 +138,7 @@ interface RevenueMixRow {
   key: string
   label: string
   directAmount: number
-  hostedAmount: number
   directRatio: number
-  hostedRatio: number
 }
 
 interface MetricCard {
@@ -445,32 +444,25 @@ const revenueMixRows = computed<RevenueMixRow[]>(() => {
   if (!overview.value) return []
 
   const direct = overview.value.revenueMix.direct
-  const hosted = overview.value.revenueMix.hosted
 
   return [
     {
       key: 'total',
       label: t('admin.billing.overviewPeriods.total'),
       directAmount: direct.totalAmount,
-      hostedAmount: hosted.totalAmount,
-      directRatio: calculateRatio(direct.totalAmount, direct.totalAmount + hosted.totalAmount),
-      hostedRatio: calculateRatio(hosted.totalAmount, direct.totalAmount + hosted.totalAmount)
+      directRatio: direct.totalAmount > 0 ? 100 : 0
     },
     {
       key: 'thisMonth',
       label: t('admin.billing.overviewPeriods.thisMonth'),
       directAmount: direct.thisMonthAmount,
-      hostedAmount: hosted.thisMonthAmount,
-      directRatio: calculateRatio(direct.thisMonthAmount, direct.thisMonthAmount + hosted.thisMonthAmount),
-      hostedRatio: calculateRatio(hosted.thisMonthAmount, direct.thisMonthAmount + hosted.thisMonthAmount)
+      directRatio: direct.thisMonthAmount > 0 ? 100 : 0
     },
     {
       key: 'today',
       label: t('admin.billing.overviewPeriods.today'),
       directAmount: direct.todayAmount,
-      hostedAmount: hosted.todayAmount,
-      directRatio: calculateRatio(direct.todayAmount, direct.todayAmount + hosted.todayAmount),
-      hostedRatio: calculateRatio(hosted.todayAmount, direct.todayAmount + hosted.todayAmount)
+      directRatio: direct.todayAmount > 0 ? 100 : 0
     }
   ]
 })
@@ -558,11 +550,6 @@ const affCards = computed<MetricCard[]>(() => {
 const refundRate = computed(() => {
   if (!overview.value) return 0
   return calculateRatio(overview.value.totalRefunds, overview.value.totalRevenue)
-})
-
-const hostedRevenueShare = computed(() => {
-  if (!overview.value) return 0
-  return calculateRatio(overview.value.revenueMix.hosted.totalAmount, overview.value.totalRevenue)
 })
 
 const activeInstanceShare = computed(() => {
@@ -738,7 +725,7 @@ async function saveReconciliationItem(item: FinancialReconciliationItem) {
   }
 }
 
-async function exportFinancialReconciliation(type: 'orders' | 'balance_logs' | 'hosting_income' | 'adjustments') {
+async function exportFinancialReconciliation(type: 'orders' | 'balance_logs' | 'adjustments') {
   if (reconciliationExporting.value) return
   reconciliationExporting.value = type
   try {
@@ -1206,17 +1193,16 @@ function getReconciliationExportLabel(type: string): string {
   const labels: Record<string, string> = {
     orders: '订单',
     balance_logs: '余额流水',
-    hosting_income: '托管收益',
     adjustments: '调账审批'
   }
   return labels[type] || type
 }
 
-function getSummaryMoney(key: 'recharge' | 'balanceLogs' | 'instanceBilling' | 'approvedAdjustments' | 'hostingIncome'): number {
+function getSummaryMoney(key: 'recharge' | 'balanceLogs' | 'instanceBilling' | 'approvedAdjustments'): number {
   return Number(reconciliation.value?.summary?.[key]?.amount || 0)
 }
 
-function getSummaryCount(key: 'recharge' | 'balanceLogs' | 'instanceBilling' | 'approvedAdjustments' | 'hostingIncome'): number {
+function getSummaryCount(key: 'recharge' | 'balanceLogs' | 'instanceBilling' | 'approvedAdjustments'): number {
   return Number(reconciliation.value?.summary?.[key]?.count || 0)
 }
 
@@ -1454,19 +1440,6 @@ function copyToClipboard(text: string) {
             <article class="card min-w-0 p-5">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.hostedRevenueShare') }}</p>
-                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatPercent(hostedRevenueShare) }}</p>
-                </div>
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
-                  <BillingOverviewIcon name="cloud" class="h-5 w-5" />
-                </div>
-              </div>
-              <p class="mt-3 text-xs text-themed-muted">{{ formatMoney(overview.revenueMix.hosted.totalAmount) }}</p>
-            </article>
-
-            <article class="card min-w-0 p-5">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
                   <p class="text-sm text-themed-muted">{{ $t('admin.billing.totalRefunds') }}</p>
                   <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.totalRefunds) }}</p>
                 </div>
@@ -1526,7 +1499,7 @@ function copyToClipboard(text: string) {
               <div class="flex flex-col gap-3 border-b border-themed pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
                   <h2 class="text-base font-semibold text-themed">{{ $t('admin.billing.revenueBreakdownTitle') }}</h2>
-                  <p class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.directRevenue') }} / {{ $t('admin.billing.hostedRevenue') }}</p>
+                  <p class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.revenueLabel') }}</p>
                 </div>
                 <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
                   <BillingOverviewIcon name="chart" class="h-5 w-5" />
@@ -1535,63 +1508,16 @@ function copyToClipboard(text: string) {
 
               <div class="mt-5 grid gap-4 sm:grid-cols-2">
                 <div class="min-w-0 border-l-2 border-sky-500 pl-3">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.directRevenue') }}</p>
+                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.revenueLabel') }}</p>
                   <p class="mt-1 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.revenueMix.direct.totalAmount) }}</p>
-                  <p class="mt-1 text-xs text-themed-muted">{{ formatPercent(revenueMixRows[0]?.directRatio || 0) }}</p>
-                </div>
-                <div class="min-w-0 border-l-2 border-amber-500 pl-3">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.hostedRevenue') }}</p>
-                  <p class="mt-1 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.revenueMix.hosted.totalAmount) }}</p>
-                  <p class="mt-1 text-xs text-themed-muted">{{ formatPercent(revenueMixRows[0]?.hostedRatio || 0) }}</p>
-                </div>
-              </div>
-
-              <div class="mt-5 h-2.5 overflow-hidden rounded-full bg-themed-tertiary">
-                <div class="flex h-full w-full">
-                  <div class="bg-sky-500" :style="{ width: `${revenueMixRows[0]?.directRatio || 0}%` }"></div>
-                  <div class="bg-amber-500" :style="{ width: `${revenueMixRows[0]?.hostedRatio || 0}%` }"></div>
                 </div>
               </div>
 
               <div class="mt-5 divide-y divide-themed">
                 <div v-for="row in revenueMixRows" :key="row.key" class="py-4 first:pt-0 last:pb-0">
-                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="min-w-0">
-                      <p class="font-medium text-themed">{{ row.label }}</p>
-                      <p class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.revenueLabel') }} {{ formatMoney(row.directAmount + row.hostedAmount) }}</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2 text-xs">
-                      <span class="inline-flex items-center gap-2 rounded-md bg-sky-500/10 px-2.5 py-1 font-medium text-sky-600 dark:text-sky-300">
-                        <span class="h-2 w-2 rounded-full bg-sky-500"></span>
-                        {{ formatPercent(row.directRatio) }}
-                      </span>
-                      <span class="inline-flex items-center gap-2 rounded-md bg-amber-500/10 px-2.5 py-1 font-medium text-amber-600 dark:text-amber-300">
-                        <span class="h-2 w-2 rounded-full bg-amber-500"></span>
-                        {{ formatPercent(row.hostedRatio) }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div class="min-w-0">
-                      <div class="flex items-center justify-between gap-3 text-sm">
-                        <span class="text-themed-muted">{{ $t('admin.billing.directRevenue') }}</span>
-                        <span class="break-words text-right font-semibold text-themed">{{ formatMoney(row.directAmount) }}</span>
-                      </div>
-                    </div>
-                    <div class="min-w-0">
-                      <div class="flex items-center justify-between gap-3 text-sm">
-                        <span class="text-themed-muted">{{ $t('admin.billing.hostedRevenue') }}</span>
-                        <span class="break-words text-right font-semibold text-themed">{{ formatMoney(row.hostedAmount) }}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="mt-3 h-2 overflow-hidden rounded-full bg-themed-tertiary">
-                    <div class="flex h-full w-full">
-                      <div class="bg-sky-500" :style="{ width: `${row.directRatio}%` }"></div>
-                      <div class="bg-amber-500" :style="{ width: `${row.hostedRatio}%` }"></div>
-                    </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="font-medium text-themed">{{ row.label }}</p>
+                    <span class="break-words text-right font-semibold text-themed">{{ formatMoney(row.directAmount) }}</span>
                   </div>
                 </div>
               </div>
@@ -2400,14 +2326,14 @@ function copyToClipboard(text: string) {
                 <td class="p-3 text-themed-muted whitespace-nowrap">{{ formatDate(rec.createdAt) }}</td>
                 <td class="p-3 whitespace-nowrap">
                   <div class="flex items-center gap-2">
-                  <button
+                  <IconButton
                     v-if="rec.status === 'pending'"
-                    class="btn btn-sm btn-ghost text-themed"
+                    :label="syncingRecordId === rec.id ? $t('common.syncing') : $t('admin.billing.sync')"
                     :disabled="syncingRecordId === rec.id"
                     @click="syncRechargeRecord(rec)"
                   >
-                    {{ syncingRecordId === rec.id ? $t('common.syncing') : $t('admin.billing.sync') }}
-                  </button>
+                    <RefreshCw />
+                  </IconButton>
                   <span v-if="rec.status !== 'pending'" class="text-themed-muted">-</span>
                   </div>
                 </td>
@@ -2468,7 +2394,7 @@ function copyToClipboard(text: string) {
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 class="text-base font-semibold text-themed">日对账工作台</h2>
-            <p class="mt-1 text-sm text-themed-muted">按业务日汇总充值、余额流水、实例扣费、退款审批和托管收益。</p>
+            <p class="mt-1 text-sm text-themed-muted">按业务日汇总充值、余额流水、实例扣费和退款审批。</p>
           </div>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label class="block">
@@ -2538,11 +2464,11 @@ function copyToClipboard(text: string) {
             </div>
             <div class="flex flex-wrap gap-2">
               <button
-                v-for="type in ['orders', 'balance_logs', 'hosting_income', 'adjustments']"
+                v-for="type in ['orders', 'balance_logs', 'adjustments']"
                 :key="type"
                 class="btn btn-sm btn-ghost"
                 :disabled="!!reconciliationExporting"
-                @click="exportFinancialReconciliation(type as 'orders' | 'balance_logs' | 'hosting_income' | 'adjustments')"
+                @click="exportFinancialReconciliation(type as 'orders' | 'balance_logs' | 'adjustments')"
               >
                 {{ reconciliationExporting === type ? '导出中...' : `导出${getReconciliationExportLabel(type)}` }}
               </button>
