@@ -40,7 +40,7 @@ function getNavLabel(item: MenuItem): string {
   return item.label.split('.').pop() || item.label
 }
 
-const hiddenExpandMenuNames = new Set(['my-hosts', 'my-packages', 'hosting-wallet'])
+const hiddenExpandMenuNames = new Set(['my-hosts', 'my-packages'])
 const hiddenWhenTicketDisabledMenuNames = new Set(['tickets'])
 const hiddenWhenMailUnavailableMenuNames = new Set(['mail'])
 const collapsibleGroupLabels = new Set(['nav.operations', 'nav.billing', 'nav.resources', 'nav.system'])

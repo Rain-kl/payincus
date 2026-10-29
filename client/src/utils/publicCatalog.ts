@@ -1,7 +1,6 @@
-export type PackageSource = 'official' | 'market' | `zone:${number}`
+export type PackageSource = 'official'
 export type PackageSourceRequest = {
-  source: 'official' | 'market' | 'zone'
-  zoneId?: number
+  source: 'official'
 }
 
 export interface PublicPackagePlan {
@@ -40,7 +39,7 @@ export interface PublicPackage {
   host_ids: number[]
   privileged: number
   nested: number
-  sourceType: 'official' | 'market'
+  sourceType: 'official'
   soldOut: boolean
   isPaid: boolean
   plans: PublicPackagePlan[]
@@ -60,26 +59,12 @@ function getQueryString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-export function normalizePackageSourceQuery(value: unknown, zoneIdValue?: unknown): PackageSource {
-  const query = getQueryString(value)
-  if (query === 'market') return 'market'
-  if (query === 'zone') {
-    const zoneId = parsePackageIdQuery(zoneIdValue)
-    return zoneId ? `zone:${zoneId}` : 'official'
-  }
-  if (query?.startsWith('zone:')) {
-    const zoneId = Number(query.slice('zone:'.length))
-    return Number.isInteger(zoneId) && zoneId > 0 ? `zone:${zoneId}` : 'official'
-  }
+export function normalizePackageSourceQuery(_value: unknown): PackageSource {
   return 'official'
 }
 
-export function toPackageSourceRequest(source: PackageSource): PackageSourceRequest {
-  if (source.startsWith('zone:')) {
-    const zoneId = Number(source.slice('zone:'.length))
-    return { source: 'zone', zoneId }
-  }
-  return { source: source === 'market' ? 'market' : 'official' }
+export function toPackageSourceRequest(_source: PackageSource): PackageSourceRequest {
+  return { source: 'official' }
 }
 
 export function parsePackageIdQuery(value: unknown): number | null {

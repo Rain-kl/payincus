@@ -22,15 +22,12 @@ import { calculateInstanceTrafficStatus } from '../services/traffic-utils.js'
 import { normalizePlanTrafficLimitSpeed } from '../services/traffic-bandwidth.js'
 import { reservePlanUpgradeCapacityWithLock, type PlanUpgradeCapacityCheck } from './hosts.js'
 import {
-  HOSTING_BALANCE_LOG_LOCK_NAMESPACE,
   USER_BALANCE_LOCK_NAMESPACE,
   tryAdvisoryTransactionLock
 } from './advisory-locks.js'
 import { arbitrateVipPrice, getUserContinuousVipBenefit, type VipPriceSource } from '../services/vip-benefits.js'
 import { PromoCodeEngine } from '../services/promo-engine.js'
 import { sendPromoBindingExhaustedNotification } from '../services/promo/notifications.js'
-
-const HOSTING_FREEZE_DAYS = 30
 
 // ==================== 类型定义 ====================
 
@@ -66,14 +63,6 @@ export interface InstanceRemainingRefundQuote {
   refundableValue: number
   maxRefundable: number
   isPaid: boolean
-}
-
-export interface HostingBalanceDeductionResult {
-  hostOwnerId: number
-  deductedAmount: number
-  fromFrozen: number
-  fromAvailable: number
-  fromBalance: number
 }
 
 export interface ChangePlanPreviewResult {
@@ -572,7 +561,7 @@ export async function performRenewal(
   userId: number,
   instance: Instance,
   months: number
-): Promise<{ newExpiresAt: Date; amount: number; balanceLogId: number; discountAmount?: number; hostingIncomeResult?: { hostOwnerId: number; hostName: string } | null }> {
+): Promise<{ newExpiresAt: Date; amount: number; balanceLogId: number; discountAmount?: number }> {
   if (instance.status === 'deleted') {
     throw new Error('实例已删除，无法续费')
   }
@@ -764,35 +753,14 @@ export async function performRenewal(
       )
     }
 
-    let hostingIncomeResult: { hostOwnerId: number; hostName: string } | null = null
-
-    const hostingOwner = await resolveHostedIncomeOwner(tx, instance.hostId)
-    if (hostingOwner) {
-      // 用户托管节点，记录托管收入（带快照）
-      const unfreezeAt = new Date(Date.now() + HOSTING_FREEZE_DAYS * 24 * 60 * 60 * 1000)
-      await createHostingLogWithSnapshot(tx, {
-        userId: hostingOwner.userId,
-        type: 'income',
-        actionType: 'renew',
-        amount: finalAmount,
-        instanceId: instance.id,
-        frozen: true,
-        unfreezeAt,
-        remark: `用户续费实例收入（冻结30天）`
-      })
-      console.log(`[HostingIncome] 记录续费托管收入: hostOwnerId=${hostingOwner.userId}, amount=${finalAmount}, instanceId=${instance.id}`)
-      hostingIncomeResult = { hostOwnerId: hostingOwner.userId, hostName: hostingOwner.hostName }
-    }
-
-    return { balanceLogId: balanceLog.id, hostingIncomeResult }
+    return { balanceLogId: balanceLog.id }
   })
 
   return {
     newExpiresAt,
     amount: finalAmount,
     balanceLogId: result.balanceLogId,
-    discountAmount: discountAmount > 0 ? discountAmount : undefined,
-    hostingIncomeResult: result.hostingIncomeResult
+    discountAmount: discountAmount > 0 ? discountAmount : undefined
   }
 }
 
@@ -811,7 +779,6 @@ export async function performPlanChange(
   newConfig: { cpu: number; memory: number; disk: number }
   needRestart: boolean  // 标记是否需要重启
   refundAmount?: number // 降级时的退款金额
-  hostingIncomeResult?: { hostOwnerId: number; hostName: string } | null // 托管收入结果
   bandwidthLimit: string | null
   capacity: PlanUpgradeCapacityCheck
 }> {
@@ -893,7 +860,6 @@ export async function performPlanChange(
     }
 
     const oldBalance = Number(user.balance)
-    let hostingIncomeResult: { hostOwnerId: number; hostName: string } | null = null
 
     // 升级需要补差价
     if (changeResult.priceDiff > 0) {
@@ -931,24 +897,6 @@ export async function performPlanChange(
           remark: `升级方案：${changeResult.oldPlan.name} → ${newPlan.name}`
         }
       })
-
-      const hostingOwner = await resolveHostedIncomeOwner(tx, instance.hostId)
-      if (hostingOwner) {
-        // 用户托管节点，记录托管收入（升级差价，带快照）
-        const unfreezeAt = new Date(Date.now() + HOSTING_FREEZE_DAYS * 24 * 60 * 60 * 1000)
-        await createHostingLogWithSnapshot(tx, {
-          userId: hostingOwner.userId,
-          type: 'income',
-          actionType: 'upgrade',
-          amount: changeResult.priceDiff,
-          instanceId: instance.id,
-          frozen: true,
-          unfreezeAt,
-          remark: `用户升级实例方案收入（冻结30天）`
-        })
-        console.log(`[HostingIncome] 记录升级托管收入: hostOwnerId=${hostingOwner.userId}, amount=${changeResult.priceDiff}, instanceId=${instance.id}`)
-        hostingIncomeResult = { hostOwnerId: hostingOwner.userId, hostName: hostingOwner.hostName }
-      }
     }
 
     // 降级退款到余额
@@ -1038,7 +986,7 @@ export async function performPlanChange(
       }
     })
 
-    return { hostingIncomeResult, capacity }
+    return { capacity }
   })
 
   return {
@@ -1046,7 +994,6 @@ export async function performPlanChange(
     newConfig: changeResult.newConfig,
     needRestart: true,  // 升降级后需要重启实例才能生效
     refundAmount,
-    hostingIncomeResult: txResult.hostingIncomeResult,
     bandwidthLimit: normalizedPlanTrafficLimitSpeed,
     capacity: txResult.capacity
   }
@@ -1087,26 +1034,13 @@ export async function getInstanceBillingInfo(instanceId: number): Promise<{
     discountRate: number  // 折扣率，如 0.05 表示 5%
     affCodeId: number
   } | null
-  // 托管实例相关信息
-  isHostedInstance: boolean
   daysUntilExpire: number | null
-  hostingRenewRestriction: { monthsOnly: number; daysBeforeExpire: number } | null
 } | null> {
   const instance = await prisma.instance.findUnique({
     where: { id: instanceId },
     include: {
       packagePlan: {
         select: { id: true, name: true, isActive: true }
-      },
-      host: {
-        select: {
-          userId: true,
-          user: {
-            select: {
-              role: true
-            }
-          }
-        }
       }
     }
   })
@@ -1115,18 +1049,12 @@ export async function getInstanceBillingInfo(instanceId: number): Promise<{
 
   const isPaid = instance.packagePlanId !== null
 
-  // 判断是否为托管实例（节点所有者不是管理员）
-  const isHostedInstance = instance.host?.user.role === 'user'
-
   // 计算剩余天数
   let daysUntilExpire: number | null = null
   if (instance.expiresAt) {
     const now = new Date()
     daysUntilExpire = Math.ceil((instance.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   }
-
-  // 托管续费限制
-  const hostingRenewRestriction = isHostedInstance ? { monthsOnly: 1, daysBeforeExpire: 7 } : null
 
   let monthlyPrice: number | null = null
   let renewPreview: Array<{ months: number; amount: number; discountedAmount: number; expiresAt: Date }> | null = null
@@ -1162,10 +1090,7 @@ export async function getInstanceBillingInfo(instanceId: number): Promise<{
       expiresAt: instance.expiresAt
     })
 
-    // 托管实例只返回1个月的续费选项
-    const filteredPreview = isHostedInstance
-      ? originalPreview.filter(p => p.months === 1)
-      : originalPreview
+    const filteredPreview = originalPreview
 
     let maxEffectiveDiscountRate = 0
 
@@ -1222,9 +1147,7 @@ export async function getInstanceBillingInfo(instanceId: number): Promise<{
     packagePlan: instance.packagePlan,
     renewPreview,
     affDiscount,
-    isHostedInstance,
-    daysUntilExpire,
-    hostingRenewRestriction
+    daysUntilExpire
   }
 }
 
@@ -1260,244 +1183,6 @@ export function isExpired(instance: { expiresAt: Date | null }): boolean {
   return new Date() > instance.expiresAt
 }
 
-// ==================== 托管余额结算 ====================
-
-/**
- * 内部辅助函数：统一创建带快照的托管日志
- * 用于所有实例相关托管日志的写入，确保快照字段一致性
- */
-async function createHostingLogWithSnapshot(
-  client: any,
-  params: {
-    userId: number
-    type: 'income' | 'deduction'
-    actionType: string
-    amount: number
-    instanceId: number
-    frozen: boolean
-    unfreezeAt?: Date | null
-    remark: string
-  }
-) {
-  // 查询实例及关联信息用于快照
-  const instance = await client.instance.findUnique({
-    where: { id: params.instanceId },
-    select: {
-      name: true,
-      user: { select: { username: true, email: true, avatarStyle: true } },
-      host: { select: { name: true } },
-      package: { select: { name: true } },
-      packagePlan: { select: { name: true } }
-    }
-  })
-
-  await client.hostingBalanceLog.create({
-    data: {
-      userId: params.userId,
-      type: params.type,
-      actionType: params.actionType,
-      amount: params.amount,
-      frozen: params.frozen,
-      unfreezeAt: params.unfreezeAt ?? null,
-      relatedId: params.instanceId,
-      remark: params.remark,
-      snapshotBuyerName: instance?.user.username ?? null,
-      snapshotBuyerEmail: instance?.user.email ?? null,
-      snapshotBuyerAvatar: instance?.user.avatarStyle ?? null,
-      snapshotInstanceName: instance?.name ?? null,
-      snapshotHostName: instance?.host.name ?? null,
-      snapshotPackageName: instance?.package?.name ?? null,
-      snapshotPlanName: instance?.packagePlan?.name ?? null
-    }
-  })
-}
-
-async function resolveHostedIncomeOwner(
-  client: any,
-  hostId: number,
-  options: {
-    instanceId?: number | null
-    allowHistoricalFallback?: boolean
-  } = {}
-): Promise<{ userId: number; hostName: string } | null> {
-  const { instanceId = null, allowHistoricalFallback = false } = options
-
-  const host = await client.host.findUnique({
-    where: { id: hostId },
-    select: {
-      userId: true,
-      name: true,
-      user: {
-        select: {
-          role: true
-        }
-      }
-    }
-  })
-
-  if (!host) {
-    return null
-  }
-
-  if (host.user.role !== 'admin') {
-    return {
-      userId: host.userId,
-      hostName: host.name
-    }
-  }
-
-  if (!allowHistoricalFallback || !instanceId) {
-    return null
-  }
-
-  const latestIncomeLog = await client.hostingBalanceLog.findFirst({
-    where: {
-      relatedId: instanceId,
-      type: 'income'
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    select: {
-      userId: true
-    }
-  })
-
-  if (!latestIncomeLog) {
-    return null
-  }
-
-  const historicalOwner = await client.user.findUnique({
-    where: { id: latestIncomeLog.userId },
-    select: {
-      role: true
-    }
-  })
-
-  if (!historicalOwner || historicalOwner.role === 'admin') {
-    return null
-  }
-
-  return {
-    userId: latestIncomeLog.userId,
-    hostName: host.name
-  }
-}
-
-/**
- * 判断节点是否为用户托管节点（非管理员节点）
- */
-export async function isUserHostedNode(hostId: number): Promise<boolean> {
-  const host = await prisma.host.findUnique({
-    where: { id: hostId },
-    select: {
-      user: {
-        select: {
-          role: true
-        }
-      }
-    }
-  })
-  return host?.user.role === 'user'
-}
-
-/**
- * 获取节点所有者ID
- */
-export async function getHostOwnerId(hostId: number): Promise<number | null> {
-  const host = await prisma.host.findUnique({
-    where: { id: hostId },
-    select: { userId: true }
-  })
-  return host?.userId ?? null
-}
-
-/**
- * 记录托管收入（用户购买/续费用户托管节点上的实例时调用）
- * 
- * @param hostOwnerId 节点所有者用户ID
- * @param amount 金额（元）
- * @param instanceId 关联的实例ID
- * @param remark 备注
- * @param actionType 操作类型（purchase/renew/upgrade/destroy等）
- * @param tx 可选的事务客户端
- */
-export async function recordHostingIncome(
-  hostOwnerId: number,
-  amount: number,
-  instanceId: number,
-  remark: string,
-  actionType: 'purchase' | 'renew' | 'upgrade' | 'destroy' | 'unfreeze' | 'withdraw',
-  tx?: any
-): Promise<void> {
-  const client = tx || prisma
-
-  // 计算解冻时间（30天后）
-  const unfreezeAt = new Date(Date.now() + HOSTING_FREEZE_DAYS * 24 * 60 * 60 * 1000)
-
-  await createHostingLogWithSnapshot(client, {
-    userId: hostOwnerId,
-    type: 'income',
-    actionType,
-    amount,
-    instanceId,
-    frozen: true,
-    unfreezeAt,
-    remark
-  })
-}
-
-/**
- * 处理托管收入结算
- * 在用户购买或续费实例时调用，检查节点是否为用户托管，如是则记录收入
- * 
- * @param hostId 节点ID
- * @param amount 金额（元）
- * @param instanceId 实例ID
- * @param type 类型：'purchase' | 'renew'
- * @param tx 可选的事务客户端
- * @returns 如果是用户托管节点，返回节点所有者信息；否则返回 null
- */
-export async function processHostingIncome(
-  hostId: number,
-  amount: number,
-  instanceId: number,
-  type: 'purchase' | 'renew',
-  tx?: any
-): Promise<{ hostOwnerId: number; hostName: string } | null> {
-  const client = tx || prisma
-
-  // 获取节点所有者和节点名称
-  const host = await client.host.findUnique({
-    where: { id: hostId },
-    select: {
-      userId: true,
-      name: true,
-      user: {
-        select: {
-          role: true
-        }
-      }
-    }
-  })
-
-  if (!host || host.user.role === 'admin') {
-    // 管理员所有的节点不需要记录托管收入
-    return null
-  }
-
-  // 用户托管节点，记录托管收入
-  const remark = type === 'purchase'
-    ? `用户购买实例收入（冻结30天）`
-    : `用户续费实例收入（冻结30天）`
-
-  await recordHostingIncome(host.userId, amount, instanceId, remark, type, client)
-
-  console.log(`[HostingIncome] 记录托管收入: hostOwnerId=${host.userId}, amount=${amount}, instanceId=${instanceId}, type=${type}`)
-
-  return { hostOwnerId: host.userId, hostName: host.name }
-}
-
 /**
  * 获取实例剩余天数
  * 使用公共方法 calculateRemainingDays
@@ -1505,200 +1190,4 @@ export async function processHostingIncome(
 export function getRemainingDays(instance: { expiresAt: Date | null }): number | null {
   if (instance.expiresAt === null) return null
   return calculateRemainingDays(instance.expiresAt)
-}
-
-/**
- * 托管实例销毁时扣除节点所有者的托管余额
- * 
- * 优先从该实例相关的冻结收入中扣除，不足部分从可用余额扣除
- * 
- * @param hostId 节点ID
- * @param amount 扣除金额（元）
- * @param instanceId 实例ID
- * @param remark 备注
- * @param tx 可选的事务客户端
- * @returns 如果是用户托管节点，返回扣除结果；否则返回 null
- */
-export async function deductHostingBalance(
-  hostId: number,
-  amount: number,
-  instanceId: number,
-  remark: string,
-  tx?: any
-): Promise<HostingBalanceDeductionResult | null> {
-  const run = async (client: Prisma.TransactionClient): Promise<HostingBalanceDeductionResult | null> => {
-    const hostingOwner = await resolveHostedIncomeOwner(client, hostId, {
-      instanceId,
-      allowHistoricalFallback: true
-    })
-    if (!hostingOwner) {
-      return null
-    }
-    const hostOwnerId = hostingOwner.userId
-
-    const locked = await tryAdvisoryTransactionLock(client, HOSTING_BALANCE_LOG_LOCK_NAMESPACE, hostOwnerId)
-    if (!locked) {
-      throw new Error('托管余额正在处理，请稍后重试')
-    }
-
-    const userBalanceLocked = await tryAdvisoryTransactionLock(client, USER_BALANCE_LOCK_NAMESPACE, hostOwnerId)
-    if (!userBalanceLocked) {
-      throw new Error('余额正在处理，请稍后重试')
-    }
-
-    // 查找该实例相关的冻结托管收入记录
-    const frozenLogs = await client.hostingBalanceLog.findMany({
-      where: {
-        userId: hostOwnerId,
-        relatedId: instanceId,
-        type: 'income',
-        frozen: true
-      },
-      orderBy: { createdAt: 'asc' }
-    })
-
-    let remainingToDeduct = amount
-    let fromFrozen = 0
-    let fromAvailable = 0
-    let fromBalance = 0
-    let shortfallDebt = 0
-
-    // 第一步：优先从冻结收入中扣除
-    // 冻结记录尚未计入 hostingBalance，通过删除/减少原记录来确保这部分钱不会被计入，
-    // 即账务上正确地抵消了这笔收入。同时在下方统一新建一条独立的审计扣除记录。
-    for (const log of frozenLogs) {
-      if (remainingToDeduct <= 0) break
-
-      const logAmount = Number(log.amount)
-      const deductFromThis = Math.min(logAmount, remainingToDeduct)
-
-      if (deductFromThis >= logAmount) {
-        // 全额抵扣：删除整条冻结收入记录（此笔收入永远不会进入 hostingBalance）
-        await client.hostingBalanceLog.delete({
-          where: { id: log.id }
-        })
-      } else {
-        // 部分抵扣：减少冻结记录金额，剩余部分继续冻结等待解冻
-        await client.hostingBalanceLog.update({
-          where: { id: log.id },
-          data: { amount: { decrement: deductFromThis } }
-        })
-      }
-
-      fromFrozen += deductFromThis
-      remainingToDeduct -= deductFromThis
-    }
-
-    // 第二步：如果冻结收入不足，从已解冻的托管余额扣除
-    if (remainingToDeduct > 0) {
-      const user = await client.user.findUnique({
-        where: { id: hostOwnerId },
-        select: { hostingBalance: true, balance: true }
-      })
-
-      const availableHostingBalance = Number(user?.hostingBalance || 0)
-      const deductFromAvailable = Math.min(availableHostingBalance, remainingToDeduct)
-
-      if (deductFromAvailable > 0) {
-        const hostingBalanceUpdateResult = await client.user.updateMany({
-          where: {
-            id: hostOwnerId,
-            hostingBalance: { gte: deductFromAvailable }
-          },
-          data: { hostingBalance: { decrement: deductFromAvailable } }
-        })
-        if (hostingBalanceUpdateResult.count === 0) {
-          throw new Error('托管余额不足，请稍后重试')
-        }
-
-        fromAvailable = deductFromAvailable
-        remainingToDeduct -= deductFromAvailable
-      }
-
-      // 第三步：如果托管余额仍不足，从面板余额扣除
-      if (remainingToDeduct > 0) {
-        const availableBalance = Number(user?.balance || 0)
-        const deductFromBalance = Math.min(availableBalance, remainingToDeduct)
-
-        if (deductFromBalance > 0) {
-          const balanceUpdateResult = await client.user.updateMany({
-            where: {
-              id: hostOwnerId,
-              balance: { gte: deductFromBalance }
-            },
-            data: { balance: { decrement: deductFromBalance } }
-          })
-          if (balanceUpdateResult.count === 0) {
-            throw new Error('余额不足，请稍后重试')
-          }
-          const updatedUser = await client.user.findUniqueOrThrow({
-            where: { id: hostOwnerId },
-            select: { balance: true }
-          })
-          const balanceAfter = Number(updatedUser.balance)
-
-          // 记录面板余额变动日志
-          await client.balanceLog.create({
-            data: {
-              userId: hostOwnerId,
-              type: 'hosting_deduction',
-              amount: -deductFromBalance,
-              balanceBefore: availableBalance,
-              balanceAfter,
-              instanceId,
-              remark: `托管实例销毁扣款：用户退款需从面板余额补扣`
-            }
-          })
-
-          fromBalance = deductFromBalance
-          remainingToDeduct -= deductFromBalance
-        }
-      }
-    }
-
-    // 前三层余额仍不足时，将缺口记入节点主人的托管余额欠款。
-    // 此处刻意不设置非负条件，仅该回扣缺口场景允许 hostingBalance 变为负数。
-    if (remainingToDeduct > 0) {
-      const shortfall = remainingToDeduct
-      await client.user.update({
-        where: { id: hostOwnerId },
-        data: { hostingBalance: { decrement: shortfall } }
-      })
-      shortfallDebt = shortfall
-      remainingToDeduct = 0
-    }
-
-    const totalDeducted = fromFrozen + fromAvailable + fromBalance + shortfallDebt
-
-    // 始终创建一条独立的销毁扣除审计记录（无论扣款来自冻结、托管余额还是面板余额）
-    // 原来的条件 (fromFrozen>0 || fromAvailable>0) 遗漏了纯从面板余额扣款的情况，
-    // 且金额也未包含 fromBalance，现统一修正。
-    if (totalDeducted > 0) {
-      const parts: string[] = []
-      if (fromFrozen > 0) parts.push(`冻结抵扣 ¥${fromFrozen.toFixed(2)}`)
-      if (fromAvailable > 0) parts.push(`托管余额扣除 ¥${fromAvailable.toFixed(2)}`)
-      if (fromBalance > 0) parts.push(`面板余额补扣 ¥${fromBalance.toFixed(2)}`)
-      if (shortfallDebt > 0) parts.push(`回扣缺口记欠款 ¥${shortfallDebt.toFixed(2)}`)
-
-      await createHostingLogWithSnapshot(client, {
-        userId: hostOwnerId,
-        type: 'deduction',
-        actionType: 'destroy',
-        amount: -totalDeducted,
-        instanceId,
-        frozen: false,
-        remark: `${remark}（${parts.join('，')}）`
-      })
-    }
-
-    console.log(`[HostingBalance] 扣除托管余额: hostOwnerId=${hostOwnerId}, amount=${amount}, deducted=${totalDeducted}, fromFrozen=${fromFrozen}, fromAvailable=${fromAvailable}, fromBalance=${fromBalance}, instanceId=${instanceId}`)
-
-    return { hostOwnerId, deductedAmount: totalDeducted, fromFrozen, fromAvailable, fromBalance }
-  }
-
-  if (tx) {
-    return run(tx)
-  }
-
-  return prisma.$transaction(async (transaction) => run(transaction))
 }

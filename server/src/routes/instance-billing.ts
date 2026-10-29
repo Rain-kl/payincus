@@ -9,7 +9,7 @@ import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
 import { createLog } from '../db/logs.js'
 import { apiError, ErrorCode } from '../lib/errors.js'
-import { sendHostManagedInstanceNotification, sendNotification } from '../lib/notifier.js'
+import { sendNotification } from '../lib/notifier.js'
 import { getIncusClient, patchInstanceResources } from '../lib/incus/index.js'
 import { restoreBandwidth } from '../lib/incus/incus-traffic.js'
 import { sendRenewSuccessEmail } from '../lib/mailer.js'
@@ -22,7 +22,6 @@ interface BatchRenewPreviewItem {
   canRenew: boolean
   autoRenew: boolean
   reason?: string
-  isHostedInstance: boolean
   daysUntilExpire: number | null
   options: Array<{
     months: number
@@ -126,7 +125,6 @@ async function buildBatchRenewPreviewItem(userId: number, instanceId: number): P
       canRenew: false,
       autoRenew: false,
       reason: BATCH_HIDDEN_REASON,
-      isHostedInstance: false,
       daysUntilExpire: null,
       options: []
     }
@@ -139,7 +137,6 @@ async function buildBatchRenewPreviewItem(userId: number, instanceId: number): P
       canRenew: false,
       autoRenew: false,
       reason: BATCH_HIDDEN_REASON,
-      isHostedInstance: false,
       daysUntilExpire: null,
       options: []
     }
@@ -152,7 +149,6 @@ async function buildBatchRenewPreviewItem(userId: number, instanceId: number): P
       canRenew: false,
       autoRenew: false,
       reason: '实例已删除，无法续费',
-      isHostedInstance: false,
       daysUntilExpire: null,
       options: []
     }
@@ -165,7 +161,6 @@ async function buildBatchRenewPreviewItem(userId: number, instanceId: number): P
       canRenew: false,
       autoRenew: false,
       reason: '免费实例无需续费',
-      isHostedInstance: false,
       daysUntilExpire: null,
       options: []
     }
@@ -179,26 +174,12 @@ async function buildBatchRenewPreviewItem(userId: number, instanceId: number): P
       canRenew: false,
       autoRenew: false,
       reason: '无法获取实例计费信息',
-      isHostedInstance: false,
       daysUntilExpire: null,
       options: []
     }
   }
 
-  const restriction = billingInfo.hostingRenewRestriction
   const daysUntilExpire = billingInfo.daysUntilExpire
-  if (billingInfo.isHostedInstance && restriction && daysUntilExpire !== null && daysUntilExpire > restriction.daysBeforeExpire) {
-    return {
-      id: instance.id,
-      name: instance.name,
-      canRenew: false,
-      autoRenew: billingInfo.autoRenew,
-      reason: `仅可在到期前 ${restriction.daysBeforeExpire} 天内续费`,
-      isHostedInstance: billingInfo.isHostedInstance,
-      daysUntilExpire,
-      options: []
-    }
-  }
 
   const options = (billingInfo.renewPreview || []).map(option => ({
     months: option.months,
@@ -213,7 +194,6 @@ async function buildBatchRenewPreviewItem(userId: number, instanceId: number): P
     canRenew: options.length > 0,
     autoRenew: billingInfo.autoRenew,
     reason: options.length > 0 ? undefined : '暂无可用续费选项',
-    isHostedInstance: billingInfo.isHostedInstance,
     daysUntilExpire,
     options
   }
@@ -279,20 +259,6 @@ async function executeRenewForUser(
       renewMonths: months,
       newExpiresAt: result.newExpiresAt.toISOString()
     })
-
-    if (result.hostingIncomeResult) {
-      sendHostManagedInstanceNotification(
-        instance.hostId,
-        'renew',
-        {
-          username: user.username,
-          instanceName: instance.name,
-          amount: result.amount
-        }
-      ).catch(err => {
-        console.warn('[批量续费] 发送托管收入通知失败:', err)
-      })
-    }
 
     try {
       const userInfo = await db.findUserById(user.id)
@@ -390,10 +356,7 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
           discountRate: billingInfo.affDiscount.discountRate,
           discountPercent: Math.round(billingInfo.affDiscount.discountRate * 100)  // 百分比，如 5 表示 5%
         } : null,
-        // 托管实例相关信息
-        isHostedInstance: billingInfo.isHostedInstance,
-        daysUntilExpire: billingInfo.daysUntilExpire,
-        hostingRenewRestriction: billingInfo.hostingRenewRestriction
+        daysUntilExpire: billingInfo.daysUntilExpire
       }
     }
   })
@@ -474,40 +437,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: '免费实例无需续费', code: 'FREE_INSTANCE' })
     }
 
-    // 检查是否为用户托管节点的续费限制
-    const host = await prisma.host.findUnique({
-      where: { id: instance.hostId },
-      select: {
-        user: {
-          select: {
-            role: true
-          }
-        }
-      }
-    })
-    const isHostedInstance = host?.user.role === 'user'
-    if (isHostedInstance) {
-      // 用户托管节点的实例只能续费1个月
-      if (months !== 1) {
-        return reply.code(400).send({
-          error: '用户托管节点的实例仅支持按月续费',
-          code: 'HOSTING_MONTHLY_ONLY'
-        })
-      }
-      
-      // 只能在到期前7天内续费
-      if (instance.expiresAt) {
-        const now = new Date()
-        const daysUntilExpire = Math.ceil((instance.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        if (daysUntilExpire > 7) {
-          return reply.code(400).send({
-            error: `用户托管节点的实例仅可在到期前7天内续费（当前剩余 ${daysUntilExpire} 天）`,
-            code: 'HOSTING_RENEW_TOO_EARLY'
-          })
-        }
-      }
-    }
-
     try {
       const result = await db.performRenewal(user.id, instance, months)
 
@@ -519,21 +448,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
         newExpiresAt: result.newExpiresAt.toISOString()
       })
       
-      // 发送托管收入通知给节点所有者（仅发送到外部渠道，不创建站内信）
-      if (result.hostingIncomeResult) {
-        sendHostManagedInstanceNotification(
-          instance.hostId,
-          'renew',
-          {
-            username: user.username,
-            instanceName: instance.name,
-            amount: result.amount
-          }
-        ).catch(err => {
-          console.warn(`[续费] 发送托管收入通知失败:`, err)
-        })
-      }
-
       // 发送续费成功邮件通知
       try {
         const userInfo = await db.findUserById(user.id)

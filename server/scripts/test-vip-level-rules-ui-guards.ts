@@ -20,11 +20,8 @@ assert.ok(
     editor.includes('v-model.trim="rule.badgeStyle.backgroundColor"') &&
     editor.includes('v-model="rule.badgeStyle.textColor"') &&
     editor.includes('v-model.trim="rule.badgeStyle.textColor"') &&
-    editor.includes('v-model="rule.conditionMode"') &&
     editor.includes('v-model="rule.minRecharge"') &&
     editor.includes('v-model="rule.minConsume"') &&
-    editor.includes('v-model="rule.minHostingIncome"') &&
-    editor.includes('v-model="rule.minHostingInstances"') &&
     editor.includes('@click="saveRules"'),
   'VIP level rules responsive layout must preserve all editable fields and the save action'
 )

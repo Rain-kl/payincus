@@ -240,9 +240,7 @@ function isAdminLikeRoute(route: RouteInfo): boolean {
       '/:id/disable-2fa',
       '/:id/oauth/:provider',
       '/:id/login-records',
-      '/detect-linked-accounts',
-      '/:id/hosting-balance/logs',
-      '/:id/hosting-balance/adjust'
+      '/detect-linked-accounts'
     ].includes(route.path)
   }
 

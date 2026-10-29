@@ -9,7 +9,7 @@ import {
 } from '../services/vip-levels.js'
 
 function parseRuleType(value: string | undefined): VipRuleType | null {
-  return value === 'user' || value === 'hosting' ? value : null
+  return value === 'user' ? value : null
 }
 
 function sendInvalidType(reply: FastifyReply) {

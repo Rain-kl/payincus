@@ -154,13 +154,7 @@ export {
   isExpired,
   getRemainingDays,
   calculateInstanceRemainingRefundQuote,
-  calculateInstanceRefund,
-  // 托管余额相关
-  isUserHostedNode,
-  getHostOwnerId,
-  recordHostingIncome,
-  processHostingIncome,
-  deductHostingBalance
+  calculateInstanceRefund
 } from './billing-operations.js'
 
 // 导出支付渠道相关操作
@@ -183,9 +177,6 @@ export * from './mail.js'
 
 // 导出宿主机通知邮件队列相关操作
 export * from './host-notification-email-tasks.js'
-
-// 导出托管拉黑相关操作
-export * from './hosting-blocks.js'
 
 // 导出统一优惠码相关操作
 export * from './promo-codes.js'

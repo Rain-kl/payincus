@@ -41,9 +41,6 @@ https://panel.example.com
 以下模块会根据系统配置、账号权限或构建边界显示：
 
 - 域名邮箱：`/mail`、`/mail/domains/:id`，用于邮箱套餐、域名和账号管理。
-- 托管节点：`/resources/hosts`，允许满足条件的用户提交和管理托管节点。
-- 托管套餐：`/resources/packages`，用于托管方维护自己的套餐。
-- 托管收益：`/hosting-wallet`，用于查看托管收益和结算记录。
 - 娱乐系统：`/entertainment`，用于积分、会员或其它玩法。
 
 ## 关联后端能力
@@ -52,7 +49,7 @@ https://panel.example.com
 - 账务支付：`orders`、`balance`、`recharge`、`gift-cards`、`redeem-codes`、`aff`、`vip-levels`。
 - 工单通知：`tickets`、`inbox`、`notifications`、`help`。
 - 邮箱服务：`mail`。
-- 托管资源：`hosting`、`resource-pool`、`packages`。
+- 资源与套餐：`resource-pool`、`packages`。
 
 ## 验证重点
 

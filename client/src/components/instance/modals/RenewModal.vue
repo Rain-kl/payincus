@@ -74,26 +74,6 @@ const balanceAfterRenew = computed(() => {
   return userBalance.value - actualPrice.value
 })
 
-// 是否为托管实例
-const isHostedInstance = computed(() => {
-  return billingInfo.value?.isHostedInstance ?? false
-})
-
-// 托管实例续费限制：是否满足续费条件（到期前7天内）
-const canHostedInstanceRenew = computed(() => {
-  if (!isHostedInstance.value) return true
-  const restriction = billingInfo.value?.hostingRenewRestriction
-  if (!restriction) return true
-  const daysUntilExpire = billingInfo.value?.daysUntilExpire
-  if (daysUntilExpire === null || daysUntilExpire === undefined) return true
-  return daysUntilExpire <= restriction.daysBeforeExpire
-})
-
-// 托管实例距到期剩余天数
-const daysUntilExpire = computed(() => {
-  return billingInfo.value?.daysUntilExpire ?? null
-})
-
 // 格式化金额（API 返回的是元）
 function formatMoney(amount: number): string {
   return amount.toFixed(2)
@@ -136,7 +116,7 @@ async function loadBillingInfo() {
 
 // 执行续费
 async function handleRenew() {
-  if (insufficientBalance.value || !selectedRenewOption.value || !canHostedInstanceRenew.value) return
+  if (insufficientBalance.value || !selectedRenewOption.value) return
   
   renewing.value = true
   error.value = ''
@@ -294,19 +274,6 @@ function handleClose() {
                 {{ t('billing.insufficientBalance') }}
                 <RouterLink :to="walletPath()" class="underline ml-1">{{ t('billing.goRecharge') }}</RouterLink>
               </div>
-
-              <!-- 托管实例续费限制提示 -->
-              <div
-                v-if="isHostedInstance && !canHostedInstanceRenew && daysUntilExpire !== null"
-                class="p-3 rounded border border-warning/30 bg-warning/10 text-sm"
-              >
-                <div class="flex items-start gap-2">
-                  <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span class="text-warning">{{ t('billing.hostingRenewTooEarly', { days: daysUntilExpire }) }}</span>
-                </div>
-              </div>
             </template>
           </div>
 
@@ -319,7 +286,7 @@ function handleClose() {
               {{ t('common.cancel') }}
             </button>
             <button
-              :disabled="loading || renewing || insufficientBalance || !selectedRenewOption || !canHostedInstanceRenew"
+              :disabled="loading || renewing || insufficientBalance || !selectedRenewOption"
               class="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               @click="handleRenew"
             >

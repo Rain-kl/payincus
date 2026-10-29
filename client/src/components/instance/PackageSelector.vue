@@ -26,7 +26,6 @@ const props = withDefaults(defineProps<Props>(), {
 })
 const emit = defineEmits<{
   select: [pkg: Package]
-  showOwnerInfo: [packageId: number, ownerId: number]
 }>()
 
 const themeStore = useThemeStore()
@@ -89,14 +88,12 @@ function getInstanceTypeLabel(type: string | undefined | null): string {
   return normalizedType === 'vm' ? t('common.instanceType.vm') : t('common.instanceType.container')
 }
 
-function getPackageBadgeClass(kind: 'soldOut' | 'own' | 'market' | 'friends' | 'available' | 'shared'): string {
+function getPackageBadgeClass(kind: 'soldOut' | 'own' | 'friends' | 'available' | 'shared'): string {
   switch (kind) {
     case 'soldOut':
       return themeStore.isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'
     case 'own':
       return themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
-    case 'market':
-      return themeStore.isDark ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
     case 'friends':
       return themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
     case 'available':
@@ -106,12 +103,11 @@ function getPackageBadgeClass(kind: 'soldOut' | 'own' | 'market' | 'friends' | '
   }
 }
 
-function getPackageBadgeKind(pkg: Package): 'soldOut' | 'own' | 'market' | 'friends' | 'available' | 'shared' | null {
+function getPackageBadgeKind(pkg: Package): 'soldOut' | 'own' | 'friends' | 'available' | 'shared' | null {
   if (pkg.soldOut) return 'soldOut'
   if (isOwnPackage(pkg)) return 'own'
-  if (pkg.sourceType === 'market') return 'market'
   if (pkg.sourceType === 'friends') return 'friends'
-  if (pkg.isGlobalShared || pkg.sourceType === 'official' || pkg.sourceType === 'zone') return 'available'
+  if (pkg.isGlobalShared || pkg.sourceType === 'official') return 'available'
   if (pkg.isShared && !pkg.isOwn) return 'shared'
   return null
 }
@@ -123,8 +119,6 @@ function getPackageBadgeLabel(pkg: Package): string | null {
       return props.soldOutLabel || t('package.soldOut')
     case 'own':
       return t('package.myPackage')
-    case 'market':
-      return `UID:${pkg.ownerId}`
     case 'friends':
       return `${t('package.friendPrefix')}${pkg.ownerUsername}`
     case 'available':
@@ -279,17 +273,8 @@ onBeforeUnmount(() => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
-              <button
-                v-if="getPackageBadgeKind(pkg) === 'market'"
-                type="button"
-                class="text-xs px-2 py-0.5 rounded transition-colors"
-                :class="getPackageBadgeClass('market')"
-                @click.stop="emit('showOwnerInfo', pkg.id, pkg.ownerId!)"
-              >
-                {{ getPackageBadgeLabel(pkg) }}
-              </button>
               <span
-                v-else-if="getPackageBadgeKind(pkg)"
+                v-if="getPackageBadgeKind(pkg)"
                 class="text-xs px-2 py-0.5 rounded"
                 :class="getPackageBadgeClass(getPackageBadgeKind(pkg)!)"
               >
@@ -370,17 +355,8 @@ onBeforeUnmount(() => {
           </div>
           <div class="modal-body space-y-4">
             <div class="flex flex-wrap gap-2">
-              <button
-                v-if="getPackageBadgeKind(detailPackage) === 'market'"
-                type="button"
-                class="text-xs px-2 py-1 rounded transition-colors"
-                :class="getPackageBadgeClass('market')"
-                @click.stop="emit('showOwnerInfo', detailPackage.id, detailPackage.ownerId!)"
-              >
-                {{ getPackageBadgeLabel(detailPackage) }}
-              </button>
               <span
-                v-else-if="getPackageBadgeKind(detailPackage)"
+                v-if="getPackageBadgeKind(detailPackage)"
                 class="text-xs px-2 py-1 rounded"
                 :class="getPackageBadgeClass(getPackageBadgeKind(detailPackage)!)"
               >

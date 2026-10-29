@@ -6,7 +6,7 @@ type PopupPromoPackage = {
     id: number
     name: string
     description: string | null
-    source: 'official' | 'market'
+    source: 'official'
     plans: Array<{
         id: number
         name: string
@@ -37,8 +37,6 @@ export const useConfigStore = defineStore('config', () => {
     const transferFee = ref(0)
     const footerContactEmail = ref<string | null>('ryan@io0.cc')
     const footerTelegramLink = ref<string | null>(null)
-    const hostingMarketEntryEnabled = ref(true)
-    const hostingNotice = ref<string | null>(null)
     const popupAnnouncement = ref<string | null>(null)
     const popupAnnouncementUpdatedAt = ref<string | null>(null)
     const popupPromoImageUrl = ref<string | null>(null)
@@ -70,8 +68,6 @@ export const useConfigStore = defineStore('config', () => {
                 transferFee.value = config.transferFee || 0
                 footerContactEmail.value = config.footerContactEmail ?? null
                 footerTelegramLink.value = config.footerTelegramLink ?? null
-                hostingMarketEntryEnabled.value = config.hostingMarketEntryEnabled ?? true
-                hostingNotice.value = config.hostingNotice ?? null
                 popupAnnouncement.value = config.popupAnnouncement ?? null
                 popupAnnouncementUpdatedAt.value = config.popupAnnouncementUpdatedAt ?? null
                 popupPromoImageUrl.value = config.popupPromoImageUrl ?? null
@@ -106,8 +102,6 @@ export const useConfigStore = defineStore('config', () => {
         transferFee,
         footerContactEmail,
         footerTelegramLink,
-        hostingMarketEntryEnabled,
-        hostingNotice,
         popupAnnouncement,
         popupAnnouncementUpdatedAt,
         popupPromoImageUrl,

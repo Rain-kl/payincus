@@ -49,7 +49,6 @@ export async function findUserByUsername(username: string): Promise<User | null>
     ban_reason: user.banReason,
     avatar_style: user.avatarStyle,
     avatar_badge_id: user.avatarBadgeId,
-    has_created_host_before: user.hasCreatedHostBefore,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString()
   }
@@ -75,7 +74,6 @@ export async function findUserByUsernameOrEmail(identifier: string): Promise<Use
       ban_reason: userByUsername.banReason,
       avatar_style: userByUsername.avatarStyle,
       avatar_badge_id: userByUsername.avatarBadgeId,
-      has_created_host_before: userByUsername.hasCreatedHostBefore,
       created_at: userByUsername.createdAt.toISOString(),
       updated_at: userByUsername.updatedAt.toISOString()
     }
@@ -107,9 +105,8 @@ export async function findUserByUsernameOrEmail(identifier: string): Promise<Use
     status: userByEmail.status,
     ban_reason: userByEmail.banReason,
     avatar_style: userByEmail.avatarStyle,
-    avatar_badge_id: userByEmail.avatarBadgeId,
-    has_created_host_before: userByEmail.hasCreatedHostBefore,
-    created_at: userByEmail.createdAt.toISOString(),
+      avatar_badge_id: userByEmail.avatarBadgeId,
+      created_at: userByEmail.createdAt.toISOString(),
     updated_at: userByEmail.updatedAt.toISOString()
   }
 }
@@ -134,7 +131,6 @@ export async function findUserById(id: number): Promise<User | null> {
     ban_reason: user.banReason,
     avatar_style: user.avatarStyle,
     avatar_badge_id: user.avatarBadgeId,
-    has_created_host_before: user.hasCreatedHostBefore,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString()
   }
@@ -167,7 +163,6 @@ export async function findUserByEmail(email: string): Promise<User | null> {
     ban_reason: user.banReason,
     avatar_style: user.avatarStyle,
     avatar_badge_id: user.avatarBadgeId,
-    has_created_host_before: user.hasCreatedHostBefore,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString()
   }

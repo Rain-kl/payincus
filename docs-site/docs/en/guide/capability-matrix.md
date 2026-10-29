@@ -22,7 +22,7 @@ Status legend:
 | Telegram integration | Usable foundation | `/admin/settings/telegram` | Profile binding | `server/src/routes/telegram.ts`, `client/src/views/admin/TelegramConfigView.vue` | Bot, webhook, user bindings, and group eligibility exist. |
 | Mail and Lsky attachments | Usable foundation | `/admin/settings/mail`, `/admin/settings/tickets` | Email verification, ticket attachments | `server/src/routes/system-config.ts`, `server/src/lib/lsky.ts` | SMTP/Lsky configuration and preflight exist. |
 | Public API / OAuth | Usable foundation | `/admin/oauth` | `/api/v1/*`, OAuth Provider | `server/src/routes/public-api.ts`, `server/src/lib/public-api-openapi.ts` | Token auth, scopes, pagination, sorting, errors, and SDK exist; service creation, refunds, direct balance writes, and migrations remain closed. |
-| Hosting and resource pools | Usable foundation | `/admin/hosting`, resource pages | My hosts, my packages, hosting wallet | `server/src/routes/hosting.ts`, `server/src/routes/packages.ts` | Hosting zones, income, packages, and host binding exist; business acceptance and anomaly notification need more work. |
+| Resource pools and packages | Usable foundation | Resource pages | Package list | `server/src/routes/packages.ts` | Packages, host binding, and resource pools exist; the hosting subsystem has been removed. |
 | Entertainment and benefits | Usable foundation | `/admin/entertainment` | `/entertainment`, check-in/benefits | `server/src/routes/admin-entertainment.ts`, `server/src/routes/checkin.ts` | Foundation exists; product positioning, visibility, and configuration boundaries should be clarified. |
 
 ## Next Closures

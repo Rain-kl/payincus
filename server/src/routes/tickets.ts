@@ -234,27 +234,16 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
         attachments: uploadedAttachments
       })
 
-      // 发送通知：如果是用户托管节点的实例，发送给节点所有者；否则发送给管理员
+      // 发送通知给所有管理员
       try {
-        if (host && host.user.role !== 'admin') {
-          // 用户托管节点：发送通知给节点所有者
-          await sendNotification(host.userId, 'ticket_created', {
+        const adminIds = await getAllAdminUserIds()
+        for (const adminId of adminIds) {
+          await sendNotification(adminId, 'ticket_created', {
             username: user.username,
             subject,
-            hostName: host.name,
+            hostName: host?.name || '系统',
             instanceName: instance?.name || '无'
           })
-        } else {
-          // 官方节点或未选择实例：发送通知给所有管理员
-          const adminIds = await getAllAdminUserIds()
-          for (const adminId of adminIds) {
-            await sendNotification(adminId, 'ticket_created', {
-              username: user.username,
-              subject,
-              hostName: host?.name || '系统',
-              instanceName: instance?.name || '无'
-            })
-          }
         }
       } catch (err) {
         console.error('[Tickets] Failed to send notification:', err)
@@ -651,10 +640,6 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
       )
 
       // 发送通知
-      // 判断是否是托管实例的工单（宿主机有所有者且不是管理员账号）
-      const hostedTicketHost = await getTicketHostOwnership(ticket.host?.id)
-      const isHostedTicket = hostedTicketHost?.user.role === 'user'
-
       try {
         if (access.isOwner) {
           // 宿主机所有者或管理员回复，通知工单创建用户
@@ -664,24 +649,14 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
             replyFrom: user.username
           })
         } else {
-          // 用户回复工单
-          if (isHostedTicket) {
-            // 托管实例的工单：通知宿主机所有者
-            await sendNotification(hostedTicketHost!.userId, 'ticket_replied', {
+          // 通知所有管理员
+          const adminIds = await getAllAdminUserIds()
+          for (const adminId of adminIds) {
+            await sendNotification(adminId, 'ticket_replied', {
               subject: ticket.subject,
               hostName: ticket.host?.name || '系统',
               replyFrom: user.username
             })
-          } else {
-            // 官方节点或无实例的工单：通知所有管理员
-            const adminIds = await getAllAdminUserIds()
-            for (const adminId of adminIds) {
-              await sendNotification(adminId, 'ticket_replied', {
-                subject: ticket.subject,
-                hostName: ticket.host?.name || '系统',
-                replyFrom: user.username
-              })
-            }
           }
         }
       } catch (err) {
@@ -843,30 +818,16 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
     await ticketDb.updateTicketStatus(ticketId, 'closed')
 
     // 发送通知
-    // 判断是否是托管实例的工单（宿主机有所有者且不是管理员账号）
-    const hostedTicketHost = await getTicketHostOwnership(ticket.host?.id)
-    const isHostedTicket = hostedTicketHost?.user.role === 'user'
-    
     try {
       if (access.isCreator) {
-        // 用户关闭工单
-        if (isHostedTicket) {
-          // 托管实例的工单：通知宿主机所有者
-          await sendNotification(hostedTicketHost!.userId, 'ticket_closed', {
+        // 用户关闭工单：通知所有管理员
+        const adminIds = await getAllAdminUserIds()
+        for (const adminId of adminIds) {
+          await sendNotification(adminId, 'ticket_closed', {
             subject: ticket.subject,
             hostName: ticket.host?.name || '系统',
             closedBy: user.username
           })
-        } else {
-          // 官方节点或无实例的工单：通知所有管理员
-          const adminIds = await getAllAdminUserIds()
-          for (const adminId of adminIds) {
-            await sendNotification(adminId, 'ticket_closed', {
-              subject: ticket.subject,
-              hostName: ticket.host?.name || '系统',
-              closedBy: user.username
-            })
-          }
         }
       } else {
         // 宿主机所有者或管理员关闭工单，通知工单创建用户
@@ -949,7 +910,7 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
     Querystring: {
       status?: ExtendedTicketStatus
       hostId?: number
-      sourceType?: 'all' | 'user' | 'official' | 'hosted'
+      sourceType?: 'all' | 'user' | 'official'
       queue?: 'pending' | 'due_soon' | 'overdue' | 'waiting_user' | 'waiting_internal'
       search?: string
       page?: number
@@ -961,7 +922,7 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
     Querystring: {
       status?: ExtendedTicketStatus
       hostId?: number
-      sourceType?: 'all' | 'user' | 'official' | 'hosted'
+      sourceType?: 'all' | 'user' | 'official'
       queue?: 'pending' | 'due_soon' | 'overdue' | 'waiting_user' | 'waiting_internal'
       search?: string
       page?: number
@@ -982,7 +943,7 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
       return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
     }
 
-    if (sourceType && !['all', 'user', 'official', 'hosted'].includes(sourceType)) {
+    if (sourceType && !['all', 'user', 'official'].includes(sourceType)) {
       return reply.code(400).send(apiError(ErrorCode.INVALID_PARAMS, 'Invalid source type'))
     }
     if (queue && !['pending', 'due_soon', 'overdue', 'waiting_user', 'waiting_internal'].includes(queue)) {
@@ -992,7 +953,7 @@ export default async function ticketsRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    if (!isAdmin && sourceType && sourceType !== 'all' && sourceType !== 'hosted') {
+    if (!isAdmin && sourceType && sourceType !== 'all') {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 

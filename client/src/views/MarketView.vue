@@ -13,7 +13,6 @@ import {
   formatPublicPrice,
   formatPublicTraffic,
   getStartingMonthlyPrice,
-  normalizePackageSourceQuery,
   parsePackageIdQuery,
   parseTextQuery,
   type PublicPackage,
@@ -39,10 +38,10 @@ void configStore.loadPublicConfig()
 const revealRoot = ref<HTMLElement | null>(null)
 useReveal(revealRoot)
 
-type PublicPackageSource = 'official' | 'market'
+type PublicPackageSource = 'official'
 
-function normalizePublicPackageSource(value: unknown): PublicPackageSource {
-  return normalizePackageSourceQuery(value) === 'market' ? 'market' : 'official'
+function normalizePublicPackageSource(_value: unknown): PublicPackageSource {
+  return 'official'
 }
 
 const packageSource = ref<PublicPackageSource>(normalizePublicPackageSource(route.query.source))
@@ -174,7 +173,7 @@ const summaryCards = computed(() => [
   { label: t('publicSite.market.summary.total'), value: String(packages.value.length) },
   { label: t('publicSite.market.summary.available'), value: String(packages.value.filter(pkg => !pkg.soldOut).length) },
   { label: t('publicSite.market.summary.regions'), value: String(regions.value.length) },
-  { label: t('publicSite.market.summary.source'), value: packageSource.value === 'official' ? t('publicSite.market.official') : t('publicSite.market.market') }
+  { label: t('publicSite.market.summary.source'), value: t('publicSite.market.official') }
 ])
 
 usePageSeo(() => {
@@ -182,10 +181,8 @@ usePageSeo(() => {
   const plan = selectedPlan.value
   const origin = window.location.origin
   const canonical = selected
-    ? `${origin}/market?source=${selected.sourceType}&package=${selected.id}${plan ? `&plan=${plan.id}` : ''}`
-    : packageSource.value === 'market'
-      ? `${origin}/market?source=market`
-      : `${origin}/market`
+    ? `${origin}/market?source=official&package=${selected.id}${plan ? `&plan=${plan.id}` : ''}`
+    : `${origin}/market`
 
   if (selected) {
     return {
@@ -311,10 +308,6 @@ function syncRouteQuery(): void {
   }
 
   const nextQuery: Record<string, string> = {}
-
-  if (packageSource.value !== 'official') {
-    nextQuery.source = packageSource.value
-  }
 
   if (selectedRegion.value) {
     nextQuery.region = selectedRegion.value
@@ -444,19 +437,6 @@ async function syncFromRoute(): Promise<void> {
   ensureSelectedPackage(nextPackageId)
   ensureSelectedPlan(nextPlanId)
   syncRouteQuery()
-}
-
-async function switchSource(source: PublicPackageSource): Promise<void> {
-  if (source === packageSource.value) {
-    return
-  }
-
-  packageSource.value = source
-  selectedRegion.value = null
-  selectedPackageId.value = null
-  selectedPlanId.value = null
-  searchQuery.value = ''
-  await loadData(null, null)
 }
 
 function selectRegion(code: string | null): void {
@@ -602,23 +582,6 @@ onUnmounted(() => {
       <div class="mx-auto max-w-7xl">
         <div class="market-toolbar" data-reveal>
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-            <div class="inline-flex shrink-0 items-center gap-0.5 rounded-xl border border-themed bg-themed-surface p-1">
-              <button
-                class="h-9 rounded-lg px-4 text-sm font-semibold tracking-normal transition-colors duration-150"
-                :class="packageSource === 'official' ? 'bg-primary-500 text-white shadow-sm' : 'text-themed-muted hover:text-themed'"
-                @click="switchSource('official')"
-              >
-                {{ t('publicSite.market.official') }}
-              </button>
-              <button
-                class="h-9 rounded-lg px-4 text-sm font-semibold tracking-normal transition-colors duration-150"
-                :class="packageSource === 'market' ? 'bg-primary-500 text-white shadow-sm' : 'text-themed-muted hover:text-themed'"
-                @click="switchSource('market')"
-              >
-                {{ t('publicSite.market.market') }}
-              </button>
-            </div>
-
             <div v-if="regions.length > 0" class="market-chips flex min-w-0 flex-1 gap-2 overflow-x-auto">
               <button
                 class="inline-flex h-9 shrink-0 items-center rounded-xl px-3.5 text-sm font-semibold transition-colors duration-150"
@@ -728,7 +691,7 @@ onUnmounted(() => {
                   <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
                       <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="pkg.sourceType === 'official' ? ui.chipOfficial : ui.chipMarket">
-                        {{ pkg.sourceType === 'official' ? t('publicSite.market.official') : t('publicSite.market.market') }}
+                        {{ t('publicSite.market.official') }}
                       </span>
                       <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="pkg.instance_type === 'vm' ? ui.chipKvm : ui.chipLxc">
                         {{ pkg.instance_type === 'vm' ? 'KVM' : 'LXC' }}
@@ -788,7 +751,7 @@ onUnmounted(() => {
               <template v-if="selectedPackage">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="selectedPackage.sourceType === 'official' ? ui.chipOfficial : ui.chipMarket">
-                    {{ selectedPackage.sourceType === 'official' ? t('publicSite.market.official') : t('publicSite.market.market') }}
+                    {{ t('publicSite.market.official') }}
                   </span>
                   <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="selectedPackage.instance_type === 'vm' ? ui.chipKvm : ui.chipLxc">
                     {{ selectedPackage.instance_type === 'vm' ? 'KVM' : 'LXC' }}

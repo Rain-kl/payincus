@@ -4,7 +4,6 @@ import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
 import PackageQuotaReleaseModal from '@/components/PackageQuotaReleaseModal.vue'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
@@ -24,10 +23,6 @@ const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 const MAX_PACKAGE_PLAN_PRICE_CENTS = 99999999
 const MAX_PACKAGE_PLAN_PRICE = MAX_PACKAGE_PLAN_PRICE_CENTS / 100
-
-// 管理员专用：套餐范围切换器
-const scope = ref<'mine' | 'hosted'>('mine')
-const filterUserId = ref('')  // 用于筛选特定用户的托管套餐
 
 const packages = ref<Package[]>([])
 const hosts = ref<Host[]>([])
@@ -177,13 +172,7 @@ onActivated(async (): Promise<void> => {
 async function loadPackages(): Promise<void> {
   loading.value = true
   try {
-    if (isAdmin.value && scope.value === 'hosted') {
-      // 管理员查看托管套餐
-      const response = await api.packages.listHosted({
-        ...(filterUserId.value ? { userId: parseInt(filterUserId.value, 10) } : {})
-      })
-      packages.value = (response as { packages?: Package[] }).packages || []
-    } else if (isAdmin.value && scope.value === 'mine') {
+    if (isAdmin.value) {
       // 管理员查看自己的套餐（传 scope: 'mine'）
       const response = await api.packages.list({ all: true, scope: 'mine' })
       packages.value = (response as { packages?: Package[] }).packages || []
@@ -197,24 +186,6 @@ async function loadPackages(): Promise<void> {
     loading.value = false
   }
 }
-
-// 切换范围时重新加载
-function switchScope(newScope: 'mine' | 'hosted'): void {
-  scope.value = newScope
-  filterUserId.value = ''
-  packagesPage.value = 1
-  loadPackages()
-}
-
-// 按用户ID筛选时重新加载
-let filterTimer: ReturnType<typeof setTimeout> | null = null
-watch(filterUserId, () => {
-  if (filterTimer) clearTimeout(filterTimer)
-  filterTimer = setTimeout(() => {
-    packagesPage.value = 1
-    loadPackages()
-  }, 300)
-})
 
 async function loadHosts(): Promise<void> {
   try {
@@ -295,16 +266,12 @@ function isPackageActive(pkg: Package): boolean {
 
 /**
  * 复制套餐分享链接
- * 链接格式: /instances/create?source=market|official&package=123
+ * 链接格式: /instances/create?source=official&package=123
  */
 function copyShareLink(pkg: Package): void {
   if (isAdminEntry) return
 
-  // 判断套餐来源：任一节点名以 PEER 开头 = 托管市场
-  const hostNames = getHostNames(pkg)
-  const isHostedPackage = hostNames.split(', ').some(name => name.toUpperCase().startsWith('PEER'))
-  const source = isHostedPackage ? 'market' : 'official'
-  const link = `${window.location.origin}${instanceCreatePath()}?source=${source}&package=${pkg.id}`
+  const link = `${window.location.origin}${instanceCreatePath()}?source=official&package=${pkg.id}`
   
   navigator.clipboard.writeText(link).then(() => {
     toast.success(t('resources.packages.shareLinkCopied'))
@@ -734,7 +701,7 @@ function getBillingCycleLabel(months: number): string {
         <h1 class="page-title">{{ t('resources.packages.title') }}</h1>
         <p class="page-description">{{ t('resources.packages.description') }}</p>
       </div>
-      <button v-if="scope === 'mine'" class="btn-primary btn-sm sm:btn" @click="openCreate">
+      <button class="btn-primary btn-sm sm:btn" @click="openCreate">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
@@ -765,35 +732,6 @@ function getBillingCycleLabel(months: number): string {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-      </div>
-      <!-- 管理员专用：套餐范围切换器 -->
-      <div v-if="isAdmin" class="inline-flex rounded-lg border border-themed bg-themed-secondary p-1">
-        <button
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="scope === 'mine' ? 'bg-themed-surface text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-          @click="switchScope('mine')"
-        >
-          {{ t('resources.packages.mine') }}
-        </button>
-        <button
-          class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-          :class="scope === 'hosted' ? 'bg-themed-surface text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-          @click="switchScope('hosted')"
-        >
-          {{ t('resources.packages.hosted') }}
-        </button>
-      </div>
-      <!-- 托管套餐用户ID筛选 -->
-      <div v-if="isAdmin && scope === 'hosted'" class="relative sm:w-40">
-        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-        <input
-          v-model="filterUserId"
-          type="text"
-          :placeholder="t('resources.packages.filterByUserId')"
-          class="input pl-9 w-full"
-        />
       </div>
     </div>
 
@@ -842,17 +780,6 @@ function getBillingCycleLabel(months: number): string {
               <span v-else class="badge badge-default shrink-0 text-xs" :title="t('admin.packages.archivedHint')">{{ t('admin.packages.inactive') }}</span>
             </div>
 
-            <div v-if="isAdmin && scope === 'hosted'" class="mt-4 rounded-lg bg-themed-secondary p-3">
-              <div v-if="pkg.owner" class="flex items-center gap-2">
-                <UserAvatar :avatar-style="pkg.owner.avatarStyle" :badge-id="pkg.owner.avatarBadgeId || null" :size="28" :username="pkg.owner.username" />
-                <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-themed">{{ pkg.owner.username }}</div>
-                  <div class="text-xs text-themed-muted">UID: {{ pkg.owner.id }}</div>
-                </div>
-              </div>
-              <span v-else class="text-sm text-themed-muted">-</span>
-            </div>
-
             <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <dt class="text-xs text-themed-muted">{{ t('resources.packages.networkModeColumn') }}</dt>
@@ -876,7 +803,7 @@ function getBillingCycleLabel(months: number): string {
               </div>
             </dl>
 
-            <div v-if="scope === 'mine'" class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-themed pt-3">
+            <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-themed pt-3">
               <button
                 v-if="!isAdminEntry"
                 type="button"
@@ -950,14 +877,13 @@ function getBillingCycleLabel(months: number): string {
             <thead>
               <tr class="border-b border-themed bg-themed-secondary">
                 <th class="w-[26%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.name') }}</th>
-                <th v-if="isAdmin && scope === 'hosted'" class="w-[20%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.owner') }}</th>
                 <th class="w-[8%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.status') }}</th>
                 <th class="w-[11%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.networkModeColumn') }}</th>
                 <th class="w-[8%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceTypeColumn') }}</th>
                 <th class="w-[6%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.trafficMultiplierColumn') }}</th>
                 <th class="w-[13%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.hostColumn') }}</th>
                 <th class="w-[8%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceColumn') }}</th>
-                <th v-if="scope === 'mine'" class="w-[20%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('common.actions') }}</th>
+                <th class="w-[20%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -979,17 +905,6 @@ function getBillingCycleLabel(months: number): string {
                     </span>
                   </div>
                   <div v-if="pkg.description" class="text-xs text-themed-muted mt-0.5 max-w-48 truncate">{{ pkg.description }}</div>
-                </td>
-                <!-- 托管套餐所有者信息 -->
-                <td v-if="isAdmin && scope === 'hosted'" class="px-4 py-3 whitespace-nowrap">
-                  <div v-if="pkg.owner" class="flex items-center gap-2">
-                    <UserAvatar :avatar-style="pkg.owner.avatarStyle" :badge-id="pkg.owner.avatarBadgeId || null" :size="28" :username="pkg.owner.username" />
-                    <div>
-                      <div class="text-sm font-medium text-themed">{{ pkg.owner.username }}</div>
-                      <div class="text-xs text-themed-muted">UID: {{ pkg.owner.id }}</div>
-                    </div>
-                  </div>
-                  <span v-else class="text-themed-muted">-</span>
                 </td>
                 <!-- 状态 -->
                 <td class="px-4 py-3 whitespace-nowrap">
@@ -1021,7 +936,7 @@ function getBillingCycleLabel(months: number): string {
                   {{ pkg.instance_count || 0 }}
                 </td>
                 <!-- 操作 -->
-                <td v-if="scope === 'mine'" class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap">
                   <div class="flex items-center justify-end gap-1">
                     <!-- 分享链接 -->
                     <button

@@ -104,25 +104,9 @@ assert.ok(
 )
 
 assert.ok(
-  manualRefundRoute.includes(`await db.deductHostingBalance(
-          instance.hostId,
-          amount,
-          instanceId,
-          \`管理员退款扣除托管收入：\${instance.name}\`,
-          tx
-        )`),
-  'admin manual instance refunds must deduct the actual refund amount from hosted income in the same transaction'
-)
-
-assert.ok(
-  deleteAndRefundRoute.includes(`await db.deductHostingBalance(
-              instance.hostId,
-              refundAmount,
-              instanceId,
-              \`管理员删除托管实例退款扣除：\${instance.name}\`,
-              tx
-            )`),
-  'admin delete-and-refund must deduct the actual refund amount from hosted income in the same transaction'
+  manualRefundRoute.includes('await reverseInstanceAffCommissionForRefund({') &&
+    deleteAndRefundRoute.includes('await reverseInstanceAffCommissionForRefund({'),
+  'admin refunds must reverse AFF commission in the same transaction'
 )
 
 console.log('admin billing route ID guard tests passed')

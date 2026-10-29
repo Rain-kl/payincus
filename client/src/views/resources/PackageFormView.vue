@@ -9,7 +9,7 @@ import FlagIcon from '@/components/FlagIcon.vue'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
-import type { Host, HostWithDetails, Package, CreatePackageRequest, UpdatePackageRequest } from '@/types/api'
+import type { Host, Package, CreatePackageRequest, UpdatePackageRequest } from '@/types/api'
 import { validateName, validateText } from '@/utils/validation'
 import { translateError } from '@/utils/errorHandler'
 
@@ -51,19 +51,16 @@ const showPackageLevelInstanceDefaults = computed(() => packageCreationMode.valu
 // Loading states
 const loading = ref(false)
 const saving = ref(false)
-type HostScope = 'official' | 'hosted'
 type PackageHostOption = Host & {
   countryCode?: string
   cpuAllowanceMax?: number
   memoryMax?: number
   instanceType?: 'container' | 'vm' | 'both'
-  owner?: HostWithDetails['owner']
 }
 
 const hosts = ref<PackageHostOption[]>([])
 const allKnownHosts = ref<PackageHostOption[]>([])
 const hostsLoading = ref(false)
-const hostScope = ref<HostScope>('official')
 const hostSearchInput = ref('')
 const hostSearchQuery = ref('')
 const prerequisitePackages = ref<Package[]>([])
@@ -95,7 +92,7 @@ const prerequisitePackageOptions = computed(() => {
     if (pkg.id === currentPackageId) return false
     if (wouldCreateCycle(pkg.id)) return false
     if (ownerId === null) return pkg.isOwn === true
-    return pkg.ownerId === ownerId || pkg.owner?.id === ownerId
+    return pkg.ownerId === ownerId
   })
 })
 
@@ -205,8 +202,7 @@ const displayedHosts = computed(() => {
       host.name,
       host.location,
       host.url,
-      getHostCountryCode(host),
-      getHostOwnerLabel(host)
+      getHostCountryCode(host)
     ]
     return fields.some(value => String(value || '').toLowerCase().includes(query))
   })
@@ -416,17 +412,11 @@ function getHostStatusClass(status: string | undefined): string {
   return themeStore.isDark ? 'bg-zinc-800 text-zinc-300 ring-1 ring-zinc-700' : 'bg-zinc-100 text-zinc-600 ring-1 ring-zinc-300'
 }
 
-function getHostOwnerLabel(host: PackageHostOption | null): string {
-  if (!host?.owner) return ''
-  return `${host.owner.username} UID:${host.owner.id}`
-}
-
 function getHostSummary(host: PackageHostOption): string {
   return [
     host.location,
     host.architecture,
-    host.instanceType || host.instance_type,
-    getHostOwnerLabel(host)
+    host.instanceType || host.instance_type
   ].filter(Boolean).join(' · ')
 }
 
@@ -447,13 +437,6 @@ function applyHostSearch(): void {
 function clearHostSearch(): void {
   hostSearchInput.value = ''
   hostSearchQuery.value = ''
-}
-
-async function switchHostScope(scope: HostScope): Promise<void> {
-  if (hostScope.value === scope) return
-  hostScope.value = scope
-  clearHostSearch()
-  await loadHosts()
 }
 
 async function loadHostStoragePools(hostId: number): Promise<void> {
@@ -577,7 +560,7 @@ async function loadHosts(): Promise<void> {
     const canBindAnyHost = authStore.isAdmin
     // 传递 pageSize 以获取所有宿主机，避免默认分页限制（默认只返回20条）
     const params = canBindAnyHost
-      ? { pageSize: '1000', scope: hostScope.value }
+      ? { pageSize: '1000', scope: 'official' }
       : { mine: 'true', pageSize: '1000' }
     const response = await api.hosts.list(params)
     hosts.value = ((response as { hosts?: PackageHostOption[] }).hosts || [])
@@ -1058,28 +1041,6 @@ const goBack = closeDrawer
                   {{ t('packageForm.hostSelector.selectedCount', { count: form.hostIds.length }) }}
                 </div>
               </div>
-              <div v-if="authStore.isAdmin" class="inline-flex self-start rounded-lg bg-themed-secondary p-1">
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-                  :class="hostScope === 'official'
-                    ? 'bg-primary-500 text-white shadow-sm'
-                    : 'text-themed-muted hover:text-themed'"
-                  @click="switchHostScope('official')"
-                >
-                  {{ t('packageForm.hostSelector.official') }}
-                </button>
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-                  :class="hostScope === 'hosted'
-                    ? 'bg-primary-500 text-white shadow-sm'
-                    : 'text-themed-muted hover:text-themed'"
-                  @click="switchHostScope('hosted')"
-                >
-                  {{ t('resources.hosts.hosted') }}
-                </button>
-              </div>
             </div>
             <div class="rounded-lg border border-themed bg-themed-tertiary p-3">
               <div class="flex flex-col gap-2 sm:flex-row">
@@ -1144,9 +1105,6 @@ const goBack = closeDrawer
                         </div>
                         <div class="mt-1 truncate text-xs text-themed-muted">
                           {{ getHostSummary(host) || host.url }}
-                        </div>
-                        <div v-if="host.owner" class="mt-1 text-xs text-themed-muted">
-                          {{ t('resources.hosts.owner') }}: {{ host.owner.username }} · UID {{ host.owner.id }}
                         </div>
                       </div>
                     </div>

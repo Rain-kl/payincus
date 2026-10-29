@@ -26,7 +26,6 @@ const savingAffRates = ref(false)
 const savingVipBenefits = ref(false)
 const savingPopupAnnouncement = ref(false)
 const savingPopupPromo = ref(false)
-const savingHostingFeature = ref(false)
 const savingQuota = ref(false)
 const savingTurnstile = ref(false)
 const savingAvatar = ref(false)
@@ -101,9 +100,6 @@ const form = ref({
   popup_announcement: '',
   popup_promo_image_url: '',
   popup_promo_package_id: '',
-  hosting_feature_enabled: true,
-  hosting_market_entry_enabled: true,
-  hosting_notice: '',
   ticket_enabled: true,
   ticket_auto_close_enabled: true,
   ticket_auto_close_hours: 24,
@@ -181,10 +177,10 @@ const numericConfigKeys = ['default_quota_host', 'default_quota_friend', 'defaul
 const floatConfigKeys = ['transfer_fee', 'free_site_register_gift_balance', 'aff_commission_rate', 'aff_discount_rate']
 
 // 布尔类型的配置键
-const booleanConfigKeys = ['registration_enabled', 'require_invite_code', 'hosting_feature_enabled', 'hosting_market_entry_enabled', 'ticket_enabled', 'ticket_auto_close_enabled', 'free_site_mode', 'free_site_register_gift_enabled', 'turnstile_enabled', 'smtp_enabled', 'smtp_secure', 'email_domain_whitelist_enabled']
+const booleanConfigKeys = ['registration_enabled', 'require_invite_code', 'ticket_enabled', 'ticket_auto_close_enabled', 'free_site_mode', 'free_site_register_gift_enabled', 'turnstile_enabled', 'smtp_enabled', 'smtp_secure', 'email_domain_whitelist_enabled']
 
 // 字符串类型的配置键
-const stringConfigKeys = ['turnstile_site_key', 'turnstile_secret_key', 'avatar_api_base', 'smtp_host', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name', 'email_allowed_domains', 'footer_contact_email', 'brand_name', 'brand_subtitle', 'brand_logo_url', 'brand_copyright', 'hosting_notice']
+const stringConfigKeys = ['turnstile_site_key', 'turnstile_secret_key', 'avatar_api_base', 'smtp_host', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name', 'email_allowed_domains', 'footer_contact_email', 'brand_name', 'brand_subtitle', 'brand_logo_url', 'brand_copyright']
 stringConfigKeys.push('popup_announcement', 'popup_promo_image_url', 'popup_promo_package_id', 'ticket_image_lsky_base_url', 'ticket_image_lsky_token', 'ticket_image_lsky_api_version', 'ticket_image_lsky_target_id')
 stringConfigKeys.push('system_update_allowed_admin_ids', 'payincus_gift_card_admin_ids')
 
@@ -199,7 +195,6 @@ const currentSection = computed(() =>
 )
 
 const isAccessSection = computed(() => currentSectionKey.value === 'access')
-const isHostingSection = computed(() => false)
 const isBrandSection = computed(() => currentSectionKey.value === 'brand')
 const isSecuritySection = computed(() => currentSectionKey.value === 'security')
 const isMailSection = computed(() => currentSectionKey.value === 'mail')
@@ -307,13 +302,9 @@ async function loadPopupPromoPackages() {
   }
   popupPromoPackagesLoading.value = true
   try {
-    const [officialResponse, marketResponse] = await Promise.all([
-      api.packages.list({ source: 'official' }),
-      api.packages.list({ source: 'market' })
-    ])
+    const officialResponse = await api.packages.list({ source: 'official' })
     popupPromoPackages.value = [
-      ...(officialResponse.packages || []),
-      ...(marketResponse.packages || [])
+      ...(officialResponse.packages || [])
     ].filter(pkg => pkg.active === 1)
     popupPromoPackagesLoaded.value = true
   } catch (err) {
@@ -486,19 +477,6 @@ async function saveTransfer() {
 }
 const hasTransferChanges = computed(() => {
   return transferKeys.some(key => {
-    const config = configs.value.find(c => c.key === key)
-    if (!config) return false
-    return String((form.value as any)[key]) !== config.value
-  })
-})
-
-const hostingFeatureKeys = ['hosting_feature_enabled', 'hosting_market_entry_enabled', 'hosting_notice']
-async function saveHostingFeature() {
-  await saveConfigGroup(hostingFeatureKeys, savingHostingFeature)
-  await configStore.loadPublicConfig(true)
-}
-const hasHostingFeatureChanges = computed(() => {
-  return hostingFeatureKeys.some(key => {
     const config = configs.value.find(c => c.key === key)
     if (!config) return false
     return String((form.value as any)[key]) !== config.value
@@ -1162,102 +1140,6 @@ async function sendTestEmail() {
           </div>
         </div>
 
-        <div v-if="isHostingSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.hostingFeature.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.hostingFeature.description') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasHostingFeatureChanges || savingHostingFeature"
-              @click="saveHostingFeature"
-            >
-              {{ savingHostingFeature ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50">
-              <div class="flex-1">
-                <label class="text-sm font-medium text-themed">{{ t('admin.system.hostingFeature.enable') }}</label>
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.hostingFeature.enableDesc') }}</p>
-              </div>
-              <div class="flex items-center gap-3 ml-4">
-                <span class="text-xs" :class="form.hosting_feature_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                  {{ t('admin.system.hostingFeature.hiddenForNewUsers') }}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  :aria-checked="form.hosting_feature_enabled"
-                  class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  :class="[
-                    form.hosting_feature_enabled
-                      ? 'bg-accent focus:ring-accent'
-                      : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                  ]"
-                  @click="form.hosting_feature_enabled = !form.hosting_feature_enabled"
-                >
-                  <span
-                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                    :class="form.hosting_feature_enabled ? 'translate-x-5' : 'translate-x-0'"
-                  />
-                </button>
-                <span class="text-xs" :class="form.hosting_feature_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                  {{ t('admin.system.hostingFeature.visibleToAll') }}
-                </span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50">
-              <div class="flex-1">
-                <label class="text-sm font-medium text-themed">{{ t('admin.system.hostingFeature.marketEntry') }}</label>
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.hostingFeature.marketEntryDesc') }}</p>
-              </div>
-              <div class="flex items-center gap-3 ml-4">
-                <span class="text-xs" :class="form.hosting_market_entry_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                  {{ t('admin.system.hostingFeature.marketEntryHidden') }}
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  :aria-checked="form.hosting_market_entry_enabled"
-                  class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  :class="[
-                    form.hosting_market_entry_enabled
-                      ? 'bg-accent focus:ring-accent'
-                      : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                  ]"
-                  @click="form.hosting_market_entry_enabled = !form.hosting_market_entry_enabled"
-                >
-                  <span
-                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                    :class="form.hosting_market_entry_enabled ? 'translate-x-5' : 'translate-x-0'"
-                  />
-                </button>
-                <span class="text-xs" :class="form.hosting_market_entry_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                  {{ t('admin.system.hostingFeature.marketEntryVisible') }}
-                </span>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.hostingFeature.notice') }}
-              </label>
-              <textarea
-                v-model="form.hosting_notice"
-                rows="5"
-                class="input min-h-[120px] resize-y"
-                :placeholder="t('admin.system.hostingFeature.noticePlaceholder')"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.hostingFeature.noticeHint') }}</p>
-            </div>
-          </div>
-        </div>
-
         <!-- Transfer Settings -->
         <div v-if="isAccessSection" class="card p-6">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
@@ -1400,7 +1282,7 @@ async function sendTestEmail() {
         </div>
 
         <!-- Free Site Settings -->
-        <div v-if="isHostingSection" class="card p-6">
+        <div v-if="isAccessSection" class="card p-6">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
             <div>
               <h3 class="text-themed font-semibold">{{ t('admin.system.freeSite.title') }}</h3>

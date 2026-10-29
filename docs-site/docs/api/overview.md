@@ -91,7 +91,7 @@ Public API 不开放直接支付建单、支付回调、退款、直接余额写
     <tr><th>Scope</th><td><code>balance:read</code></td></tr>
     <tr><th>Query</th><td><code>page</code>、<code>pageSize</code>、<code>sort</code>、<code>type</code>、<code>lotteryGift</code></td></tr>
     <tr><th>返回</th><td><code>data</code> 流水列表和 <code>meta</code> 分页信息。</td></tr>
-    <tr><th>边界</th><td>不返回支付渠道 payload、调整对象、托管余额或其他用户流水。</td></tr>
+    <tr><th>边界</th><td>不返回支付渠道 payload、调整对象或其他用户流水。</td></tr>
   </tbody></table>
 </div>
 
@@ -197,7 +197,7 @@ Public API 不开放直接支付建单、支付回调、退款、直接余额写
     <tr><th>Scope</th><td><code>services:billing</code></td></tr>
     <tr><th>Body</th><td>续费周期和幂等键。</td></tr>
     <tr><th>返回</th><td>续费后的服务和账务结果。</td></tr>
-    <tr><th>边界</th><td>余额扣减、账单、AFF 折扣和托管节点限制由内部事务处理，不暴露直接扣款接口。</td></tr>
+    <tr><th>边界</th><td>余额扣减、账单和 AFF 折扣由内部事务处理，不暴露直接扣款接口。</td></tr>
   </tbody></table>
 </div>
 

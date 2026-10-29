@@ -91,17 +91,6 @@ const ecosystemCards = computed(() => [
       t('publicSite.portal.officialPoint2'),
       t('publicSite.portal.officialPoint3')
     ]
-  },
-  {
-    key: 'market',
-    source: 'market' as PackageSource,
-    title: t('publicSite.portal.marketTitle'),
-    description: t('publicSite.portal.marketDescription'),
-    points: [
-      t('publicSite.portal.marketPoint1'),
-      t('publicSite.portal.marketPoint2'),
-      t('publicSite.portal.marketPoint3')
-    ]
   }
 ])
 
@@ -253,7 +242,7 @@ onMounted(() => {
           </div>
 
           <div class="nimbus-hero-trust">
-            <span class="nimbus-trust-chip">Direct / Hosted</span>
+            <span class="nimbus-trust-chip">LXC / KVM Ready</span>
             <span class="nimbus-trust-chip">LXC / KVM</span>
             <span class="nimbus-trust-chip">IPv4 NAT / BGP</span>
           </div>
@@ -274,10 +263,6 @@ onMounted(() => {
             <div class="nimbus-stat-label">{{ t('publicSite.portal.stats.official') }}</div>
           </div>
           <div class="nimbus-stat">
-            <div class="nimbus-stat-value">{{ packages.filter((item) => item.sourceType === 'market').length }}</div>
-            <div class="nimbus-stat-label">{{ t('publicSite.portal.stats.market') }}</div>
-          </div>
-          <div class="nimbus-stat">
             <div class="nimbus-stat-value">8+</div>
             <div class="nimbus-stat-label">{{ t('publicSite.portal.stats.regions') }}</div>
           </div>
@@ -285,7 +270,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- 3. DUAL SELECTOR: 官方直营 / 托管市场 -->
+    <!-- 3. 官方直营 -->
     <section class="nimbus-section">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="nimbus-section-head" data-reveal>
@@ -307,12 +292,9 @@ onMounted(() => {
           >
             <div class="nimbus-choice-top">
               <div class="nimbus-icon-tile">
-                <svg v-if="line.source === 'official'" class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 3l7 3v5c0 4.5-2.9 8.4-7 9.8C7.9 19.4 5 15.5 5 11V6l7-3z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9.3 12l1.9 1.9 3.8-4.1" />
-                </svg>
-                <svg v-else class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
                 </svg>
               </div>
               <div class="nimbus-choice-tags">
@@ -320,10 +302,10 @@ onMounted(() => {
                   class="rounded-lg px-2.5 py-1 text-[11px] font-semibold tracking-normal"
                   :class="getSourceChipClass(line.source)"
                 >
-                  {{ line.source === 'official' ? t('publicSite.market.official') : t('publicSite.market.market') }}
+                  {{ t('publicSite.market.official') }}
                 </span>
                 <span class="nimbus-choice-badge">
-                  {{ line.source === 'official' ? t('publicSite.portal.stableSupply') : t('publicSite.portal.moreChoices') }}
+                  {{ t('publicSite.portal.stableSupply') }}
                 </span>
               </div>
             </div>
@@ -343,7 +325,7 @@ onMounted(() => {
               class="nimbus-choice-action"
               @click.stop="browseCatalog(line.source)"
             >
-              {{ line.source === 'official' ? t('publicSite.actions.browseOfficial') : t('publicSite.actions.browseMarket') }}
+              {{ t('publicSite.actions.browseOfficial') }}
               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.5 4.5l6 6m0 0l-6 6m6-6h-15" />
               </svg>
@@ -429,7 +411,7 @@ onMounted(() => {
                   class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal"
                   :class="getSourceChipClass(pkg.sourceType)"
                 >
-                  {{ pkg.sourceType === 'official' ? t('publicSite.market.official') : t('publicSite.market.market') }}
+                  {{ t('publicSite.market.official') }}
                 </span>
                 <span
                   class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal"
@@ -716,7 +698,7 @@ onMounted(() => {
   color: var(--kawaii-muted);
 }
 
-/* ── 双选卡：官方直营 / 托管市场 ── */
+/* ── 官方直营选择卡 ── */
 .nimbus-choice-grid {
   margin-top: 2.25rem;
   display: grid;

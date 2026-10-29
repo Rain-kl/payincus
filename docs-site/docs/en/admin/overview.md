@@ -25,7 +25,6 @@ https://admin.example.com
 | Admin create instance | `/admin/instances/create` | Manual delivery or correction workflows. |
 | Tickets & Customer Success | `/admin/tickets` | Handle support tickets with user context, linked objects, internal notes, handling timeline and safe support shortcuts. |
 | Images | `/admin/images` | OS images, architecture and availability. |
-| Hosting | `/admin/hosting` | Hosted hosts, providers, revenue and review. |
 | Statistics | `/admin/statistics` | Operations overview, revenue, orders, resources, delivery and billing metrics. |
 | Gift Cards | `/admin/gift-cards` | Create single or batch balance gift cards, review stats and redacted lists, and enable, disable or delete unused cards. |
 | Logs and Audit | `/admin/logs` | Audit logs and system operation records with risk levels, approval or verification hints, and redacted CSV export. |

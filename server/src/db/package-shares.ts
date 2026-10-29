@@ -3,7 +3,6 @@
  */
 
 import { prisma } from './prisma.js'
-import { getBlockerIdsForUser, isUserBlockedByHoster } from './hosting-blocks.js'
 
 function normalizeGlobalMaxInstances(value: number | null | undefined): number {
     return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5 ? value : 1
@@ -53,15 +52,6 @@ export interface SharedPackageInfo {
     requiredPackageId?: number | null
     requiredPackageName?: string | null
     allowInstanceDeletion?: boolean  // 是否允许用户删除实例
-}
-
-export interface HostingZoneInfo {
-    id: number
-    name: string
-    ownerId: number
-    ownerUsername: string
-    logoUrl: string
-    sortOrder: number
 }
 
 // ==================== 共享操作 ====================
@@ -183,10 +173,6 @@ export async function getPackageShareForUser(
     })
 
     if (pkg && pkg.globalShared && pkg.userId !== userId) {
-        if (await isUserBlockedByHoster(pkg.userId, userId, client)) {
-            return null
-        }
-
         return {
             id: packageId,  // 使用 packageId 作为标识
             quotaMultiplier: null,
@@ -196,10 +182,6 @@ export async function getPackageShareForUser(
     }
 
     if (pkg && pkg.userId !== userId) {
-        if (await isUserBlockedByHoster(pkg.userId, userId, client)) {
-            return null
-        }
-
         const share = await client.packageShare.findUnique({
             where: {
                 packageId_sharedToId: {
@@ -368,11 +350,9 @@ export async function getSharedByUser(userId: number): Promise<PackageShareInfo[
  * 通过 PackageShare 表查询好友共享的套餐
  */
 export async function getSharedToUser(userId: number): Promise<SharedPackageInfo[]> {
-    const blockerIds = await getBlockerIdsForUser(userId)
     const shares = await prisma.packageShare.findMany({
         where: {
-            sharedToId: userId,
-            ...(blockerIds.length > 0 ? { ownerId: { notIn: blockerIds } } : {})
+            sharedToId: userId
         },
         include: {
             package: {
@@ -431,161 +411,7 @@ export async function getSharedToUser(userId: number): Promise<SharedPackageInfo
 }
 
 /**
- * 获取托管市场的套餐列表（用户托管的公开套餐）
- * 非管理员创建的 globalShared=true 的套餐
- * 注意：现在包含用户自己的套餐（展示用），但创建实例时会校验
- */
-export async function getActiveHostingZoneOwnerIds(): Promise<number[]> {
-    const zones = await prisma.hostingZone.findMany({
-        where: { active: true },
-        select: { ownerId: true }
-    })
-    return zones.map(zone => zone.ownerId)
-}
-
-export async function getHostingZonesForViewer(viewerId?: number): Promise<HostingZoneInfo[]> {
-    const blockerIds = viewerId ? await getBlockerIdsForUser(viewerId) : []
-    const zones = await prisma.hostingZone.findMany({
-        where: {
-            active: true,
-            ...(blockerIds.length > 0 ? { ownerId: { notIn: blockerIds } } : {})
-        },
-        include: {
-            owner: {
-                select: {
-                    id: true,
-                    username: true
-                }
-            }
-        },
-        orderBy: [
-            { sortOrder: 'asc' },
-            { id: 'asc' }
-        ]
-    })
-
-    return zones.map(zone => ({
-        id: zone.id,
-        name: zone.name,
-        ownerId: zone.ownerId,
-        ownerUsername: zone.owner.username,
-        logoUrl: zone.logoUrl,
-        sortOrder: zone.sortOrder
-    }))
-}
-
-export async function getActiveHostingZoneById(zoneId: number, viewerId?: number): Promise<HostingZoneInfo | null> {
-    const zone = await prisma.hostingZone.findFirst({
-        where: {
-            id: zoneId,
-            active: true
-        },
-        include: {
-            owner: {
-                select: {
-                    id: true,
-                    username: true
-                }
-            }
-        }
-    })
-
-    if (!zone) return null
-    if (viewerId && await isUserBlockedByHoster(zone.ownerId, viewerId)) return null
-
-    return {
-        id: zone.id,
-        name: zone.name,
-        ownerId: zone.ownerId,
-        ownerUsername: zone.owner.username,
-        logoUrl: zone.logoUrl,
-        sortOrder: zone.sortOrder
-    }
-}
-
-export async function getHostedMarketPackages(
-    viewerId?: number,
-    options: {
-        ownerId?: number
-        excludeOwnerIds?: number[]
-    } = {}
-): Promise<SharedPackageInfo[]> {
-    const blockerIds = viewerId ? await getBlockerIdsForUser(viewerId) : []
-    const excludedOwnerIds = Array.from(new Set([
-        ...blockerIds,
-        ...(options.excludeOwnerIds || [])
-    ]))
-
-    if (options.ownerId && excludedOwnerIds.includes(options.ownerId)) {
-        return []
-    }
-
-    const packages = await prisma.package.findMany({
-        where: {
-            globalShared: true,
-            active: true,
-            ...(options.ownerId
-                ? { userId: options.ownerId }
-                : excludedOwnerIds.length > 0
-                    ? { userId: { notIn: excludedOwnerIds } }
-                    : {}),
-            // 不再排除用户自己的套餐，允许展示
-            user: {
-                role: { not: 'admin' }  // 排除管理员创建的套餐（那是官方套餐）
-            }
-        },
-        include: {
-            packageHosts: {
-                select: { hostId: true }
-            },
-            user: {
-                select: { id: true, username: true }
-            },
-            requiredPackage: {
-                select: {
-                    id: true,
-                    name: true
-                }
-            }
-        },
-        orderBy: { createdAt: 'desc' }
-    })
-
-    return packages.map(pkg => ({
-        id: pkg.id,
-        name: pkg.name,
-        description: pkg.description,
-        cpuMax: pkg.cpuMax,
-        memoryMax: pkg.memoryMax,
-        diskMax: pkg.diskMax,
-        bandwidthMax: pkg.bandwidthMax,
-        networkMode: pkg.networkMode,
-        gpuShared: pkg.gpuShared,
-        gpuDeviceIds: pkg.gpuDeviceIds,
-        instanceType: pkg.instanceType === 'vm' ? 'vm' : 'container',
-        portLimit: pkg.portLimit,
-        snapshotLimit: pkg.snapshotLimit,
-        backupLimit: pkg.backupLimit,
-        siteLimit: pkg.siteLimit,
-        monthlyTrafficLimit: pkg.monthlyTrafficLimit?.toString() ?? null,
-        nested: pkg.nested ? 1 : 0,
-        privileged: pkg.privileged ? 1 : 0,
-        allowInstanceDeletion: pkg.allowInstanceDeletion,
-        hostIds: pkg.packageHosts.map(ph => ph.hostId),
-        ownerId: pkg.user.id,
-        ownerUsername: pkg.user.username,
-        sharedAt: pkg.createdAt,
-        isGlobalShared: true,  // 托管市场也是全局共享类型
-        quotaMultiplier: null,
-        maxInstances: normalizeGlobalMaxInstances(pkg.globalMaxInstances),
-        requiredPackageId: pkg.requiredPackageId,
-        requiredPackageName: pkg.requiredPackage?.name ?? null
-    }))
-}
-
-/**
  * 获取全局共享的套餐列表（仅管理员创建的官方套餐）
- * 注意：用户托管的套餐不在此列表中显示，将通过其他入口访问
  * 注意：现在包含用户自己的套餐（展示用），但创建实例时会校验
  */
 export async function getGlobalSharedPackages(): Promise<SharedPackageInfo[]> {
@@ -652,7 +478,6 @@ export async function getGlobalSharedPackages(): Promise<SharedPackageInfo[]> {
  * 注意：已移除好友共享机制
  */
 export async function getAccessiblePackageIds(userId: number): Promise<number[]> {
-    const blockerIds = await getBlockerIdsForUser(userId)
     // 获取自己的套餐（管理员）
     const ownPackages = await prisma.package.findMany({
         where: { userId, active: true },
@@ -665,8 +490,7 @@ export async function getAccessiblePackageIds(userId: number): Promise<number[]>
             globalShared: true,
             active: true,
             userId: {
-                not: userId,
-                ...(blockerIds.length > 0 ? { notIn: blockerIds } : {})
+                not: userId
             }
         },
         select: { id: true }
@@ -700,12 +524,10 @@ export async function canUserAccessPackage(userId: number, packageId: number): P
     // 检查是否是自己的套餐（所有者始终可以访问，无论套餐是否启用）
     if (pkg.userId === userId) return true
 
-    if (await isUserBlockedByHoster(pkg.userId, userId)) return false
-    
     // 非所有者只能访问启用的套餐
     if (!pkg.active) return false
     
-    // 检查是否是公开套餐（包括官方直营和托管市场）
+    // 检查是否是公开套餐（官方直营）
     if (pkg.globalShared) return true
 
     // 检查是否是好友共享的套餐

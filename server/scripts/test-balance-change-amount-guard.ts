@@ -84,7 +84,6 @@ assert.ok(
 
 assert.ok(
   balanceRouteSource.includes('const BALANCE_LOG_TYPES = new Set<BalanceLogType>([') &&
-  balanceRouteSource.includes("'hosting_deduction'") &&
   balanceRouteSource.includes("'invite_generate'"),
   'balance log filters must be allowlisted before DB reads'
 )

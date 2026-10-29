@@ -36,13 +36,11 @@ import SSHKeySelector from '@/components/instance/SSHKeySelector.vue'
 import InitCommandSelector from '@/components/extensions/InitCommandSelector.vue'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { instancesPath, profilePath } from '@/utils/app-paths'
-import UserAvatar from '@/components/UserAvatar.vue'
 import type { Package, UserQuota, SshKey, AvailableHost, CreateInstanceRequest } from '@/types/api'
 import { normalizePackageSourceQuery, toPackageSourceRequest, type PackageSource } from '@/utils/publicCatalog'
 import { validateName as validateInstanceName } from '@/utils/validation'
 import { translateError } from '@/utils/errorHandler'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
-import { getVipBadgeInlineStyle, normalizeVipBadgeStyle, type VipBadgeStyle } from '@/utils/vipBadge'
 
 interface ImageOption {
   value: string
@@ -77,13 +75,10 @@ interface PackagePlan {
   slaGuarantee: number | null
 }
 
-type HostingZoneTab = Awaited<ReturnType<typeof api.packages.getHostingZones>>['zones'][number]
-
 interface SourceTab {
   key: PackageSource
-  type: 'official' | 'market' | 'zone'
+  type: 'official'
   label: string
-  logoUrl?: string
 }
 
 const router = useRouter()
@@ -100,7 +95,6 @@ const rightPanelScrollRef = ref<HTMLElement | null>(null)
 // 当前选中的套餐来源
 const packageSource = ref<PackageSource>('official')
 const sourceLoading = ref<boolean>(false)
-const hostingZones = ref<HostingZoneTab[]>([])
 
 // 数据加载状态
 // 地区选择
@@ -232,22 +226,6 @@ const promoCodeValid = ref<boolean | null>(null)
 const promoCodeDiscount = ref<number>(0)
 const promoCodeCommissionRate = ref<number>(0)  // 返利率
 const promoCodeError = ref('')
-
-// 托管者信息弹窗
-const showHostOwnerModal = ref(false)
-const hostOwnerLoading = ref(false)
-const hostOwnerInfo = ref<{
-  id: number
-  username: string
-  email: string
-  avatarStyle: string
-  avatarBadgeId?: string | null
-  hostCount: number
-  instanceCount: number
-  registeredDays: number
-  vipLevel: number
-  vipBadgeStyle?: VipBadgeStyle | null
-} | null>(null)
 
 // 是否为付费套餐（有方案）
 const isPaidPackage = computed<boolean>(() => packagePlans.value.length > 0)
@@ -637,7 +615,7 @@ function onTurnstileError(): void {
   toast.error(t('instance.createPage.turnstileFailed'))
 }
 
-function getPackageSourceLabel(source: 'official' | 'market'): string {
+function getPackageSourceLabel(source: 'official'): string {
   if (configStore.freeSiteMode) {
     return t(`instance.createPage.source.${source}`)
   }
@@ -663,13 +641,6 @@ function getSelectablePackageSource(source: PackageSource): PackageSource {
   return isPackageSourceSelectable(source) ? source : 'official'
 }
 
-const selectedHostingZone = computed<HostingZoneTab | null>(() => {
-  if (!String(packageSource.value).startsWith('zone:')) return null
-  const zoneId = Number(String(packageSource.value).slice('zone:'.length))
-  if (!Number.isInteger(zoneId) || zoneId <= 0) return null
-  return hostingZones.value.find(zone => zone.id === zoneId) || null
-})
-
 const turnstileAction = computed(() => 'create_instance')
 
 onMounted(async (): Promise<void> => {
@@ -682,14 +653,13 @@ onMounted(async (): Promise<void> => {
   const targetPlanId = planParam ? Number(planParam) : null
   
   // 确定初始加载的套餐来源
-  const initialSource = normalizePackageSourceQuery(route.query.source, route.query.zoneId)
+  const initialSource = normalizePackageSourceQuery(route.query.source)
   
   try {
     const [userRes, keysRes] = await Promise.all([
       api.users.get(authStore.user!.id),
       api.sshKeys.list()
     ])
-    hostingZones.value = []
 
     const effectiveInitialSource = getSelectablePackageSource(initialSource)
     const initialSourceRequest = toPackageSourceRequest(effectiveInitialSource)
@@ -793,14 +763,6 @@ async function switchPackageSource(source: PackageSource): Promise<void> {
     sourceLoading.value = false
   }
 }
-
-/**
- * 判断当前选中的套餐是否来自托管市场
- */
-const isHostedMarketPackage = computed<boolean>(() => {
-  if (!selectedPackage.value) return false
-  return selectedPackage.value?.sourceType === 'market' || selectedPackage.value?.sourceType === 'zone'
-})
 
 // 是否正在切换套餐（用于防止 watch 意外触发 loadAvailableHosts）
 const isSwitchingPackage = ref(false)
@@ -998,25 +960,6 @@ async function verifyPromoCode(): Promise<void> {
     promoCodeError.value = err?.response?.data?.error || err.message || t('aff.promoCodeInvalid')
   } finally {
     promoCodeVerifying.value = false
-  }
-}
-
-/**
- * 加载托管者信息（点击 UID 标签时触发）
- */
-async function loadHostOwnerInfo(packageId: number): Promise<void> {
-  hostOwnerLoading.value = true
-  hostOwnerInfo.value = null
-  showHostOwnerModal.value = true
-  
-  try {
-    const res = await api.packages.getOwnerInfo(packageId)
-    hostOwnerInfo.value = res
-  } catch (err: any) {
-    toast.error(err.message || t('common.loadFailed'))
-    showHostOwnerModal.value = false
-  } finally {
-    hostOwnerLoading.value = false
   }
 }
 
@@ -1315,12 +1258,6 @@ async function handleSubmit(): Promise<void> {
                     <svg v-if="source.type === 'official'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                    <img
-                      v-else-if="source.type === 'zone'"
-                      :src="source.logoUrl"
-                      :alt="source.label"
-                      class="w-5 h-5 rounded-full object-cover"
-                    />
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
@@ -1329,15 +1266,6 @@ async function handleSubmit(): Promise<void> {
                 </span>
               </button>
             </div>
-          </div>
-          <div
-            v-if="selectedHostingZone"
-            class="flex items-center gap-3 rounded-xl border border-themed bg-themed-tertiary px-5 py-3"
-          >
-            <svg class="h-5 w-5 shrink-0 text-primary-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
-            <p class="text-sm font-medium leading-6 text-themed-secondary">
-              {{ $t('instance.createPage.zoneNotice.content', { uid: selectedHostingZone.ownerId, username: selectedHostingZone.ownerUsername }) }}
-            </p>
           </div>
           <RegionSelector
             v-if="regions.length > 0"
@@ -1356,7 +1284,6 @@ async function handleSubmit(): Promise<void> {
             :empty-message="getCreatePageText('noPackages')"
             :sold-out-label="getCreatePageText('planSoldOut')"
             @select="selectPackage"
-            @show-owner-info="(packageId) => loadHostOwnerInfo(packageId)"
           />
             <PlanSelector
             v-if="isPaidPackage"
@@ -1635,7 +1562,7 @@ async function handleSubmit(): Promise<void> {
                   <div>
                     <label class="label text-xs uppercase tracking-wide text-themed-muted mb-2">{{ configStore.freeSiteMode ? freeSiteCopy.createPromoCode : $t('aff.promoCode') }}</label>
                     <div class="relative">
-                      <input v-model="form.promoCode" type="text" class="input w-full pr-10" :placeholder="isHostedMarketPackage ? (configStore.freeSiteMode ? freeSiteCopy.createPromoHostedDisabled : $t('aff.promoCodeHostedDisabled')) : (configStore.freeSiteMode ? freeSiteCopy.createPromoPlaceholder : $t('aff.promoCodePlaceholder'))" :disabled="promoCodeVerifying || isHostedMarketPackage" @blur="verifyPromoCode" @keyup.enter="verifyPromoCode" />
+                      <input v-model="form.promoCode" type="text" class="input w-full pr-10" :placeholder="configStore.freeSiteMode ? freeSiteCopy.createPromoPlaceholder : $t('aff.promoCodePlaceholder')" :disabled="promoCodeVerifying" @blur="verifyPromoCode" @keyup.enter="verifyPromoCode" />
                       <div v-if="promoCodeVerifying" class="absolute right-3 top-1/2 -translate-y-1/2"><svg class="w-5 h-5 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
                       <div v-else-if="promoCodeValid === true" class="absolute right-3 top-1/2 -translate-y-1/2"><svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg></div>
                       <div v-else-if="promoCodeValid === false" class="absolute right-3 top-1/2 -translate-y-1/2"><svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></div>
@@ -1662,10 +1589,6 @@ async function handleSubmit(): Promise<void> {
                         </div>
                       </div>
                       <div class="text-3xl font-mono font-semibold tabular-nums tracking-tight text-themed"><span class="align-[0.14em] text-[0.62em] font-medium text-themed-muted">¥</span>{{ planPriceInfo.finalPrice.toFixed(2) }}</div>
-                    </div>
-                    <div v-if="isHostedMarketPackage" class="px-4 py-3 flex items-center gap-2 bg-amber-500/10 border-t border-amber-500/25">
-                      <svg class="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                      <p class="text-xs text-amber-700 dark:text-amber-300"><span class="font-medium">{{ $t('instance.createPage.hostedDisclaimer.title') }}</span> {{ $t('instance.createPage.hostedDisclaimer.content', { uid: selectedPackage?.ownerId }) }}</p>
                     </div>
                   </div>
                 </div>
@@ -1769,102 +1692,6 @@ async function handleSubmit(): Promise<void> {
     </form>
   </div>
 
-  <!-- 托管者信息弹窗 -->
-  <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="showHostOwnerModal" class="modal-overlay">
-        <div class="modal-backdrop" @click="showHostOwnerModal = false"></div>
-        <div class="modal-content max-w-sm">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t('instance.detail.info.hostOwnerTitle') }}</h3>
-            <button type="button" class="text-themed-muted hover:text-themed" @click="showHostOwnerModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <!-- 加载状态 -->
-            <div v-if="hostOwnerLoading" class="flex justify-center py-8">
-              <svg class="w-8 h-8 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <!-- 托管者信息 -->
-            <template v-else-if="hostOwnerInfo">
-              <!-- 用户头像区域 -->
-              <div class="flex items-center gap-4 mb-6">
-                <UserAvatar
-                  :username="hostOwnerInfo.username"
-                  :email="hostOwnerInfo.email"
-                  :avatar-style="hostOwnerInfo.avatarStyle"
-                  :badge-id="hostOwnerInfo.avatarBadgeId || null"
-                  :size="56"
-                />
-                <div class="flex-1">
-                  <p class="font-medium text-themed truncate">{{ hostOwnerInfo.username }}</p>
-                  <p class="text-sm text-themed-muted">UID: <span class="font-mono tabular-nums">{{ hostOwnerInfo.id }}</span></p>
-                </div>
-                <!-- VIP徽章 -->
-                <div 
-                  v-if="hostOwnerInfo.vipLevel > 0"
-                  class="px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 shadow-sm"
-                  :style="getVipBadgeInlineStyle(normalizeVipBadgeStyle(hostOwnerInfo.vipBadgeStyle, hostOwnerInfo.vipLevel))"
-                >
-                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                  </svg>
-                  VIP{{ hostOwnerInfo.vipLevel }}
-                </div>
-              </div>
-              <!-- 详细信息 -->
-              <div class="space-y-3">
-                <div class="flex items-center justify-between p-3 rounded-xl bg-themed-tertiary">
-                  <span class="text-sm text-themed-muted flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                    </svg>
-                    {{ $t('instance.detail.info.hostOwnerHostCount') }}
-                  </span>
-                  <span class="text-sm font-mono font-semibold tabular-nums text-themed">
-                    {{ hostOwnerInfo.hostCount }}
-                  </span>
-                </div>
-                <div class="flex items-center justify-between p-3 rounded-xl bg-themed-tertiary">
-                  <span class="text-sm text-themed-muted flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    {{ $t('instance.detail.info.hostOwnerInstanceCount') }}
-                  </span>
-                  <span class="text-sm font-mono font-semibold tabular-nums text-themed">
-                    {{ hostOwnerInfo.instanceCount }}
-                  </span>
-                </div>
-                <div class="flex items-center justify-between p-3 rounded-xl bg-themed-tertiary">
-                  <span class="text-sm text-themed-muted flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {{ $t('instance.detail.info.hostOwnerRegisteredDays') }}
-                  </span>
-                  <span class="text-sm font-semibold text-themed">
-                    <span class="font-mono tabular-nums">{{ hostOwnerInfo.registeredDays }}</span> {{ $t('common.days') }}
-                  </span>
-                </div>
-              </div>
-            </template>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn-primary" @click="showHostOwnerModal = false">
-              {{ $t('common.close') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
 </template>
 
 <style scoped>

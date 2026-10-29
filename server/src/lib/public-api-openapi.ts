@@ -201,7 +201,7 @@ export function buildPublicApiOpenApiDocument() {
               in: 'query',
               schema: {
                 type: 'string',
-                enum: ['recharge', 'consume', 'refund', 'admin_adjust', 'gift', 'transfer_fee', 'transfer_refund', 'hosting_withdraw', 'hosting_deduction', 'invite_generate']
+                enum: ['recharge', 'consume', 'refund', 'admin_adjust', 'gift', 'transfer_fee', 'transfer_refund', 'invite_generate']
               }
             },
             {
@@ -637,7 +637,7 @@ export function buildPublicApiOpenApiDocument() {
         post: {
           tags: ['Services'],
           summary: 'Renew one current user service',
-          description: 'Requires services:billing scope. Renews one paid service owned by the authenticated user through the internal renewal transaction. The endpoint deducts user balance, creates billing records, applies AFF discounts and hosted-node renewal restrictions, and never exposes provider payloads or direct balance mutation controls.',
+          description: 'Requires services:billing scope. Renews one paid service owned by the authenticated user through the internal renewal transaction. The endpoint deducts user balance, creates billing records, applies AFF discounts, and never exposes provider payloads or direct balance mutation controls.',
           operationId: 'renewPublicService',
           security: [{ publicApiToken: ['services:billing'] }, { oauthAccessToken: ['services:billing'] }],
           parameters: [
@@ -1390,7 +1390,7 @@ export function buildPublicApiOpenApiDocument() {
             id: { type: 'integer' },
             type: {
               type: 'string',
-              enum: ['recharge', 'consume', 'refund', 'admin_adjust', 'gift', 'transfer_fee', 'transfer_refund', 'hosting_withdraw', 'hosting_deduction', 'invite_generate']
+              enum: ['recharge', 'consume', 'refund', 'admin_adjust', 'gift', 'transfer_fee', 'transfer_refund', 'invite_generate']
             },
             amount: { type: 'number' },
             balanceBefore: { type: 'number' },

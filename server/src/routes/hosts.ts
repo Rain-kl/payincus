@@ -22,7 +22,6 @@ import { dirname } from 'path'
 import * as db from '../db/index.js'
 import { prisma } from '../db/prisma.js'
 import { caddyInstallRequested, caddyUninstallRequested } from './agent.js'
-import { checkHostingAccess } from '../lib/hosting-access.js'
 import { createInboxMessage } from '../db/inbox.js'
 import { createLog } from '../db/logs.js'
 import { apiError, ErrorCode, type ErrorCodeType } from '../lib/errors.js'
@@ -609,56 +608,6 @@ function normalizeProcessText(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
 }
 
-async function generateUniqueOwnedName(
-  tx: any,
-  model: 'host' | 'package',
-  userId: number,
-  baseName: string
-): Promise<string> {
-  const MAX_OWNED_NAME_LENGTH = 64
-
-  const findExisting = async (candidate: string) => {
-    if (model === 'host') {
-      return tx.host.findFirst({
-        where: { userId, name: candidate },
-        select: { id: true }
-      })
-    }
-
-    return tx.package.findFirst({
-      where: { userId, name: candidate },
-      select: { id: true }
-    })
-  }
-
-  const normalizedBaseName = String(baseName || '').trim()
-  const truncateWithSuffix = (suffixText = '') => {
-    if (!suffixText) {
-      return normalizedBaseName.slice(0, MAX_OWNED_NAME_LENGTH)
-    }
-
-    const baseMaxLength = Math.max(1, MAX_OWNED_NAME_LENGTH - suffixText.length)
-    return `${normalizedBaseName.slice(0, baseMaxLength)}${suffixText}`
-  }
-
-  const currentCandidate = truncateWithSuffix()
-  const currentNameTaken = await findExisting(currentCandidate)
-  if (!currentNameTaken) {
-    return currentCandidate
-  }
-
-  let suffix = 1
-  while (true) {
-    const suffixText = suffix === 1 ? '-official' : `-official-${suffix}`
-    const candidate = truncateWithSuffix(suffixText)
-    const existing = await findExisting(candidate)
-    if (!existing) {
-      return candidate
-    }
-    suffix++
-  }
-}
-
 /**
  * 从请求上下文推导面板访问地址
  * 优先级：SITE_URL/FRONTEND_URL 环境变量 > Origin/Referer 头 > Host 头拼接
@@ -726,15 +675,14 @@ export default async function hostRoutes(fastify: FastifyInstance) {
   // 获取宿主机列表（支持分页和搜索）
   // 管理员可以看所有节点，普通用户只能看自己的节点 (mine=true)
   // 管理员可用参数：
-  //   - scope: mine(我的) / official(自营) / hosted(托管的)
-  //   - userId: 筛选特定用户（仅 scope=hosted 时有效）
+  //   - scope: mine(我的) / official(自营)
   fastify.get<{
     Querystring: {
       page?: string
       pageSize?: string
       search?: string
       mine?: string
-      scope?: string  // mine | official | hosted
+      scope?: string  // mine | official
       userId?: string // 筛选特定用户
     }
   }>('/', {
@@ -772,15 +720,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     let ownerRole: 'admin' | 'user' | undefined = undefined
     let includeOwner = false
 
-    if (isAdmin && scope === 'hosted') {
-      // 查看托管节点：仅显示普通用户的节点
-      ownerRole = 'user'
-      includeOwner = true
-      // 如果指定了筛选用户
-      if (parsedFilterUserId && parsedFilterUserId !== user.id) {
-        queryUserId = parsedFilterUserId
-      }
-    } else if (isAdmin && scope === 'official') {
+    if (isAdmin && scope === 'official') {
       // 查看自营节点：所有管理员账号名下的节点都视为官方自营
       ownerRole = 'admin'
     } else if (isAdmin && scope === 'mine') {
@@ -873,17 +813,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         tunnelEnabled: (host as any).tunnelEnabled ?? (host as any).tunnel_enabled ?? false,
         targetHost: (host as any).targetHost ?? (host as any).target_host ?? '127.0.0.1',
         targetPort: (host as any).targetPort ?? (host as any).target_port ?? 8443,
-        tunnelOnline: hostTunnelManager.isTunnelOnline(host.id),
-        // 托管节点所有者信息
-        ...(host.owner && {
-          owner: {
-            id: host.owner.id,
-            username: host.owner.username,
-            email: host.owner.email,
-            avatarStyle: host.owner.avatarStyle,
-            avatarBadgeId: host.owner.avatarBadgeId ?? null
-          }
-        })
+        tunnelOnline: hostTunnelManager.isTunnelOnline(host.id)
       }
     }))
 
@@ -1009,15 +939,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(400).send(apiError(ErrorCode.HOST_NAME_EXISTS))
     }
 
-    // 检查托管准入条件（管理员不受限制）
+    // 托管功能已移除：仅管理员可以创建节点
     if (request.user.role !== 'admin') {
-      const accessCheck = await checkHostingAccess(request.user.id)
-      if (!accessCheck.allowed) {
-        return reply.code(403).send({
-          error: accessCheck.reason,
-          code: 'HOSTING_ACCESS_DENIED'
-        })
-      }
+      return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
     const urlValidation = validateUrl(url, 'Host URL')
@@ -1188,13 +1112,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             targetHost: targetHost ?? '127.0.0.1',
             targetPort: targetPort ?? 8443
           }, tx)
-
-          if (request.user.role !== 'admin') {
-            await tx.user.update({
-              where: { id: request.user.id },
-              data: { hasCreatedHostBefore: true }
-            })
-          }
 
           if (lockedSnapshot) {
             await persistHostAddressSnapshot(createdHostId, lockedSnapshot, 'create', tx)
@@ -2764,18 +2681,9 @@ export default async function hostRoutes(fastify: FastifyInstance) {
                   balanceBefore: oldBalance,
                   balanceAfter: newBalance,
                   instanceId: instance.id,
-                  remark: `托管实例被删除退款：${instance.name}`
+                  remark: `实例被删除退款：${instance.name}`
                 }
               })
-
-              // 从节点所有者托管余额扣除
-              await db.deductHostingBalance(
-                hostId,
-                refundAmount,
-                instance.id,
-                `删除托管实例退款扣除：${instance.name}`,
-                tx
-              )
             })
 
             totalRefundAmount += refundAmount
@@ -4692,212 +4600,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       success: true,
       message: `成功为 ${extendedCount} 个付费实例延期 ${days} 天`,
       extendedCount
-    }
-  })
-
-  // 接管托管节点为自营（仅管理员）
-  fastify.post<{
-    Params: { id: string }
-  }>('/:id/takeover-official', {
-    onRequest: [fastify.authenticateAdmin]
-  }, async (request, reply) => {
-    const { user } = request
-    const hostId = parsePositiveRouteId(request.params.id)
-
-    if (!hostId) {
-      return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
-    }
-
-    const officialAdminId = user.id
-
-    try {
-      const summary = await prisma.$transaction(async (tx) => {
-        const host = await tx.host.findUnique({
-          where: { id: hostId },
-          select: {
-            id: true,
-            name: true,
-            userId: true,
-            user: {
-              select: {
-                id: true,
-                username: true,
-                role: true
-              }
-            }
-          }
-        })
-
-        if (!host) {
-          throw new Error('HOST_NOT_FOUND')
-        }
-
-        if (host.user.role === 'admin') {
-          throw new Error('HOST_ALREADY_OFFICIAL')
-        }
-
-        const instanceCount = await tx.instance.count({
-          where: {
-            hostId,
-            status: { not: 'deleted' }
-          }
-        })
-
-        const hostPackages = await tx.package.findMany({
-          where: {
-            packageHosts: {
-              some: { hostId }
-            }
-          },
-          select: {
-            id: true,
-            name: true,
-            userId: true,
-            user: {
-              select: {
-                id: true,
-                role: true
-              }
-            },
-            packageHosts: {
-              select: {
-                hostId: true,
-                host: {
-                  select: {
-                    userId: true,
-                    user: {
-                      select: {
-                        role: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        })
-
-        const packageActions = hostPackages.map((pkg) => {
-          const otherBindings = pkg.packageHosts.filter(binding => binding.hostId !== hostId)
-          const hasOtherHostedBindings = otherBindings.some(binding => binding.host.user.role !== 'admin')
-          const canTransferPackage = pkg.user.role !== 'admin' &&
-            pkg.userId === host.userId &&
-            !hasOtherHostedBindings
-
-          return {
-            pkg,
-            otherBindings,
-            canTransferPackage
-          }
-        })
-
-        const blockedPackageNames = packageActions
-          .filter(({ pkg, otherBindings, canTransferPackage }) =>
-            pkg.user.role !== 'admin' &&
-            !canTransferPackage &&
-            otherBindings.length === 0
-          )
-          .map(({ pkg }) => pkg.name)
-
-        if (blockedPackageNames.length > 0) {
-          throw Object.assign(new Error('HOST_TAKEOVER_PACKAGE_BINDING_CONFLICT'), {
-            packageNames: blockedPackageNames
-          })
-        }
-
-        const newHostName = await generateUniqueOwnedName(tx, 'host', officialAdminId, host.name)
-        await tx.host.update({
-          where: { id: hostId },
-          data: {
-            userId: officialAdminId,
-            name: newHostName
-          }
-        })
-
-        const transferredPackageNames: string[] = []
-        const detachedPackageNames: string[] = []
-
-        for (const { pkg, otherBindings, canTransferPackage } of packageActions) {
-          if (pkg.user.role === 'admin') {
-            continue
-          }
-
-          if (canTransferPackage) {
-            const newPackageName = await generateUniqueOwnedName(tx, 'package', officialAdminId, pkg.name)
-            await tx.package.update({
-              where: { id: pkg.id },
-              data: {
-                userId: officialAdminId,
-                name: newPackageName,
-                releaseChannelId: null
-              }
-            })
-            await tx.packageShare.updateMany({
-              where: { packageId: pkg.id },
-              data: { ownerId: officialAdminId }
-            })
-            transferredPackageNames.push(pkg.name)
-            continue
-          }
-
-          if (otherBindings.length > 0) {
-            await tx.packageHost.deleteMany({
-              where: {
-                packageId: pkg.id,
-                hostId
-              }
-            })
-            detachedPackageNames.push(pkg.name)
-          }
-        }
-
-        return {
-          hostId: host.id,
-          previousOwnerId: host.user.id,
-          previousOwnerUsername: host.user.username,
-          instanceCount,
-          transferredPackageCount: transferredPackageNames.length,
-          detachedPackageCount: detachedPackageNames.length,
-          transferredPackageNames,
-          detachedPackageNames,
-          hostRenamed: newHostName !== host.name,
-          oldHostName: host.name,
-          newHostName
-        }
-      })
-
-      await createLog(
-        user.id,
-        'host',
-        'host.takeover_official',
-        `Take over hosted host #${summary.hostId} from user #${summary.previousOwnerId}: transferredPackages=${summary.transferredPackageCount}, detachedPackages=${summary.detachedPackageCount}, instances=${summary.instanceCount}`,
-        'success'
-      )
-
-      return {
-        success: true,
-        summary
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === 'HOST_NOT_FOUND') {
-          return reply.code(404).send(apiError(ErrorCode.HOST_NOT_FOUND))
-        }
-        if (error.message === 'HOST_ALREADY_OFFICIAL') {
-          return reply.code(400).send(apiError(ErrorCode.HOST_ALREADY_OFFICIAL))
-        }
-        if (error.message === 'HOST_TAKEOVER_PACKAGE_BINDING_CONFLICT') {
-          const packageNames = Array.isArray((error as Error & { packageNames?: string[] }).packageNames)
-            ? (error as Error & { packageNames: string[] }).packageNames
-            : []
-          return reply.code(409).send({
-            ...apiError(ErrorCode.HOST_TAKEOVER_PACKAGE_BINDING_CONFLICT),
-            packageNames,
-            count: packageNames.length
-          })
-        }
-      }
-      throw error
     }
   })
 

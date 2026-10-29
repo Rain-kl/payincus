@@ -6,7 +6,6 @@
 
 import * as db from '../db/index.js'
 import { createInboxMessage } from '../db/inbox.js'
-import { prisma } from '../db/prisma.js'
 import { assertSafeWebhookUrl, safeFetch } from './outbound-security.js'
 import { sanitizeTokensInString } from './log-sanitizer.js'
 
@@ -86,7 +85,7 @@ type EventType =
   | 'redeem_code_used'
   // AFF相关
   | 'aff_applied'
-  // 托管节点价格调整
+  // 续费价格调整
   | 'instance_renewal_price_updated'
   // 公共 API 受控通知
   | 'public_api_notification'
@@ -996,180 +995,6 @@ export async function sendNotification(
     return { sent, failed }
   } catch (err) {
     console.error('[Notifier] sendNotification error:', err)
-    return { sent: 0, failed: 0 }
-  }
-}
-
-type HostManagedInstanceEventType = 'purchase' | 'renew' | 'destroy'
-
-function buildHostManagedInstanceNotification(
-  eventType: HostManagedInstanceEventType,
-  data: {
-    hostName: string
-    username: string
-    instanceName: string
-    amount?: number
-    refundAmount?: number
-    feeAmount?: number
-  }
-): { title: string; message: string; webhookEvent: string } {
-  switch (eventType) {
-    case 'purchase':
-      return {
-        title: '💰 托管收入到账',
-        message: [
-          `有用户购买了您托管的实例，收入 ¥${Number(data.amount || 0).toFixed(2)}`,
-          `节点: ${data.hostName}`,
-          '该笔收入将冻结30天后可提现'
-        ].join('\n'),
-        webhookEvent: 'host.instance_purchase'
-      }
-    case 'renew':
-      return {
-        title: '💰 托管收入到账',
-        message: [
-          `有用户续费了您托管的实例，收入 ¥${Number(data.amount || 0).toFixed(2)}`,
-          `节点: ${data.hostName}`,
-          '该笔收入将冻结30天后可提现'
-        ].join('\n'),
-        webhookEvent: 'host.instance_renew'
-      }
-    case 'destroy':
-      return {
-        title: '🗑️ 托管实例销毁',
-        message: [
-          `有用户销毁了您托管的实例，实际退款 ¥${Number(data.refundAmount || 0).toFixed(2)}`,
-          `节点: ${data.hostName}`,
-          `手续费: ¥${Number(data.feeAmount || 0).toFixed(2)}`
-        ].join('\n'),
-        webhookEvent: 'host.instance_destroy'
-      }
-  }
-}
-
-export async function sendHostManagedInstanceNotification(
-  hostId: number,
-  eventType: HostManagedInstanceEventType,
-  data: {
-    username: string
-    instanceName: string
-    amount?: number
-    refundAmount?: number
-    feeAmount?: number
-  }
-): Promise<SendResult> {
-  try {
-    const host = await prisma.host.findUnique({
-      where: { id: hostId },
-      select: {
-        userId: true,
-        name: true,
-        notifyPurchase: true,
-        notifyRenew: true,
-        notifyDestroy: true,
-        user: {
-          select: {
-            role: true
-          }
-        }
-      }
-    })
-
-    if (!host || host.user.role === 'admin') {
-      return { sent: 0, failed: 0 }
-    }
-
-    const enabled = eventType === 'purchase'
-      ? host.notifyPurchase
-      : eventType === 'renew'
-        ? host.notifyRenew
-        : host.notifyDestroy
-
-    if (!enabled) {
-      return { sent: 0, failed: 0 }
-    }
-
-    const channels = (await db.getEnabledChannelsByUserId(host.userId))
-      .filter(channel => ['telegram', 'discord', 'webhook'].includes(channel.type))
-
-    if (channels.length === 0) {
-      return { sent: 0, failed: 0 }
-    }
-
-    const payload = buildHostManagedInstanceNotification(eventType, {
-      hostName: host.name,
-      ...data
-    })
-
-    let sent = 0
-    let failed = 0
-
-    for (const channel of channels) {
-      try {
-        const config = typeof channel.config === 'string'
-          ? JSON.parse(channel.config)
-          : channel.config
-
-        const logId = await db.createNotificationLog({
-          channelId: channel.id,
-          eventType: payload.webhookEvent,
-          message: payload.message,
-          status: 'pending'
-        })
-
-        let result: NotificationResult
-
-        switch (channel.type) {
-          case 'telegram':
-            result = await sendWithRetry(
-              () => sendTelegram(config as TelegramConfig, payload.title, payload.message),
-              'Telegram'
-            )
-            break
-          case 'discord':
-            result = await sendWithRetry(
-              () => sendDiscord(config as DiscordConfig, payload.title, payload.message),
-              'Discord'
-            )
-            break
-          case 'webhook':
-            result = await sendWithRetry(
-              () => sendWebhook(
-                config as WebhookConfig,
-                payload.webhookEvent,
-                payload.title,
-                payload.message,
-                {
-                  hostId,
-                  hostName: host.name,
-                  eventType,
-                  ...data
-                }
-              ),
-              'Webhook'
-            )
-            break
-          default:
-            result = { success: false, error: `Unsupported channel type: ${channel.type}` }
-        }
-
-        await db.updateNotificationLogStatus(logId, result.success ? 'sent' : 'failed', result.error)
-
-        if (result.success) {
-          sent++
-        } else {
-          failed++
-        }
-      } catch (err) {
-        const error = err instanceof Error ? err.message : String(err)
-        console.error(`[Notifier] Failed to send host managed instance notification to channel ${channel.id}:`, error)
-        failed++
-      }
-    }
-
-    return { sent, failed }
-  } catch (err) {
-    console.error('[Notifier] sendHostManagedInstanceNotification error:', err)
     return { sent: 0, failed: 0 }
   }
 }

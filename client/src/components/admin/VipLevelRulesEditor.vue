@@ -14,8 +14,6 @@ interface EditableVipRule {
   benefits: Record<string, unknown>
   minRecharge: string | number | null
   minConsume: string | number | null
-  minHostingIncome: string | number | null
-  minHostingInstances: string | number | null
 }
 
 const props = defineProps<{
@@ -32,8 +30,8 @@ const rules = ref<EditableVipRule[]>([])
 const userMetric = ref<UserVipMetric>('totalRecharge')
 
 const isUserRules = computed(() => props.type === 'user')
-const title = computed(() => isUserRules.value ? t('admin.vipRules.userTitle') : t('admin.vipRules.hostingTitle'))
-const description = computed(() => isUserRules.value ? t('admin.vipRules.userDescription') : t('admin.vipRules.hostingDescription'))
+const title = computed(() => t('admin.vipRules.userTitle'))
+const description = computed(() => t('admin.vipRules.userDescription'))
 const userMetricThresholdLabel = computed(() => userMetric.value === 'totalRecharge'
   ? t('admin.vipRules.minRecharge')
   : t('admin.vipRules.minConsume')
@@ -47,9 +45,7 @@ function emptyRule(level: number): EditableVipRule {
     badgeStyle: getDefaultVipBadgeStyle(level),
     benefits: {},
     minRecharge: '',
-    minConsume: '',
-    minHostingIncome: '',
-    minHostingInstances: ''
+    minConsume: ''
   }
 }
 
@@ -65,9 +61,7 @@ function mapApiRule(rule: VipLevelRule): EditableVipRule {
     badgeStyle: normalizeVipBadgeStyle(rule.badgeStyle || rule.benefits?.badgeStyle, rule.level),
     benefits: rule.benefits || {},
     minRecharge: toInputValue(rule.minRecharge),
-    minConsume: toInputValue(rule.minConsume),
-    minHostingIncome: toInputValue(rule.minHostingIncome),
-    minHostingInstances: toInputValue(rule.minHostingInstances)
+    minConsume: toInputValue(rule.minConsume)
   }
 }
 
@@ -82,13 +76,6 @@ function parseOptionalNumber(value: string | number | null | undefined): number 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
-function parseOptionalInteger(value: string | number | null | undefined): number | null {
-  const trimmed = normalizeInputValue(value)
-  if (!trimmed) return null
-  const parsed = Number(trimmed)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
 function hasInvalidPositiveNumber(value: string | number | null | undefined): boolean {
   const trimmed = normalizeInputValue(value)
   if (!trimmed) return false
@@ -101,12 +88,9 @@ function isValidHexColor(value: string): boolean {
 }
 
 function hasCondition(rule: EditableVipRule): boolean {
-  if (isUserRules.value) {
-    return userMetric.value === 'totalRecharge'
-      ? parseOptionalNumber(rule.minRecharge) !== null
-      : parseOptionalNumber(rule.minConsume) !== null
-  }
-  return parseOptionalNumber(rule.minHostingIncome) !== null || parseOptionalInteger(rule.minHostingInstances) !== null
+  return userMetric.value === 'totalRecharge'
+    ? parseOptionalNumber(rule.minRecharge) !== null
+    : parseOptionalNumber(rule.minConsume) !== null
 }
 
 function buildPayload(): VipLevelRule[] {
@@ -115,12 +99,10 @@ function buildPayload(): VipLevelRule[] {
       type: props.type,
       level: rule.level,
       enabled: rule.enabled,
-      conditionMode: isUserRules.value ? 'any' : rule.conditionMode,
-      userMetric: isUserRules.value ? userMetric.value : undefined,
-      minRecharge: isUserRules.value && userMetric.value === 'totalRecharge' ? parseOptionalNumber(rule.minRecharge) : null,
-      minConsume: isUserRules.value && userMetric.value === 'totalConsume' ? parseOptionalNumber(rule.minConsume) : null,
-      minHostingIncome: isUserRules.value ? null : parseOptionalNumber(rule.minHostingIncome),
-      minHostingInstances: isUserRules.value ? null : parseOptionalInteger(rule.minHostingInstances),
+      conditionMode: 'any',
+      userMetric: userMetric.value,
+      minRecharge: userMetric.value === 'totalRecharge' ? parseOptionalNumber(rule.minRecharge) : null,
+      minConsume: userMetric.value === 'totalConsume' ? parseOptionalNumber(rule.minConsume) : null,
       benefits: {
         ...rule.benefits,
         badgeStyle: normalizeVipBadgeStyle(rule.badgeStyle, rule.level)
@@ -154,23 +136,14 @@ async function loadRules() {
 
 async function saveRules() {
   for (const rule of rules.value) {
-    if (isUserRules.value) {
-      const thresholdValue = userMetric.value === 'totalRecharge' ? rule.minRecharge : rule.minConsume
-      if (hasInvalidPositiveNumber(thresholdValue)) {
-        toast.error(t('admin.vipRules.moneyThresholdInvalid', { level: rule.level }))
-        return
-      }
-    } else if (hasInvalidPositiveNumber(rule.minHostingIncome)) {
+    const thresholdValue = userMetric.value === 'totalRecharge' ? rule.minRecharge : rule.minConsume
+    if (hasInvalidPositiveNumber(thresholdValue)) {
       toast.error(t('admin.vipRules.moneyThresholdInvalid', { level: rule.level }))
       return
     }
 
     if (rule.enabled && !hasCondition(rule)) {
       toast.error(t('admin.vipRules.conditionRequired', { level: rule.level }))
-      return
-    }
-    if (!isUserRules.value && normalizeInputValue(rule.minHostingInstances) && parseOptionalInteger(rule.minHostingInstances) === null) {
-      toast.error(t('admin.vipRules.instanceThresholdInvalid', { level: rule.level }))
       return
     }
     if (!isValidHexColor(rule.badgeStyle.backgroundColor) || !isValidHexColor(rule.badgeStyle.textColor)) {
@@ -308,14 +281,7 @@ onMounted(() => {
                 />
               </div>
             </label>
-            <label v-if="!isUserRules" class="text-xs text-themed-muted">
-              {{ t('admin.vipRules.mode') }}
-              <select v-model="rule.conditionMode" class="input mt-1 w-full">
-                <option value="any">{{ t('admin.vipRules.modeAny') }}</option>
-                <option value="all">{{ t('admin.vipRules.modeAll') }}</option>
-              </select>
-            </label>
-            <label v-if="isUserRules" class="text-xs text-themed-muted">
+            <label class="text-xs text-themed-muted">
               {{ userMetricThresholdLabel }}
               <input
                 v-if="userMetric === 'totalRecharge'"
@@ -332,28 +298,6 @@ onMounted(() => {
                 type="number"
                 min="0"
                 step="0.01"
-                class="input mt-1 w-full"
-                :placeholder="t('admin.vipRules.noLimit')"
-              />
-            </label>
-            <label v-if="!isUserRules" class="text-xs text-themed-muted">
-              {{ t('admin.vipRules.minHostingIncome') }}
-              <input
-                v-model="rule.minHostingIncome"
-                type="number"
-                min="0"
-                step="0.01"
-                class="input mt-1 w-full"
-                :placeholder="t('admin.vipRules.noLimit')"
-              />
-            </label>
-            <label v-if="!isUserRules" class="text-xs text-themed-muted">
-              {{ t('admin.vipRules.minHostingInstances') }}
-              <input
-                v-model="rule.minHostingInstances"
-                type="number"
-                min="0"
-                step="1"
                 class="input mt-1 w-full"
                 :placeholder="t('admin.vipRules.noLimit')"
               />
@@ -379,28 +323,9 @@ onMounted(() => {
                 {{ t('admin.vipRules.enabled') }}
               </th>
               <th
-                v-if="!isUserRules"
-                class="w-[14%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted"
-              >
-                {{ t('admin.vipRules.mode') }}
-              </th>
-              <th
-                v-if="isUserRules"
                 class="w-[36%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted"
               >
                 {{ userMetricThresholdLabel }}
-              </th>
-              <th
-                v-if="!isUserRules"
-                class="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted"
-              >
-                {{ t('admin.vipRules.minHostingIncome') }}
-              </th>
-              <th
-                v-if="!isUserRules"
-                class="w-[16%] px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted"
-              >
-                {{ t('admin.vipRules.minHostingInstances') }}
               </th>
             </tr>
           </thead>
@@ -454,13 +379,7 @@ onMounted(() => {
                   {{ rule.enabled ? t('common.enabled') : t('common.disabled') }}
                 </label>
               </td>
-              <td v-if="!isUserRules" class="px-4 py-4">
-                <select v-model="rule.conditionMode" class="input w-full">
-                  <option value="any">{{ t('admin.vipRules.modeAny') }}</option>
-                  <option value="all">{{ t('admin.vipRules.modeAll') }}</option>
-                </select>
-              </td>
-              <td v-if="isUserRules" class="px-4 py-4">
+              <td class="px-4 py-4">
                 <input
                   v-if="userMetric === 'totalRecharge'"
                   v-model="rule.minRecharge"
@@ -476,26 +395,6 @@ onMounted(() => {
                   type="number"
                   min="0"
                   step="0.01"
-                  class="input w-full"
-                  :placeholder="t('admin.vipRules.noLimit')"
-                />
-              </td>
-              <td v-if="!isUserRules" class="px-4 py-4">
-                <input
-                  v-model="rule.minHostingIncome"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  class="input w-full"
-                  :placeholder="t('admin.vipRules.noLimit')"
-                />
-              </td>
-              <td v-if="!isUserRules" class="px-4 py-4">
-                <input
-                  v-model="rule.minHostingInstances"
-                  type="number"
-                  min="0"
-                  step="1"
                   class="input w-full"
                   :placeholder="t('admin.vipRules.noLimit')"
                 />

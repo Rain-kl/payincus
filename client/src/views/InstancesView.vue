@@ -94,7 +94,6 @@ const batchRenewPreview = ref<Array<{
   canRenew: boolean
   autoRenew: boolean
   reason?: string
-  isHostedInstance: boolean
   daysUntilExpire: number | null
   options: Array<{
     months: number
@@ -849,17 +848,11 @@ function getDistroFromName(name: string): string {
 }
 
 // 获取付费实例的图标类型（根据节点名称判断）
-// 返回 'pro' | 'prime' | 'peer' | null
-function getPaidIconType(instance: Instance): 'pro' | 'prime' | 'peer' | null {
+// 返回 'pro' | 'prime' | null
+function getPaidIconType(instance: Instance): 'pro' | 'prime' | null {
   // 只有付费实例才显示付费图标
   if (!instance.packagePlanId) return null
-  
-  // 如果节点名称以 PEER 开头（不区分大小写），则是托管实例，显示 peer 图标
-  const hostName = instance.host?.name || ''
-  if (/^PEER\d/i.test(hostName)) {
-    return 'peer'
-  }
-  
+
   // 根据实例类型判断：虚拟机显示 prime，容器显示 pro
   return instance.instanceType === 'vm' ? 'prime' : 'pro'
 }
@@ -2539,13 +2532,6 @@ async function confirmBatchDestroy(): Promise<void> {
                         <div class="mt-1 flex flex-wrap gap-2 text-xs">
                           <span class="inline-flex items-center rounded-full px-2 py-0.5" :class="'bg-themed-secondary text-themed'">
                             {{ item.autoRenew ? $t('billing.autoRenewEnabled') : $t('billing.autoRenewDisabled') }}
-                          </span>
-                          <span
-                            v-if="item.isHostedInstance"
-                            class="inline-flex items-center rounded-full px-2 py-0.5"
-                            :class="'bg-primary-500/10 text-primary-600 dark:text-primary-300'"
-                          >
-                            {{ $t('instance.batch.hosted') }}
                           </span>
                         </div>
                       </div>

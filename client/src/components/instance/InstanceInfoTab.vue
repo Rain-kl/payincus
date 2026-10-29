@@ -4,17 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { formatMemory, formatDisk, formatDate } from '@/utils/formatters'
 import type { Instance, PortMapping } from '@/types/api'
 import FlagIcon from '@/components/FlagIcon.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
 import TrafficStats from '@/components/instance/TrafficStats.vue'
-import { getVipBadgeInlineStyle, normalizeVipBadgeStyle } from '@/utils/vipBadge'
 
 const { t } = useI18n()
 
 // SSH 连接帮助弹窗
 const showSshHelpModal = ref(false)
-
-// 托管者信息弹窗
-const showHostOwnerModal = ref(false)
 
 interface ResourceStats {
   cpu: { usagePercent: number }
@@ -260,14 +255,6 @@ const canReassignIpv6 = computed(() => {
                 <span>{{ instance.incus_id }}</span>
               </template>
             </span>
-            <!-- 托管UID：仅托管节点实例显示 -->
-            <button
-              v-if="instance.hostOwnerInfo"
-              class="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 hover:shadow-glow-sakura transition-all border border-gray-200 dark:border-gray-700"
-              @click="showHostOwnerModal = true"
-            >
-              {{ t('instance.detail.info.hostUid') }}:{{ instance.hostOwnerInfo.id }}
-            </button>
           </dd>
         </div>
         <div class="flex justify-between">
@@ -700,97 +687,5 @@ const canReassignIpv6 = computed(() => {
       </Transition>
     </Teleport>
 
-    <!-- 托管者信息弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showHostOwnerModal && instance.hostOwnerInfo" class="modal-overlay">
-          <div class="modal-backdrop" @click="showHostOwnerModal = false"></div>
-          <div class="modal-content max-w-sm">
-            <div class="modal-header">
-              <h3 class="modal-title">{{ t('instance.detail.info.hostOwnerTitle') }}</h3>
-              <button type="button" class="text-themed-muted hover:text-themed" @click="showHostOwnerModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="modal-body">
-              <!-- 用户头像区域 -->
-              <div class="flex items-center gap-4 mb-6">
-                <UserAvatar
-                  :username="instance.hostOwnerInfo.username"
-                  :email="instance.hostOwnerInfo.email"
-                  :avatar-style="instance.hostOwnerInfo.avatarStyle"
-                  :badge-id="instance.hostOwnerInfo.avatarBadgeId"
-                  :size="56"
-                />
-                <div class="flex-1">
-                  <p class="font-medium text-themed">{{ instance.hostOwnerInfo.username }}</p>
-                  <p class="text-sm text-themed-muted">UID: {{ instance.hostOwnerInfo.id }}</p>
-                </div>
-                <!-- VIP徽章 -->
-                <div 
-                  v-if="instance.hostOwnerInfo.vipLevel > 0"
-                  class="px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1.5 shadow-sm"
-                  :style="getVipBadgeInlineStyle(normalizeVipBadgeStyle(instance.hostOwnerInfo.vipBadgeStyle, instance.hostOwnerInfo.vipLevel))"
-                >
-                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                  </svg>
-                  VIP{{ instance.hostOwnerInfo.vipLevel }}
-                </div>
-              </div>
-              <!-- 详细信息 -->
-              <div class="space-y-3">
-                <div
-                  class="flex items-center justify-between p-3 rounded-lg bg-themed/30 border border-themed/30"
-                >
-                  <span class="text-sm text-themed-muted flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                    </svg>
-                    {{ t('instance.detail.info.hostOwnerHostCount') }}
-                  </span>
-                  <span class="text-sm font-semibold text-themed">
-                    {{ instance.hostOwnerInfo.hostCount }}
-                  </span>
-                </div>
-                <div
-                  class="flex items-center justify-between p-3 rounded-lg bg-themed/30 border border-themed/30"
-                >
-                  <span class="text-sm text-themed-muted flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    {{ t('instance.detail.info.hostOwnerInstanceCount') }}
-                  </span>
-                  <span class="text-sm font-semibold text-themed">
-                    {{ instance.hostOwnerInfo.instanceCount }}
-                  </span>
-                </div>
-                <div
-                  class="flex items-center justify-between p-3 rounded-lg bg-themed/30 border border-themed/30"
-                >
-                  <span class="text-sm text-themed-muted flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {{ t('instance.detail.info.hostOwnerRegisteredDays') }}
-                  </span>
-                  <span class="text-sm font-semibold text-themed">
-                    {{ instance.hostOwnerInfo.registeredDays }} {{ t('common.days') }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn-primary" @click="showHostOwnerModal = false">
-                {{ t('common.close') }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
   </div>
 </template>

@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { buildApiUrl } from '@/utils/api-url'
 import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, UpdateUserResponse, GenerateInviteRequest, InviteListResponse, User, BadgeOverview, BadgeMultiDrawResponse, BadgeOwnership, BadgeCatalogItem, BadgeSeriesItem, UpdateUserRequest, Instance, InstanceWithDetails, InstanceStats, CreateInstanceRequest, CreateInstanceResponse, UpdateInstanceRequest, ChangeHostOptionsResponse, PortMapping, CreatePortMappingRequest, IpAddress, Ipv6Subnet, HostAgentStatusResponse, HostAgentInstallCommandResponse, Snapshot, Backup, CreateSnapshotRequest, CreateBackupRequest, SnapshotPolicy, BackupPolicy, UpdateSnapshotPolicyRequest, UpdateBackupPolicyRequest, Host, HostWithDetails, AvailableHost, CreateHostRequest, UpdateHostRequest, Package, CreatePackageRequest, UpdatePackageRequest, SshKey, CreateSshKeyRequest, NotificationChannel, CreateNotificationChannelRequest, UpdateNotificationChannelRequest, UserOAuthBinding, HelpArticle, HostImagePolicy, SystemImage, Log, PaginatedResponse, Ticket, TicketMessage, TicketStatus, TicketObjectLink, TicketObjectLinkType, TicketSupportContext, TicketInternalNote, CreateTicketRequest, PaginatedTickets, PaginatedTicketMessages, TerminalSavedCommand, CreateTerminalSavedCommandRequest, UpdateTerminalSavedCommandRequest, TelegramBindingStatus, TelegramBindTokenResponse, UserInvite, UserInviteSummary, PublicApiScope, PublicApiScopeMetadata, PublicApiToken, CreatePublicApiTokenRequest, CreatePublicApiTokenResponse, OAuthProviderConsentResponse, OAuthProviderAuthorizeRequest, OAuthProviderAuthorizeResponse, OAuthProviderAuthorization, GiftCardListResponse, GiftCardRecord } from '@/types/api.js'
 
-export type VipRuleType = 'user' | 'hosting'
+export type VipRuleType = 'user'
 export type VipConditionMode = 'any' | 'all'
 export type UserVipMetric = 'totalRecharge' | 'totalConsume'
 
@@ -45,8 +45,6 @@ export interface VipLevelRule {
   userMetric?: UserVipMetric
   minRecharge: number | null
   minConsume: number | null
-  minHostingIncome: number | null
-  minHostingInstances: number | null
   benefits?: Record<string, unknown> & {
     badgeStyle?: VipBadgeStyle
     benefitHall?: VipBenefitHallConfig
@@ -72,7 +70,7 @@ export interface RiskOperationDefinition {
   batchSensitive: boolean
 }
 
-export type VipProgressMetric = 'totalRecharge' | 'totalConsume' | 'totalHostingIncome' | 'instanceCount'
+export type VipProgressMetric = 'totalRecharge' | 'totalConsume' | 'instanceCount'
 
 export interface VipProgressCondition {
   metric: VipProgressMetric
@@ -95,20 +93,13 @@ export interface VipLevelProgress {
 
 export interface VipOverviewResponse {
   userVipLevel: number
-  hostingVipLevel: number
   userVipBadgeStyle?: VipBadgeStyle | null
-  hostingVipBadgeStyle?: VipBadgeStyle | null
   userVipMetric?: UserVipMetric
   userStats: {
     totalRecharge: number
     totalConsume: number
   }
-  hostingStats: {
-    totalHostingIncome: number
-    instanceCount: number
-  }
   userVipProgress?: VipLevelProgress
-  hostingVipProgress?: VipLevelProgress
 }
 
 export type VipBenefitRewardType = 'balance' | 'points' | 'instance'
@@ -1099,7 +1090,7 @@ const api = {
         pending: number
       }
     }> => http.get('/notifications/stats'),
-    // 获取管理员创建的全局通知渠道（供托管用户绑定套餐使用）
+    // 获取管理员创建的全局通知渠道（供套餐绑定使用）
     getGlobalChannels: (): Promise<{
       channels: Array<{ id: number; name: string; type: string; configPreview: string }>
     }> => http.get('/notifications/global-channels')
@@ -1118,9 +1109,6 @@ const api = {
     updateGpu: (hostId: number, gpuId: number, data: { sharingEnabled: boolean; maxInstances: number }): Promise<{ success: boolean }> => http.put(`/hosts/${hostId}/gpus/${gpuId}`, data),
     list: (params: Record<string, unknown> = {}): Promise<{ hosts: HostWithDetails[]; total: number; page: number; pageSize: number; totalPages: number }> =>
       http.get('/hosts', { params }),
-    // 管理员专用：获取托管节点列表
-    listHosted: (params: { userId?: number; page?: number; pageSize?: number; search?: string } = {}): Promise<{ hosts: HostWithDetails[]; total: number; page: number; pageSize: number; totalPages: number }> =>
-      http.get('/hosts', { params: { ...params, scope: 'hosted' } }),
     get: (id: number): Promise<HostWithDetails> => http.get(`/hosts/${id}`),
     lookupGiftTargetUser: (hostId: number, username: string): Promise<{
       user: {
@@ -1139,22 +1127,6 @@ const api = {
     delete: (id: number): Promise<void> => http.delete(`/hosts/${id}`),
     test: (id: number): Promise<{ success: boolean; message?: string }> =>
       http.post(`/hosts/${id}/test`, {}, { timeout: TIMEOUT.LONG }),
-    takeoverOfficial: (id: number): Promise<{
-      success: boolean
-      summary: {
-        hostId: number
-        previousOwnerId: number
-        previousOwnerUsername: string
-        instanceCount: number
-        transferredPackageCount: number
-        detachedPackageCount: number
-        transferredPackageNames: string[]
-        detachedPackageNames: string[]
-        hostRenamed: boolean
-        oldHostName: string
-        newHostName: string
-      }
-    }> => http.post(`/hosts/${id}/takeover-official`, {}),
     verify: (id: number): Promise<{ success: boolean; message?: string; resources?: { cpuTotal: number; memoryTotalGB: number; diskTotalGB: number } }> =>
       http.post(`/hosts/${id}/verify`, {}, { timeout: TIMEOUT.MEDIUM }),
     regenerateInstall: (id: number): Promise<{ success: boolean; installCommand: string; installToken?: string; message: string }> =>
@@ -1312,7 +1284,7 @@ const api = {
         giftDays?: number | null
       }
     }> => http.post(`/hosts/${hostId}/instances/create-for-user`, data),
-    // 修改付费实例的续费价格（托管节点所有者专用）
+    // 修改付费实例的续费价格
     updateInstanceRenewalPrice: (hostId: number, instanceId: number, newPrice: number): Promise<{
       message: string
       instanceId: number
@@ -1689,13 +1661,13 @@ const api = {
   // 套餐管理
   packages: {
     // 公开 API（无需登录）
-    listPublic: (options?: { source?: 'official' | 'market' }): Promise<{ packages: Package[]; total: number }> => {
+    listPublic: (options?: { source?: 'official' }): Promise<{ packages: Package[]; total: number }> => {
       const params = new URLSearchParams()
       if (options?.source) params.append('source', options.source)
       const queryString = params.toString()
       return http.get(queryString ? `/packages/public?${queryString}` : '/packages/public')
     },
-    getPublicRegions: (options?: { source?: 'official' | 'market' }): Promise<{
+    getPublicRegions: (options?: { source?: 'official' }): Promise<{
       regions: Array<{
         code: string
         name: string
@@ -1709,28 +1681,14 @@ const api = {
       return http.get(queryString ? `/packages/public/regions?${queryString}` : '/packages/public/regions')
     },
     // 需要登录的 API
-    list: (options?: { all?: boolean; source?: 'official' | 'market' | 'friends' | 'zone'; zoneId?: number; scope?: 'mine' | 'official' | 'hosted' }): Promise<{ packages: Package[]; total: number }> => {
+    list: (options?: { all?: boolean; source?: 'official' | 'friends'; scope?: 'mine' | 'official' }): Promise<{ packages: Package[]; total: number }> => {
       const params = new URLSearchParams()
       if (options?.all) params.append('all', 'true')
       if (options?.source) params.append('source', options.source)
-      if (options?.zoneId) params.append('zoneId', String(options.zoneId))
       if (options?.scope) params.append('scope', options.scope)
       const queryString = params.toString()
       return http.get(queryString ? `/packages?${queryString}` : '/packages')
     },
-    getHostingZones: (): Promise<{
-      zones: Array<{
-        id: number
-        name: string
-        ownerId: number
-        ownerUsername: string
-        logoUrl: string
-        sortOrder: number
-      }>
-    }> => http.get('/packages/hosting-zones'),
-    // 管理员专用：获取托管套餐列表
-    listHosted: (params: { userId?: number } = {}): Promise<{ packages: Package[] }> =>
-      http.get('/packages', { params: { ...params, scope: 'hosted' } }),
     get: (id: number): Promise<Package> => http.get(`/packages/${id}`),
     create: (data: CreatePackageRequest): Promise<Package> => http.post('/packages', data),
     update: (id: number, data: UpdatePackageRequest): Promise<Package> =>
@@ -1819,20 +1777,6 @@ const api = {
       }>
     }> => http.post(`/packages/${packageId}/release-quota`, data),
 
-    // 获取托管套餐所有者信息
-    getOwnerInfo: (packageId: number): Promise<{
-      id: number
-      username: string
-      email: string
-      avatarStyle: string
-      avatarBadgeId?: string | null
-      hostCount: number
-      instanceCount: number
-      registeredDays: number
-      vipLevel: number
-      vipBadgeStyle?: VipBadgeStyle | null
-    }> => http.get(`/packages/${packageId}/owner-info`),
-
     // 套餐方案管理
     getPlans: (packageId: number, options?: { activeOnly?: boolean }): Promise<{
       plans: Array<{
@@ -1920,7 +1864,7 @@ const api = {
       http.delete(`/packages/${packageId}/plans/${planId}`),
 
     // 获取可用地区列表（拥有付费方案的套餐所在的国家/地区）
-    getRegions: (params?: { source?: 'official' | 'market' | 'friends' | 'zone'; zoneId?: number }): Promise<{
+    getRegions: (params?: { source?: 'official' | 'friends' }): Promise<{
       regions: Array<{
         code: string
         name: string
@@ -2002,8 +1946,6 @@ const api = {
       transferFee?: number
       footerContactEmail?: string | null
       footerTelegramLink?: string | null
-      hostingMarketEntryEnabled?: boolean
-      hostingNotice?: string | null
       brandName?: string | null
       brandSubtitle?: string | null
       brandLogoUrl?: string | null
@@ -2015,7 +1957,7 @@ const api = {
         id: number
         name: string
         description: string | null
-        source: 'official' | 'market'
+        source: 'official'
         plans: Array<{
           id: number
           name: string
@@ -2553,7 +2495,7 @@ const api = {
       http.get(`/tickets/hosts/${hostId}`, { params }),
 
     // 获取所有宿主机的工单（汇总视图，支持 active 状态筛选和搜索）
-    getMyHostTickets: (params?: { status?: TicketStatus | 'active'; hostId?: number; sourceType?: 'all' | 'user' | 'official' | 'hosted'; queue?: 'pending' | 'due_soon' | 'overdue' | 'waiting_user' | 'waiting_internal'; search?: string; page?: number; pageSize?: number }): Promise<PaginatedTickets> =>
+    getMyHostTickets: (params?: { status?: TicketStatus | 'active'; hostId?: number; sourceType?: 'all' | 'user' | 'official'; queue?: 'pending' | 'due_soon' | 'overdue' | 'waiting_user' | 'waiting_internal'; search?: string; page?: number; pageSize?: number }): Promise<PaginatedTickets> =>
       http.get('/tickets/my-hosts', { params }),
 
     // 获取待处理工单数量
@@ -2854,7 +2796,6 @@ const api = {
         canRenew: boolean
         autoRenew: boolean
         reason?: string
-        isHostedInstance: boolean
         daysUntilExpire: number | null
         options: Array<{
           months: number
@@ -3566,170 +3507,6 @@ const api = {
       page: number
       pageSize: number
     }> => http.get('/entertainment/lottery-records', { params })
-  },
-
-  // ==================== 托管余额 API ====================
-  hosting: {
-    // 检查托管准入条件
-    checkAccess: (): Promise<{
-      allowed: boolean
-      reason?: string
-      details?: {
-        instanceCount: number
-        hasCreatedHostBefore?: boolean
-        featureEnabled?: boolean
-        hiddenBySystemSetting?: boolean
-      }
-    }> => http.get('/hosting/access-check'),
-
-    // 获取托管余额
-    getBalance: (): Promise<{
-      balance: {
-        available: number
-        frozen: number
-        pendingWithdrawal: number
-        totalIncome: number
-        totalWithdrawn: number
-      }
-      config: {
-        minWithdrawalAmount: number
-        feeRateBalance: number
-      }
-    }> => http.get('/hosting/balance'),
-
-    // 获取托管统计
-    getStats: (): Promise<{
-      stats: {
-        myHostsCount: number
-        instancesOnMyHosts: number
-        uniqueCustomersCount: number
-        monthIncome: number
-        vipLevel: number
-        vipBadgeStyle?: VipBadgeStyle | null
-      }
-      recentIncome: Array<{
-        id: number
-        amount: number
-        instanceId: number | null
-        remark: string | null
-        createdAt: string
-      }>
-    }> => http.get('/hosting/stats'),
-
-    // 获取托管余额日志
-    getLogs: (params?: { page?: number; pageSize?: number; actionType?: string; frozen?: string; search?: string }): Promise<{
-      logs: Array<{
-        id: number
-        type: string
-        actionType: string | null
-        amount: number
-        frozen: boolean
-        unfreezeAt: string | null
-        relatedId: number | null
-        remark: string | null
-        createdAt: string
-        instance: {
-          id: number
-          name: string
-          buyer: {
-            id: number
-            username: string
-            email: string | null
-            avatarStyle: string
-            avatarBadgeId?: string | null
-          }
-          host: {
-            id: number
-            name: string
-          }
-          package: {
-            id: number
-            name: string
-          } | null
-          plan: {
-            id: number
-            name: string
-          } | null
-        } | null
-      }>
-      total: number
-      page: number
-      pageSize: number
-    }> => http.get('/hosting/logs', { params }),
-
-    // 申请提现
-    withdraw: (data: { amount: number }): Promise<{
-      message: string
-      withdrawal: {
-        id: number
-        amount: number
-        feeRate: number
-        feeAmount: number
-        actualAmount: number
-        target: string
-        status: string
-        createdAt: string
-      }
-    }> => http.post('/hosting/withdraw', data),
-
-    // 获取提现记录
-    getWithdrawals: (params?: { page?: number; pageSize?: number; status?: string }): Promise<{
-      records: Array<{
-        id: number
-        amount: number
-        feeRate: number
-        feeAmount: number
-        actualAmount: number
-        target: string
-        status: string
-        rejectReason: string | null
-        processedAt: string | null
-        createdAt: string
-      }>
-      total: number
-      page: number
-      pageSize: number
-    }> => http.get('/hosting/withdrawals', { params }),
-
-    getBlocks: (): Promise<{
-      blocks: Array<{
-        id: number
-        blockedUserId: number
-        username: string
-        email: string | null
-        avatarStyle: string
-        avatarBadgeId?: string | null
-        remark: string | null
-        createdAt: string
-      }>
-    }> => http.get('/hosting/blocks'),
-
-    searchBlockUsers: (keyword: string): Promise<{
-      users: Array<{
-        id: number
-        username: string
-        email: string | null
-        avatarStyle: string
-        avatarBadgeId?: string | null
-        blocked: boolean
-      }>
-    }> => http.get('/hosting/blocks/search', { params: { keyword } }),
-
-    blockUser: (data: { userId: number; remark?: string | null }): Promise<{
-      block: {
-        id: number
-        blockedUserId: number
-        username: string
-        email: string | null
-        avatarStyle: string
-        avatarBadgeId?: string | null
-        remark: string | null
-        createdAt: string
-      }
-    }> => http.post('/hosting/blocks', data),
-
-    unblockUser: (userId: number): Promise<{ success: boolean }> =>
-      http.delete(`/hosting/blocks/${userId}`)
   },
 
   // ==================== VIP 等级 API ====================

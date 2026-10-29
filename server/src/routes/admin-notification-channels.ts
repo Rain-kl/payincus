@@ -1,6 +1,6 @@
 /**
  * 管理员全局通知渠道管理路由
- * 管理员可以创建全局 Telegram 通知渠道，供所有托管用户绑定使用
+ * 管理员可以创建全局 Telegram 通知渠道，供套餐绑定使用
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'

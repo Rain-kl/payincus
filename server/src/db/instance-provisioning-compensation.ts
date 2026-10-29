@@ -170,15 +170,6 @@ export async function compensateFailedInstancePurchase(
       }
     }
 
-    await tx.hostingBalanceLog.deleteMany({
-      where: {
-        relatedId: instanceId,
-        type: 'income',
-        actionType: 'purchase',
-        frozen: true
-      }
-    })
-
     return { refunded: true, refundAmount }
   }, {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,

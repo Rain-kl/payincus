@@ -15,7 +15,6 @@ export interface User {
   ban_reason: string | null  // 封禁原因
   avatar_style: string
   avatar_badge_id?: string | null
-  has_created_host_before?: boolean
   created_at: string
   updated_at: string
 }

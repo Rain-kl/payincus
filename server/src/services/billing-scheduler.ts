@@ -7,7 +7,7 @@ import { schedule } from 'node-cron'
 import pLimit from 'p-limit'
 import { prisma } from '../db/prisma.js'
 import * as db from '../db/index.js'
-import { sendHostManagedInstanceNotification, sendNotification } from '../lib/notifier.js'
+import { sendNotification } from '../lib/notifier.js'
 import { 
   sendExpiryReminderEmail, 
   sendAutoRenewSuccessEmail, 
@@ -252,20 +252,6 @@ async function processAutoRenew(instance: any): Promise<void> {
       renewMonths: renewMonths,
       newExpiresAt: result.newExpiresAt.toISOString()
     })
-
-    if (result.hostingIncomeResult) {
-      sendHostManagedInstanceNotification(
-        instance.hostId,
-        'renew',
-        {
-          username: user.username,
-          instanceName: instance.name,
-          amount: result.amount
-        }
-      ).catch(err => {
-        console.warn('[Billing] Failed to send host renew notification:', err)
-      })
-    }
 
     // 发送自动续费成功邮件
     if (user.email) {

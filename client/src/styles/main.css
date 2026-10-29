@@ -128,6 +128,28 @@
     @apply px-5 py-2.5 text-base;
   }
 
+  /* ============ 表格操作图标按钮（shadcn 风格：扁平、无边框、hover 才浮出浅底） ============ */
+  /* 表格 <td> 操作列唯一允许的按钮形态，见 AGENTS.md §2.13 / THEME.md §5 */
+  .icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500;
+  }
+
+  .icon-btn:hover:not(:disabled) {
+    @apply bg-[var(--bg-tertiary)] text-[var(--text-primary)];
+  }
+
+  .icon-btn:disabled {
+    @apply cursor-not-allowed text-[var(--text-tertiary)];
+  }
+
+  .icon-btn-danger {
+    @apply text-[var(--error)];
+  }
+
+  .icon-btn-danger:hover:not(:disabled) {
+    @apply bg-[var(--bg-tertiary)] text-[var(--error)];
+  }
+
   /* ============ 输入框 ============ */
   .input {
     @apply w-full px-3 py-2 text-sm rounded transition-colors duration-150;

@@ -94,7 +94,6 @@ export const ErrorCode = {
     QUOTA_INCREASE_STEP_INVALID: 'QUOTA_INCREASE_STEP_INVALID',
     QUOTA_USAGE_UNAVAILABLE: 'QUOTA_USAGE_UNAVAILABLE',
     QUOTA_USAGE_TOO_LOW: 'QUOTA_USAGE_TOO_LOW',
-    HOSTING_BALANCE_BUSY: 'HOSTING_BALANCE_BUSY',
 
     // Snapshot errors
     SNAPSHOT_NOT_FOUND: 'SNAPSHOT_NOT_FOUND',
@@ -446,7 +445,6 @@ export const ErrorMessages: Record<ErrorCodeType, string> = {
     [ErrorCode.QUOTA_INCREASE_STEP_INVALID]: 'Quota increase step is invalid',
     [ErrorCode.QUOTA_USAGE_UNAVAILABLE]: 'Quota usage cannot be calculated',
     [ErrorCode.QUOTA_USAGE_TOO_LOW]: 'Quota usage is below the required threshold',
-    [ErrorCode.HOSTING_BALANCE_BUSY]: 'Hosting balance is being processed, please try again later',
 
     // Snapshot errors
     [ErrorCode.SNAPSHOT_NOT_FOUND]: 'Snapshot not found',

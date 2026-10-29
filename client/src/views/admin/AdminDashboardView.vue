@@ -215,7 +215,7 @@ const activeRisks = computed<ActionableRiskItem[]>(() => {
   return stats.value.operations.risks.map(r => {
     let targetPath = '/admin/settings'
     if (r.key === 'delivery_failed') {
-      targetPath = '/admin/hosting'
+      targetPath = '/admin/resources/hosts'
     } else if (r.key === 'payment_attention') {
       targetPath = '/admin/orders'
     } else if (r.key === 'host_offline' || r.key === 'agent_stale') {
@@ -998,13 +998,13 @@ function getTicketPriorityText(priority: string): string {
             </div>
 
             <div class="mt-4 pt-3 border-t border-themed flex items-center justify-between text-xs text-themed-muted">
-              <span>托管 / 自营实例全部在线统计</span>
+              <span>自营实例全部在线统计</span>
               <button
                 type="button"
                 class="text-primary-600 dark:text-primary-400 hover:underline font-medium"
-                @click="jumpTo('/admin/hosting')"
+                @click="jumpTo('/admin/resources/hosts')"
               >
-                管理托管实例 ➔
+                管理节点 ➔
               </button>
             </div>
           </div>

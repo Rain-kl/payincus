@@ -237,15 +237,6 @@ export default async function promoCodesRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN, '无权操作该实例'))
     }
 
-    // 用户托管节点不允许使用优惠码（托管节点命名前四位固定为 peer）
-    if (instance.host && instance.host.name.toLowerCase().startsWith('peer')) {
-      return reply.code(400).send({
-        success: false,
-        error: '用户托管节点不支持使用优惠码',
-        errorCode: 'NOT_ELIGIBLE'
-      })
-    }
-
     if (!instance.packageId || !instance.packagePlanId) {
       return reply.code(400).send({
         success: false,

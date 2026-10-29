@@ -12,6 +12,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeCountryName } from '@/utils/countryDisplay'
 import { instancesPath } from '@/utils/app-paths'
+import { useTabQuery } from '@/composables/useTabQuery'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -26,7 +27,11 @@ const normalizedCountryLabels = computed(() => ({
 }))
 
 // Tab 切换
-const activeTab = ref('users')
+const activeTab = useTabQuery({
+  keys: ['users', 'invites', 'linkedAccounts', 'userVipLevels', 'vipBenefits'],
+  fallback: 'users',
+  onExternalChange: (tab) => loadTabData(tab)
+})
 
 // 用户数据
 const USER_SEARCH_FIELDS = ['username', 'id', 'email']
@@ -137,26 +142,6 @@ const adjustPointsForm = ref({
 })
 const adjustPointsLoading = ref(false)
 
-// 托管余额弹窗
-const showHostingBalanceModal = ref(false)
-const hostingBalanceUser = ref(null)
-const hostingBalanceTab = ref('overview')  // 'overview' | 'logs' | 'adjust'
-const hostingBalanceInfo = ref({ available: 0, frozen: 0 })
-const hostingBalanceInfoLoading = ref(false)
-const hostingBalanceLogs = ref([])
-const hostingBalanceLogsLoading = ref(false)
-const hostingBalanceLogsPage = ref(1)
-const hostingBalanceLogsPageSize = ref(50)
-const hostingBalanceLogsTotal = ref(0)
-const hostingBalanceLogsTotalPages = ref(1)
-const adjustHostingBalanceForm = ref({
-  type: 'available',  // 'available' | 'frozen'
-  operation: 'add',   // 'add' | 'deduct'
-  amount: '',
-  reason: ''
-})
-const adjustHostingBalanceLoading = ref(false)
-
 // 关联账号检测
 const linkedAccountsData = ref(null)
 const linkedAccountsLoading = ref(false)
@@ -233,6 +218,7 @@ onMounted(async () => {
   window.addEventListener('resize', closeActionMenu)
   window.addEventListener('scroll', closeActionMenu, true)
   await loadUsers()
+  loadTabData(activeTab.value)
 })
 
 onUnmounted(() => {
@@ -291,14 +277,18 @@ async function loadInvites() {
   }
 }
 
-function switchTab(tab) {
-  activeTab.value = tab
+function loadTabData(tab) {
   if (tab === 'invites' && invites.value.length === 0) {
     loadInvites()
   }
   if (tab === 'linkedAccounts' && !linkedAccountsData.value) {
     loadLinkedAccounts()
   }
+}
+
+function switchTab(tab) {
+  activeTab.value = tab
+  loadTabData(tab)
 }
 
 function openGenerateModal() {
@@ -796,140 +786,6 @@ async function submitAdjustPoints() {
   }
 }
 
-// 打开托管余额弹窗
-async function openHostingBalanceModal(user) {
-  hostingBalanceUser.value = user
-  hostingBalanceTab.value = 'overview'
-  hostingBalanceInfo.value = { 
-    available: user.hostingBalance || 0, 
-    frozen: user.hostingBalanceFrozen || 0 
-  }
-  hostingBalanceLogs.value = []
-  adjustHostingBalanceForm.value = { type: 'available', operation: 'add', amount: '', reason: '' }
-  showHostingBalanceModal.value = true
-  // 加载详细信息
-  await loadHostingBalanceInfo()
-}
-
-// 加载托管余额详情
-async function loadHostingBalanceInfo() {
-  if (!hostingBalanceUser.value) return
-  hostingBalanceInfoLoading.value = true
-  try {
-    const res = await api.admin.getHostingBalanceLogs(hostingBalanceUser.value.id, { page: 1, pageSize: 1 })
-    hostingBalanceInfo.value = {
-      available: res.available,
-      frozen: res.frozen
-    }
-  } catch (err) {
-    console.error('Failed to load hosting balance info:', err)
-  } finally {
-    hostingBalanceInfoLoading.value = false
-  }
-}
-
-// 加载托管余额明细
-async function loadHostingBalanceLogs() {
-  if (!hostingBalanceUser.value) return
-  hostingBalanceLogsLoading.value = true
-  try {
-    const res = await api.admin.getHostingBalanceLogs(hostingBalanceUser.value.id, {
-      page: hostingBalanceLogsPage.value,
-      pageSize: hostingBalanceLogsPageSize.value
-    })
-    hostingBalanceLogs.value = res.logs
-    hostingBalanceLogsTotal.value = res.total
-    hostingBalanceLogsTotalPages.value = res.totalPages
-    // 同步更新余额信息
-    hostingBalanceInfo.value = {
-      available: res.available,
-      frozen: res.frozen
-    }
-  } catch (err) {
-    toast.error(t('admin.users.loadHostingLogsFailed') + ': ' + err.message)
-  } finally {
-    hostingBalanceLogsLoading.value = false
-  }
-}
-
-// 切换托管余额弹窗TAB
-function switchHostingBalanceTab(tab) {
-  hostingBalanceTab.value = tab
-  if (tab === 'logs' && hostingBalanceLogs.value.length === 0) {
-    hostingBalanceLogsPage.value = 1
-    loadHostingBalanceLogs()
-  }
-}
-
-// 托管余额明细翻页
-function changeHostingBalanceLogsPage(page) {
-  hostingBalanceLogsPage.value = page
-  loadHostingBalanceLogs()
-}
-
-// 提交调整托管余额
-async function submitAdjustHostingBalance() {
-  if (!hostingBalanceUser.value) return
-
-  const amount = parseFloat(adjustHostingBalanceForm.value.amount)
-  if (isNaN(amount) || amount <= 0) {
-    toast.error(t('admin.users.invalidAmount'))
-    return
-  }
-
-  if (!adjustHostingBalanceForm.value.reason.trim()) {
-    toast.error(t('admin.users.reasonRequired'))
-    return
-  }
-
-  // 根据操作类型计算实际金额
-  const finalAmount = adjustHostingBalanceForm.value.operation === 'add' ? amount : -amount
-
-  adjustHostingBalanceLoading.value = true
-  try {
-    const res = await api.admin.adjustHostingBalance(
-      hostingBalanceUser.value.id,
-      adjustHostingBalanceForm.value.type,
-      finalAmount,
-      adjustHostingBalanceForm.value.reason.trim()
-    )
-    toast.success(t('admin.users.hostingBalanceAdjusted'))
-    // 更新显示
-    hostingBalanceInfo.value = {
-      available: res.available,
-      frozen: res.frozen
-    }
-    // 重置表单
-    adjustHostingBalanceForm.value = { type: 'available', operation: 'add', amount: '', reason: '' }
-    // 刷新明细
-    if (hostingBalanceLogs.value.length > 0) {
-      await loadHostingBalanceLogs()
-    }
-    // 刷新用户列表
-    await loadUsers()
-    // 切换到概览TAB
-    hostingBalanceTab.value = 'overview'
-  } catch (err) {
-    const errorCode = err?.code
-    const errorMessage = errorCode ? t(`errors.${errorCode}`) : err.message
-    toast.error(t('admin.users.hostingBalanceAdjustFailed') + ': ' + errorMessage)
-  } finally {
-    adjustHostingBalanceLoading.value = false
-  }
-}
-
-// 获取托管余额记录类型标签
-function getHostingLogTypeLabel(type, actionType) {
-  if (actionType === 'admin_adjust') return t('admin.users.hostingLogType.admin_adjust')
-  const labels = {
-    income: t('admin.users.hostingLogType.income'),
-    deduction: t('admin.users.hostingLogType.deduction'),
-    unfreeze: t('admin.users.hostingLogType.unfreeze'),
-    withdraw: t('admin.users.hostingLogType.withdraw')
-  }
-  return labels[type] || type
-}
-
 // 获取余额记录类型标签
 function getBalanceLogTypeLabel(type) {
   const labels = {
@@ -1251,20 +1107,6 @@ function _getQuotaPercent(used, limit) {
                 </div>
               </div>
               <div class="rounded-md bg-themed-tertiary p-2">
-                <div>{{ t('admin.users.hostingBalance') }}</div>
-                <button
-                  class="mt-1 text-left font-mono tabular-nums text-sm font-medium hover:text-primary"
-                  :class="user.hostingBalance > 0 ? 'text-success' : 'text-themed-muted'"
-                  :title="t('admin.users.viewHostingBalance')"
-                  @click="openHostingBalanceModal(user)"
-                >
-                  ¥{{ (user.hostingBalance || 0).toFixed(2) }}
-                </button>
-                <div v-if="user.hostingBalanceFrozen > 0" class="mt-1">
-                  {{ t('admin.users.frozen') }} ¥{{ (user.hostingBalanceFrozen || 0).toFixed(2) }}
-                </div>
-              </div>
-              <div class="rounded-md bg-themed-tertiary p-2">
                 <div>{{ t('admin.users.allInstances') }}</div>
                 <div class="mt-1 flex items-center gap-2 text-themed">
                   <span>{{ user.instanceCount || 0 }} {{ t('admin.users.instances') }}</span>
@@ -1353,7 +1195,6 @@ function _getQuotaPercent(used, limit) {
                 <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.status') }}</th>
                 <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.balance') }}</th>
                 <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.points') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.hostingBalance') }}</th>
                 <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.allInstances') }}</th>
                 <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.userActivity') }}</th>
                 <th class="text-right text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('common.actions') }}</th>
@@ -1430,26 +1271,6 @@ function _getQuotaPercent(used, limit) {
                       :title="t('admin.users.spentPoints')"
                     >
                       {{ t('admin.users.spent') }} {{ user.totalEarnedPoints - user.points }}
-                    </span>
-                  </div>
-                </td>
-                <!-- 托管余额 -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <div class="flex flex-col gap-0.5">
-                    <button 
-                      class="text-sm font-mono tabular-nums font-medium hover:text-primary transition-colors text-left"
-                      :class="user.hostingBalance > 0 ? 'text-success' : 'text-themed-muted'"
-                      :title="t('admin.users.viewHostingBalance')"
-                      @click="openHostingBalanceModal(user)"
-                    >
-                      ¥{{ (user.hostingBalance || 0).toFixed(2) }}
-                    </button>
-                    <span 
-                      v-if="user.hostingBalanceFrozen > 0" 
-                      class="text-xs text-themed-muted"
-                      :title="t('admin.users.frozenHostingBalance')"
-                    >
-                      {{ t('admin.users.frozen') }} ¥{{ (user.hostingBalanceFrozen || 0).toFixed(2) }}
                     </span>
                   </div>
                 </td>
@@ -2818,250 +2639,6 @@ function _getQuotaPercent(used, limit) {
                 </svg>
                 {{ adjustPointsLoading ? t('common.submitting') : t('common.confirm') }}
               </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- 托管余额弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showHostingBalanceModal" class="modal-overlay">
-          <div class="modal-backdrop" @click="showHostingBalanceModal = false"></div>
-          <div class="modal-content max-w-2xl">
-            <div class="modal-header">
-              <h3 class="modal-title">{{ t('admin.users.hostingBalanceDetails') }} - {{ hostingBalanceUser?.username }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showHostingBalanceModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <!-- TAB 切换 -->
-            <div class="flex gap-1 border-b border-themed px-4">
-              <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="hostingBalanceTab === 'overview' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchHostingBalanceTab('overview')"
-              >
-                {{ t('admin.users.hostingBalanceOverview') }}
-              </button>
-              <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="hostingBalanceTab === 'logs' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchHostingBalanceTab('logs')"
-              >
-                {{ t('admin.users.hostingBalanceLogs') }}
-              </button>
-              <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="hostingBalanceTab === 'adjust' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchHostingBalanceTab('adjust')"
-              >
-                {{ t('admin.users.adjustHostingBalance') }}
-              </button>
-            </div>
-            <div class="modal-body">
-              <!-- 概览 TAB -->
-              <div v-if="hostingBalanceTab === 'overview'">
-                <div v-if="hostingBalanceInfoLoading" class="flex items-center justify-center py-8">
-                  <svg class="w-6 h-6 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-                <div v-else class="grid grid-cols-2 gap-4">
-                  <div class="bg-themed-tertiary rounded-lg p-4 text-center">
-                    <div class="font-mono text-2xl font-semibold tabular-nums" :class="hostingBalanceInfo.available > 0 ? 'text-success' : 'text-themed'">
-                      ¥{{ hostingBalanceInfo.available.toFixed(2) }}
-                    </div>
-                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ t('admin.users.availableBalance') }}</div>
-                  </div>
-                  <div class="bg-themed-tertiary rounded-lg p-4 text-center">
-                    <div class="font-mono text-2xl font-semibold tabular-nums text-warning">
-                      ¥{{ hostingBalanceInfo.frozen.toFixed(2) }}
-                    </div>
-                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ t('admin.users.frozenBalance') }}</div>
-                  </div>
-                </div>
-              </div>
-              <!-- 明细 TAB -->
-              <div v-else-if="hostingBalanceTab === 'logs'">
-                <div v-if="hostingBalanceLogsLoading" class="flex items-center justify-center py-8">
-                  <svg class="w-6 h-6 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-                <div v-else-if="hostingBalanceLogs.length === 0" class="text-center py-8 text-themed-muted">
-                  {{ t('common.noData') }}
-                </div>
-                <div v-else>
-                  <div class="space-y-3 lg:hidden">
-                    <div
-                      v-for="log in hostingBalanceLogs"
-                      :key="log.id"
-                      class="rounded-lg border border-themed p-3"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                          <span class="badge badge-default">{{ getHostingLogTypeLabel(log.type, log.actionType) }}</span>
-                          <div class="mt-2 text-xs text-themed-muted">{{ new Date(log.createdAt).toLocaleString() }}</div>
-                        </div>
-                        <div
-                          class="shrink-0 text-right font-mono text-sm font-semibold tabular-nums"
-                          :class="log.type === 'income' || log.type === 'unfreeze' ? 'text-success' : 'text-error'"
-                        >
-                          {{ log.type === 'income' || log.type === 'unfreeze' ? '+' : '-' }}¥{{ log.amount.toFixed(2) }}
-                        </div>
-                      </div>
-                      <div class="mt-3 flex items-center justify-between gap-3">
-                        <span v-if="log.frozen" class="badge badge-warning">{{ t('admin.users.frozen') }}</span>
-                        <span v-else class="badge badge-success">{{ t('admin.users.available') }}</span>
-                        <span class="min-w-0 truncate text-sm text-themed-muted" :title="log.description">{{ log.description || '-' }}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="hidden overflow-hidden rounded-lg border border-themed lg:block">
-                    <table class="w-full table-fixed text-sm">
-                      <thead class="text-[11px] font-mono uppercase tracking-wider text-themed-faint border-b border-themed">
-                        <tr>
-                          <th class="w-[24%] text-left py-2.5 px-2 font-medium">{{ t('admin.users.logTime') }}</th>
-                          <th class="w-[18%] text-left py-2.5 px-2 font-medium">{{ t('admin.users.logType') }}</th>
-                          <th class="w-[16%] text-right py-2.5 px-2 font-medium">{{ t('admin.users.logAmount') }}</th>
-                          <th class="w-[14%] text-left py-2.5 px-2 font-medium">{{ t('admin.users.logStatus') }}</th>
-                          <th class="w-[28%] text-left py-2.5 px-2 font-medium">{{ t('admin.users.logDescription') }}</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-themed">
-                        <tr v-for="log in hostingBalanceLogs" :key="log.id" class="hover:bg-themed-tertiary">
-                          <td class="py-2 px-2 whitespace-nowrap text-themed-muted">
-                            {{ new Date(log.createdAt).toLocaleString() }}
-                          </td>
-                          <td class="py-2 px-2 whitespace-nowrap">
-                            <span class="badge badge-default">{{ getHostingLogTypeLabel(log.type, log.actionType) }}</span>
-                          </td>
-                          <td class="py-2 px-2 text-right whitespace-nowrap font-mono tabular-nums" :class="log.type === 'income' || log.type === 'unfreeze' ? 'text-success' : 'text-error'">
-                            {{ log.type === 'income' || log.type === 'unfreeze' ? '+' : '-' }}¥{{ log.amount.toFixed(2) }}
-                          </td>
-                          <td class="py-2 px-2 whitespace-nowrap">
-                            <span v-if="log.frozen" class="badge badge-warning">{{ t('admin.users.frozen') }}</span>
-                            <span v-else class="badge badge-success">{{ t('admin.users.available') }}</span>
-                          </td>
-                          <td class="py-2 px-2 text-themed-muted max-w-xs truncate" :title="log.description">
-                            {{ log.description || '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <!-- 分页 -->
-                  <div v-if="hostingBalanceLogsTotalPages > 1" class="flex justify-center mt-4 gap-1">
-                    <button 
-                      class="btn btn-xs btn-ghost" 
-                      :disabled="hostingBalanceLogsPage <= 1"
-                      @click="changeHostingBalanceLogsPage(hostingBalanceLogsPage - 1)"
-                    >
-                      {{ t('common.prev') }}
-                    </button>
-                    <span class="px-2 text-sm text-themed-muted">
-                      {{ hostingBalanceLogsPage }} / {{ hostingBalanceLogsTotalPages }}
-                    </span>
-                    <button 
-                      class="btn btn-xs btn-ghost" 
-                      :disabled="hostingBalanceLogsPage >= hostingBalanceLogsTotalPages"
-                      @click="changeHostingBalanceLogsPage(hostingBalanceLogsPage + 1)"
-                    >
-                      {{ t('common.next') }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <!-- 调整 TAB -->
-              <div v-else-if="hostingBalanceTab === 'adjust'" class="space-y-4">
-                <!-- 当前余额 -->
-                <div class="grid grid-cols-2 gap-4 py-2 px-3 bg-themed-tertiary rounded-lg">
-                  <div class="text-center">
-                    <div class="font-mono text-lg font-semibold tabular-nums text-success">¥{{ hostingBalanceInfo.available.toFixed(2) }}</div>
-                    <div class="text-xs text-themed-muted">{{ t('admin.users.availableBalance') }}</div>
-                  </div>
-                  <div class="text-center">
-                    <div class="font-mono text-lg font-semibold tabular-nums text-warning">¥{{ hostingBalanceInfo.frozen.toFixed(2) }}</div>
-                    <div class="text-xs text-themed-muted">{{ t('admin.users.frozenBalance') }}</div>
-                  </div>
-                </div>
-                <!-- 调整类型 -->
-                <div>
-                  <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.adjustType') }}</label>
-                  <div class="flex gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="adjustHostingBalanceForm.type" type="radio" value="available" class="radio" />
-                      <span class="text-sm">{{ t('admin.users.availableBalance') }}</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="adjustHostingBalanceForm.type" type="radio" value="frozen" class="radio" />
-                      <span class="text-sm">{{ t('admin.users.frozenBalance') }}</span>
-                    </label>
-                  </div>
-                </div>
-                <!-- 操作类型 -->
-                <div>
-                  <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.operation') }}</label>
-                  <div class="flex gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="adjustHostingBalanceForm.operation" type="radio" value="add" class="radio" />
-                      <span class="text-sm text-success">{{ t('admin.users.operationAdd') }}</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="adjustHostingBalanceForm.operation" type="radio" value="deduct" class="radio" />
-                      <span class="text-sm text-error">{{ t('admin.users.operationDeduct') }}</span>
-                    </label>
-                  </div>
-                </div>
-                <!-- 金额 -->
-                <div>
-                  <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.amount') }} <span class="text-error">*</span></label>
-                  <input 
-                    v-model="adjustHostingBalanceForm.amount" 
-                    type="number" 
-                    step="0.01"
-                    min="0"
-                    class="input" 
-                    :placeholder="t('admin.users.amountPlaceholder')"
-                  />
-                </div>
-                <!-- 理由 -->
-                <div>
-                  <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.adjustReason') }} <span class="text-error">*</span></label>
-                  <textarea 
-                    v-model="adjustHostingBalanceForm.reason" 
-                    class="input min-h-[80px]" 
-                    :placeholder="t('admin.users.hostingReasonPlaceholder')"
-                    maxlength="200"
-                  ></textarea>
-                  <p class="mt-1 text-xs text-themed-muted">{{ adjustHostingBalanceForm.reason.length }}/200</p>
-                </div>
-                <!-- 按钮 -->
-                <div class="flex justify-end gap-2 pt-2">
-                  <button class="btn btn-ghost" @click="hostingBalanceTab = 'overview'">{{ t('common.cancel') }}</button>
-                  <button 
-                    class="btn btn-primary" 
-                    :disabled="adjustHostingBalanceLoading || !adjustHostingBalanceForm.amount || !adjustHostingBalanceForm.reason.trim()"
-                    @click="submitAdjustHostingBalance"
-                  >
-                    <svg v-if="adjustHostingBalanceLoading" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    {{ adjustHostingBalanceLoading ? t('common.submitting') : t('common.confirm') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-secondary" @click="showHostingBalanceModal = false">{{ t('common.close') }}</button>
             </div>
           </div>
         </div>

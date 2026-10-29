@@ -81,7 +81,7 @@ const zhSidebar = [
       { text: '实例与资源交付', link: '/features/instances' },
       { text: '支付与账务', link: '/features/billing' },
       { text: '通知、工单与帮助', link: '/features/communication' },
-      { text: '托管与资源池', link: '/features/resource-hosting' },
+      { text: '主机与资源池', link: '/features/resource-hosting' },
       { text: 'Agent', link: '/agent/install' },
       { text: 'API 概览', link: '/api/overview' }
     ]
@@ -209,7 +209,7 @@ const enSidebar = [
       { text: 'Instances and Delivery', link: '/en/features/instances' },
       { text: 'Billing and Payments', link: '/en/features/billing' },
       { text: 'Communication', link: '/en/features/communication' },
-      { text: 'Hosting and Resource Pools', link: '/en/features/resource-hosting' },
+      { text: 'Hosts and Resource Pools', link: '/en/features/resource-hosting' },
       { text: 'Agent', link: '/en/agent/install' },
       { text: 'API Overview', link: '/en/api/overview' }
     ]
