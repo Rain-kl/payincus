@@ -124,12 +124,25 @@ export async function issueHostAgentInstallToken(hostId: number, enabled = true)
   installToken: string
   installTokenExpiresAt: Date
 }> {
-  const rotated = await rotateHostAgentCredentials(hostId, enabled)
+  const host = await prisma.host.findUnique({ where: { id: hostId }, select: { id: true, name: true } })
+  if (!host) throw new Error('HOST_NOT_FOUND')
+  let identity = await agentModel.findUnique({ where: { hostId } })
+  if (!identity) {
+    const agentId = await generateUniqueAgentId()
+    const agentSecret = generateAgentSecret()
+    identity = await agentModel.upsert({
+      where: { hostId },
+      create: { hostId, agentId, secretHash: hashAgentSecret(agentSecret), secretEncrypted: encryptSensitiveData(agentSecret), enabled, status: 'offline' },
+      update: {}
+    })
+  }
+  // Issuing an installation token must not revoke a running node or change its policy.
+  // Explicit credential rotation remains the separate revocation operation.
   const installToken = generateAgentInstallToken()
   const installTokenExpiresAt = new Date(Date.now() + agentInstallTokenTtlMs)
 
   const agent = await agentModel.update({
-    where: { id: rotated.agent.id },
+    where: { id: identity.id },
     data: {
       installTokenHash: hashAgentInstallToken(installToken),
       installTokenExpiresAt,
@@ -138,7 +151,7 @@ export async function issueHostAgentInstallToken(hostId: number, enabled = true)
   })
 
   return {
-    host: rotated.host,
+    host,
     agent,
     installToken,
     installTokenExpiresAt

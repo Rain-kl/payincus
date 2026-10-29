@@ -37,7 +37,7 @@ import {
   tryAdvisoryTransactionLock
 } from '../db/advisory-locks.js'
 import { IncusClient, getIncusClient, removeIncusClient } from '../lib/incus/index.js'
-import { deriveEffectiveHostStatus, hostTunnelManager } from '../lib/incus/tunnel-manager.js'
+import { HeartbeatTestError, deriveEffectiveHostStatus, hostTunnelManager } from '../lib/incus/tunnel-manager.js'
 import { getInstance, updateInstance } from '../lib/incus/incus-instances.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
 import { createStoragePool, deleteStoragePool, updateStoragePool } from '../lib/incus/incus-storage.js'
@@ -1618,12 +1618,12 @@ export default async function hostRoutes(fastify: FastifyInstance) {
       return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
     }
 
-    if (!host.cert_path || !host.key_path) {
-      return reply.code(400).send(apiError(ErrorCode.HOST_CERT_NOT_CONFIGURED))
+    try {
+      await hostTunnelManager.requestHeartbeatAndWait(hostId)
+      return { success: true, message: '测试通过' }
+    } catch (error) {
+      return reply.code(error instanceof HeartbeatTestError ? error.statusCode : 502).send({ success: false, error: error instanceof HeartbeatTestError ? error.message : '节点上报测试失败' })
     }
-
-    if (!hostTunnelManager.requestHeartbeat(hostId)) return reply.code(409).send({ error: '节点连接不可用或不支持立即上报，请检查节点版本与连接' })
-    return reply.code(202).send({ success: true, queued: true, message: '已通知节点立即上报心跳' })
   })
 
   // 获取宿主机详情（支持节点所有者）

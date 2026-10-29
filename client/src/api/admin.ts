@@ -1373,7 +1373,7 @@ const api = {
       http.patch(`/hosts/${id}`, data),
     delete: (id: number): Promise<void> => http.delete(`/hosts/${id}`),
     test: (id: number): Promise<{ success: boolean; message?: string }> =>
-      http.post(`/hosts/${id}/test`, {}, { timeout: TIMEOUT.MEDIUM }),
+      http.post(`/hosts/${id}/test`, {}, { timeout: TIMEOUT.LONG }),
     takeoverOfficial: (id: number): Promise<{
       success: boolean
       summary: {

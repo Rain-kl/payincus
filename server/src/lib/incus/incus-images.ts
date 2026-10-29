@@ -2,10 +2,8 @@
  * Incus 镜像管理
  */
 
-import { request } from 'undici'
 import type { IncusClient } from './incus-client.js'
 import type { IncusImage, IncusImageAlias, PullImageOptions } from '../../types/incus.js'
-import { waitForOperationLong } from './incus-utils.js'
 
 /**
  * 获取镜像列表
@@ -96,51 +94,7 @@ export async function pullImageWithLongTimeout(
     auto_update: autoUpdate
   }
 
-  // Send request and get operation URL
-  const url = `${client.baseUrl}/1.0/images`
-  
-  // 记录请求日志
-  console.log('[Incus API Request]', {
-    method: 'POST',
-    url,
-    body: JSON.stringify(payload, null, 2),
-    operation: 'pullImageWithLongTimeout'
-  })
-  
-  const response = await request(url, {
-    method: 'POST',
-    dispatcher: client.agent!,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  
-  const text = await response.body.text()
-  
-  // 记录响应日志
-  console.log('[Incus API Response]', {
-    method: 'POST',
-    url,
-    statusCode: response.statusCode,
-    responseBody: text.length > 1000 ? `${text.substring(0, 1000)}... (truncated, total: ${text.length} chars)` : text
-  })
-  
-  let data: { type: string; operation?: string; metadata?: unknown; error?: string }
-  try {
-    data = JSON.parse(text)
-  } catch (e) {
-    throw new Error(text || `HTTP ${response.statusCode}`)
-  }
-
-  if (data.type === 'error') {
-    throw new Error(data.error || 'Incus API 错误')
-  }
-
-  // Wait for async operation with long timeout
-  if (data.type === 'async' && data.operation) {
-    return waitForOperationLong(client, data.operation, timeout)
-  }
-
-  return data.metadata
+  return client.request('POST', '/1.0/images', payload, timeout)
 }
 
 /**

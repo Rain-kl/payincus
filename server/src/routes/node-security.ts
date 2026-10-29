@@ -5,7 +5,7 @@ import { INCUS_CLI_COMMANDS, recordReport } from '../lib/node-security/report.js
 import { restoreNodeInstances, type RecoveryState } from '../lib/node-security/recovery.js'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../db/prisma.js'
-import { IncusClient, nodeErrorDetail } from '../lib/incus/incus-client.js'
+import { IncusClient, IncusApiError, nodeErrorDetail } from '../lib/incus/incus-client.js'
 import { createLog, LogModule, LogResult } from '../db/logs.js'
 import { datasetPattern, fingerprint, seal, unseal } from '../lib/node-security/vault.js'
 
@@ -148,7 +148,10 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
       try {
         const state = await (await client(hostId)).request('POST', '/1.0/payincus/security/unlock', { dataset: record.dataset, key })
         return { state }
-      } catch { return reply.code(409).send({ error: '存储解锁未完成，节点锁定状态未解除' }) }
+      } catch (error) {
+        const status = error instanceof IncusApiError ? error.statusCode === 401 ? 502 : error.statusCode : 409
+        return reply.code(status).send({ error: nodeErrorDetail(error, '存储解锁未完成', { key }) })
+      }
       finally { key = '' }
     })
   }

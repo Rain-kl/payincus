@@ -16,7 +16,7 @@
 
 受管 Linux `incus` CLI 全部调用会记录分类、UID/PID、时间、是否关键及是否拒绝，不记录完整参数、命令载荷或 stdin。普通查询和 help/version 只审计；exec、shell、console、文件访问、导出/发布/复制/移动、危险配置及启动/恢复等命令触发。未知别名按敏感操作处理，TUI 使用原生 Unix API，不走受安全模式监控的 CLI。
 
-触发时先持久化统一 API 锁定，再停止本节点全部 LXC 容器；停止核验后，对已注册 ZFS 根卸载文件系统、卸载密钥并核验。连接 Agent 与 incusd 保持运行，独立报告每项结果。没有 ZFS 时明确显示附加存储锁定不适用，不能宣称 DIR 数据被加密。普通 CLI 和受限节点 API 返回 `Failed to begin transaction: sql: database disk image is malformed (11)`，管理端保留真实结果。
+触发时先持久化统一 API 锁定，再停止本节点全部 LXC 容器；停止核验后，对已注册 ZFS 根卸载文件系统、卸载密钥并核验。连接 Agent 与 incusd 保持运行，独立报告每项结果。没有 ZFS 时明确显示附加存储锁定不适用，不能宣称 DIR 数据被加密。只有确认已触发或处于全局锁定的 CLI，以及被全局锁拒绝的非白名单节点 API，才返回 `Failed to begin transaction: sql: database disk image is malformed (11)`。未锁定时的权限、协议、审计写入、状态读取和存储错误保留真实原因；证书指纹校验不代表节点处于锁定状态。管理接口保留真实结果。
 
 告警进入控制端管理日志；独立 HMAC 上报通常在本地检查后 2 秒内发起，实际送达受网络/队列影响。只有事务提交后才 ACK 并删除节点事件，断网时重试，不能保证断网期间实时远程报警。每批 128 条、本地上限 2048 条，队列满时拒绝新的受管 CLI 调用；节点上报时控制端清理 30 天前记录（离线期间不主动清理），页面显示最近 100 条。
 
@@ -134,3 +134,24 @@ owner 已确认第 9 项是对已加密 ZFS 存储锁盘，不包含明文盘迁
 ## 存储状态改由心跳驱动（2026-10-28）
 
 当前存储 GET 只查询数据库中的最新心跳快照，不再连接节点核验。写操作仍使用 pinned mTLS 进行身份和状态核对；操作前后把存储状态置为等待上报，并通过现有连接通知立即心跳。自动加载调度先检查数据库中的节点/存储状态、托管密钥和手动锁，再按需执行带核验的解锁，不再定时扫描每个健康池的节点接口。容量、重新创建同名池、稀疏 Loop 扩容、测试证据与部署要求见 [STORAGE_HEARTBEAT.md](STORAGE_HEARTBEAT.md)。此处为本次代码行为，前文验收记录保留其对应版本的事实。
+
+
+## 未锁定错误语义复核（2026-10-29）
+
+- GPT-6.1 Terra 独立排查发现控制端 pinned API 全面掩蔽、节点 guard 的状态读取/手动锁盘误报，以及审计异常与全局锁混淆。相关主修复已包含在当前 canary：只有 errors.Is(ErrLocked) 才使用既有原生伪装；TLS 证书固定不改变普通/管理/非 JSON/异步错误的原文和 HTTP 状态，密钥字段脱敏。真实全局锁定和未知状态下的拒绝执行仍保留。
+- 本次继续同步最新 canary 后，补查新增扩容入口：ResizePool 原先把状态读取失败称为 node/storage unavailable，把 ZFS 属性读取失败称为 identity changed。现分别保留原错误，单独报告手动锁盘，仍先拒绝再操作，不新增解锁或授权回退。errors_test.go 新增损坏状态下扩容零存储命令的回归。
+- Terra 最初复审因额度中断；owner 要求恢复后，已完成三轮只读复审，新增发现均已修复，最终针对性复审无新增必须修正问题。子代理没有自行进行真机验证。
+
+- 本轮收尾验证通过：node-security 全套（含直接/隧道 TLS、普通/管理/非 JSON/异步错误及密钥脱敏）、storage-encryption 全套、storage-resize 契约、server type-check、控制仓库 make check；节点定制模块 race、真实 daemon TestPayIncusAuthenticatedRoute、实例/存储驱动 go vet、daemon 构建与新增改动增量 lint（0 issues）。同步心跳 schema 后重新生成 Prisma Client，未执行数据库迁移。
+- 当前 Netcatty 的 10.211.55.11 测试会话未连接，尝试连接后执行返回 Session not found，已关闭本轮新建的无效会话；本轮没有再次替换或重启该测试节点，不能将此前真机验证当成本轮新增扩容错误分支的实证。没有操作其它节点，也没有执行本轮 commit/push。
+
+- 恢复复审补修：ZFS GUID/加密根/管理标记的读取异常与值不符分开；卸载/创建/分配/文件操作保留执行阶段和安全的系统错误，不再猜测 busy、身份变更或锁定。创建/解锁在属性读取失败后，先用成功的只读 imported-pool 清单确认是否缺池；清单失败或池已存在就停止，不能因查询失败创建文件或 import。安全命令仍不捕获 stderr，部分底层错误只能报告阶段和退出状态，不能据此断定设备/权限等具体原因。
+- 控制端 legacy keys/unlock 保留安全原因和节点 HTTP 状态（节点 401 对控制端映射 502，避免注销管理员会话）。异步 wait/cancel 继承原请求脱敏上下文，错误和进度先脱敏再截断；操作失败立即返回状态/原因，长等待与镜像导入不再吞错拖成超时。AbortSignal 取消及超时保留可识别名称，无效异步响应立即报格式错误；并发取消不覆盖已收到的明确节点错误。
+- 新增回归覆盖属性/管理标记读取失败零写、已确认缺池的导入、缺少命令、缺失设备、解锁 HTTP 状态和脱敏、直接/隧道 TLS 异步失败及截断边界、长等待不重试权限失败、进度脱敏、预取消/等待中取消和并发错误。最终检查结果以随后验证记录为准。当前重新查询 Netcatty，授权 bad 测试节点仍没有可用会话，未在其它主机替代执行。
+
+- 恢复复审后的最终验证通过：node-security 全套、storage-encryption 全套、operation-tasks（含新异步/取消/脱敏用例）、server type-check、控制仓库 make check、git diff --check；节点定制模块 race、最后追加用例后的 security race、真实 daemon TestPayIncusAuthenticatedRoute、daemon/实例/存储/security go vet、daemon 构建，以及 security 增量 golangci-lint 0 issues。只读复审完成，未执行本轮提交/推送/发布；本轮新增分支的 bad 真机替换与复测仍待连接恢复。
+
+
+## 2026-10-29 接入与锁定状态上报后续修复
+
+节点“测试”现在等待本次带相关 ID 的认证报告采集并写入成功；已补上部分失败/乱序采样/DB 失败的拒绝确认。全局锁定时只保留存储恢复身份上报，缺遥测的锁定 ZFS 池仍可打开解密入口，由节点重新核验。安装命令签发不再撤销现有 Agent 身份，未知 ID/真实禁用分别报错。详细契约、临时数据库与浏览器 fixture/真机证据见 [STORAGE_HEARTBEAT.md](STORAGE_HEARTBEAT.md)。此前本轮 Netcatty 未连接的记录仅对应当时；bad 后来已恢复连接并完成凭证修复及本轮程序备份替换，保留原全局锁，实际新心跳在线且锁定池身份已经落库。没有让此前的失败验证代替本轮收尾记录。

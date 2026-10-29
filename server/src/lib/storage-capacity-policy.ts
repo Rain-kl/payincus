@@ -4,6 +4,6 @@ export function storageHeadroomMB(totalMB: number): number {
 
 export function storageReportMaxAgeMs(report: unknown): number {
   const value = Number((report as { metrics?: { heartbeatIntervalSeconds?: number } } | null)?.metrics?.heartbeatIntervalSeconds)
-  const interval = Number.isFinite(value) && value >= 5 && value <= 3600 ? value : 10
+  const interval = Number.isFinite(value) && value >= 5 && value <= 3600 ? value : 5
   return Math.max(120000, interval * 3000)
 }

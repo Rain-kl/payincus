@@ -6,19 +6,20 @@ const bytes = (value: unknown): value is number => Number.isSafeInteger(value) &
 
 // Only update registered pools. Telemetry must never recreate a deleted pool or change its purpose.
 export async function processAgentStorageReport(hostId: number, payload: unknown, receivedAt = new Date()) {
-  if (!record(payload)) return
+  if (!record(payload)) return false
   const sampledAt = new Date(payload.reportedAt)
-  if (!Number.isFinite(sampledAt.getTime()) || sampledAt.getTime() > receivedAt.getTime() + 30000 || sampledAt.getTime() < receivedAt.getTime() - 120000) return
-  if (payload.available !== false && (payload.available !== true || !Array.isArray(payload.pools) || payload.pools.length > 256)) return
+  if (!Number.isFinite(sampledAt.getTime()) || sampledAt.getTime() > receivedAt.getTime() + 30000 || sampledAt.getTime() < receivedAt.getTime() - 120000) return false
+  if (payload.available !== false && (payload.available !== true || !Array.isArray(payload.pools) || payload.pools.length > 256)) return false
   const items = payload.available === true ? payload.pools as unknown[] : []
   const byName = new Map<string, Record<string, any>>()
   for (const item of items) {
-    if (!record(item) || typeof item.name !== 'string' || byName.has(item.name)) return
+    if (!record(item) || typeof item.name !== 'string' || byName.has(item.name)) return false
     byName.set(item.name, item)
   }
   const pools = await prisma.storagePool.findMany({ where: { hostId } })
+  let accepted = true
   for (const pool of pools) {
-    if (sampledAt < pool.createdAt || (pool.reportedAt && sampledAt <= pool.reportedAt)) continue
+    if (sampledAt < pool.createdAt || (pool.reportedAt && sampledAt <= pool.reportedAt)) { accepted = false; continue }
     const config: Record<string, any> = record(pool.config) ? pool.config as Record<string, any> : {}
     if (config._payincusDeletion) continue
     let item = byName.get(pool.name)
@@ -53,6 +54,7 @@ export async function processAgentStorageReport(hostId: number, payload: unknown
         manualLocked: item.encryption.manualLocked === true,
         lockPending: item.encryption.lockPending === true,
         pendingRecovery: Number.isSafeInteger(item.encryption.pendingRecovery) ? item.encryption.pendingRecovery : 0,
+        nodeLocked: item.encryption.nodeLocked === true,
         keyFormat: String(item.encryption.keyFormat || '').slice(0, 20)
       } : null
       // Never store arbitrary node fields (especially key material) in pool telemetry.
@@ -62,6 +64,8 @@ export async function processAgentStorageReport(hostId: number, payload: unknown
         filesystemId: typeof item.filesystemId === 'string' ? item.filesystemId.slice(0, 100) : null }
       if (record(item.config) && Object.values(item.config).every(v => typeof v === 'string')) data.config = { ...config, ...item.config } as Prisma.InputJsonObject
     }
-    await prisma.storagePool.updateMany({ where: { id: pool.id, createdAt: { lte: sampledAt }, OR: [{ reportedAt: null }, { reportedAt: { lt: sampledAt } }] }, data })
+    const updated = await prisma.storagePool.updateMany({ where: { id: pool.id, createdAt: { lte: sampledAt }, OR: [{ reportedAt: null }, { reportedAt: { lt: sampledAt } }] }, data })
+    if (updated.count !== 1 || data.status === 'unavailable' || data.status === 'missing') accepted = false
   }
+  return accepted
 }

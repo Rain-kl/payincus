@@ -228,10 +228,10 @@ async function refreshEncryption(hostId: number, generation: number) {
           encryption.value[pool.name] = state
           delete encryptionErrors.value[pool.name]
         }
-      } catch {
+      } catch (error: unknown) {
         if (generation === loadGeneration) {
           delete encryption.value[pool.name]
-          encryptionErrors.value[pool.name] = '尚未收到节点加密状态，请验证节点或等待心跳上报'
+          encryptionErrors.value[pool.name] = error instanceof Error ? error.message : '尚未收到节点加密状态，可点击节点测试立即上报，或直接解密核验'
         }
       }
     }))
@@ -557,13 +557,13 @@ async function submitEdit() {
 
             <!-- 使用者 -->
             <div v-if="pool.usedBy > 0" class="mt-2 text-xs text-themed-muted">
-              <span class="text-themed-secondary">{{ t('admin.hosts.storage.usedBy') }}:</span>
-              {{ pool.usedBy }} {{ t('admin.hosts.storage.volumes') }}
+              <span class="text-themed-secondary">关联资源:</span>
+              {{ pool.usedBy }} 项（包含镜像、实例及配置引用）
             </div>
           </div>
 
           <div class="flex items-center gap-2 ml-4">
-            <button v-if="encryption[pool.name]?.encrypted && (encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked || !!encryption[pool.name]?.pendingRecovery || !encryption[pool.name]?.keySaved)" class="btn-secondary btn-sm" :disabled="unlocking" @click="openUnlock(pool)">{{ encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked && encryption[pool.name]?.state === 'unlocked' ? '继续恢复实例' : encryption[pool.name]?.pendingImport && encryption[pool.name]?.state === 'unlocked' ? '继续导入' : encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked ? '解密磁盘' : '保存解锁密钥' }}</button>
+            <button v-if="pool.driver === 'zfs' && pool.status === 'locked' || encryption[pool.name]?.encrypted && (encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked || !!encryption[pool.name]?.pendingRecovery || !encryption[pool.name]?.keySaved)" class="btn-secondary btn-sm" :disabled="unlocking" @click="openUnlock(pool)">{{ encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked && encryption[pool.name]?.state === 'unlocked' ? '继续恢复实例' : encryption[pool.name]?.pendingImport && encryption[pool.name]?.state === 'unlocked' ? '继续导入' : pool.status === 'locked' || encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked ? '解密磁盘' : '保存解锁密钥' }}</button>
             <button v-if="encryption[pool.name]?.encrypted && !encryption[pool.name]?.pendingImport && encryption[pool.name]?.keySaved && (encryption[pool.name]?.state === 'unlocked' || encryption[pool.name]?.lockPending)" class="btn-secondary btn-sm" :disabled="encryption[pool.name]?.nodeLocked || locking || unlocking || !!encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked" @click="openLock(pool)">{{ encryption[pool.name]?.lockPending ? '重试锁盘' : '加密锁盘' }}</button>
             <!-- 编辑按钮 -->
             <button
@@ -580,7 +580,7 @@ async function submitEdit() {
             <button
               class="btn-danger btn-sm"
               :aria-label="`删除存储池 ${pool.name}`"
-              :disabled="deleting === pool.name || pool.usedBy > 0"
+              :disabled="deleting === pool.name"
               @click="deletePool(pool.name)"
             >
               <svg v-if="deleting === pool.name" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -985,9 +985,9 @@ async function submitEdit() {
     <DrawerModal :show="!!unlockTarget" title="解密存储磁盘" :closable="!unlocking" :close-on-backdrop="!unlocking" @close="closeUnlock">
       <form class="space-y-4" @submit.prevent="submitUnlock">
         <p class="text-sm text-themed">存储池：{{ unlockTarget?.name }}</p>
-        <p class="text-sm text-themed-muted">{{ unlockTarget && encryption[unlockTarget.name]?.keySaved ? '密钥已托管，可直接解锁；也可输入原密钥重新核验。' : '输入创建此加密卷时保存的密钥。校验并加载成功后，控制端加密保存密钥，后续可使用已保存的密钥解锁，无需重复输入。' }}</p>
+        <p class="text-sm text-themed-muted">{{ unlockTarget && !encryption[unlockTarget.name] ? '尚未收到加密状态，可直接提交尝试已托管密钥；如未托管，请输入原密钥。节点将重新核验加密根与密钥。' : unlockTarget && encryption[unlockTarget.name]?.keySaved ? '密钥已托管，可直接解锁；也可输入原密钥重新核验。' : '输入创建此加密卷时保存的密钥。校验并加载成功后，控制端加密保存密钥，后续可使用已保存的密钥解锁，无需重复输入。' }}</p>
         <label class="block text-sm text-themed">ZFS 密钥
-          <input v-model="unlockKey" class="input mt-1 w-full" type="password" autocomplete="off" spellcheck="false" :required="!!unlockTarget && !encryption[unlockTarget.name]?.keySaved" pattern="[0-9a-f]{64}" placeholder="64 位十六进制密钥" :disabled="unlocking" />
+          <input v-model="unlockKey" class="input mt-1 w-full" type="password" autocomplete="off" spellcheck="false" :required="!!unlockTarget && !!encryption[unlockTarget.name] && !encryption[unlockTarget.name]?.keySaved" pattern="[0-9a-f]{64}" placeholder="64 位十六进制密钥" :disabled="unlocking" />
         </label>
         <p v-if="unlockError" class="text-sm text-themed" role="alert">{{ unlockError }}</p>
         <p class="text-xs text-themed-muted">解密后将恢复本次锁盘前运行的相关实例。加载存储密钥不会解除节点安全锁定。</p>

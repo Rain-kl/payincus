@@ -108,7 +108,7 @@ const agentStatusError = ref('')
 let agentStatusRefreshTimer: ReturnType<typeof setInterval> | null = null
 let agentStatusRefreshIntervalMs = 0
 
-const defaultAgentRefreshSeconds = 30
+const defaultAgentRefreshSeconds = 5
 const minAgentRefreshSeconds = 5
 const maxAgentRefreshSeconds = 3600
 

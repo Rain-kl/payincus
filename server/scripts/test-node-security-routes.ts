@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import Fastify from 'fastify'
+import { IncusClient, IncusApiError } from '../src/lib/incus/incus-client.js'
 import routes from '../src/routes/node-security.js'
 import { prisma } from '../src/db/prisma.js'
 import { seal, fingerprint } from '../src/lib/node-security/vault.js'
@@ -10,7 +11,7 @@ const key = randomBytes(32).toString('hex')
 let row: any = null
 let audit = 0
 let failAudit = false
-Object.assign(prisma.host, { findUnique: async () => ({ id: 9 }) })
+Object.assign(prisma.host, { findUnique: async () => ({ id: 9, url: 'https://fixture.invalid:8443' }) })
 Object.assign(prisma.nodeStorageKey, {
   findUnique: async () => row,
   create: async ({ data }: any) => { row = { id: 1, version: 1, ...data }; return { id: row.id, version: row.version, dataset: row.dataset, fingerprint: row.fingerprint } }
@@ -46,6 +47,25 @@ const denied = await app.inject({ method: 'POST', url: base + '/keys/reveal', he
 assert.equal(denied.statusCode, 503)
 assert.equal(denied.body.includes(key), false)
 failAudit = false
+Object.assign(prisma.nodeSecurityState, { findUnique: async () => ({ serverFingerprint: 'a'.repeat(64) }) })
+const originalConnect = IncusClient.prototype.connect, originalClose = IncusClient.prototype.close, originalRequest = IncusClient.prototype.request
+IncusClient.prototype.connect = async () => ({} as any)
+IncusClient.prototype.close = async () => {}
+try {
+  for (const status of [401, 403, 409, 500]) {
+    IncusClient.prototype.request = async function (_method, path) {
+      if (path === '/1.0/payincus') return { api_extensions: ['payincus_security_v1'] } as any
+      throw new IncusApiError(`key loading permission denied: ${key}`, status)
+    }
+    const failed = await app.inject({ method: 'POST', url: base + '/keys/unlock', headers: { authorization: 'admin' }, payload: { dataset: 'tank/private' } })
+    assert.equal(failed.statusCode, status === 401 ? 502 : status)
+    assert.match(failed.json().error, /key loading permission denied: \[REDACTED\]/)
+    assert.equal(failed.body.includes(key), false)
+    assert.doesNotMatch(failed.json().error, /节点锁定状态|database disk image/)
+  }
+} finally {
+  IncusClient.prototype.connect = originalConnect; IncusClient.prototype.close = originalClose; IncusClient.prototype.request = originalRequest
+}
 row.ciphertext = seal(key, { hostId: 10, dataset: 'tank/private', version: 1 })
 assert.equal((await app.inject({ method: 'POST', url: base + '/keys/reveal', headers: { authorization: 'admin' }, payload: { dataset: 'tank/private' } })).statusCode, 409)
 assert.equal((await app.inject({ method: 'POST', url: base + '/keys', headers: { authorization: 'admin' }, payload: { dataset: 'tank/private', key } })).statusCode, 409)

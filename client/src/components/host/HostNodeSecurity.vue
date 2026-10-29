@@ -85,7 +85,7 @@ onUnmounted(() => { generation++; clearInterval(timer) })
   <section class="card p-5 space-y-4">
     <div>
       <h3 class="text-lg font-semibold text-themed">节点安全模式</h3>
-      <p class="text-sm text-themed-muted mt-1">所有受管 CLI 调用上报审计；安全模式默认关闭。关闭安全模式不会解除已有 API 锁定。</p>
+      <p class="text-sm text-themed-muted mt-1">所有受管 CLI 调用上报审计；安全模式默认关闭。</p>
     </div>
     <p v-if="error" class="text-sm text-themed" role="alert">{{ error }}</p>
     <p v-if="message" class="text-sm text-themed" role="status">{{ message }}</p>

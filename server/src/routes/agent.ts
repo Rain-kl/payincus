@@ -64,6 +64,7 @@ interface AgentHeartbeatBody {
   resources?: Record<string, unknown>
   metrics?: Record<string, unknown>
   storage?: Record<string, unknown>
+  heartbeatRequestId?: string
   nodeApi?: string
   nodeSecurity?: { state?: { locked?: boolean } }
   networkStatus?: Record<string, unknown>
@@ -92,7 +93,7 @@ export const caddyInstallRequested = new Set<number>()
 export const caddyUninstallRequested = new Set<number>()
 
 const maxAgentInstallUrlLength = 2048
-const defaultAgentHeartbeatIntervalSeconds = 10
+const defaultAgentHeartbeatIntervalSeconds = 5
 const minAgentHeartbeatIntervalSeconds = 5
 const maxAgentHeartbeatIntervalSeconds = 3600
 const minAgentOfflineThresholdSeconds = 120
@@ -443,7 +444,11 @@ async function authenticateAgentRequest(
     where: { agentId: headers.agentId }
   })
 
-  if (!agent || !agent.enabled) {
+  if (!agent) {
+    if (reply) reply.code(401).send({ error: 'Agent identity is not registered or has been rotated', code: 'AGENT_NOT_REGISTERED' })
+    return null
+  }
+  if (!agent.enabled) {
     if (reply) reply.code(401).send({ error: 'Agent is not enabled', code: 'AGENT_DISABLED' })
     return null
   }
@@ -833,6 +838,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
         type: 'object',
         additionalProperties: true,
         properties: {
+          heartbeatRequestId: { type: 'string', pattern: '^[0-9a-f-]{36}$' },
           version: { type: 'string', maxLength: 128 },
           capabilities: {
             type: 'array',
@@ -853,19 +859,28 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       return
     }
 
+    let reportError: string | undefined = '本次节点上报未完成，测试失败'
+    // Only authenticated, persisted reports can complete a waiting test.
+    reply.raw.once('finish', () => {
+      hostTunnelManager.completeHeartbeat(agent.hostId, request.body.heartbeatRequestId, reply.statusCode >= 400 ? '本次节点上报未能保存，测试失败' : reportError)
+    })
     if (request.body.nodeApi !== 'payincus_node_v1') return reply.code(409).send({ code: 'NODE_API_REQUIRED', error: 'Install the Incus node package' })
     const now = new Date()
     // Locked nodes remain online without turning an intentionally absent inventory into deletions.
     if (request.body.nodeSecurity?.state?.locked === true) {
       await agentModel.update({ where: { agentId: agent.agentId }, data: { status: 'online', version: sanitizeShortString(request.body.version, 128), capabilities: normalizeCapabilities(request.body.capabilities), lastSeenAt: now, lastHeartbeatIp: sanitizeShortString(getAgentHeartbeatIp(request), 128) } })
-      await prisma.storagePool.updateMany({ where: { hostId: agent.hostId }, data: { status: 'locked' } })
+      const storageAccepted = await processAgentStorageReport(agent.hostId, request.body.storage, now)
+      reportError = storageAccepted && request.body.storage?.available === true && request.body.storage?.collectionComplete === true ? undefined : '节点已连接，但锁定存储状态采集或保存未完成，测试失败'
       const connection = await prisma.host.findUnique({ where: { id: agent.hostId }, select: { tunnelEnabled: true, targetHost: true, targetPort: true } })
       return { ok: true, serverTime: now.toISOString(), tunnel: { enabled: connection?.tunnelEnabled === true || (Array.isArray(agent.capabilities) && agent.capabilities.includes('network-control')), targetHost: connection?.targetHost ?? '127.0.0.1', targetPort: connection?.targetPort ?? 8443 } }
     }
     let instanceReport: Awaited<ReturnType<typeof processAgentInstanceReport>> | null = null
+    let instancePersisted = true
+    let gpuPersisted = true
     try {
       instanceReport = await processAgentInstanceReport(agent.hostId, request.body.instances)
     } catch (error) {
+      instancePersisted = false
       request.log.warn(
         { agentId: agent.agentId, hostId: agent.hostId, error },
         'Failed to process Agent instance report'
@@ -885,12 +900,15 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     })
 
     await syncHostGpuReport(agent.hostId, request.body.resources?.nvidiaGpu).catch(error => {
+      gpuPersisted = false
       request.log.warn({ error, hostId: agent.hostId }, 'Failed to update NVIDIA GPU inventory')
     })
 
-    await processAgentStorageReport(agent.hostId, request.body.storage, now).catch(error => {
-      request.log.warn({ error, hostId: agent.hostId }, 'Failed to persist node storage report')
-    })
+    const storageAccepted = await processAgentStorageReport(agent.hostId, request.body.storage, now)
+    reportError = request.body.incus?.available !== true ? '节点已连接，但 Incus 状态采集失败，测试失败'
+      : !storageAccepted || request.body.storage?.available !== true || request.body.storage?.collectionComplete !== true ? '节点存储状态采集或保存失败，测试失败'
+      : !instancePersisted || request.body.instances?.available !== true || !instanceReport || instanceReport.errors > 0 ? '节点实例状态采集或保存失败，测试失败'
+      : !gpuPersisted || request.body.resources?.storageAvailable !== true ? '节点硬件状态采集或保存失败，测试失败' : undefined
 
     if (request.body.incus?.available === true) {
       await prisma.host.updateMany({ where: { id: agent.hostId, status: 'offline' }, data: { status: 'online' } })

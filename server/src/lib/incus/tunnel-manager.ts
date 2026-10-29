@@ -1,4 +1,5 @@
 import { requestNodeAPI, type NodeAPIRequester } from './payincus-node-api.js'
+import { randomUUID } from 'node:crypto'
 import { Duplex } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { decodeFrame, encodeFrame, TunnelFrameType } from './tunnel-protocol.js'
@@ -30,6 +31,15 @@ interface PendingControl {
   finish(error?: TunnelControlError, value?: unknown): void
 }
 
+export class HeartbeatTestError extends Error {
+  constructor(readonly statusCode: number, message: string) { super(message) }
+}
+interface PendingHeartbeat {
+  hostId: number
+  socket: WebSocketLike
+  finish(error?: HeartbeatTestError): void
+}
+
 /**
  * 宿主机反向 WebSocket 隧道管理器（单例）
  *
@@ -42,6 +52,7 @@ export class HostTunnelManager extends EventEmitter {
   private streamMap = new Map<string, Duplex>()
   private nextStreamId = 0
   private controlCapabilities = new Map<number, Set<string>>()
+  private pendingHeartbeats = new Map<string, PendingHeartbeat>()
   private pendingControls = new Map<string, PendingControl>()
 
   /**
@@ -148,6 +159,36 @@ export class HostTunnelManager extends EventEmitter {
     } catch { return false }
   }
 
+  // Completion comes only from the authenticated HTTP report after its writes finish.
+  requestHeartbeatAndWait(hostId: number, timeoutMs = 105000): Promise<void> {
+    const ws = this.activeTunnels.get(hostId)
+    if (!ws || ws.readyState !== WS_OPEN) return Promise.reject(new HeartbeatTestError(409, '节点连接不可用，上报测试失败'))
+    if (!this.controlCapabilities.get(hostId)?.has('heartbeat-confirm-v1')) return Promise.reject(new HeartbeatTestError(409, '节点版本不支持上报结果确认，请更新节点集成包'))
+    if ([...this.pendingHeartbeats.values()].some(item => item.hostId === hostId)) return Promise.reject(new HeartbeatTestError(409, '此节点正在执行上报测试，请等待结果'))
+    const requestId = randomUUID()
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => finish(new HeartbeatTestError(504, '等待本次节点上报超时，测试失败')), timeoutMs)
+      const finish = (error?: HeartbeatTestError) => {
+        if (!this.pendingHeartbeats.delete(requestId)) return
+        clearTimeout(timer)
+        if (error) reject(error); else resolve()
+      }
+      this.pendingHeartbeats.set(requestId, { hostId, socket: ws, finish })
+      try {
+        ws.send(encodeFrame(TunnelFrameType.HEARTBEAT, 0, Buffer.from(JSON.stringify({ requestId }))), error => {
+          if (error) finish(new HeartbeatTestError(502, '无法发送本次上报请求，测试失败'))
+        })
+      } catch { finish(new HeartbeatTestError(502, '无法发送本次上报请求，测试失败')) }
+    })
+  }
+
+  completeHeartbeat(hostId: number, requestId: unknown, error?: string): void {
+    if (typeof requestId !== 'string') return
+    const pending = this.pendingHeartbeats.get(requestId)
+    if (!pending || pending.hostId !== hostId || this.activeTunnels.get(hostId) !== pending.socket) return
+    pending.finish(error ? new HeartbeatTestError(502, error) : undefined)
+  }
+
   supportsControl(hostId: number, _method: ControlMethod): boolean {
     return this.isTunnelOnline(hostId) && this.controlCapabilities.get(hostId)?.has('payincus_node_v1') === true
   }
@@ -192,6 +233,7 @@ export class HostTunnelManager extends EventEmitter {
 
   private cleanupHostControls(hostId: number): void {
     this.controlCapabilities.delete(hostId)
+    for (const pending of [...this.pendingHeartbeats.values()]) if (pending.hostId === hostId) pending.finish(new HeartbeatTestError(502, '节点连接已断开，上报测试失败'))
     for (const pending of [...this.pendingControls.values()]) if (pending.hostId === hostId) pending.finish(new TunnelControlError('DISCONNECTED'))
   }
 
@@ -339,7 +381,7 @@ export class HostTunnelManager extends EventEmitter {
         if (streamId !== 0 || payload.length > 4096) break
         try {
           const hello = JSON.parse(payload.toString('utf8'))
-          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'payincus_node_v1' || v === 'heartbeat-trigger-v1') : [])
+          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'payincus_node_v1' || v === 'heartbeat-trigger-v1' || v === 'heartbeat-confirm-v1') : [])
           const firstHello = !this.controlCapabilities.has(hostId)
           this.controlCapabilities.set(hostId, capabilities)
           if (firstHello && capabilities.has('payincus_node_v1')) this.emit('control_ready', hostId)

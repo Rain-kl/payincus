@@ -14,7 +14,7 @@ export async function storedStoragePools(hostId: number) {
     const config = (pool.config || {}) as Record<string, any>
     return { name: pool.name, driver: pool.driver, description: pool.description || '', purpose: pool.purpose,
       config: { ...config, ...(telemetry?.backing?.sizeBytes ? { size: `${telemetry.backing.sizeBytes / 1024 ** 3}GiB` } : {}) },
-      status: pool.status === 'ready' && (!services.get(hostId)?.available || !pool.reportedAt || Date.now() - pool.reportedAt.getTime() > storageReportMaxAgeMs(agent?.lastReport)) ? 'unavailable' : pool.status,
+      status: services.get(hostId)?.status === 'locked' ? 'locked' : pool.status === 'ready' && (!services.get(hostId)?.available || !pool.reportedAt || Date.now() - pool.reportedAt.getTime() > storageReportMaxAgeMs(agent?.lastReport)) ? 'unavailable' : pool.status,
       pendingImport: !!config._payincusImport, usedBy: telemetry?.usedBy || 0,
       reportedAt: pool.reportedAt?.toISOString() || null,
       space: pool.totalBytes > 0n ? { total: Number(pool.totalBytes), used: Number(pool.usedBytes) } : null }

@@ -43,6 +43,38 @@ await runOperationTask(1, 'progress-vm', 'create', async () => {
 })
 assert(logs.some(log => /download_progress: 50%/.test(log.message)))
 assert(!logs.some(log => /must-not-log/.test(log.message)))
+const progressSecret = 'fixture-private-progress-material'
+await runOperationTask(1, 'redacted-progress', 'create', async () => {
+  await waitForOperation({ request: async () => ({ status: 'Success', status_code: 200, description: `progress ${progressSecret}`, metadata: { progress: 'x'.repeat(990) + progressSecret } }) } as any, '/1.0/operations/redaction', 1000, undefined, { key: progressSecret })
+})
+assert(!logs.some(log => log.message.includes(progressSecret) || log.message.includes('fixture-pr')), 'progress was truncated before key redaction')
+for (const name of ['AbortError', 'TimeoutError']) {
+  for (const alreadyAborted of [false, true]) {
+    const controller = new AbortController()
+    const reason = new DOMException(`fixture stop ${progressSecret}`, name)
+    let calls = 0
+    if (alreadyAborted) controller.abort(reason)
+    await assert.rejects(waitForOperation({ request: async () => {
+      calls++
+      controller.abort(reason)
+      throw new DOMException('request aborted', 'AbortError')
+    } } as any, '/abort', 1000, controller.signal, { key: progressSecret }), (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.equal(error.name, name)
+      assert.equal(error.message, 'fixture stop [REDACTED]')
+      return true
+    })
+    assert.equal(calls, alreadyAborted ? 0 : 1)
+  }
+}
+await assert.rejects(waitForOperation({ request: async () => ({}) } as any, '/invalid', 1000), /节点异步操作响应格式无效/)
+const { IncusApiError } = await import('../src/lib/incus/incus-error.js')
+const concurrentAbort = new AbortController()
+await assert.rejects(waitForOperation({ request: async () => {
+  concurrentAbort.abort()
+  throw new IncusApiError('node permission denied', 403)
+} } as any, '/concurrent-abort', 1000, concurrentAbort.signal), (error: unknown) => error instanceof IncusApiError && error.statusCode === 403 && error.message === 'node permission denied')
+
 // Reset only test fixtures before the parallel isolation checks.
 tasks.length = 0; logs.length = 0; nextTask = 0; nextLog = 0
 await Promise.all([

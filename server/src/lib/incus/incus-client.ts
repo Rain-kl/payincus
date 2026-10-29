@@ -4,6 +4,7 @@
  */
 
 import { Agent, request } from 'undici'
+import { IncusApiError } from './incus-error.js'
 import { connectPinned } from '../node-security/transport.js'
 import { readFileSync } from 'fs'
 import tls from 'node:tls'
@@ -16,29 +17,7 @@ import { waitForOperation } from './incus-utils.js'
 import { resolveCertificatePair } from './certificate-paths.js'
 import { hostTunnelManager } from './tunnel-manager.js'
 
-// A certificate pin authenticates the node; it does not imply that node security is locked.
-export class IncusApiError extends Error {
-  readonly statusCode: number
-  constructor(message: string, statusCode: number, body?: unknown) {
-    let detail = message
-    const redact = (value: unknown, depth: number) => {
-      if (!value || typeof value !== 'object' || depth > 5) return
-      for (const [name, item] of Object.entries(value)) {
-        if (/key|password|secret|token|credential/i.test(name) && typeof item === 'string' && item) detail = detail.split(item).join('[REDACTED]')
-        else if (item && typeof item === 'object') redact(item, depth + 1)
-      }
-    }
-    redact(body, 0)
-    super(detail.slice(0, 4096))
-    this.name = 'IncusApiError'
-    this.statusCode = statusCode >= 400 && statusCode <= 599 ? statusCode : 502
-  }
-}
-
-export function nodeErrorDetail(error: unknown, fallback: string, body?: unknown): string {
-  const message = error instanceof Error ? error.message : fallback
-  return new IncusApiError(message || fallback, 500, body).message
-}
+export { IncusApiError, nodeErrorDetail } from './incus-error.js'
 
 export class IncusClient {
   baseUrl: string
@@ -175,9 +154,9 @@ export class IncusClient {
 
   /**
    * 发送 API 请求
-   * @param timeout 异步操作的超时时间（毫秒），默认 120 秒。对于长时间操作（如复制实例），建议使用 300000（5分钟）
+   * @param timeout 异步操作的超时时间（毫秒），默认 30 分钟
    */
-  async request<T = unknown>(method: string, path: string, body: unknown = null, timeout: number = 30 * 60 * 1000, signal?: AbortSignal): Promise<T> {
+  async request<T = unknown>(method: string, path: string, body: unknown = null, timeout: number = 30 * 60 * 1000, signal?: AbortSignal, errorBody: unknown = body): Promise<T> {
     if (!this.agent) {
       throw new Error('Incus 客户端未连接')
     }
@@ -210,18 +189,18 @@ export class IncusClient {
     try {
       data = JSON.parse(text) as IncusApiResponse<T>
     } catch {
-      throw new IncusApiError(text.trim() || `节点 API 返回了非 JSON 响应（HTTP ${response.statusCode}）`, response.statusCode >= 400 ? response.statusCode : 502, body)
+      throw new IncusApiError(text.trim() || `节点 API 返回了非 JSON 响应（HTTP ${response.statusCode}）`, response.statusCode >= 400 ? response.statusCode : 502, errorBody)
     }
 
-    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new IncusApiError('节点 API 响应格式无效', 502, body)
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new IncusApiError('节点 API 响应格式无效', 502, errorBody)
 
     if (response.statusCode >= 400 || data.type === 'error') {
-      throw new IncusApiError(typeof data.error === 'string' && data.error ? data.error : `Incus API HTTP ${response.statusCode}`, response.statusCode >= 400 ? response.statusCode : data.error_code || 502, body)
+      throw new IncusApiError(typeof data.error === 'string' && data.error ? data.error : `Incus API HTTP ${response.statusCode}`, response.statusCode >= 400 ? response.statusCode : data.error_code || 502, errorBody)
     }
 
     // 异步操作需要等待完成
     if (data.type === 'async' && data.operation) {
-      return await waitForOperation(this, data.operation, timeout, signal) as T
+      return await waitForOperation(this, data.operation, timeout, signal, errorBody) as T
     }
 
     return (data.metadata || data) as T
