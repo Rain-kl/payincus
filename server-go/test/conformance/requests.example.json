@@ -1,0 +1,19 @@
+[
+  { "name": "health", "method": "GET", "path": "/api/health" },
+  { "name": "announcements-anon", "method": "GET", "path": "/api/announcements" },
+  { "name": "announcements-anon-bad-id", "method": "GET", "path": "/api/announcements/0" },
+  {
+    "name": "demo-read-only-blocks-post",
+    "method": "POST",
+    "path": "/api/users",
+    "headers": { "Host": "demo.payincus.com" },
+    "body": {}
+  },
+  { "name": "unknown-api-route", "method": "GET", "path": "/api/does-not-exist" },
+  {
+    "name": "announcements-authenticated",
+    "method": "GET",
+    "path": "/api/announcements?page=1&pageSize=20",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]
