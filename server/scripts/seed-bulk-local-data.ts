@@ -210,7 +210,7 @@ const SHARED_PASSWORD = 'BulkSeed123!'
 const LOCAL_PASSWORD_SALT = '$2a$10$1234567890123456789012'
 const TODAY = new Date()
 
-const avatarStyles = ['bigSmile', 'croodles', 'notionists', 'lorelei']
+const avatarStyles = ['initials', '']
 const countries = ['us', 'sg', 'jp', 'de', 'nl', 'au']
 const cities = ['Los Angeles', 'Singapore', 'Tokyo', 'Frankfurt', 'Amsterdam', 'Sydney']
 const containerImages = [

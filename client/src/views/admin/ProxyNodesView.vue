@@ -13,7 +13,7 @@ const content = ref(''), subscriptionUrl = ref(''), source = ref('content'), bus
 const requestedHost = Number(route.query.hostId)
 const probeHost = ref(Number.isSafeInteger(requestedHost) && requestedHost > 0 ? requestedHost : 0)
 const probeUrl = ref('https://1.1.1.1/cdn-cgi/trace')
-const testing = ref(false), showImport = ref(false), tab = ref<'nodes' | 'profiles'>('nodes')
+const testing = ref(false), showImport = ref(false), tab = ref<'nodes' | 'profiles' | 'settings'>('nodes')
 const allSelected = computed(() => nodes.value.length > 0 && nodes.value.every(node => selected.value.includes(node.id)))
 const latency = computed(() => new Map(probeResult.value?.items.map(item => [item.nodeId, item]) ?? []))
 function toggleAll() { selected.value = allSelected.value ? [] : nodes.value.map(node => node.id) }
@@ -92,9 +92,20 @@ onUnmounted(deactivate)
 <template>
   <div class="space-y-6">
     <header><h1 class="text-2xl font-semibold text-themed">{{ t('egress.pageTitle') }}</h1><p class="mt-1 text-sm text-themed-muted">{{ t('egress.pageDescription') }}</p></header>
-    <div class="flex gap-3 border-b border-themed pb-3" role="tablist"><button type="button" role="tab" :aria-selected="tab === 'nodes'" :class="tab === 'nodes' ? 'btn-primary' : 'btn-secondary'" @click="tab = 'nodes'">{{ t('egress.proxyNodes') }}</button><button type="button" role="tab" :aria-selected="tab === 'profiles'" :class="tab === 'profiles' ? 'btn-primary' : 'btn-secondary'" @click="tab = 'profiles'">{{ t('packageEgress.profiles') }}</button></div>
+    <div class="border-b border-themed overflow-x-auto">
+      <nav class="flex flex-nowrap gap-1 sm:gap-2 min-w-max" role="tablist">
+        <button type="button" role="tab" :aria-selected="tab === 'nodes'" :class="['-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors', tab === 'nodes' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed']" @click="tab = 'nodes'">{{ t('egress.proxyNodes') }}</button>
+        <button type="button" role="tab" :aria-selected="tab === 'profiles'" :class="['-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors', tab === 'profiles' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed']" @click="tab = 'profiles'">{{ t('packageEgress.profiles') }}</button>
+        <button type="button" role="tab" :aria-selected="tab === 'settings'" :class="['-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors', tab === 'settings' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed']" @click="tab = 'settings'">{{ t('egress.settings') }}</button>
+      </nav>
+    </div>
     <p v-if="error && !showImport" class="text-error break-words" role="alert">{{ error }}</p>
     <EgressProfilesPanel v-if="tab === 'profiles'" :nodes="nodes" />
+    <section v-else-if="tab === 'settings'" class="card space-y-4 p-5 sm:p-6">
+      <h2 class="font-semibold text-themed">{{ t('egress.settings') }}</h2>
+      <label class="flex flex-wrap items-center gap-3 text-sm text-themed-secondary">{{ t('egress.probeUrl') }}<input v-model="probeUrl" :disabled="testing" class="input flex-1" type="url" /></label>
+      <p class="text-xs text-themed-muted">{{ t('egress.probeUrlHint') }}</p>
+    </section>
     <section v-else class="card space-y-4 p-5 sm:p-6">
       <div class="flex flex-wrap items-center gap-3">
         <h2 class="mr-auto font-semibold text-themed">{{ t('egress.proxyNodes') }}</h2>
@@ -102,7 +113,6 @@ onUnmounted(deactivate)
         <button class="btn-secondary" :disabled="busy || testing || !selected.length || !probeHost" @click="probe">{{ t(testing ? 'egress.testing' : 'egress.testSelected') }}</button>
         <button class="btn-primary" :disabled="busy || testing" @click="showImport = true">{{ t('egress.importNodes') }}</button>
       </div>
-      <label class="flex flex-wrap items-center gap-3 text-sm text-themed-secondary">{{ t('egress.probeUrl') }}<input v-model="probeUrl" :disabled="testing" class="input flex-1" type="url" /></label>
       <p v-if="!nodes.length" class="text-sm text-themed-muted">{{ t('egress.noNodes') }}</p>
       <div v-else class="overflow-hidden"><table class="w-full table-fixed text-sm"><thead><tr class="border-b border-themed text-left"><th class="w-[6%] py-3"><input type="checkbox" :checked="allSelected" :disabled="testing" :aria-label="t('packageEgress.selectAll')" @change="toggleAll" /></th><th class="w-[25%]">{{ t('packageEgress.name') }}</th><th class="w-[16%]">{{ t('egress.protocol') }}</th><th class="w-[28%]">{{ t('packageEgress.endpoint') }}</th><th class="w-[15%]">{{ t('packageEgress.latency') }}</th><th class="w-[10%] text-right">{{ t('common.actions') }}</th></tr></thead><tbody><tr v-for="node in nodes" :key="node.id" class="border-b border-themed"><td class="py-4"><input v-model="selected" type="checkbox" :disabled="testing" :value="node.id" :aria-label="node.name" /></td><td class="break-words font-medium pr-2">{{ node.name }}</td><td class="break-words pr-2">{{ node.protocol }}</td><td class="break-all pr-2">{{ node.server }}:{{ node.port }}</td><td class="break-words pr-2" aria-live="polite"><span v-if="testing && selected.includes(node.id) && !latency.has(node.id)" class="text-themed-muted">{{ t('egress.testing') }}</span><span v-else-if="latency.has(node.id)" :class="latency.get(node.id)!.success ? 'text-success' : 'text-error'" :title="latency.get(node.id)?.errorDetail">{{ latency.get(node.id)!.success ? `${latency.get(node.id)!.latencyMs} ms` : latency.get(node.id)!.error }}</span><span v-else class="text-themed-muted">—</span></td><td class="text-right"><button class="btn-ghost text-error" :disabled="busy || testing" @click="remove(node.id)">{{ t('common.delete') }}</button></td></tr></tbody></table></div>
       <p class="text-xs text-themed-muted">{{ t('egress.probeHint') }}</p>

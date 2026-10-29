@@ -16,15 +16,8 @@ const toast = useToast()
 const userDetails = ref<User | null>(null)
 const loading = ref<boolean>(true)
 
-// 头像风格相关 - 所有可用风格
-const avatarStyles = [
-  'adventurer', 'adventurerNeutral', 'avataaars', 'avataaarsNeutral',
-  'bigEars', 'bigEarsNeutral', 'bigSmile', 'bottts', 'botttsNeutral',
-  'croodles', 'croodlesNeutral', 'dylan', 'funEmoji', 'glass', 'icons',
-  'identicon', 'initials', 'lorelei', 'loreleiNeutral', 'micah', 'miniavs',
-  'notionists', 'notionistsNeutral', 'openPeeps', 'personas', 'pixelArt',
-  'pixelArtNeutral', 'rings', 'shapes', 'thumbs'
-] as const
+// 头像风格相关 - 仅保留默认头像与首字母风格
+const avatarStyles = ['initials'] as const
 
 const selectedAvatarStyle = ref<string>(authStore.user?.avatarStyle || '')
 const savingAvatar = ref(false)

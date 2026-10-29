@@ -28,37 +28,9 @@ onMounted(() => {
 })
 
 // 风格名称映射：camelCase -> kebab-case (DiceBear API 格式)
+// 仅保留 initials（首字母）风格，其余卡通风格已下线，历史值统一回落到默认头像
 const styleNameMap: Record<string, string> = {
-  adventurer: 'adventurer',
-  adventurerNeutral: 'adventurer-neutral',
-  avataaars: 'avataaars',
-  avataaarsNeutral: 'avataaars-neutral',
-  bigEars: 'big-ears',
-  bigEarsNeutral: 'big-ears-neutral',
-  bigSmile: 'big-smile',
-  bottts: 'bottts',
-  botttsNeutral: 'bottts-neutral',
-  croodles: 'croodles',
-  croodlesNeutral: 'croodles-neutral',
-  dylan: 'dylan',
-  funEmoji: 'fun-emoji',
-  glass: 'glass',
-  icons: 'icons',
-  identicon: 'identicon',
-  initials: 'initials',
-  lorelei: 'lorelei',
-  loreleiNeutral: 'lorelei-neutral',
-  micah: 'micah',
-  miniavs: 'miniavs',
-  notionists: 'notionists',
-  notionistsNeutral: 'notionists-neutral',
-  openPeeps: 'open-peeps',
-  personas: 'personas',
-  pixelArt: 'pixel-art',
-  pixelArtNeutral: 'pixel-art-neutral',
-  rings: 'rings',
-  shapes: 'shapes',
-  thumbs: 'thumbs'
+  initials: 'initials'
 }
 
 // 预设高辨识度与优雅质感背景色盘
