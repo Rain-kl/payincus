@@ -1,0 +1,56 @@
+[
+  { "name": "vip-levels-me-anon", "method": "GET", "path": "/api/vip-levels/me" },
+  { "name": "vip-levels-admin-get-anon", "method": "GET", "path": "/api/admin/vip-levels/user" },
+  {
+    "name": "vip-levels-admin-put-anon",
+    "method": "PUT",
+    "path": "/api/admin/vip-levels/user",
+    "body": { "rules": [], "userMetric": "totalRecharge" }
+  },
+  {
+    "name": "vip-levels-me",
+    "method": "GET",
+    "path": "/api/vip-levels/me",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "vip-levels-admin-get-invalid-type",
+    "method": "GET",
+    "path": "/api/admin/vip-levels/host",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "vip-levels-admin-get",
+    "method": "GET",
+    "path": "/api/admin/vip-levels/user",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "vip-levels-admin-put-invalid-type",
+    "method": "PUT",
+    "path": "/api/admin/vip-levels/host",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "rules": [], "userMetric": "totalRecharge" }
+  },
+  {
+    "name": "vip-levels-admin-put-missing-metric",
+    "method": "PUT",
+    "path": "/api/admin/vip-levels/user",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "rules": [] }
+  },
+  {
+    "name": "vip-levels-admin-put-invalid-metric",
+    "method": "PUT",
+    "path": "/api/admin/vip-levels/user",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "rules": [], "userMetric": "nope" }
+  },
+  {
+    "name": "vip-levels-admin-put-non-object-body",
+    "method": "PUT",
+    "path": "/api/admin/vip-levels/user",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  }
+]
