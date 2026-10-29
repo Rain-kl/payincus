@@ -26,6 +26,10 @@ func NewRouter() *gin.Engine {
 	// Fastify does not redirect trailing slashes; keep Gin's behaviour identical.
 	router.RedirectTrailingSlash = false
 
+	// fastify request.ip is trust-proxy aware, so every consumer of the caller IP
+	// must resolve it the same way. Turnstile needs it for Cloudflare's siteverify.
+	lib.SetTurnstileClientIPResolver(middleware.ClientIP)
+
 	router.Use(
 		middleware.Recovery(),
 		middleware.CORS(lib.GetCorsOrigins()),

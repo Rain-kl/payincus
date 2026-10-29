@@ -24,12 +24,21 @@
 | 对拍工具 | `server-go/test/conformance/` | **双跑对拍**：Node 与 Go 连同一 DB，逐请求 diff 状态码与 JSON |
 | 单元测试 | `src/lib/lib_test.go`、`src/models/models_test.go`、`src/app_test.go` | 错误目录/脱敏/demo/限流/模型计数/健康检查/鉴权/404 |
 | **Wave 1 地基（已完成）** | `src/lib/log_localization.go`、`src/lib/risk_audit.go`、`src/db/logs.go`、`src/db/advisory_locks.go`、`src/db/system_config.go`、`src/lib/config_cache.go`、`src/db/balance.go`、`src/lib/operation_verification.go` | 共享地基 + 单测（`go test ./...` 全绿） |
+| **Wave 2 地基（已完成）** | `src/lib/security.go`（1753 行，含 AES-GCM 加解密/2FA/登录锁/审计/refresh token）、`src/lib/security_config.go`、`src/lib/runtime_settings.go`、`src/lib/turnstile.go`、`src/lib/distributed_lock.go`、`src/lib/outbound_security.go`、`src/lib/public_api_auth.go` | 鉴权与安全地基，`go test -race ./...` 全绿 |
+| **Wave 2 首批模块（已完成）** | `src/services/vip_levels.go` + `src/routes/vip_levels.go`、`src/db/images.go` + `src/routes/images.go`、`src/db/terminal_saved_commands.go` + `src/routes/terminal_saved_commands.go` | 端到端路由模块，含对拍用例 |
+
+### 已确认的关键事实（勿再重复踩）
+
+- **Fastify AJV 默认值**（`@fastify/ajv-compiler/lib/default-ajv-options.js`，已实测核对）：`coerceTypes:'array'`、`useDefaults:true`、`removeAdditional:true`、`allErrors:false`。含义：**未知字段被静默丢弃而非报错**、标量会被字符串化、单元素数组会解包、**只报第一个校验错误**。带 `schema.body` 的路由必须复刻这套语义（见 `routes/terminal_saved_commands.go`）。
+- **AES-GCM 互通已实证**：key=`sha256(ENCRYPTION_KEY || (prod ? "" : JWT_SECRET || 'default-encryption-key'))`，16B IV，密文 `iv:tag:ct`（hex）；Go 加密 → Node 解密已实测通过。
+- **TOTP/otpauth URI 已实测比对** otplib v12（`window:0`，拒绝上一周期令牌）。
 
 ### 待接线 / 已知缺口（下一步）
 
 - `lib/mailer.go`、`lib/notifier.go` 未移植 → `lib/operation_verification.go` 预留了 `OperationVerificationEmailSender` / `OperationVerificationNotificationSender` seam（默认返回显式失败，不静默成功），落地后由主程接线。
-- `lib/invite_pricing.go` 待办（依赖 `db/advisory_locks.go` + `db/system_config.go`，二者已就绪，可直接开工）。
-- `lib/operation_verification.go` 内有一份**未导出的** advisory-lock 副本，待与 `db.AdvisoryTransactionLockString` 归一（签名从 `*gorm.DB` 改为 `pgx.Tx`）。
+- `lib/invite_pricing.go` 待办（依赖 `db/advisory_locks.go` + `db/system_config.go`，二者已就绪）。
+- `lib/operation_verification.go` 内有一份**未导出的** advisory-lock 副本，待与 `db.AdvisoryTransactionLockString` 归一。
+- `vip-levels` 的每路由限流（60/30/20 per minute）在 TS 里是路由内联声明，**不在** `config/rate-limit.ts`，所以 Go 侧目前只受全局 300/min 约束——需在 `app.go` 的路由注册处按 TS 补齐。
 - 静态托管（生产 `SERVE_STATIC_CLIENT`：index.html / 预览机器人降级 / 缓存头）尚未移植。
 
 **参考模块就是「翻译模板」**：新增模块请照 `announcements` 的四层结构写（route → db → 复用 lib/middleware）。
