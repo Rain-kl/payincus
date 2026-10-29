@@ -846,10 +846,14 @@ func RegisterGiftCards(r *gin.Engine) {
 		if !requireGiftCardManager(c) {
 			return
 		}
-		ids, valid, status, message := decodeGiftCardIDList(c)
+		ids, valid, status, ajvMessage, bodyMessage := decodeGiftCardIDList(c)
 		if !valid {
 			if status != 0 {
-				c.JSON(status, gin.H{"error": message})
+				c.JSON(status, gin.H{"error": bodyMessage})
+				return
+			}
+			if ajvMessage != "" {
+				respondAJVValidation(c, ajvMessage)
 				return
 			}
 			lib.RespondAPIError(c, http.StatusBadRequest, lib.ErrInvalidParams, "Invalid ids")
@@ -868,10 +872,14 @@ func RegisterGiftCards(r *gin.Engine) {
 		if !requireGiftCardManager(c) {
 			return
 		}
-		ids, valid, status, message := decodeGiftCardIDList(c)
+		ids, valid, status, ajvMessage, bodyMessage := decodeGiftCardIDList(c)
 		if !valid {
 			if status != 0 {
-				c.JSON(status, gin.H{"error": message})
+				c.JSON(status, gin.H{"error": bodyMessage})
+				return
+			}
+			if ajvMessage != "" {
+				respondAJVValidation(c, ajvMessage)
 				return
 			}
 			lib.RespondAPIError(c, http.StatusBadRequest, lib.ErrInvalidParams, "Invalid ids")
@@ -1166,61 +1174,67 @@ func ajvQueryBoolean(raw string) (bool, bool) {
 }
 
 // decodeGiftCardIDList decodes and validates the `{ ids: number[] }` body shared
-// by batch-disable / batch-delete.
+// by batch-disable / batch-delete against the real schema:
 //
-// Return contract:
-//   - (ids, true, 0, "")      → proceed
-//   - (nil, false, 0, "")     → the AJV response was already written (the ids
-//     array is structurally invalid, or normalizeIdList rejected it → callers
-//     answer 400 INVALID_PARAMS 'Invalid ids')
-//   - (nil, false, status,msg) → body-parser error, caller writes { error: msg }
-func decodeGiftCardIDList(c *gin.Context) ([]int32, bool, int, string) {
-	decoded, status, message := readGiftCardJSONBody(c)
+//	ids: { type: 'array', items: { type: 'integer', minimum: 1 }, minItems: 1, maxItems: 500 }
+//
+// Return contract — the AJV branch returns the message instead of writing a
+// response, because the caller has to choose between the AJV envelope and the
+// INVALID_PARAMS one:
+//   - (ids, true, 0, "", "")        → proceed
+//   - (nil, false, 0, msg, "")      → AJV validation failure → 400 {error: msg,
+//     code: VALIDATION_ERROR} via respondAJVValidation
+//   - (nil, false, status, "", msg) → body-parser error → caller writes {error: msg}
+//
+// The previous version wrote the AJV response inline AND returned "not valid",
+// so the caller appended a second INVALID_PARAMS envelope to the same socket
+// (two concatenated JSON objects). The dual-run harness caught it.
+func decodeGiftCardIDList(c *gin.Context) (ids []int32, valid bool, status int, ajvMessage string, bodyMessage string) {
+	decoded, status, bodyMessage := readGiftCardJSONBody(c)
 	if status != 0 {
-		return nil, false, status, message
+		return nil, false, status, "", bodyMessage
 	}
 
 	object, ok := decoded.(map[string]any)
 	if !ok {
-		respondAJVValidation(c, "must be object")
-		return nil, false, 0, ""
+		return nil, false, 0, "must be object", ""
 	}
 	rawIDs, present := object["ids"]
 	if !present {
-		respondAJVValidation(c, "ids is required")
-		return nil, false, 0, ""
+		return nil, false, 0, "ids is required", ""
 	}
-	array, ok := rawIDs.([]any)
-	if !ok {
-		respondAJVValidation(c, "must be array")
-		return nil, false, 0, ""
+
+	// AJV's coerceTypes:'array' wraps a bare scalar into a one-element array, so
+	// {"ids":"x"} reports "must be integer" rather than "must be array"
+	// (verified against the live Node server).
+	array, isArray := rawIDs.([]any)
+	if !isArray {
+		array = []any{rawIDs}
 	}
+
 	if len(array) < 1 {
-		respondAJVValidation(c, "must NOT have fewer than 1 items")
-		return nil, false, 0, ""
+		return nil, false, 0, "must NOT have fewer than 1 items", ""
 	}
 	if len(array) > db.GiftCardMaxBatchCount {
-		respondAJVValidation(c, "must NOT have more than 500 items")
-		return nil, false, 0, ""
+		return nil, false, 0, "must NOT have more than 500 items", ""
 	}
 	for _, item := range array {
 		number, ok := ajvIntegerValue(item)
 		if !ok {
-			respondAJVValidation(c, "must be integer")
-			return nil, false, 0, ""
+			return nil, false, 0, "must be integer", ""
 		}
 		if number < 1 {
-			respondAJVValidation(c, "must be >= 1")
-			return nil, false, 0, ""
+			return nil, false, 0, "must be >= 1", ""
 		}
 	}
 
-	ids, ok := normalizeGiftCardIDList(rawIDs)
+	ids, ok = normalizeGiftCardIDList(array)
 	if !ok {
-		// Structurally fine but rejected by normalizeIdList (duplicates/overflow).
-		return nil, false, 0, ""
+		// Structurally valid but rejected by normalizeIdList: duplicates, or an
+		// id beyond int32 (Prisma would raise P2020). Node answers INVALID_PARAMS.
+		return nil, false, 0, "", ""
 	}
-	return ids, true, 0, ""
+	return ids, true, 0, "", ""
 }
 
 func init() {

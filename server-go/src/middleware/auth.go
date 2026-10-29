@@ -95,17 +95,51 @@ func verifyAndActivate(c *gin.Context) *lib.AccessTokenClaims {
 	return claims
 }
 
+// continueAfterAuth runs Fastify's body-parser rules and then the handler chain.
+//
+// Ordering is measurable and must not be swapped: in Fastify, `onRequest` (auth)
+// runs BEFORE the body parser, so an unauthenticated request gets 401 even when
+// its JSON body is empty or malformed, and even with an unsupported Content-Type.
+// Only once auth has succeeded does the parser run and produce 400/413/415.
+//
+// A route may stack auth layers (Authenticate followed by RequireAdmin), and the
+// body must only be parsed after the LAST of them: an authenticated non-admin
+// hitting an admin route must still get 403 ADMIN_REQUIRED, not a body error.
+// bodyValidated records that the parse already happened so the second layer does
+// not consume the body again.
+func continueAfterAuth(c *gin.Context) {
+	if validated, ok := c.Get(contextBodyValidatedKey); ok && validated == true {
+		c.Next()
+		return
+	}
+	if status, message := ValidateFastifyBody(c); status != 0 {
+		AbortFastifyBody(c, status, message)
+		return
+	}
+	c.Set(contextBodyValidatedKey, true)
+	c.Next()
+}
+
+// contextBodyValidatedKey marks a request whose body already passed the Fastify
+// body-parser rules.
+const contextBodyValidatedKey = "fastifyBodyValidated"
+
 // Authenticate mirrors app.authenticate.
 func Authenticate() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if verifyAndActivate(c) == nil {
 			return
 		}
-		c.Next()
+		continueAfterAuth(c)
 	}
 }
 
 // RequireAdmin mirrors app.requireAdmin (must run after Authenticate).
+//
+// It deliberately does NOT parse the body: this is the middleware that turns an
+// authenticated non-admin into 403 ADMIN_REQUIRED, and Fastify produces that 403
+// even when the request body is malformed. The parse therefore runs only in the
+// terminal auth layer (or in the handler-facing middlewares above).
 func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := CurrentUser(c)
@@ -116,7 +150,7 @@ func RequireAdmin() gin.HandlerFunc {
 		if !ensureCurrentAdmin(c, claims) {
 			return
 		}
-		c.Next()
+		continueAfterAuth(c)
 	}
 }
 
@@ -130,7 +164,7 @@ func AuthenticateAdmin() gin.HandlerFunc {
 		if !ensureCurrentAdmin(c, claims) {
 			return
 		}
-		c.Next()
+		continueAfterAuth(c)
 	}
 }
 
@@ -145,6 +179,6 @@ func AuthenticateUser() gin.HandlerFunc {
 			c.AbortWithStatusJSON(403, gin.H{"error": "This feature is for regular users only", "code": "USER_ONLY"})
 			return
 		}
-		c.Next()
+		continueAfterAuth(c)
 	}
 }
