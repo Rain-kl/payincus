@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Check, X } from 'lucide-vue-next'
 import api from '@/api/admin'
+import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 
 const { t } = useI18n()
@@ -258,20 +260,9 @@ const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
                 <td class="truncate px-4 py-3 text-sm text-themed-muted">{{ w.rejectReason || '-' }}</td>
                 <td class="px-4 py-3">
                   <template v-if="w.status === 'pending'">
-                    <div class="flex flex-wrap gap-2">
-                      <button
-                        class="btn btn-xs btn-success"
-                        :disabled="approveLoading === w.id"
-                        @click="approveWithdrawal(w)"
-                      >
-                        {{ approveLoading === w.id ? $t('common.processing') : $t('aff.approve') }}
-                      </button>
-                      <button
-                        class="btn btn-xs btn-ghost text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
-                        @click="openRejectModal(w)"
-                      >
-                        {{ $t('aff.reject') }}
-                      </button>
+                    <div class="flex items-center gap-1">
+                      <IconButton :label="approveLoading === w.id ? $t('common.processing') : $t('aff.approve')" :disabled="approveLoading === w.id" @click="approveWithdrawal(w)"><Check /></IconButton>
+                      <IconButton :label="$t('aff.reject')" variant="danger" @click="openRejectModal(w)"><X /></IconButton>
                     </div>
                   </template>
                   <template v-else>

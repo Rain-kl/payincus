@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { Check, Info, X } from 'lucide-vue-next'
 import api from '@/api/admin'
+import IconButton from '@/components/IconButton.vue'
 
 type OrderSourceType = 'recharge' | 'instance_billing'
 type OrderOperationStatus = 'pending_review' | 'confirmed' | 'compensated' | 'closed'
@@ -696,7 +698,9 @@ onMounted(() => {
               <td class="px-4 py-3 text-themed-muted">{{ instanceName(order) }}</td>
               <td class="px-4 py-3 font-mono tabular-nums text-themed-muted">{{ formatTime(order.createdAt) }}</td>
               <td class="px-4 py-3 text-right">
-                <button class="btn btn-sm btn-secondary" @click="openDetail(order)">详情</button>
+                <div class="flex items-center justify-end gap-1">
+                  <IconButton :label="$t('common.detail')" @click="openDetail(order)"><Info /></IconButton>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -820,9 +824,9 @@ onMounted(() => {
               </td>
               <td class="px-4 py-3 font-mono tabular-nums text-themed-muted">{{ formatTime(request.createdAt) }}</td>
               <td class="px-4 py-3 text-right">
-                <div v-if="request.status === 'pending'" class="flex justify-end gap-2">
-                  <button class="btn btn-sm btn-danger" :disabled="reviewLoadingId === request.id" @click="rejectAdjustmentRequest(request)">驳回</button>
-                  <button class="btn btn-sm btn-primary" :disabled="reviewLoadingId === request.id" @click="approveAdjustmentRequest(request)">通过并执行</button>
+                <div v-if="request.status === 'pending'" class="flex items-center justify-end gap-1">
+                  <IconButton :label="$t('admin.orders.rejectAdjustment')" variant="danger" :disabled="reviewLoadingId === request.id" @click="rejectAdjustmentRequest(request)"><X /></IconButton>
+                  <IconButton :label="$t('admin.orders.approveAdjustment')" :disabled="reviewLoadingId === request.id" @click="approveAdjustmentRequest(request)"><Check /></IconButton>
                 </div>
                 <span v-else class="text-xs text-themed-muted">{{ request.reviewedBy?.username || '-' }}</span>
               </td>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Check } from 'lucide-vue-next'
 import api from '@/api'
+import IconButton from '@/components/IconButton.vue'
 import { useAuthStore } from '@/stores/auth'
 const HostNodeSecurity = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostNodeSecurity.vue')) : null
 import type { SshKey, SystemImage } from '@/types/api'
@@ -1729,7 +1731,7 @@ async function runAuditKillProcess() {
                   <div v-if="process.findings.length" class="text-xs text-amber-500 mt-1">{{ localizeProcessFindings(process.findings) }}</div>
                 </td>
                 <td class="px-4 py-3">
-                  <button class="btn-ghost btn-sm" @click="selectAuditProcess(process)">选择</button>
+                  <IconButton :label="t('common.select')" @click="selectAuditProcess(process)"><Check /></IconButton>
                 </td>
               </tr>
             </tbody>

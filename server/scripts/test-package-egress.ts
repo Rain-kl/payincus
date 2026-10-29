@@ -54,6 +54,12 @@ try {
   const profileId = created.id
   assert.equal((await inject('GET', '/api/egress/profiles', undefined, 2)).json().profiles.length, 0)
   assert((await inject('GET', '/api/egress/profiles', undefined, 1)).json().profiles.some((p: any) => p.id === profileId && !('proxyNodeId' in p) && p.hostIds.length === 1))
+  // PayIncus: authorizing a host pre-provisions the policy group before any instance exists,
+  // while unauthorized hosts stay untouched and offline pushes never hold the editor open.
+  assert.equal(created.pendingHostIds.includes(hosts[0]), true, 'authorized host must be queued for synchronization')
+  assert.equal(created.pendingHostIds.includes(hosts[1]), false, 'unauthorized host must not be synchronized')
+  assert.equal((await packageEgressInstruction(hosts[0])).groups.some((group: any) => group.key === `p${profileId}`), true, 'authorized host must pre-provision the group')
+  assert.equal((await packageEgressInstruction(hosts[1])).groups.length, 0, 'unauthorized host must not receive the group')
   await assert.rejects(validatePackageEgress(prisma, { egressMode: 'profile', egressProfileId: profileId, hostIds: hosts }))
   const pkg = await prisma.package.create({ data: { userId: users[1], name: prefix, cpuMax: 100, memoryMax: 256, diskMax: 1024, egressMode: 'profile', egressProfileId: profileId, packageHosts: { create: { hostId: hosts[0] } } } }); pkgId = pkg.id
   const base = { userId: users[1], hostId: hosts[0], packageId: pkg.id, name: prefix, image: 'debian', cpu: 100, memory: 256, disk: 1024 }

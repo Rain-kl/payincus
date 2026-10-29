@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
 import { useBadgeStore } from '@/stores/badges'
+import { useTabQuery } from '@/composables/useTabQuery'
 import type { BadgeCatalogItem, BadgeSeriesItem } from '@/types/api'
 
 const { t } = useI18n()
@@ -11,7 +12,12 @@ const toast = useToast()
 const badgeStore = useBadgeStore()
 
 // 当前 TAB
-const activeTab = ref<'lotteries' | 'records' | 'users' | 'badges' | 'checkin'>('lotteries')
+type EntertainmentTab = 'lotteries' | 'records' | 'users' | 'badges' | 'checkin'
+const activeTab = useTabQuery<EntertainmentTab>({
+  keys: ['lotteries', 'records', 'users', 'badges', 'checkin'],
+  fallback: 'lotteries',
+  onExternalChange: (tab) => loadTabData(tab)
+})
 
 // 抽奖列表
 const lotteries = ref<any[]>([])
@@ -140,6 +146,7 @@ const filteredBadges = computed(() => {
 
 onMounted(() => {
   loadLotteries()
+  loadTabData(activeTab.value)
 })
 
 async function loadLotteries() {
@@ -197,8 +204,7 @@ async function loadUsers() {
   }
 }
 
-function switchTab(tab: 'lotteries' | 'records' | 'users' | 'badges' | 'checkin') {
-  activeTab.value = tab
+function loadTabData(tab: EntertainmentTab) {
   if (tab === 'records' && records.value.length === 0) {
     loadRecords()
   } else if (tab === 'users' && users.value.length === 0) {
@@ -208,6 +214,11 @@ function switchTab(tab: 'lotteries' | 'records' | 'users' | 'badges' | 'checkin'
   } else if (tab === 'checkin' && checkinLogs.value.length === 0) {
     loadCheckinAdminData()
   }
+}
+
+function switchTab(tab: EntertainmentTab) {
+  activeTab.value = tab
+  loadTabData(tab)
 }
 
 async function loadCheckinAdminData() {

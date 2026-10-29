@@ -22,6 +22,7 @@ import HostCreateInstanceTab from '@/components/host/HostCreateInstanceTab.vue'
 import HostOpsTab from '@/components/host/HostOpsTab.vue'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { hostsPath } from '@/utils/app-paths'
+import { useTabQuery } from '@/composables/useTabQuery'
 
 // 为 KeepAlive exclude 匹配定义组件名称
 defineOptions({
@@ -39,7 +40,10 @@ const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 type TabType = 'firewall' | 'gpu' | 'info' | 'config' | 'images' | 'instances' | 'storage' | 'publicIpv4' | 'caddy' | 'agentLogs' | 'redeemCodes' | 'ops' | 'create'
-const activeTab = ref<TabType>('info')
+const activeTab = useTabQuery<TabType>({
+  keys: ['firewall', 'gpu', 'info', 'config', 'images', 'instances', 'storage', 'publicIpv4', 'caddy', 'agentLogs', 'redeemCodes', 'ops', 'create'],
+  fallback: 'info'
+})
 
 interface Host {
   id: number
@@ -397,6 +401,13 @@ const tabs = computed(() => [
   { key: 'instances', labelKey: 'admin.hosts.tabInstances', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
   { key: 'create', labelKey: 'admin.hosts.tabCreate', icon: 'M12 4v16m8-8H4' }
 ].flatMap(tab => tab.key === 'config' && isAdmin.value ? [tab, { key: 'firewall', labelKey: 'egress.firewall', icon: 'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7l8-4z' }] : [tab]))
+
+// 非管理员没有 firewall tab；URL 直接落到该 tab（如分享链接）时回退到 info，避免空白
+watch(tabs, (list) => {
+  if (!list.some(tab => tab.key === activeTab.value)) {
+    activeTab.value = 'info'
+  }
+}, { immediate: true })
 </script>
 
 <template>

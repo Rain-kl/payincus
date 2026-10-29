@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Ban, Check, Send, X } from 'lucide-vue-next'
 import api from '@/api'
+import IconButton from '@/components/IconButton.vue'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
@@ -634,21 +636,22 @@ function getNetworkModeText(mode: string | null | undefined) {
                   <template v-if="activeTab === 'sent'">
                     <template v-if="transfer.status === 'pending'">
                       <!-- 直接推送按钮（仅当发起方是宿主机所有者时显示） -->
-                      <button
+                      <IconButton
                         v-if="transfer.canPush"
-                        class="btn btn-sm btn-secondary"
+                        :label="pushLoading === transfer.id ? $t('common.processing') : $t('transfer.actions.push')"
                         :disabled="pushLoading === transfer.id || actionLoading === transfer.id"
                         @click="handlePush(transfer)"
                       >
-                        {{ pushLoading === transfer.id ? $t('common.processing') : $t('transfer.actions.push') }}
-                      </button>
-                      <button
-                        class="btn btn-sm btn-ghost text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                        <Send />
+                      </IconButton>
+                      <IconButton
+                        :label="$t('transfer.actions.cancel')"
+                        variant="danger"
                         :disabled="actionLoading === transfer.id || pushLoading === transfer.id"
                         @click="handleCancel(transfer)"
                       >
-                        {{ $t('transfer.actions.cancel') }}
-                      </button>
+                        <Ban />
+                      </IconButton>
                     </template>
                     <div v-else-if="transfer.status === 'accepted'" class="text-sm text-themed-muted tabular-nums">
                       {{ $t('transfer.completedAt') }}: {{ formatDate(transfer.acceptedAt) }}
@@ -666,20 +669,21 @@ function getNetworkModeText(mode: string | null | undefined) {
                   <!-- Received tab actions -->
                   <template v-else>
                     <template v-if="transfer.status === 'pending'">
-                      <button
-                        class="btn btn-sm btn-primary"
+                      <IconButton
+                        :label="$t('transfer.actions.accept')"
                         :disabled="actionLoading === transfer.id"
                         @click="handleAccept(transfer)"
                       >
-                        {{ $t('transfer.actions.accept') }}
-                      </button>
-                      <button
-                        class="btn btn-sm btn-ghost text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                        <Check />
+                      </IconButton>
+                      <IconButton
+                        :label="$t('transfer.actions.reject')"
+                        variant="danger"
                         :disabled="actionLoading === transfer.id"
                         @click="openRejectModal(transfer)"
                       >
-                        {{ $t('transfer.actions.reject') }}
-                      </button>
+                        <X />
+                      </IconButton>
                     </template>
                     <div v-else-if="transfer.status === 'accepted'" class="text-sm text-themed-muted tabular-nums">
                       {{ $t('transfer.completedAt') }}: {{ formatDate(transfer.acceptedAt) }}

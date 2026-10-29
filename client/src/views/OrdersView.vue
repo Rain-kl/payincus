@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { Info } from 'lucide-vue-next'
 import api from '@/api'
 import { useReveal } from '@/composables/useReveal'
+import IconButton from '@/components/IconButton.vue'
 
 const revealRoot = ref<HTMLElement | null>(null)
 useReveal(revealRoot)
@@ -287,7 +289,9 @@ onMounted(loadOrders)
               </td>
               <td class="px-4 py-3 text-themed-muted whitespace-nowrap">{{ formatTime(order.createdAt) }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <button class="btn btn-sm btn-secondary" @click="openDetail(order)">详情</button>
+                <div class="flex items-center justify-end gap-1">
+                  <IconButton :label="$t('common.detail')" @click="openDetail(order)"><Info /></IconButton>
+                </div>
               </td>
             </tr>
           </tbody>

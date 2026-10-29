@@ -48,16 +48,20 @@ export default async function egressProfileRoutes(app: FastifyInstance) {
           const instances = existing ? await tx.instance.findMany({ where: { egressProfileId: existing.id, status: { not: 'deleted' } }, select: { hostId: true }, distinct: ['hostId'] }) : []
           const affected = [...new Set([...used, ...hostBindings, ...packages, ...instances].map(item => item.hostId))].sort((a,b) => a-b)
           if (affected.some(hostId => !request.body.hostIds.includes(hostId))) throw new NetworkInputError('授权宿主范围仍有套餐、实例或节点引用，不能移除')
+          // PayIncus: authorizing a host pre-provisions the policy group on that node, so
+          // every host touched by this change (added, kept or revoked) gets a fresh
+          // revision and an immediate push instead of waiting for its first instance.
+          const targets = [...new Set([...affected, ...request.body.hostIds, ...(existing?.allowedHostIds ?? [])])].sort((a,b) => a-b)
           const data = { name: request.body.name.trim(), allowedHostIds: request.body.hostIds, egress: egress as unknown as Prisma.InputJsonValue }
           const profile = existing ? await tx.egressProfile.update({ where: { id: existing.id }, data }) : await tx.egressProfile.create({ data })
-          for (const hostId of affected) await bumpEgressHost(tx, hostId)
-          return { profile, affected }
+          for (const hostId of targets) await bumpEgressHost(tx, hostId)
+          return { profile, targets }
         })
         if (!result) return reply.code(404).send({ error: '出口策略不存在' })
         await createLog(request.user.id, 'host', editing ? 'egress.profile.update' : 'egress.profile.create', `Saved egress policy ${result.profile.id}`, 'success')
         // Persisted host revisions retry on heartbeat/reconnect; slow or offline nodes never hold the editor open.
-        for (const hostId of result.affected) void pushNetworkPolicy(hostId).catch(() => app.log.warn({ hostId }, 'Egress synchronization pending'))
-        return reply.code(editing ? 202 : 201).send({ id: result.profile.id, pendingHostIds: result.affected })
+        for (const hostId of result.targets) void pushNetworkPolicy(hostId).catch(() => app.log.warn({ hostId }, 'Egress synchronization pending'))
+        return reply.code(editing ? 202 : 201).send({ id: result.profile.id, pendingHostIds: result.targets })
       }
     })
   }

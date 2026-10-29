@@ -7,13 +7,19 @@ import { useThemeStore } from '@/stores/theme'
 import { translateError } from '@/utils/errorHandler'
 import FlagIcon from '@/components/FlagIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import { useTabQuery } from '@/composables/useTabQuery'
 
 const { t } = useI18n()
 const toast = useToast()
 const themeStore = useThemeStore()
 
 // TAB 状态
-const activeTab = ref<'sources' | 'plans' | 'subscriptions' | 'domains'>('sources')
+type MailTab = 'sources' | 'plans' | 'subscriptions' | 'domains'
+const activeTab = useTabQuery<MailTab>({
+  keys: ['sources', 'plans', 'subscriptions', 'domains'],
+  fallback: 'sources',
+  onExternalChange: (tab) => loadTabData(tab)
+})
 
 // 加载状态
 const loading = ref(true)
@@ -65,11 +71,10 @@ const subscriptionsTotalPages = computed(() => Math.ceil(totalSubscriptions.valu
 const domainsTotalPages = computed(() => Math.ceil(totalDomains.value / pageSize.value))
 
 onMounted(async () => {
-  await loadSources()
+  await loadTabData(activeTab.value)
 })
 
-async function switchTab(tab: typeof activeTab.value) {
-  activeTab.value = tab
+async function loadTabData(tab: MailTab) {
   if (tab === 'sources' && sources.value.length === 0) {
     await loadSources()
   } else if (tab === 'plans' && plans.value.length === 0) {
@@ -83,6 +88,11 @@ async function switchTab(tab: typeof activeTab.value) {
     domainsSearch.value = '' // 重置搜索条件
     await loadDomains()
   }
+}
+
+async function switchTab(tab: MailTab) {
+  activeTab.value = tab
+  await loadTabData(tab)
 }
 
 // ===== 邮箱源管理 =====

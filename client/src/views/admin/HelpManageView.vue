@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-vue-next'
 import api from '@/api/admin'
+import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
 import { parseMarkdown } from '@/utils/markdown'
@@ -527,12 +529,10 @@ function formatDate(dateStr: string | null | undefined): string {
                 </td>
                 <td class="truncate px-4 py-3 text-sm font-mono tabular-nums text-themed-muted">{{ formatDate(article.updated_at) }}</td>
                 <td class="px-4 py-3 text-right">
-                  <div class="flex flex-wrap items-center justify-end gap-2">
-                    <button class="btn-ghost btn-sm" @click="openEdit(article)">{{ t('common.edit') }}</button>
-                    <button class="btn-ghost btn-sm" @click="togglePublished(article)">
-                      {{ article.published ? t('admin.helpManage.hide') : t('admin.helpManage.publish') }}
-                    </button>
-                    <button class="btn-ghost btn-sm text-error" @click="deleteArticle(article)">{{ t('common.delete') }}</button>
+                  <div class="flex items-center justify-end gap-1">
+                    <IconButton :label="t('common.edit')" @click="openEdit(article)"><Pencil /></IconButton>
+                    <IconButton :label="article.published ? t('admin.helpManage.hide') : t('admin.helpManage.publish')" @click="togglePublished(article)"><EyeOff v-if="article.published" /><Eye v-else /></IconButton>
+                    <IconButton :label="t('common.delete')" variant="danger" @click="deleteArticle(article)"><Trash2 /></IconButton>
                   </div>
                 </td>
               </tr>

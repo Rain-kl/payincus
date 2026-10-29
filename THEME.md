@@ -153,7 +153,50 @@ border-color: #295ba73d; /* 8 位 hex 也禁止 */
 
 ---
 
-## 5. 只改主题颜色时（改 theme.css）
+## 5. 表格操作列规范（shadcn 扁平图标按钮）
+
+> **硬规矩**：表格（`<table>`）的**操作列（`<td>`）内禁止出现带文字的按钮** —— `btn-primary` / `btn-secondary` / `btn-danger` / `btn-ghost` 等「编辑 / 删除 / 详情 / 启用」文字按钮一律不得出现在表格单元格里（浅色主题下这类白底黑描边按钮视觉重量过大）。表格操作**必须**改用**扁平化无边框图标按钮 + hint 提示**。
+> 由 `pnpm --filter server test:frontend-table-actions` 守卫强制（AGENTS.md §2.13）。
+
+### 5.1 统一写法
+
+用 `client/src/components/IconButton.vue`（底层 class `.icon-btn`，定义在 `main.css`）：
+
+```vue
+<script setup lang="ts">
+import { Pencil, Trash2 } from 'lucide-vue-next'
+import IconButton from '@/components/IconButton.vue'
+</script>
+
+<td class="text-right">
+  <div class="flex items-center justify-end gap-1">
+    <IconButton :label="t('common.edit')" @click="open(row)"><Pencil /></IconButton>
+    <IconButton :label="t('common.delete')" variant="danger" :disabled="busy" @click="remove(row.id)"><Trash2 /></IconButton>
+  </div>
+</td>
+```
+
+### 5.2 规则明细
+
+| 项 | 规定 |
+|---|---|
+| 形态 | 32×32（`h-8 w-8`）、`rounded-md`、**无边框 / 无描边 / 无默认底色块**；hover 才浮出 `--bg-tertiary` 浅底 |
+| 颜色 | 默认图标色 `--text-secondary`，hover 转 `--text-primary`；危险操作用 `--error`（`variant="danger"`）|
+| hint | **必须**同时提供 `title`（hover 提示）与 `aria-label`（无障碍名），文案走 i18n，禁止硬编码中英文 |
+| 图标 | 统一 `lucide-vue-next`，默认 16px（`w-4 h-4`）|
+| 布局 | 操作列用 `flex items-center justify-end`（间距 `gap-1`）包裹；已被表格布局守卫锁定的表格**保留其既有容器 class**；仍在 `table-fixed` 内平衡列宽，**不得**引入横向滚动（AGENTS.md §4 表格布局守卫）|
+| 移动卡片 | 移动端卡片（非 `<td>`）**不受此限**，保留文字按钮便于触控 |
+| 抽屉 / 弹窗内 | 不受此限，仍按 AGENTS.md §2.12 用 `btn-secondary`（取消）/ `btn-primary`（提交）|
+
+### 5.3 为什么
+
+- 行内文字按钮视觉重量大，一行出现两三个就把表格压成「按钮墙」，与单色极简方向冲突。
+- 图标 + hint 让操作列保持统一节奏，同时不牺牲可读性（hover 即见功能说明）。
+- 与 shadcn 的 ghost icon button 一致：默认没有轮廓，hover 才显形。
+
+---
+
+## 6. 只改主题颜色时（改 theme.css）
 
 1. 打开 `client/src/styles/theme.css`。
 2. 改 `:root`（暗）和 `.light`（亮）两处对应 token。
@@ -164,7 +207,7 @@ border-color: #295ba73d; /* 8 位 hex 也禁止 */
 
 ---
 
-## 6. 豁免白名单（允许 hex 的区域）
+## 7. 豁免白名单（允许 hex 的区域）
 
 以下位置允许多个 hex 色值，**新增豁免必须同步更新** `server/scripts/test-frontend-color-tokens.ts` 的 `EXEMPT_PATHS`：
 
@@ -185,7 +228,7 @@ border-color: #295ba73d; /* 8 位 hex 也禁止 */
 
 ---
 
-## 7. 常见错误清单（开发时自查）
+## 8. 常见错误清单（开发时自查）
 
 | # | 错误写法 | 正确写法 |
 |---|---|---|
@@ -199,23 +242,25 @@ border-color: #295ba73d; /* 8 位 hex 也禁止 */
 
 ---
 
-## 8. 常用语义 class（main.css 已定义，直接可用）
+## 9. 常用语义 class（main.css 已定义，直接可用）
 
 - 文字：`text-themed` / `text-themed-secondary` / `text-themed-muted` / `text-themed-faint`
 - 背景：`bg-themed` / `bg-themed-surface` / `bg-themed-secondary` / `bg-themed-tertiary`
 - 边框：`border-themed` / `border-themed-hover`
 - 按钮：`btn-primary` / `btn-secondary` / `btn-ghost` / `btn-danger` / `btn-warning`
+- 表格操作图标按钮：`icon-btn`（+ `icon-btn-danger`），见 §5；**表格 `<td>` 内只能用这个，禁止文字按钮**
 - 卡片：`card` / `card-hover` / `stat-card`
 - 徽章：`badge` / `badge-success` / `badge-warning` / `badge-error` / `badge-default`
 - 状态：`text-success` / `text-warning` / `text-error`
 
 ---
 
-## 9. 验证命令
+## 10. 验证命令
 
 ```bash
-pnpm --filter server test:frontend-color-tokens   # 主题色纪律守卫（必跑）
-pnpm --filter client type-check                   # 类型检查
-pnpm build:client                                 # 双端构建
-pnpm --filter server test:frontend-route-guards   # 改前端必跑
+pnpm --filter server test:frontend-color-tokens    # 主题色纪律守卫（必跑）
+pnpm --filter server test:frontend-table-actions   # 表格操作列守卫（改表格必跑）
+pnpm --filter client type-check                    # 类型检查
+pnpm build:client                                  # 双端构建
+pnpm --filter server test:frontend-route-guards    # 改前端必跑
 ```
