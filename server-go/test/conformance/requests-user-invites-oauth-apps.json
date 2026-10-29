@@ -1,0 +1,510 @@
+[
+  { "name": "user-invites-summary-anon", "method": "GET", "path": "/api/user-invites/summary" },
+  { "name": "user-invites-list-anon", "method": "GET", "path": "/api/user-invites" },
+  { "name": "user-invites-list-anon-trailing-slash", "method": "GET", "path": "/api/user-invites/" },
+  {
+    "name": "user-invites-create-anon",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "body": { "costResource": "balance", "count": 1 }
+  },
+
+  {
+    "name": "oauth-apps-list-anon",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps"
+  },
+  {
+    "name": "oauth-apps-list-anon-trailing-slash",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/"
+  },
+  {
+    "name": "oauth-apps-authorizations-anon",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-anon",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/1"
+  },
+  {
+    "name": "oauth-apps-create-anon",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-update-anon",
+    "method": "PUT",
+    "path": "/api/admin/oauth-apps/1",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  { "name": "oauth-apps-rotate-anon", "method": "POST", "path": "/api/admin/oauth-apps/1/rotate-secret" },
+  { "name": "oauth-apps-delete-anon", "method": "DELETE", "path": "/api/admin/oauth-apps/1" },
+
+  {
+    "name": "user-invites-summary",
+    "method": "GET",
+    "path": "/api/user-invites/summary",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list",
+    "method": "GET",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/user-invites/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list-pagination",
+    "method": "GET",
+    "path": "/api/user-invites?page=2&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list-invalid-pagination-falls-back",
+    "method": "GET",
+    "path": "/api/user-invites?page=0&pageSize=abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list-pagesize-clamped",
+    "method": "GET",
+    "path": "/api/user-invites?pageSize=500",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list-pagesize-overflow-falls-back",
+    "method": "GET",
+    "path": "/api/user-invites?pageSize=99999999999999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "user-invites-list-loose-parseint",
+    "method": "GET",
+    "path": "/api/user-invites?page=1abc&pageSize=5xyz",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "user-invites-create-missing-costresource",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "user-invites-create-empty-costresource",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "" }
+  },
+  {
+    "name": "user-invites-create-long-costresource",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+  },
+  {
+    "name": "user-invites-create-count-too-big",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "balance", "count": 11 }
+  },
+  {
+    "name": "user-invites-create-count-zero",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "balance", "count": 0 }
+  },
+  {
+    "name": "user-invites-create-count-fractional",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "balance", "count": 1.5 }
+  },
+  {
+    "name": "user-invites-create-non-object-body",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "user-invites-create-cost-option-disabled",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "balance" }
+  },
+  {
+    "name": "user-invites-create-unsupported-resource",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "coupon" }
+  },
+  {
+    "name": "user-invites-create-happy",
+    "method": "POST",
+    "path": "/api/user-invites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "costResource": "points", "count": 1 },
+    "skipBody": true
+  },
+
+  {
+    "name": "oauth-apps-list",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "oauth-apps-authorizations",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-pagination",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?page=1&pageSize=10",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-invalid-pagination-falls-back",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?page=0&pageSize=abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-pagesize-clamped",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?pageSize=500",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-status-active",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?status=active",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-status-revoked",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?status=revoked",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-status-disabled",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?status=disabled",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-status-invalid-falls-back-to-all",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?status=nope",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-appid-invalid-ignored",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?appId=abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-appid-missing",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?appId=2147483000",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-user-no-match",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?user=zzzz-no-such-user",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-user-like-escaped",
+    "method": "GET",
+    "path": "/api/admin/oauth-apps/authorizations?user=a_b",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-invalid-id-zero",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-invalid-id-leading-zero",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/01",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-invalid-id-negative",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/-1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-invalid-id-text",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-missing",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-authorizations-delete-out-of-range-id",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/authorizations/2147483648",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "oauth-apps-create-missing-name",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-blank-name",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "   ",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-missing-redirect-uris",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "Conformance App", "scopes": ["profile:read"] }
+  },
+  {
+    "name": "oauth-apps-create-empty-redirect-uris",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": [],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-http-nonlocal-redirect",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["http://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-too-many-redirect-uris",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": [
+        "https://e1.example.com/cb",
+        "https://e2.example.com/cb",
+        "https://e3.example.com/cb",
+        "https://e4.example.com/cb",
+        "https://e5.example.com/cb",
+        "https://e6.example.com/cb",
+        "https://e7.example.com/cb",
+        "https://e8.example.com/cb",
+        "https://e9.example.com/cb",
+        "https://e10.example.com/cb",
+        "https://e11.example.com/cb",
+        "https://e12.example.com/cb",
+        "https://e13.example.com/cb",
+        "https://e14.example.com/cb",
+        "https://e15.example.com/cb",
+        "https://e16.example.com/cb",
+        "https://e17.example.com/cb",
+        "https://e18.example.com/cb",
+        "https://e19.example.com/cb",
+        "https://e20.example.com/cb",
+        "https://e21.example.com/cb"
+      ],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-missing-scopes",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-unknown-scope",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["root:all"]
+    }
+  },
+  {
+    "name": "oauth-apps-create-name-beats-redirect-error",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "",
+      "redirectUris": ["ftp://x/y"],
+      "scopes": ["root:all"]
+    }
+  },
+
+  {
+    "name": "oauth-apps-update-invalid-id-zero",
+    "method": "PUT",
+    "path": "/api/admin/oauth-apps/0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-update-invalid-id-leading-zero",
+    "method": "PUT",
+    "path": "/api/admin/oauth-apps/01",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-update-invalid-id-negative",
+    "method": "PUT",
+    "path": "/api/admin/oauth-apps/-1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "oauth-apps-update-missing-id",
+    "method": "PUT",
+    "path": "/api/admin/oauth-apps/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    },
+    "skipBody": true
+  },
+  {
+    "name": "oauth-apps-update-out-of-range-id",
+    "method": "PUT",
+    "path": "/api/admin/oauth-apps/2147483648",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["https://example.com/cb"],
+      "scopes": ["profile:read"]
+    },
+    "skipBody": true
+  },
+
+  {
+    "name": "oauth-apps-rotate-invalid-id-zero",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps/0/rotate-secret",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-rotate-missing",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps/2147483000/rotate-secret",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-delete-invalid-id-zero",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "oauth-apps-delete-missing",
+    "method": "DELETE",
+    "path": "/api/admin/oauth-apps/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "oauth-apps-create-happy",
+    "method": "POST",
+    "path": "/api/admin/oauth-apps",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Conformance App",
+      "redirectUris": ["HTTPS://Example.COM:443/cb#frag", "https://example.com/cb"],
+      "scopes": "profile:read balance:read",
+      "enabled": false
+    },
+    "skipBody": true
+  }
+]
