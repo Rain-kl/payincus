@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Copy, Eye, EyeOff } from 'lucide-vue-next'
 import api from '@/api'
+import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
@@ -378,11 +380,9 @@ onMounted(async () => {
               <td class="py-3 pr-4 font-medium" :class="statusClass(card.status)">{{ statusLabel(card.status) }}</td>
               <td class="py-3 pr-4 text-themed-muted">{{ formatDate(card.expiresAt) }}</td>
               <td class="py-3 pr-4 whitespace-nowrap">
-                <div class="flex gap-2">
-                  <button class="btn btn-sm btn-secondary" @click="toggleCodeReveal(card)">
-                    {{ isCodeRevealed(card) ? t('giftCards.hideCode') : t('giftCards.showCode') }}
-                  </button>
-                  <button class="btn btn-sm btn-secondary" @click="copyCode(card.code)">{{ t('giftCards.copy') }}</button>
+                <div class="flex items-center gap-1">
+                  <IconButton :label="isCodeRevealed(card) ? t('giftCards.hideCode') : t('giftCards.showCode')" @click="toggleCodeReveal(card)"><EyeOff v-if="isCodeRevealed(card)" /><Eye v-else /></IconButton>
+                  <IconButton :label="t('giftCards.copy')" @click="copyCode(card.code)"><Copy /></IconButton>
                 </div>
               </td>
             </tr>

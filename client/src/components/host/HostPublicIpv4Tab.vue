@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Power, PowerOff, Trash2 } from 'lucide-vue-next'
 import api from '@/api'
+import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 
 const props = defineProps<{
@@ -204,11 +206,11 @@ onMounted(loadPools)
               <td class="py-2 font-mono">{{ address.address }}/{{ address.prefixLength }}</td>
               <td class="py-2">{{ t(`hostPublicIpv4.status.${address.status}`) }}</td>
               <td class="py-2">{{ address.instanceId ? `#${address.instanceId}` : '-' }}</td>
-              <td class="py-2 text-right space-x-2">
-                <button v-if="address.status !== 'assigned'" class="btn-secondary btn-xs" :disabled="!!actionLoading" @click="toggleAddress(address)">
-                  {{ address.status === 'disabled' ? t('hostPublicIpv4.enable') : t('hostPublicIpv4.disable') }}
-                </button>
-                <button v-if="address.status !== 'assigned'" class="btn-danger btn-xs" :disabled="!!actionLoading" @click="deleteAddress(address)">{{ t('common.delete') }}</button>
+              <td class="py-2 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <IconButton v-if="address.status !== 'assigned'" :label="address.status === 'disabled' ? t('hostPublicIpv4.enable') : t('hostPublicIpv4.disable')" :disabled="!!actionLoading" @click="toggleAddress(address)"><Power v-if="address.status === 'disabled'" /><PowerOff v-else /></IconButton>
+                  <IconButton v-if="address.status !== 'assigned'" :label="t('common.delete')" variant="danger" :disabled="!!actionLoading" @click="deleteAddress(address)"><Trash2 /></IconButton>
+                </div>
               </td>
             </tr>
           </tbody>

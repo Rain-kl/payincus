@@ -63,13 +63,24 @@ export async function resolveProfile(profile: { egress: Prisma.JsonValue; active
 export async function packageEgressInstruction(hostId: number) {
   const attachments = await prisma.instanceEgressAttachment.findMany({ where: { hostId }, include: { instance: { select: { status: true } } }, orderBy: { id: 'asc' } })
   const active = attachments.filter(binding => binding.instance.status !== 'deleted')
-  const profileIds = [...new Set(active.flatMap(binding => binding.profileId ? [binding.profileId] : []))]
-  if (profileIds.length > MAX_EGRESS_GROUPS) throw new NetworkInputError('Host package egress group capacity exceeded')
-  const profiles = await prisma.egressProfile.findMany({ where: { id: { in: profileIds } } })
-  if (profiles.length !== profileIds.length) throw new NetworkInputError('Referenced egress policy is missing')
+  const attachedIds = [...new Set(active.flatMap(binding => binding.profileId ? [binding.profileId] : []))]
+  if (attachedIds.length > MAX_EGRESS_GROUPS) throw new NetworkInputError('Host package egress group capacity exceeded')
+  const attached = await prisma.egressProfile.findMany({ where: { id: { in: attachedIds } } })
+  if (attached.length !== attachedIds.length) throw new NetworkInputError('Referenced egress policy is missing')
+  const byId = new Map(attached.map(profile => [profile.id, profile]))
+  const groups = await Promise.all(attachedIds.flatMap(id => { const profile = byId.get(id); return profile ? [profile] : [] }).map(async profile => ({ key: `p${profile.id}`, ...await resolveProfile(profile, hostId) })))
+  // PayIncus: an authorized host pre-provisions the policy group before its first
+  // instance exists, so resource delivery no longer has to catch up on Xray. Groups
+  // required by live bindings stay strict; pre-provisioning is best effort and must
+  // never break them, so an unusable authorized policy is skipped here.
+  const authorized = await prisma.egressProfile.findMany({ where: { active: true, allowedHostIds: { has: hostId } }, orderBy: { id: 'asc' } })
+  for (const profile of authorized) {
+    if (groups.length >= MAX_EGRESS_GROUPS || attachedIds.includes(profile.id)) continue
+    try { groups.push({ key: `p${profile.id}`, ...await resolveProfile(profile, hostId) }) } catch { continue }
+  }
   return {
     schemaVersion: 2,
-    groups: await Promise.all(profiles.map(async profile => ({ key: `p${profile.id}`, ...await resolveProfile(profile, hostId) }))),
+    groups,
     bindings: active.map(binding => ({ instanceName: binding.incusName, generation: binding.generation, mode: binding.mode, groupKey: binding.profileId ? `p${binding.profileId}` : '', nics: binding.nics }))
   }
 }

@@ -8,18 +8,340 @@ This page is generated from Git tags and commits to show system version history.
 
 ## Latest Release State / 最新发布状态
 
-- Latest Release Commit / 最新发布提交: `9fda0a300`
-- Commit date / 提交日期: 2026-07-13
-- Commit subject / 提交说明: Release v1.5.2 宿主机/Agent/Caddy 安装脚本系统性整改
-- Latest tag / 最新 tag: `v1.5.2`
+- Latest Release Commit / 最新发布提交: `427dfef7c`
+- Commit date / 提交日期: 2026-10-29
+- Commit subject / 提交说明: refactor(heartbeat): reduce default heartbeat interval from 10 seconds to 5 seconds and update related configurations
+- Latest tag / 最新 tag: `v2.1.0`
 
 ## Unreleased Changes / 未发布变更
 
 ### Other Changes / 其他变更
 
-- OPERATIONS_HANDOFF: 叙述段更新为 v1.5.2(root 级安装脚本整改 + 两项待 owner 决策) `ea4cb7315`
+- feat(server-go): port security substrate and first Wave 2 route modules `8a69808eb`
+- feat(server-go): bootstrap Go backend foundation with Prisma-aligned models `b443258c2`
+- feat(node): authorize startup and bind shared egress policies `1fd5c1597`
+
+### Improvements and Adjustments / 改进与调整
+
+- refactor(avatar): simplify avatar styles to only include initials and remove deprecated options `2dc6be3b0`
 
 ## Historical Versions / 历史版本
+
+## v2.1.0
+
+- Release commit / 发布提交: `427dfef7c`
+- Commit date / 提交日期: 2026-10-29
+- Commit subject / 提交说明: refactor(heartbeat): reduce default heartbeat interval from 10 seconds to 5 seconds and update related configurations
+
+### Improvements and Adjustments / 改进与调整
+
+- refactor(heartbeat): reduce default heartbeat interval from 10 seconds to 5 seconds and update related configurations `427dfef7c`
+- refactor(storage): allocate from heartbeat-backed pool records `954525a88`
+- refactor(migration): remove default image data and update related documentation `42c01e6ed`
+- refactor(agent): remove standalone agent distribution and legacy control `e329dc9ad`
+- feat(resources): refactor package and host creation into drawer style and unify drawer toasts `e2ecf847b`
+- refactor(admin): use compact frameless action icons with bottom tooltips in entertainment view `6c25ad9db`
+- feat(nav): hide hosting features and move system update to settings tab `28e7721c6`
+- docs: update spec to remove legacy redirects and shims `19d288517`
+- refactor(hosts): decouple deriveEffectiveHostStatus to tunnel manager to prevent test script hangs `d79186df9`
+- refactor(admin): remove auto-refresh toggle and simplify data loading in admin dashboard `4619ac16c`
+
+### Other Changes / 其他变更
+
+- feat(tui): enhance download progress feedback and carriage return handling `3bff2123e`
+- feat(ci): enhance CI configuration with caching and concurrency management `6103f562d`
+- feat(storage): custom loop dir, sparse-by-default ZFS loop pools, zfs/default defaults, report cpu model `6a145f269`
+- feat(storage-encryption): implement storage encryption routes and enhance session management `e017dd065`
+- feat(security): run node recovery as background tasks `a11923c1b`
+- feat(security): reflect node availability and restore workloads `b74140523`
+- feat(admin): integrate built-in incus web ui over reverse tunnel `2f7e9a60a`
+- feat: implement root ID mapping preparation for non-privileged containers `97feef6d6`
+- feat(instances): apply advanced configuration directly to nodes `559185093`
+- chore(agent): remove retired smoke and installer remnants `b329b9a41`
+- Merge remote-tracking branch 'origin/main' `76b78bf9e`
+- feat(console): open graphical console in a separate browser window `394430277`
+- style(admin): refine operation task icons `aed2db724`
+- feat(operations): integrate instance tasks with latest main `86c285843`
+- feat(gpu): deliver multi-card bundles and validate container runtime `83c107681`
+- feat(coupon): unify promo api under /api/coupon and migrate frontend to unified engine `0676ec0ff`
+- feat(ui): confine slide-over drawer to main content area with oci theme tokens and action styling `250946b06`
+- feat(admin): move oauth to system settings as a standalone tab `6ef81facf`
+- feat(statistics): aggregate marketing and recent instances in admin overview `2295d6ac9`
+- feat(admin): design and implement operational admin dashboard `364cc2910`
+
+### Fixes and Stability / 修复与稳定性
+
+- fix(storage): correct pool directory validation, add guard, parallelize CI `4ce4390ca`
+- fix(websocket): handle close codes more gracefully and prevent error reporting during closure `c79f1c070`
+- fix(node-security): update security mode public error function `816ea7426`
+- fix(incus-ui): raise ws limits, fix close codes and back off events reconnect `4245d128f`
+- fix(ci): copy incus-ui package manifest in Dockerfile deps stage and run incus-ui guard in CI `20b156000`
+- fix: 操作诊断与自选 HTTP 连接 `935e6a427`
+- fix: perf `2a6e1df80`
+- fix(console): take over existing sessions on reconnect `224051c6e`
+- fix(console): clean up SPICE operations and recover instance status `09219f6a6`
+- fix(storage): schedule against actual Incus pool capacity `9491f0b03`
+- fix(egress): disable marked source validation inside gateway `73d7ce356`
+- fix(egress): inherit host DNS for proxy bootstrap `193feab24`
+- fix(agent): preserve network capabilities during install probes `d5d4e73dd`
+- fix(egress): publish gateway namespaces in the host mount view `e8e4eb6ff`
+- fix(egress): apply network policies and probes through live tunnel `b99050ca3`
+- fix(egress): repair proxy imports, probe reporting and Xray startup `0877bb7ab`
+- fix(gpu): guide OS selection without runtime preflight `f51ddf87f`
+- fix(vite): add type annotations to transform handlers and enable allowedHosts `cb455933e`
+- fix(billing): fix instance renewal price preview and promo discount display `36cc04847`
+- fix(aff): support unified promo code validation in /api/aff/validate `852700d4a`
+- fix(theme): eliminate all transparency and rgba from global styles `a16f5525f`
+- fix(admin): remove transparency from oauth scope dropdown and system styles `25a5e1f9b`
+- feat(admin): add pending tickets card, adjust layout and fix chart scrollbar `f1f1c5d09`
+- fix(test): resolve lint errors and guard test failures across client and server `c28a99669`
+- fix(host): derive effective host status based on tunnel connection and update accordingly `113e48ee6`
+- fix(admin): teleport orders detail modal to body with backdrop blur and bounded height `652006594`
+- fix(billing): use 3-dots action dropdown, add modal backdrop blur, remove user avatar and hosting type `043798f23`
+- fix(host): teleport public ipv4 pool creation modal to body `84136d934`
+- fix(admin): sync user avatar badge and teleport action menu to body `daa69c08a`
+- fix(hosts): exclude tunnel hosts from address conflict monitor `bce687476`
+
+### New Capabilities / 新增能力
+
+- feat: implement service management with API readiness checks and add update application menu `f61e8958f`
+- feat: add 'ops' tab to MyHostDetailView and reorder existing tabs `9658a3e3c`
+- feat(security): add node protection controls and key custody `949103e2a`
+- ci: allow manual integration verification `b1bea1cc9`
+- feat(egress): support versioned package proxy exits `97eff8ab0`
+- feat(admin): add operation task controls `43969a75d`
+- feat(operations): add instance tasks and live diagnostic logs `2ab3db49e`
+- feat(console): add authenticated SPICE graphical console for KVM `8d12f3997`
+- feat(egress): add Xray proxy and Incus firewall policies `63d872d8a`
+- feat(gpu): add shared NVIDIA GPU container support `5edd7e1e9`
+- feat(promo): support promo code editing with immutability constraints `9e69ef765`
+- feat(promo): add unified promo code engine `f3900bffe`
+- feat(resources): convert host and package creation to drawers and remove create routes `54f045010`
+- feat(i18n): add marketing label to language files and update admin navigation `ae4dbce83`
+- feat(admin): refactor revenue trend to full row and add marketing and recent instances cards `a1c45d1a8`
+- feat(i18n): add marketing and recent provisioning keys for admin dashboard `4428249c7`
+- docs(spec): add admin dashboard revenue row and activity cards design `61ee85d2d`
+- docs: add design spec for hiding hosting and moving system update tab `08a9a84d9`
+
+## v2.0.0
+
+- Release commit / 发布提交: `148f219da`
+- Commit date / 提交日期: 2026-09-21
+- Commit subject / 提交说明: feat(traffic): extract reusable TrafficLineChart and refactor host traffic stats to line chart
+
+### Improvements and Adjustments / 改进与调整
+
+- feat(traffic): extract reusable TrafficLineChart and refactor host traffic stats to line chart `148f219da`
+- refactor(admin-host): split host config fat form into sectioned cards with sticky save bar `a3b1c6fd3`
+- feat(agent): guard agent code changes against stale version in make agent-hash `40b1b6ad4`
+- docs(AGENTS): update contribution guidelines for Git commits `e8b94a512`
+- refactor(PortalView, PublicSiteFooter): remove unused buttons and computed properties `5e1c47f55`
+- style(theme): make all dropdown menus solid opaque and remove blur `222d9adc3`
+- feat(instance): update network tab labels and enhance loading indicators `9bab7bbc9`
+- feat(brand): update top bar logo to logo_white.svg and favicon to logo.svg `407a17d0e`
+- style(theme): update oci css variables and component styles in main.css `96220f233`
+- style(theme): update tailwind tokens to oci cloud blue, small radius and flat shadows `f1d593424`
+- Makefile `de00f05ec`
+- refactor: update database configuration and improve environment variable handling `c2842a105`
+- docs: update telegram group link `54e97bdc7`
+
+### Fixes and Stability / 修复与稳定性
+
+- fix(terminal): support websocket reverse tunnel for pure intranet hosts `9b09d50c7`
+- fix(host): ensure card container does not clip country dropdown with overflow visible `91c5e7b08`
+- fix(gift-cards): allow admin management when allowlist is not configured `97dce6672`
+- fix(host): include China in country selection, remove transparency and fix card overlay on config dropdown `2424d6bb5`
+- fix(view): remove tunnel mode indicator from host display `215b645eb`
+- fix(host): enable tunnel mode by default in host configuration `60316f6eb`
+- fix(host): skip address uniqueness for tunnel-mode loopback endpoints `1ebbb5df7`
+- fix(dev): harden vite proxy error handler for SSE/WebSocket long-connection errors `bf7811394`
+- fix(docs): update link reference for THEME.md and correct path `97f6253ba`
+- fix(agent): overwrite stale caddy.service unit (User=caddy) on every install `5cdacd972`
+- fix(agent): run Caddy service as root, drop caddy user requirement `e2082a1a0`
+- fix(agent): ensure /etc/caddy owned by root:caddy so caddy.service can start `483f70636`
+- fix(MyHostCreateView): update submit button disabled state to include tunnelEnabled check `d3d54d327`
+- fix(agent): assign parsed heartbeat Caddy instruction `49974b74f`
+- fix(admin-host): replace sticky save card with flush full-width action bar `77e798f09`
+- fix(guards): sync stale guards and surface risk approval/verification in logs `d6918285a`
+- fix(caddy): remove self-destructing pre-cleanup; cleanup only after success `d08d79ecb`
+- fix(caddy): chown log dir after validate, not before `39b9997af`
+- fix(agent): hash agent file contents, not filenames, in change guard `777b4dc25`
+- fix(caddy): resolve invalid-user crash and log-permission startup failure `58002dcd1`
+- fix(agent): hash only git-tracked agent files honoring .gitignore `d72554c1b`
+- fix(host): agent tunnel WS proxying + install script resilience `e19d3d28b`
+- fix(instance): live CPU usage in resource section like memory/disk `fd4b34868`
+- fix(instance): plan selection uses FBF9F8 fill with neutral border, no accent `7faa9b734`
+- fix(instance): represent plan selection with FBF9F8 primary instead of blue `eee6eeb0d`
+- fix(i18n): simplify translations for official and market terms `39d262dd5`
+- fix(instance): single background on plan cards; drop nested fixed bg `7a1b47e3e`
+- fix(instance): plan card resource region follows card hover color `dc76d3cb5`
+- fix(instance): show plan CPU in C units in package selector too `29b4096a4`
+- fix(instance): unify package card hover so inner info region follows `cd91edd15`
+- fix(instance): host selector stacks one per row when its width is under 500px `7f1914d77`
+- fix(layout): use border-[length:0.5px] so tailwind emits the thinner search box border `c8e58f16f`
+- fix(layout): topbar search box black by default, white on focus, 33px tall `b32028f04`
+- fix(admin): keep user card action menu above sibling cards on small screens `9303351ba`
+- fix(instance): teleport row menu to body and restore white table background `14dd3dd9d`
+- fix(instance): migrate transfer modal to standard modal-overlay backdrop system `76c83fa6c`
+- fix(system-update): switch update repository to Rain-kl/payincus `411e79625`
+- fix(host): sanitize leftover Caddy state and drop --resume on reinstall `0f1ef2edd`
+- fix(instance): remove unused themeStore imports in ChangePlanModal and RenewModal `1f37d719f`
+- fix(modal): smooth backdrop-filter transition to prevent blur snap-in `0c4ce0b90`
+- fix(admin): replace boxed external link icon with clean chevron in instance count `4dfaeb664`
+- fix(storage): allow optional source for DIR pool and auto-fallback to Incus default `b2626e661`
+- fix(storage): resolve storage pool creation timeouts and handle dm-thin-pool error `c2f29988d`
+- fix(server): close pg pool on prisma disconnect and unref module timers to prevent process hanging `7d8ee6253`
+- fix(layout): remove duplicate footer in SideNav `bf8ad28b0`
+- fix(ui): unify card border-radius tokens and fix full-width topbar layout `cb801d518`
+- style(layout): fix brand white text, hide sidebar scrollbar and remove topbar white gap `7e4c64092`
+- style(theme): fix oci topbar #393632 color, flat underline tabs, 4px buttons and clean sidebar indicator `e3ec1ca59`
+- fix(admin): use solid opaque background for oauth scope dropdown `77ea01ddf`
+- fix(caddy): add newline to caddy hash-password pipe to prevent EOF error `a7b796e70`
+- fix(container): ensure password authentication is enabled and clean up cloud-init drop-in `39ecda3a8`
+- fix(host): do not overwrite host resource limits when recalculating used resources `17b95b270`
+- fix(package): align paid package mode and hide instance limits in edit mode `38871bfd7`
+- fix(host): ensure incusbr0 forwarding rules are configured and persisted for Docker compatibility `c6875d265`
+- fix(host): wait for background apt locks and report errors in install_incus `9cf5e1d1c`
+- fix(host): clean up conflicting sysctl forwarding entries and force apply required params `2a8fabcea`
+- fix(host): remove stale incus trust certs by fingerprint during install/uninstall `19fa5f64a`
+- fix(docker): set INSTALL_DIR in runtime stage `6782656cd`
+- fix(docker): auto-generate panel mTLS client certificate and fix agent dist fallback `989afbfd4`
+- fix(docker): allow agent source directory in docker build context `c081dfa58`
+- fix(config): load server and vite dev host from environment variables instead of hardcoding `9806bd137`
+- fix(server): allow binding host to 0.0.0.0 for external agent connectivity `e28395a1a`
+- fix(config): remove default incudal telegram link and clean up legacy value `63916df7d`
+
+### Other Changes / 其他变更
+
+- feat(agent): stream runtime logs on demand over tunnel to panel SSE `02a9c51f8`
+- style(packages): rebalance admin package table column widths `e5f652ffe`
+- feat(instance): enlarge region cards, set height to 65px, display 3 per row and remove radio circle `5e9005d56`
+- feat(instance): convert region selector to horizontal rectangle radio cards `618400897`
+- style(instance): adapt column widths with content and cap at max spacing bounds `1c24b99ac`
+- style(theme): unify dropdown and popup menus to solid opaque token theme `99e6e1694`
+- feat(instance): sticky right actions column, flat #F6F4F3 table, cpu cores formatting, and remove redundant batch bar `514fbe28e`
+- feat(instance): rebuild instance list in oci style with horizontal scroll `955994089`
+- feat(layout): streamline user component to square icon and move language settings into user menu `0bc5bd412`
+- style(layout): adjust header height from 72px to 62px for consistency across components `82b05737e`
+- style(instance): 操作下拉菜单去透明改纯色实底, 销毁移入菜单 `19cebe62f`
+- style(instance): 去除端口映射操作区的嵌套卡片 `0dd82105d`
+- style(instance): unify all instance modals to oci redwood style `b2bb1d65d`
+- feat(instance): redesign traffic stats with unified area chart and 30/60/90d toggle `da2b26544`
+- style(layout): remove outer box frame from page-header and use single divider line `1ef24db4f`
+- feat(instances): streamline instance detail header to oci redwood style with actions dropdown `46f2700ba`
+- feat(admin-users): streamline action buttons into compact more dropdown `bfc002248`
+- feat(layout): display Cloud as brand name in title bar `342185b92`
+- feat(avatar): use local Oracle Redwood user-icon as default avatar `cc9394b02`
+- feat(avatar): display background and capitalized initial when avatar is unset `9c5b919d0`
+- style(theme): implement oci topbar color and active nav indicator in kawaii-cloud.css `e5673d920`
+- feat(agent): implement websocket reverse tunnel worker and local dialer `59ace8904`
+- feat(incus): adapt IncusClient to route requests over tunnel virtual duplex streams `99a61ff30`
+- feat(ui): redesign instance management cards for enhanced console UX `3b771385c`
+- feat(agent): register /tunnel websocket endpoint and deliver tunnel config in heartbeat `fba8c89ee`
+- feat(admin): optimize oauth scope selector with multi-select dropdown `5049bdc3b`
+- feat(tunnel): implement server-side multiplexed tunnel protocol and manager `a96c70568`
+- feat(admin): swap resources and operations categories in sidebar `b557da32f`
+- feat(host): configure lvm2 and thin-provisioning tools automatically in node install script `8f53aecf8`
+- feat(docker): bundle agent releases and eliminate systemd networkd startup stall `20e25de9c`
+- perf(nav): expand sidebar menu groups by default `ca56c35bf`
+- purge `41bf81daa`
+- Merge pull request #9 from aklibk86-dev/main `e33c2d287`
+- 增加docker部署 `876d49a3e`
+
+### New Capabilities / 新增能力
+
+- feat(caddy): implement uninstall functionality to remove Caddy and its components `6e5ffb76b`
+- feat(caddy): explicit install trigger, tunnel default-on, agent online via heartbeat `fb785a6e6`
+- feat(caddy): manage Caddy via agent tunnel, auto-install with zero public exposure `6b26331c2`
+- feat(makefile): add check target to verify agent code changes `ace76e91d`
+- feat(agent): add make agent-hash to track package hash with UTC date version `c36b1fa13`
+- feat(instance): show CPU allowance in C units (1C = 1 core) on create page `8fc9ace6d`
+- feat(theme): update color variables for improved theme consistency and add markdown theme import `9b7f73b44`
+- feat(instance): merge network addresses and traffic chart into info tab `7bf7082b7`
+- feat(layout): add 32px footer with #F5F4F2 background, terms on left and copyright on right `f2a77901b`
+- feat(admin): add copyright setting field to brand configuration `1681a0330`
+- feat(brand): add brandCopyright store property and i18n translations `31148ec2e`
+- feat(config): add brand_copyright system configuration and public api `e294664ba`
+- docs(spec): add 3-tier layout, footer and brand copyright design spec `623eed8b5`
+- feat(ui): support direct and websocket tunnel modes in host management views `9d889a7d7`
+- docs(specs): add design spec for oracle cloud theme `1a6279f11`
+- feat(host): add tunnel_enabled, target_host and target_port fields to host schema `12ba7dc39`
+- docs(specs): add design spec for agent websocket reverse tunnel `b20d77884`
+- feat(admin): support batch delete, disable and enable in images view `cdbfbd994`
+- feat(instance): support password auth and anti-weak-password on creation `ea0b2652f`
+- feat(docker): expose PostgreSQL port and update InstanceCreateView layout `568dded2f`
+- feat(nav): add create-instance entry to user sidebar and align labels to 4 chars `ba57180da`
+- refactor: clean up layout and remove unnecessary styles in InstanceCreateView `ae45f4833`
+- feat: add Docker image publish workflow for aklibk/payincus `ca56c59d0`
+
+## v1.6.0
+
+- Release commit / 发布提交: `b140752e9`
+- Commit date / 提交日期: 2026-07-14
+- Commit subject / 提交说明: Release v1.5.8 修复内网 IP 分配竞态 + LXC 端口转发改走内核 NAT
+
+- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
+
+## v1.5.8
+
+- Release commit / 发布提交: `b140752e9`
+- Commit date / 提交日期: 2026-07-14
+- Commit subject / 提交说明: Release v1.5.8 修复内网 IP 分配竞态 + LXC 端口转发改走内核 NAT
+
+- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
+
+## v1.5.7
+
+- Release commit / 发布提交: `3e2a64257`
+- Commit date / 提交日期: 2026-07-14
+- Commit subject / 提交说明: Release v1.5.7 修复宿主机 ZFS 安装失败 + 预编译内核模块加 SHA-256 校验
+
+- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
+
+## v1.5.6
+
+- Release commit / 发布提交: `1cf90c34a`
+- Commit date / 提交日期: 2026-07-14
+- Commit subject / 提交说明: Release v1.5.6 OTA 不再依赖 Git + 创建实例自动下发远程端口
+
+- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
+
+## v1.5.5
+
+- Release commit / 发布提交: `49ebad913`
+- Commit date / 提交日期: 2026-07-14
+- Commit subject / 提交说明: Release v1.5.5 页面级错误边界：渲染异常不再导致静默白屏
+
+- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
+
+## v1.5.4
+
+- Release commit / 发布提交: `d17675b30`
+- Commit date / 提交日期: 2026-07-13
+- Commit subject / 提交说明: Release v1.5.4 修复管理端节点详情白屏（Transition out-in + KeepAlive）
+
+- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
+
+## v1.5.3
+
+- Release commit / 发布提交: `24226069a`
+- Commit date / 提交日期: 2026-07-13
+- Commit subject / 提交说明: Release v1.5.3 修复节点详情白屏 + 第三方二进制固定版本与 SHA-256 校验
+
+
+### 修复
+
+- **管理后台「节点 → 节点详情」整页白屏（刷新后恢复正常）**：节点详情视图被用户端与管理端共用，但页面内负责在路由参数变化时重新加载数据的守卫写死了用户端的路由名（`my-host-detail`），管理端的路由名是 `admin-my-host-detail`，因此该守卫在管理端永远提前返回、从不加载数据。而该组件外层包着 `<KeepAlive>`，被缓存复用时 `onMounted` 不会再执行——于是页面进入「既不在加载中、节点数据又为空」的状态；模板此前没有对应的兜底分支，两个条件都不成立就什么都不渲染，表现为整页白屏（没有任何报错，刷新因为是全新挂载才恢复）。
+
+  三处修复：路由守卫改为同时识别用户端与管理端的路由名；新增 `onActivated`，组件被 `KeepAlive` 缓存复用时按需重新加载；模板补上兜底分支，数据为空时明确展示「加载失败」并提供重试 / 返回，杜绝再次渲染成空白页。
+
+### 安全（宿主机安装脚本）
+
+- **第三方二进制改为固定版本 + 固定 SHA-256 校验**：`wgcf` 与 `RFW` 以 root 身份安装并执行在客户宿主机上。此前 `RFW` 拉取的是上游的 `latest`——上游一旦变更，客户机器上装到的就是另一个二进制，既不可复现也无法校验；`wgcf` 虽已固定版本但没有任何哈希校验。现在两者的版本与期望 SHA-256 都固定在脚本内，下载后逐字节比对，任一不符即丢弃并重试，校验不通过一律不安装（fail closed）。
+
+  > 说明：仅比对上游同源的 `checksums.txt` 是不够的——能替换二进制的攻击者同样能替换那份校验和。因此哈希由本项目固定，并已通过独立下载重算核对。升级第三方组件时需同步更新版本号与哈希。
+
+> 本版不涉及数据库结构变更。基于 v1.5.2。
 
 ## v1.5.2
 
@@ -740,892 +1062,6 @@ Fix public package sold-out detection to include disk capacity, keeping market a
 ### Other Changes / 其他变更
 
 - Establish PayIncus project baseline `cddea0dc8`
-
-## v0.8.7
-
-- Release commit / 发布提交: `d7830b694`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Fix instance plan upgrade capacity checks
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix instance plan upgrade capacity checks `d7830b694`
-
-## v0.8.5
-
-- Release commit / 发布提交: `394e92c05`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Harden OTA Prisma client generation
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden OTA Prisma client generation `394e92c05`
-
-## v0.8.3
-
-- Release commit / 发布提交: `576d1382e`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Fix instance bandwidth and billing nav display
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix instance bandwidth and billing nav display `576d1382e`
-
-## v0.8.2
-
-- Release commit / 发布提交: `fe79137ec`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Add package traffic reset pricing
-
-### New Capabilities / 新增能力
-
-- Add package traffic reset pricing `fe79137ec`
-
-## v0.8.1
-
-- Release commit / 发布提交: `8dfa597e7`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Harden storage readiness and traffic reset
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden storage readiness and traffic reset `8dfa597e7`
-
-## v0.6.19
-
-- Release commit / 发布提交: `19ae72719`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Fix instance transfer path release guard
-
-- 继续发布用户端实例产品卡片和创建实例自动命名能力。
-- 修复实例卡片 PUSH 跳转的前后台构建边界，避免后台包包含用户端固定转让路径。
-- 更新 route guard 以覆盖新的 transfersPath helper 形态。
-
-## v0.6.18
-
-- Release commit / 发布提交: `d69254c73`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Polish instance cards and creation naming
-
-- 用户端实例卡片改为产品信息卡样式，集中展示地区、节点、套餐、配置、网络、流量、价格、到期时间和自动续费。
-- 实例卡片新增管理、PUSH、续费入口，并复用现有单实例续费/自动续费能力。
-- 创建实例时自动生成安全实例名称，支持手动覆盖和重新生成；后端 API 在 name 缺省时也会兜底生成。
-- 侧边栏分组标题增加翻译兜底，避免显示裸 key。
-
-## v0.6.17
-
-- Release commit / 发布提交: `7c62431e9`
-- Commit date / 提交日期: 2026-06-27
-- Commit subject / 提交说明: Polish UI structure and docs for v0.6.17
-
-- Keep public market and help pages in the public site shell.
-- Add collapsible user/admin sidebar groups.
-- Improve help center search, links, and error states.
-- Improve gift card user/admin UI safety, code masking, copy, and responsive layout.
-
-## v0.6.16
-
-- Release commit / 发布提交: `8639b5a6e`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Fix gift card Turnstile body verification
-
-#### Fixes and Stability / 修复与稳定性
-
-- Move user gift card Turnstile verification from onRequest to preHandler so body turnstileToken is available.
-
-- Keep authentication in onRequest and add guard coverage to prevent body-token verification regressions.
-
-- Let the gift-card flow test check the active database schema for isolated test runs.
-
-## v0.6.15
-
-- Release commit / 发布提交: `e67c9603f`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Persist expired gift card state
-
-### Other Changes / 其他变更
-
-- Persist expired gift card state `e67c9603f`
-
-## v0.6.14
-
-- Release commit / 发布提交: `d0389797f`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Fix gift card Turnstile token flow
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix gift card Turnstile token flow `d0389797f`
-
-## v0.6.13
-
-- Release commit / 发布提交: `dae1a64c5`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Fix user gift card Turnstile verification
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix user gift card Turnstile verification `dae1a64c5`
-
-## v0.6.12
-
-- Release commit / 发布提交: `2fcc75bfb`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Fix admin gift card generation Turnstile gate
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix admin gift card generation Turnstile gate `2fcc75bfb`
-
-## v0.6.11
-
-- Release commit / 发布提交: `6b0bf1232`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Add operations settings center
-
-### New Capabilities / 新增能力
-
-- Add operations settings center `6b0bf1232`
-
-## v0.6.10
-
-- Release commit / 发布提交: `1cb4f76b2`
-- Commit date / 提交日期: 2026-06-26
-- Commit subject / 提交说明: Add gift card center
-
-#### New capabilities / 新增能力
-
-- Add user gift card page for balance-funded gift card generation, redemption, and owned-card history.
-
-- Add admin gift card center for single and batch generation, stats, redacted lists, enable, disable, and delete actions.
-
-- Add GiftCard Prisma model and migration; OTA applies it through prisma migrate deploy.
-
-#### Fixes and stability / 修复与稳定性
-
-- Protect gift card balance flows with advisory locks, transaction-scoped balance deduction, self-redeem blocking, and one-time redeem claims.
-
-- Restrict production gift card management with PAYINCUS_GIFT_CARD_ADMIN_IDS and mask codes by default.
-
-- Localize and fix the OAuth Provider admin UI template.
-
-## v0.6.9
-
-- Release commit / 发布提交: `85d952b53`
-- Commit date / 提交日期: 2026-06-26
-
-- Trust the real docs-site host for market index and package downloads
-
-- Keep market guard coverage aligned with the live docs domain
-
-## v0.6.3
-
-- Release commit / 发布提交: `e42ee2b15`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Harden Lsky commit proof permissions / 加固 Lsky 提交证明权限检查
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden Lsky commit proof permissions / 加固 Lsky 提交证明权限检查 `e42ee2b15`
-
-## v0.6.2
-
-- Release commit / 发布提交: `49f484ec3`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Force artifact OTA dependency install / 强制重建 OTA 制品依赖
-
-### Other Changes / 其他变更
-
-- Force artifact OTA dependency install / 强制重建 OTA 制品依赖 `49f484ec3`
-
-## v0.6.1
-
-- Release commit / 发布提交: `08ad73d59`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Harden Lsky proof and artifact install output / 加固 Lsky proof 与制品安装输出
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden Lsky proof and artifact install output / 加固 Lsky proof 与制品安装输出 `08ad73d59`
-
-## v0.6.0
-
-- Release commit / 发布提交: `dd81058ff`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Summarize Lsky proof token abilities / 汇总 Lsky proof token 权限
-
-### Other Changes / 其他变更
-
-- Summarize Lsky proof token abilities / 汇总 Lsky proof token 权限 `dd81058ff`
-
-## v0.5.9
-
-- Release commit / 发布提交: `5738eb89e`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Harden artifact OTA install directory handling
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden artifact OTA install directory handling `5738eb89e`
-
-## v0.5.8
-
-- Release commit / 发布提交: `e687afc70`
-- Commit date / 提交日期: 2026-06-25
-
-### Other Changes / 其他变更
-
-- Document safe Lsky cleanup proof boundary `5cbf7d734`
-
-## v0.5.7
-
-- Release commit / 发布提交: `921168bf4`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Harden online update runner environment
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden online update runner environment `921168bf4`
-
-### Other Changes / 其他变更
-
-- Record latest Lsky proof access attempt `3178e60af`
-
-## v0.5.6
-
-- Release commit / 发布提交: `ea1d4d812`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Add Lsky production proof script
-
-### New Capabilities / 新增能力
-
-- Add Lsky production proof script `ea1d4d812`
-
-### Other Changes / 其他变更
-
-- Document Lsky cleanup blocker evidence `b41fec0a7`
-
-## v0.5.5
-
-- Release commit / 发布提交: `f92545e7b`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Expose SMTP provider proof metadata
-
-### Other Changes / 其他变更
-
-- Expose SMTP provider proof metadata `f92545e7b`
-
-## v0.5.4
-
-- Release commit / 发布提交: `b3279626c`
-- Commit date / 提交日期: 2026-06-25
-
-## v0.5.3
-
-- Release commit / 发布提交: `800036838`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Add production DB restore drill proof
-
-### New Capabilities / 新增能力
-
-- Add production DB restore drill proof `800036838`
-
-## v0.5.2
-
-- Release commit / 发布提交: `e0a630fc0`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Add Lsky delete diagnostics
-
-Log non-sensitive Lsky delete status/body/error diagnostics and avoid treating provider status:false responses as successful cleanup.
-
-## v0.5.1
-
-- Release commit / 发布提交: `498b824c2`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Fix Lsky v2 image deletion
-
-Preserve numeric Lsky v2 photo IDs and delete images through the official batch /user/photos endpoint.
-
-## v0.5.0
-
-- Release commit / 发布提交: `5fa3402a8`
-- Commit date / 提交日期: 2026-06-25
-
-## v0.4.9
-
-- Release commit / 发布提交: `0854f27c1`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Fix Lsky upload cleanup identifier / 修复 Lsky 上传清理标识
-
-Preserve Lsky pathname/path fallback provider IDs so uploaded ticket images can be cleaned up when provider responses omit id/key/hash.
-
-## v0.3.7
-
-- Release commit / 发布提交: `266f52d55`
-- Commit date / 提交日期: 2026-06-25
-- Commit subject / 提交说明: Fix admin benefits localization bundle / 修复后台福利本地化打包
-
-#### 新增能力 / New Capabilities
-
-- Added a release guard that checks all benefits translation keys used by the admin benefits page.
-- 新增后台福利页 i18n key 发布守卫，覆盖页面使用的全部福利文案。
-
-#### 改进与调整 / Improvements and Adjustments
-
-- Keep the admin benefits translation namespace in the admin frontend bundle while continuing to strip admin-only benefits text from the customer bundle.
-- 后台前端包保留福利管理所需文案，同时用户端包继续剔除后台福利管理文案。
-- Prevent admin benefits pages from rendering raw translation keys such as entertainment.admin.title.
-- 避免后台福利页显示 entertainment.admin.title 等原始翻译 key。
-
-## v0.3.6
-
-- Release commit / 发布提交: `773843087`
-- Commit date / 提交日期: 2026-06-25
-
-#### 新增能力 / New Capabilities
-
-- 后台日志页新增风险审计概览，显示风险动作数量、本页高风险、需要审批和需要验证码的记录数。 / Added an audit summary to the admin logs page with risk catalog count, high-risk records, approval-required records, and verification-required records.
-
-- 日志列表新增风险等级与风险说明，覆盖低、中、高、严重四级。 / Added risk level and risk title display to log rows with low, medium, high, and critical levels.
-
-- 新增管理员审计 CSV 导出，单次最多 1000 条，并记录 audit.export 操作日志。 / Added admin-only audit CSV export capped at 1000 rows and recorded as an audit.export operation log.
-
-#### 改进与调整 / Improvements and Adjustments
-
-- 日志接口返回前脱敏用户名、邮箱、IP、token 和 JWT 类内容。 / Redacted usernames, emails, IP addresses, tokens, and JWT-like values before returning log data.
-
-- 根目录全量测试纳入 risk-audit 守卫。 / Included the risk-audit guard in the root full test command.
-
-- 更新中英文后台文档和商业运营目标进度。 / Updated Chinese and English admin docs plus commercial operation progress notes.
-
-## v0.3.5
-
-- Release commit / 发布提交: `7e9f95a8c`
-- Commit date / 提交日期: 2026-06-25
-
-
-#### 改进与调整 / Improvements
-
-- Fix benefits admin localization fallback and missing English keys.
-
-## v0.3.1
-
-- Release commit / 发布提交: `51be2d4ac`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add customer success ticket workspace / 新增客服成功工单工作台
-
-### New Capabilities / 新增能力
-
-- Add customer success ticket workspace / 新增客服成功工单工作台 `51be2d4ac`
-
-## v0.2.8
-
-- Release commit / 发布提交: `7e8a29e43`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add financial reconciliation workflow / 新增财务对账闭环
-
-### New Capabilities / 新增能力
-
-- Add financial reconciliation workflow / 新增财务对账闭环 `7e8a29e43`
-
-## v0.2.7
-
-- Release commit / 发布提交: `7f6f66e29`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add order payment operations workflow / 新增订单支付运营闭环
-
-#### 新增能力 / New capabilities
-
-- Add admin order operation cases with dispute states: pending review, confirmed, compensated and closed.
-- Add manual refund registration that creates balance-adjustment approval requests without directly changing user balances.
-- 新增人工退款登记，只创建调账审批，不直接修改用户余额。
-- Add redacted provider status summaries and extended order search by keyword and date range.
-- 新增脱敏 provider 状态摘要，并扩展订单号、交易号、用户和时间范围搜索。
-
-#### 改进与调整 / Improvements and adjustments
-
-- Link order operation records to adjustment approvals and balance logs after approval.
-- 订单运营处理记录可关联调账审批，审批通过后继续关联余额流水。
-- Update admin billing documentation in Chinese and English.
-- 更新中英文后台与支付账务文档。
-
-#### 验证 / Verification
-
-- pnpm --filter server test:order-payment-operations-guards
-- pnpm --filter server test:order-center-guards
-- pnpm --filter server test:balance-adjustment-approval-guards
-- pnpm --filter server type-check
-- pnpm --filter client type-check
-- pnpm --filter client build
-- pnpm --filter server test:frontend-route-guards
-- pnpm --filter server test:frontend-dist-boundary-guards
-- pnpm --dir docs-site --ignore-workspace build
-- pnpm build
-- pnpm test
-- git diff --check
-
-## v0.2.6
-
-- Release commit / 发布提交: `0f327fe1f`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add commercial operations overview / 新增商业运营总览
-
-#### New capabilities / 新增能力
-
-- Add admin commercial operations overview for revenue, orders, users, instances, delivery, infrastructure, support, and risk alerts.
-- 新增后台商业运营总览，覆盖收入、订单、用户、实例、交付、基础设施、支持与风险提醒。
-
-#### Other changes / 其他变更
-
-- Update admin documentation for the operations overview.
-- 更新后台文档，说明运营总览指标与边界。
-
-#### Improvements and adjustments / 改进与调整
-
-- Add commercial operations overview guard and include it in pnpm test.
-- 新增商业运营总览守卫，并纳入 pnpm test。
-
-## v0.2.5
-
-- Release commit / 发布提交: `1c3b63086`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Harden OTA cleanup and disk preflight / 加固 OTA 清理与磁盘预检
-
-#### 新增能力 / New capabilities
-
-- Add OTA download-cache cleanup before and after update tasks.
-- Add disk-space preflight with actionable Chinese failure guidance.
-- Add atomic release pruning with protected current and rollback targets.
-
-#### 改进与调整 / Improvements and adjustments
-
-- Preserve .incudal-update-downloads during legacy artifact application until cleanup finishes.
-- Document OTA retention environment variables in Chinese and English.
-
-#### 其他变更 / Other changes
-
-- Extend system update guard coverage for cleanup, preflight and release pruning.
-
-## v0.2.4
-
-- Release commit / 发布提交: `12bcebeb2`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add balance adjustment approval / 新增调账审批流
-
-### New Capabilities / 新增能力
-
-- Add balance adjustment approval / 新增调账审批流 `12bcebeb2`
-
-## v0.2.3
-
-- Release commit / 发布提交: `9d03a7b6c`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add order exception handling / 新增订单异常处理
-
-### New Capabilities / 新增能力
-
-- Add order exception handling / 新增订单异常处理 `9d03a7b6c`
-
-## v0.2.2
-
-- Release commit / 发布提交: `2311b2442`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Add unified order center / 新增统一订单中心
-
-### New Capabilities / 新增能力
-
-- Add unified order center / 新增统一订单中心 `2311b2442`
-- Revert "Add demo login and read-only safeguards / 新增演示登录与只读保护" `bf96cde42`
-- Add demo login and read-only safeguards / 新增演示登录与只读保护 `7be458969`
-
-### Other Changes / 其他变更
-
-- Separate demo docs from production guides / 区分演示文档与生产指南 `4978cf845`
-
-## v0.2.1
-
-- Release commit / 发布提交: `815dd2f73`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Allow installer to set initial admin email / 允许安装器设置初始管理员邮箱
-
-#### 新增能力 / New Capabilities
-
-- 一键安装脚本支持设置初始管理员邮箱。
-- One-click installer now supports setting the initial admin email.
-
-#### 改进与调整 / Improvements and Adjustments
-
-- 默认管理员初始化改为读取 ADMIN_EMAIL，兼容 ADMIN_INITIAL_EMAIL。
-- Default admin initialization now reads ADMIN_EMAIL and remains compatible with ADMIN_INITIAL_EMAIL.
-- 环境示例和中英文部署文档补充 ADMIN_EMAIL。
-- Environment examples and Chinese/English deployment docs now include ADMIN_EMAIL.
-
-#### 其他变更 / Other Changes
-
-- 增加安装器和数据库初始化守卫测试，防止管理员邮箱再次硬编码。
-- Added installer and database initialization guards to prevent hardcoded admin email regressions.
-
-## v0.2.0
-
-- Release commit / 发布提交: `dd9e8e395`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix installer static asset permissions / 修复安装器静态资源权限
-
-#### 修复与稳定性 / Fixes and stability
-
-- Keep the install root traversable for Nginx so one-click installs can serve frontend static assets.
-- 保持安装根目录可被 Nginx 穿透，确保一键安装后可正常提供前端静态资源。
-
-#### 改进与调整 / Improvements and adjustments
-
-- Preserve owner-only permissions for .env after install and upgrade permission repair.
-- Add split deployment guard coverage for installer static asset permissions.
-
-## v0.1.9
-
-- Release commit / 发布提交: `9649f3c9b`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Ensure installer enables pnpm / 确保安装脚本启用 pnpm
-
-#### 修复与稳定性 / Fixes and stability
-
-- Ensure the one-click production installer enables pnpm before Prisma migrations and systemd startup.
-- 确保一键生产安装脚本在 Prisma 迁移和 systemd 启动前启用 pnpm。
-
-#### 改进与调整 / Improvements and adjustments
-
-- Pin pnpm 9.14.2 in the installer and keep a Corepack-first, npm-fallback bootstrap path.
-- 在安装脚本中固定 pnpm 9.14.2，并保留 Corepack 优先、npm 兜底的初始化路径。
-- Extend split deployment guards to prevent clean-server installer regressions.
-- 扩展前后台分离部署守卫，防止干净服务器安装路径回退。
-
-## v0.1.7
-
-- Release commit / 发布提交: `ba7a6eed2`
-- Commit date / 提交日期: 2026-06-24
-
-
-#### 其他变更 / Other changes
-
-- 实例任务失败、超时清理和启动清理僵尸任务时，会记录中文失败日志并触发用户失败通知。
-
-- Instance task failures, timeout cleanup, and startup stale-task cleanup now write Chinese failure logs and send user failure notifications.
-
-## v0.1.6
-
-- Release commit / 发布提交: `3bfdfe5ac`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix admin instance detail loading / 修复后台实例详情加载
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix admin instance detail loading / 修复后台实例详情加载 `3bfdfe5ac`
-
-## v0.1.5
-
-- Release commit / 发布提交: `33d1afc9f`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Localize operation logs in Chinese / 日志内容中文化
-
-### Other Changes / 其他变更
-
-- Localize operation logs in Chinese / 日志内容中文化 `33d1afc9f`
-
-## v0.1.4
-
-- Release commit / 发布提交: `653d3a51b`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Prevent incompatible VM package host binding / 阻止不兼容 VM 套餐节点绑定
-
-### Other Changes / 其他变更
-
-- Prevent incompatible VM package host binding / 阻止不兼容 VM 套餐节点绑定 `653d3a51b`
-
-## v0.1.3
-
-- Release commit / 发布提交: `b9857686a`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix instance detail bandwidth rendering / 修复实例详情带宽渲染
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix instance detail bandwidth rendering / 修复实例详情带宽渲染 `b9857686a`
-
-## v0.1.2
-
-- Release commit / 发布提交: `104c6c0c5`
-- Commit date / 提交日期: 2026-06-24
-
-#### New capabilities / 新增能力
-
-- Admin users can view latest release metadata while update execution remains super-admin only.
-
-- 后台管理员可查看最新 release 信息，实际更新执行仍仅限超级管理员。
-
-## v0.1.1
-
-- Release commit / 发布提交: `4fb35c487`
-- Commit date / 提交日期: 2026-06-24
-
-
-#### 其他变更 / Other Changes
-
-- 版本更新页在未发现新版本时持续展示当前/latest 版本信息，并将主按钮显示为已更新至最新版本。
-
-- The system update page keeps latest/current version details visible when no newer release exists and marks the primary action as already up to date.
-
-#### 改进与调整 / Improvements and Adjustments
-
-- 安装任务日志和市场页面布局改为更清晰的后台工作区，减少页面撑高和信息挤压。
-
-- Install logs and market layout now use clearer admin workspace spacing to reduce page overflow and crowded content.
-
-## v0.1.0
-
-- Release commit / 发布提交: `e4f9f8a17`
-- Commit date / 提交日期: 2026-06-24
-
-### Other Changes / 其他变更
-
-- Document bilingual versioning and OTA cadence rules `81fce60d0`
-
-## v0.0.21
-
-- Release commit / 发布提交: `6a4ebdb1b`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix production OTA CLI start command
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix production OTA CLI start command `6a4ebdb1b`
-
-## v0.0.20
-
-- Release commit / 发布提交: `6b99a47f2`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Update version log for static root fix
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix production split static roots `9cb0ae0c2`
-
-## v0.0.19
-
-- Release commit / 发布提交: `d8195460b`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix storage pool defaults and error guidance
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix storage pool defaults and error guidance `d8195460b`
-
-## v0.0.18
-
-- Release commit / 发布提交: `43b9807ed`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix Agent binary installer cache query
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix Agent binary installer cache query `43b9807ed`
-
-## v0.0.17
-
-- Release commit / 发布提交: `71bb4ca70`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Fix Agent installer manifest parsing
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix Agent installer manifest parsing `71bb4ca70`
-
-## v0.0.16
-
-- Release commit / 发布提交: `0a75877a6`
-- Commit date / 提交日期: 2026-06-24
-- Commit subject / 提交说明: Refresh host panel trust certificate
-
-### Other Changes / 其他变更
-
-- Refresh host panel trust certificate `0a75877a6`
-
-## v0.0.15
-
-- Release commit / 发布提交: `71e2af87c`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Fix atomic OTA install root detection
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix atomic OTA install root detection `71e2af87c`
-
-## v0.0.14
-
-- Release commit / 发布提交: `3833c6f79`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Clarify Debian host install support
-
-### New Capabilities / 新增能力
-
-- Clarify Debian host install support `3833c6f79`
-
-## v0.0.13
-
-- Release commit / 发布提交: `f9f6cdb7c`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Update version log for HSTS hardening
-
-- Add HSTS to split Nginx templates and installer-generated static frontend blocks.
-
-- Guard HSTS in split deployment and security header checks.
-
-- Document the public Strict-Transport-Security production requirement.
-
-## v0.0.12
-
-- Release commit / 发布提交: `e44a5d7ce`
-- Commit date / 提交日期: 2026-06-23
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix GitHub Pages docs workflow `5e0a9a0fa`
-
-### Other Changes / 其他变更
-
-- Deploy docs site with GitHub Pages `e041db36e`
-
-### New Capabilities / 新增能力
-
-- Add bilingual PayIncus documentation site `0c8682741`
-
-### Improvements and Adjustments / 改进与调整
-
-- Update split deployment docs `54368bf10`
-- Update README with OTA and community links `ae5617118`
-
-## v0.0.11
-
-- Release commit / 发布提交: `eae342d77`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Support atomic OTA release layout
-
-- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
-
-## v0.0.10
-
-- Release commit / 发布提交: `eae342d77`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Support atomic OTA release layout
-
-### New Capabilities / 新增能力
-
-- Support atomic OTA release layout `eae342d77`
-
-## v0.0.9
-
-- Release commit / 发布提交: `2af166460`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Auto rollback failed online updates
-
-### Fixes and Stability / 修复与稳定性
-
-- Auto rollback failed online updates `2af166460`
-
-## v0.0.8
-
-- Release commit / 发布提交: `39140db7a`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Prefer verified OTA artifacts for online updates
-
-- This tag points to the same commit as the adjacent tag, so there are no additional Git commits.
-
-## v0.0.7
-
-- Release commit / 发布提交: `39140db7a`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Prefer verified OTA artifacts for online updates
-
-### Improvements and Adjustments / 改进与调整
-
-- Prefer verified OTA artifacts for online updates `39140db7a`
-
-## v0.0.6
-
-- Release commit / 发布提交: `c6342d950`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Stabilize OTA restart verification
-
-### Fixes and Stability / 修复与稳定性
-
-- Stabilize OTA restart verification `c6342d950`
-
-## v0.0.5
-
-- Release commit / 发布提交: `8c633c68f`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Fix OTA manifest release workflow checkout
-
-### Fixes and Stability / 修复与稳定性
-
-- Fix OTA manifest release workflow checkout `8c633c68f`
-
-## v0.0.4
-
-- Release commit / 发布提交: `55fdd4abd`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Add OTA release manifest metadata
-
-### New Capabilities / 新增能力
-
-- Add OTA release manifest metadata `55fdd4abd`
-
-## v0.0.3
-
-- Release commit / 发布提交: `9ad38dde4`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Make OTA worker tolerate production git ownership
-
-### Fixes and Stability / 修复与稳定性
-
-- Make OTA worker tolerate production git ownership `9ad38dde4`
-
-## v0.0.2
-
-- Release commit / 发布提交: `cb1f45b96`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Make online updates asynchronous and build-ready
-
-### Improvements and Adjustments / 改进与调整
-
-- Make online updates asynchronous and build-ready `cb1f45b96`
-
-## v0.0.1
-
-- Release commit / 发布提交: `dcd968d20`
-- Commit date / 提交日期: 2026-06-23
-- Commit subject / 提交说明: Allow online update worker sudo under systemd
-
-### New Capabilities / 新增能力
-
-- Allow online update worker sudo under systemd `dcd968d20`
-
-### Improvements and Adjustments / 改进与调整
-
-- Prepare v0.0.1 online update baseline `c7b223d93`
-- Make release installs reproducible `deea26349`
-- Update Agent release repository default `51bf5ff43`
-- Rewrite PayIncus README `c1f237e0e`
-- Update payincus deployment checks `7979d9dda`
-- Update README.md `f971ad5f0`
-- Prepare host deployment package `09d96b11b`
-
-### Fixes and Stability / 修复与稳定性
-
-- Harden release production verification `c31d5ba79`
-
-### Other Changes / 其他变更
-
-- first commit `cb4a866db`
 
 ## Generation
 

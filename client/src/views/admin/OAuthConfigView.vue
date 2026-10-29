@@ -3,7 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
+import { Ban, Pencil, RefreshCw, Trash2 } from 'lucide-vue-next'
 import api from '@/api/admin'
+import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
 import { systemSettingsNavigationItems } from '@/constants/adminSettings'
@@ -819,10 +821,10 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
                 <span class="inline-flex rounded-full border px-2 py-0.5 text-2xs font-medium" :class="appItem.enabled ? 'border-success text-success' : 'border-warning text-warning'">{{ appItem.enabled ? '启用' : '停用' }}</span>
               </td>
               <td class="py-3 pr-6">
-                <div class="flex flex-wrap gap-2">
-                  <button class="btn-secondary btn-sm" @click="editOAuthApp(appItem)">编辑</button>
-                  <button class="btn-secondary btn-sm" @click="rotateOAuthAppSecret(appItem)">轮换 Secret</button>
-                  <button class="btn-ghost btn-sm text-error" @click="deleteOAuthApp(appItem)">删除</button>
+                <div class="flex items-center gap-1">
+                  <IconButton :label="t('admin.oauth.edit')" @click="editOAuthApp(appItem)"><Pencil /></IconButton>
+                  <IconButton :label="t('admin.oauth.rotateSecret')" @click="rotateOAuthAppSecret(appItem)"><RefreshCw /></IconButton>
+                  <IconButton :label="t('common.delete')" variant="danger" @click="deleteOAuthApp(appItem)"><Trash2 /></IconButton>
                 </div>
               </td>
             </tr>
@@ -963,13 +965,7 @@ function formatScopeAccess(access: PublicApiScopeMetadata['access']): string {
               </td>
               <td class="py-3 pr-4 text-themed-muted">{{ new Date(authorization.lastAuthorizedAt).toLocaleString() }}</td>
               <td class="py-3 pr-6">
-                <button
-                  class="btn-ghost btn-sm text-error"
-                  :disabled="Boolean(authorization.revokedAt)"
-                  @click="revokeOAuthAuthorization(authorization)"
-                >
-                  撤销授权
-                </button>
+                <IconButton :label="t('admin.oauth.revoke')" variant="danger" :disabled="Boolean(authorization.revokedAt)" @click="revokeOAuthAuthorization(authorization)"><Ban /></IconButton>
               </td>
             </tr>
             <tr v-if="oauthAuthorizations.length === 0">

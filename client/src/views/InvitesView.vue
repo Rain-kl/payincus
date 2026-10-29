@@ -2,7 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Copy, Link } from 'lucide-vue-next'
 import api from '@/api'
+import IconButton from '@/components/IconButton.vue'
 import type { InviteCostOption, UserInvite, UserInviteSummary } from '@/types/api'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
@@ -406,9 +408,9 @@ function nextPage(): void {
                   <div v-else-if="invite.expiresAt">{{ t('invites.time.expires', { time: formatDate(invite.expiresAt) }) }}</div>
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
-                  <div class="inline-flex justify-end gap-2">
-                    <button class="btn btn-ghost btn-sm" @click="copyText(invite.code, t('invites.codeCopied'))">{{ t('invites.copyCode') }}</button>
-                    <button class="btn btn-secondary btn-sm" @click="copyText(getInviteLink(invite), t('invites.linkCopied'))">{{ t('invites.copyLink') }}</button>
+                  <div class="inline-flex items-center justify-end gap-1">
+                    <IconButton :label="t('invites.copyCode')" @click="copyText(invite.code, t('invites.codeCopied'))"><Copy /></IconButton>
+                    <IconButton :label="t('invites.copyLink')" @click="copyText(getInviteLink(invite), t('invites.linkCopied'))"><Link /></IconButton>
                   </div>
                 </td>
               </tr>

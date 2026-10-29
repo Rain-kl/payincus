@@ -56,6 +56,7 @@
 10. **禁止在组件里指定主题色值**：背景 / 文字 / 边框 / 强调 / 选中态等颜色必须引用主题 token 层（`client/src/styles/theme.css` 是唯一事实来源，`tailwind.config.js` 的 token 映射与 `kawaii-cloud.css` 的 `--kawaii-*` 均为对它的引用）。改主题色**只改 theme.css 一处**，组件不得复制色值。
 11. **禁止任何透明 / 半透明元素**：全局样式、组件、scoped style、SVG、图标中一律不得出现透明 / 半透明写法 —— 包括 `rgba()`、`opacity`、`bg-*`/`text-*` 的透明度后缀（如 `bg-*/50`、`text-*/70`）、`/40`、`/50` 这类 Tailwind 透明度简写、`bg-transparent`、`transparent` 关键字等。所有背景 / 文字 / 边框 / 描边必须使用**不透明的纯色**（主题 token 或语义 class）。`test:frontend-color-tokens` 守卫会全局扫描拦截，**违反即未完成**。
 12. **所有弹窗必须使用抽屉（Drawer）**：前端所有弹窗、表单浮层、操作模态框（Modal / Dialog / Popup）一律统一使用 `<DrawerModal>` 或右侧滑出抽屉样式（`.modal-overlay` + `.modal-backdrop` + `.modal-content` 侧边抽屉布局），严禁使用居中弹窗、原生 alert/confirm（除必要的高危二次确认外）或非抽屉样式的全屏浮层。抽屉层级、遮罩背景及内构（`.modal-header` / `.modal-body` / `.modal-footer`）必须保持全系统一致，取消按钮白底黑字（`btn-secondary`），确认/提交按钮黑底白字（`btn-primary`）。
+13. **表格操作列禁止文字按钮，一律扁平无边框图标 + hint**：表格（`<table>`）操作列（`<td>`）内**禁止**出现任何带文字的按钮（`btn-primary` / `btn-secondary` / `btn-danger` / `btn-ghost` 等「编辑 / 删除 / 详情 / 启用」白底描边大按钮），**必须**改用 `client/src/components/IconButton.vue`（底层 `.icon-btn`，shadcn 风格扁平无边框，hover 才浮出浅底），图标用 `lucide-vue-next`，且每个图标按钮**必须**带 `:label`（同时落到 `title` hint 与 `aria-label`，文案走 i18n）。危险操作用 `variant="danger"`（`--error`）。移动端卡片（非 `<td>`）与抽屉/弹窗内按钮不受此限。规范全文见 [`THEME.md` §5](THEME.md)，由 `test:frontend-table-actions` 守卫强制，**违反即未完成**。
 
 ---
 
@@ -78,11 +79,12 @@
 
 - **全量**（慢，发版前跑）：`pnpm test`
 - **单个**：`pnpm --filter server test:<guard-name>`
-- **前端最常用四个**：
+- **前端最常用五个**：
   - `test:frontend-route-guards` —— 路由 / **表格布局** / `@click` 路径断言
   - `test:frontend-dist-boundary-guards` —— 双端 dist 边界
   - `test:frontend-i18n-keys` —— i18n key 完整性
   - `test:frontend-color-tokens` —— **主题色纪律**：全局扫描 `client/src` 的 `.vue/.css/.ts`，拦截任何硬编码 hex 色值（白名单见脚本内 `EXEMPT_PATHS`）
+  - `test:frontend-table-actions` —— **表格操作列纪律**：扫描所有 `.vue`，拦截表格 `<td>` 内的文字按钮，要求 `IconButton` + hint（见 §2.13 / THEME.md §5）
 - **节点分发边界**：`pnpm --filter server test:node-distribution`
 
 ### ⚠️ 表格布局守卫（最容易踩雷）
@@ -90,6 +92,7 @@
 - 想修“宽表挤压”时：**先判断该表是否在守卫清单里**。锁定表**只能在 `table-fixed` 内平衡列宽**（列宽百分比合计 = 100%）+ 允许单元格换行 + 靠移动卡应对窄屏；**不能**改成横向滚动。
 - 受锁定的表（用户端）：`MyPackagesView`、`MyHostsView`、`TransfersView`、`OrdersView`、`InvitesView`、`FlashSalesView`、`HostingWalletView`、`InstancesView`、`LogsView`、`EntertainmentView`；（管理端）`admin/BillingView`、`admin/ImagesView`、`admin/HelpManageView`、`admin/MailView`、`admin/PluginCenterView`；（组件）`HostPublicIpv4Tab`、`InstanceLogsTab`、`ConfigEditModal`。
 - 改任一前端文件后**必跑** `test:frontend-route-guards`（涉及颜色/样式时**同时必跑** `test:frontend-color-tokens`）。
+- 表格操作列（`<td>`）**只允许** `IconButton` 图标按钮（扁平无边框 + hint），**禁止**任何带文字按钮；改表格后**必跑** `test:frontend-table-actions`（见 §2.13 / THEME.md §5）。
 
 ---
 

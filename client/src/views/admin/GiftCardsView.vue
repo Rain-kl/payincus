@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Power, PowerOff, Trash2 } from 'lucide-vue-next'
 import api from '@/api/admin'
+import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 import type { GiftCardRecord, GiftCardStats, GiftCardStatus } from '@/types/api'
 
@@ -365,11 +367,9 @@ onMounted(loadData)
               </td>
               <td class="px-4 py-3 text-themed-muted">{{ formatDate(card.expiresAt) }}</td>
               <td class="px-4 py-3">
-                <div class="flex flex-wrap gap-2">
-                  <button v-if="card.status === 'active' || card.status === 'disabled'" class="btn btn-secondary btn-sm" @click="updateCardStatus(card)">
-                    {{ card.status === 'disabled' ? t('giftCardsAdmin.enable') : t('giftCardsAdmin.disable') }}
-                  </button>
-                  <button v-if="card.status !== 'used'" class="btn btn-danger btn-sm" @click="deleteCard(card)">{{ t('giftCardsAdmin.delete') }}</button>
+                <div class="flex items-center gap-1">
+                  <IconButton v-if="card.status === 'active' || card.status === 'disabled'" :label="card.status === 'disabled' ? t('giftCardsAdmin.enable') : t('giftCardsAdmin.disable')" @click="updateCardStatus(card)"><Power v-if="card.status === 'disabled'" /><PowerOff v-else /></IconButton>
+                  <IconButton v-if="card.status !== 'used'" :label="t('giftCardsAdmin.delete')" variant="danger" @click="deleteCard(card)"><Trash2 /></IconButton>
                 </div>
               </td>
             </tr>
