@@ -1,0 +1,435 @@
+[
+  {
+    "name": "ssh-keys-anon-list",
+    "method": "GET",
+    "path": "/api/ssh-keys"
+  },
+  {
+    "name": "ssh-keys-anon-detail",
+    "method": "GET",
+    "path": "/api/ssh-keys/1"
+  },
+  {
+    "name": "ssh-keys-anon-create",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "body": {
+      "name": "k",
+      "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDGkFS8vGJ7"
+    }
+  },
+  {
+    "name": "ssh-keys-anon-generate",
+    "method": "POST",
+    "path": "/api/ssh-keys/generate"
+  },
+  {
+    "name": "ssh-keys-anon-delete",
+    "method": "DELETE",
+    "path": "/api/ssh-keys/1"
+  },
+  {
+    "name": "ssh-keys-trailing-slash-anon",
+    "method": "GET",
+    "path": "/api/ssh-keys/"
+  },
+  {
+    "name": "storage-configs-anon-list",
+    "method": "GET",
+    "path": "/api/storage-configs"
+  },
+  {
+    "name": "storage-configs-anon-create",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "body": {
+      "name": "n",
+      "type": "S3",
+      "host": "example.com"
+    }
+  },
+  {
+    "name": "storage-configs-anon-patch",
+    "method": "PATCH",
+    "path": "/api/storage-configs/1",
+    "body": {
+      "name": "n"
+    }
+  },
+  {
+    "name": "storage-configs-anon-delete",
+    "method": "DELETE",
+    "path": "/api/storage-configs/1"
+  },
+  {
+    "name": "storage-configs-anon-test",
+    "method": "POST",
+    "path": "/api/storage-configs/1/test"
+  },
+  {
+    "name": "storage-configs-anon-set-default",
+    "method": "POST",
+    "path": "/api/storage-configs/1/set-default"
+  },
+  {
+    "name": "ssh-keys-list",
+    "method": "GET",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "ssh-keys-detail-bad-id-zero",
+    "method": "GET",
+    "path": "/api/ssh-keys/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "ssh-keys-detail-bad-id-negative",
+    "method": "GET",
+    "path": "/api/ssh-keys/-1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "ssh-keys-detail-bad-id-leading-zero",
+    "method": "GET",
+    "path": "/api/ssh-keys/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "ssh-keys-detail-bad-id-nonnumeric",
+    "method": "GET",
+    "path": "/api/ssh-keys/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "ssh-keys-detail-missing",
+    "method": "GET",
+    "path": "/api/ssh-keys/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "ssh-keys-create-empty-body",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "ssh-keys-create-missing-public-key",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "k"
+    }
+  },
+  {
+    "name": "ssh-keys-create-short-public-key",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "k",
+      "publicKey": "short"
+    }
+  },
+  {
+    "name": "ssh-keys-create-name-too-long",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJDGkFS8vGJ7"
+    }
+  },
+  {
+    "name": "ssh-keys-create-invalid-key-format",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "k",
+      "publicKey": "not-a-valid-ssh-key-material"
+    }
+  },
+  {
+    "name": "ssh-keys-create-unknown-field-accepted",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "k",
+      "publicKey": "not-a-valid-ssh-key-material",
+      "unknownField": 1
+    }
+  },
+  {
+    "name": "ssh-keys-create-non-object-body",
+    "method": "POST",
+    "path": "/api/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": [
+      1,
+      2
+    ]
+  },
+  {
+    "name": "storage-configs-list",
+    "method": "GET",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/storage-configs/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-create-missing-all",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "storage-configs-create-missing-host",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "S3"
+    }
+  },
+  {
+    "name": "storage-configs-create-invalid-type",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "NOPE",
+      "host": "example.com"
+    }
+  },
+  {
+    "name": "storage-configs-create-empty-name",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "",
+      "type": "S3",
+      "host": "example.com"
+    }
+  },
+  {
+    "name": "storage-configs-create-port-too-small",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "S3",
+      "host": "example.com",
+      "port": 0
+    }
+  },
+  {
+    "name": "storage-configs-create-port-not-integer",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "S3",
+      "host": "example.com",
+      "port": 22.5
+    }
+  },
+  {
+    "name": "storage-configs-create-private-host-rejected",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "SFTP",
+      "host": "127.0.0.1"
+    }
+  },
+  {
+    "name": "storage-configs-create-localhost-rejected",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "FTP",
+      "host": "localhost"
+    }
+  },
+  {
+    "name": "storage-configs-create-metadata-ip-rejected",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "WEBDAV",
+      "host": "http://169.254.169.254"
+    }
+  },
+  {
+    "name": "storage-configs-create-bad-base-path",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "SFTP",
+      "host": "example.com",
+      "basePath": "../../etc"
+    }
+  },
+  {
+    "name": "storage-configs-create-s3-without-credentials",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "S3",
+      "host": "example.com",
+      "extra": {
+        "bucket": "mybucket"
+      }
+    }
+  },
+  {
+    "name": "storage-configs-create-s3-bad-bucket",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "S3",
+      "host": "example.com",
+      "username": "AKIA",
+      "password": "secret",
+      "extra": {
+        "bucket": "Bad_Bucket"
+      }
+    }
+  },
+  {
+    "name": "storage-configs-create-unknown-field-accepted",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "type": "SFTP",
+      "host": "127.0.0.1",
+      "unknownField": true
+    }
+  },
+  {
+    "name": "storage-configs-create-non-object-body",
+    "method": "POST",
+    "path": "/api/storage-configs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": [
+      1,
+      2
+    ]
+  },
+  {
+    "name": "storage-configs-patch-bad-id",
+    "method": "PATCH",
+    "path": "/api/storage-configs/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "storage-configs-patch-leading-zero-id",
+    "method": "PATCH",
+    "path": "/api/storage-configs/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "storage-configs-patch-missing",
+    "method": "PATCH",
+    "path": "/api/storage-configs/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "storage-configs-patch-invalid-extra",
+    "method": "PATCH",
+    "path": "/api/storage-configs/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "extra": []
+    }
+  },
+  {
+    "name": "storage-configs-patch-invalid-port",
+    "method": "PATCH",
+    "path": "/api/storage-configs/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "port": "abc"
+    }
+  },
+  {
+    "name": "storage-configs-patch-invalid-type",
+    "method": "PATCH",
+    "path": "/api/storage-configs/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "type": "NOPE"
+    }
+  },
+  {
+    "name": "storage-configs-delete-bad-id",
+    "method": "DELETE",
+    "path": "/api/storage-configs/-7",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-delete-missing",
+    "method": "DELETE",
+    "path": "/api/storage-configs/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-test-bad-id",
+    "method": "POST",
+    "path": "/api/storage-configs/abc/test",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-test-missing",
+    "method": "POST",
+    "path": "/api/storage-configs/2147483000/test",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-set-default-bad-id",
+    "method": "POST",
+    "path": "/api/storage-configs/0/set-default",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-configs-set-default-missing",
+    "method": "POST",
+    "path": "/api/storage-configs/2147483000/set-default",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]

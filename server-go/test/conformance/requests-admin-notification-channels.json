@@ -1,0 +1,141 @@
+[
+  { "name": "admin-notification-channels-list-anon", "method": "GET", "path": "/api/admin/notification-channels" },
+  { "name": "admin-notification-channels-get-anon", "method": "GET", "path": "/api/admin/notification-channels/1" },
+  {
+    "name": "admin-notification-channels-create-anon",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "body": { "name": "x", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123" }
+  },
+  { "name": "admin-notification-channels-delete-anon", "method": "DELETE", "path": "/api/admin/notification-channels/1" },
+
+  {
+    "name": "admin-notification-channels-create-non-admin",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123" }
+  },
+  {
+    "name": "admin-notification-channels-patch-non-admin",
+    "method": "PATCH",
+    "path": "/api/admin/notification-channels/1",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x" }
+  },
+
+  { "name": "admin-notification-channels-list", "method": "GET", "path": "/api/admin/notification-channels", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "admin-notification-channels-list-trailing-slash", "method": "GET", "path": "/api/admin/notification-channels/", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "admin-notification-channels-get-invalid-id-text", "method": "GET", "path": "/api/admin/notification-channels/abc", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "admin-notification-channels-get-invalid-id-zero", "method": "GET", "path": "/api/admin/notification-channels/0", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "admin-notification-channels-get-invalid-id-leading-zero", "method": "GET", "path": "/api/admin/notification-channels/01", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "admin-notification-channels-get-invalid-id-negative", "method": "GET", "path": "/api/admin/notification-channels/-1", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "admin-notification-channels-get-not-found", "method": "GET", "path": "/api/admin/notification-channels/2147483647", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "admin-notification-channels-create-no-body", "method": "POST", "path": "/api/admin/notification-channels", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "admin-notification-channels-create-empty-object", "method": "POST", "path": "/api/admin/notification-channels", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} },
+  { "name": "admin-notification-channels-create-null-body", "method": "POST", "path": "/api/admin/notification-channels", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": null },
+  { "name": "admin-notification-channels-create-array-body", "method": "POST", "path": "/api/admin/notification-channels", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": [] },
+  {
+    "name": "admin-notification-channels-create-empty-name",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123" }
+  },
+  {
+    "name": "admin-notification-channels-create-name-too-long",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa",
+      "chatId": "-100123"
+    }
+  },
+  {
+    "name": "admin-notification-channels-create-name-not-string",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": {}, "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123" }
+  },
+  {
+    "name": "admin-notification-channels-create-enabled-not-boolean",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123", "enabled": "yes" }
+  },
+  {
+    "name": "admin-notification-channels-create-enabled-out-of-range",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123", "enabled": 2 }
+  },
+  {
+    "name": "admin-notification-channels-create-invalid-bot-token",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x", "botToken": "not-a-token", "chatId": "-100123" }
+  },
+  {
+    "name": "admin-notification-channels-create-masked-bot-token-rejected",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x", "botToken": "12345678...aaaaa", "chatId": "-100123" }
+  },
+  {
+    "name": "admin-notification-channels-create-invalid-chat-id",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "not-a-chat" }
+  },
+  {
+    "name": "admin-notification-channels-create-blank-name",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "     ", "botToken": "123456789:aaaaaaaaaaaaaaaaaaaaaaaaa", "chatId": "-100123" }
+  },
+  {
+    "name": "admin-notification-channels-create-invalid-media-type",
+    "method": "POST",
+    "path": "/api/admin/notification-channels",
+    "headers": { "content-type": "application/x-www-form-urlencoded" },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "name": "x" }
+  },
+
+  { "name": "admin-notification-channels-patch-invalid-id", "method": "PATCH", "path": "/api/admin/notification-channels/abc", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "name": "x" } },
+  { "name": "admin-notification-channels-patch-not-found", "method": "PATCH", "path": "/api/admin/notification-channels/2147483647", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "name": "x" } },
+  { "name": "admin-notification-channels-patch-empty-object", "method": "PATCH", "path": "/api/admin/notification-channels/2147483647", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} },
+  { "name": "admin-notification-channels-patch-invalid-bot-token", "method": "PATCH", "path": "/api/admin/notification-channels/2147483647", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "botToken": "x" } },
+  { "name": "admin-notification-channels-patch-empty-name", "method": "PATCH", "path": "/api/admin/notification-channels/2147483647", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "name": "" } },
+  { "name": "admin-notification-channels-patch-array-body", "method": "PATCH", "path": "/api/admin/notification-channels/abc", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": [] },
+
+  { "name": "admin-notification-channels-delete-invalid-id", "method": "DELETE", "path": "/api/admin/notification-channels/abc", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} },
+  { "name": "admin-notification-channels-delete-not-found", "method": "DELETE", "path": "/api/admin/notification-channels/2147483647", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} },
+  { "name": "admin-notification-channels-delete-empty-json-body", "method": "DELETE", "path": "/api/admin/notification-channels/2147483647", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "admin-notification-channels-test-invalid-id", "method": "POST", "path": "/api/admin/notification-channels/abc/test", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} },
+  { "name": "admin-notification-channels-test-not-found", "method": "POST", "path": "/api/admin/notification-channels/2147483647/test", "headers": { "content-type": "application/json" }, "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} }
+]

@@ -26,20 +26,29 @@
 | **Wave 1 地基（已完成）** | `src/lib/log_localization.go`、`src/lib/risk_audit.go`、`src/db/logs.go`、`src/db/advisory_locks.go`、`src/db/system_config.go`、`src/lib/config_cache.go`、`src/db/balance.go`、`src/lib/operation_verification.go` | 共享地基 + 单测（`go test ./...` 全绿） |
 | **Wave 2 地基（已完成）** | `src/lib/security.go`（1753 行，含 AES-GCM 加解密/2FA/登录锁/审计/refresh token）、`src/lib/security_config.go`、`src/lib/runtime_settings.go`、`src/lib/turnstile.go`、`src/lib/distributed_lock.go`、`src/lib/outbound_security.go`、`src/lib/public_api_auth.go` | 鉴权与安全地基，`go test -race ./...` 全绿 |
 | **Wave 2 首批模块（已完成）** | `src/services/vip_levels.go` + `src/routes/vip_levels.go`、`src/db/images.go` + `src/routes/images.go`、`src/db/terminal_saved_commands.go` + `src/routes/terminal_saved_commands.go` | 端到端路由模块，含对拍用例 |
+| **Wave 3 地基 + 模块（已完成）** | `src/lib/mailer.go`（SMTP/模板/13 类邮件，已接线 `OperationVerificationEmailSender`）、`src/lib/notifier.go`、`src/db/inbox.go`、`src/db/notifications.go`、`src/routes/notifications.go`、`src/routes/api_tokens.go`、`src/routes/admin_notification_channels.go`、`src/db/ssh_keys.go` + `src/routes/ssh_keys.go`、`src/db/storage_configs.go` + `src/routes/storage_configs.go` | 邮件/通知/凭证/存储配置；对拍 122 例全绿 |
 
 ### 已确认的关键事实（勿再重复踩）
 
-- **Fastify AJV 默认值**（`@fastify/ajv-compiler/lib/default-ajv-options.js`，已实测核对）：`coerceTypes:'array'`、`useDefaults:true`、`removeAdditional:true`、`allErrors:false`。含义：**未知字段被静默丢弃而非报错**、标量会被字符串化、单元素数组会解包、**只报第一个校验错误**。带 `schema.body` 的路由必须复刻这套语义（见 `routes/terminal_saved_commands.go`）。
-- **AES-GCM 互通已实证**：key=`sha256(ENCRYPTION_KEY || (prod ? "" : JWT_SECRET || 'default-encryption-key'))`，16B IV，密文 `iv:tag:ct`（hex）；Go 加密 → Node 解密已实测通过。
+- **Fastify AJV 默认值**（`@fastify/ajv-compiler/lib/default-ajv-options.js`，已实测核对）：`coerceTypes:'array'`、`useDefaults:true`、`removeAdditional:true`、`allErrors:false`。含义：标量会被字符串化、单元素数组会解包、**只报第一个校验错误**。注意：`removeAdditional` **只在 schema 写了 `additionalProperties:false` 时才丢弃未知字段**；没写则未知字段保留给 handler（storage-configs 的 PATCH 因此会把未知字段透传给 Prisma 并 500，Go 侧已按真实行为复刻）。
+- **404 形态（已实测）**：`setNotFoundHandler` 只在 `NODE_ENV=production && SERVE_STATIC_CLIENT!=false` 时注册，而**生产部署固定 `SERVE_STATIC_CLIENT=false`**（`scripts/init-env.sh`、`install-panel.sh`、`verify-production-readiness.sh` 都强制该值）。所以线上 404 是 Fastify 内置形态：
+  `{"message":"Route GET:/api/nope not found","error":"Not Found","statusCode":404}`
+  Go 侧已按此实现（`app.go` 的 `NoRoute`）。
+- **Node 的每路由限流实际未生效（已实测，Node 侧既有缺陷）**：`@fastify/rate-limit` 在 `app.ts:308` 注册，而 `addHook('onRoute')` 在 `:341` 才添加；插件注册时的封装上下文导致该 hook 不作用于后续业务路由。实测 `/api/auth/login`（规则 5/min）与 `/api/ssh-keys`（30/min）返回的 `x-ratelimit-limit` 均为 **300**（全局值）。
+  **后果**：登录暴力破解防护实际只有 300/min。Go 侧按生成的规则表正确执行（5/min），因此**此处 Go 与 Node 行为不同**。这是 Go 更正确的一处，需要 owner 决策：修 Node 还是让 Go 对齐现状。
+- **AES-GCM 互通已实证**：key=`sha256(ENCRYPTION_KEY || (prod ? "" : JWT_SECRET || 'default-encryption-key'))`，16B IV，密文 `iv:tag:ct`（hex）；Go 加密 → Node 解密、Node 加密 → Go 解密均已实测通过。
 - **TOTP/otpauth URI 已实测比对** otplib v12（`window:0`，拒绝上一周期令牌）。
+- **双跑对拍已真实跑通**：ssh-keys/storage-configs（53/53）、api-tokens（31/31）、admin-notification-channels（38/38）在同一 PostgreSQL 上状态码与 JSON 逐字段一致。
 
 ### 待接线 / 已知缺口（下一步）
 
-- `lib/mailer.go`、`lib/notifier.go` 未移植 → `lib/operation_verification.go` 预留了 `OperationVerificationEmailSender` / `OperationVerificationNotificationSender` seam（默认返回显式失败，不静默成功），落地后由主程接线。
 - `lib/invite_pricing.go` 待办（依赖 `db/advisory_locks.go` + `db/system_config.go`，二者已就绪）。
 - `lib/operation_verification.go` 内有一份**未导出的** advisory-lock 副本，待与 `db.AdvisoryTransactionLockString` 归一。
-- `vip-levels` 的每路由限流（60/30/20 per minute）在 TS 里是路由内联声明，**不在** `config/rate-limit.ts`，所以 Go 侧目前只受全局 300/min 约束——需在 `app.go` 的路由注册处按 TS 补齐。
-- 静态托管（生产 `SERVE_STATIC_CLIENT`：index.html / 预览机器人降级 / 缓存头）尚未移植。
+- `lib/turnstile.go` 的客户端 IP 已接线到 `middleware.ClientIP`（trust-proxy 感知）。
+- 存储适配器（`StorageFactory` + 4 个 provider）未移植 → `routes.StorageConnectionTester` 钩子已留，默认显式失败（不伪装成功）。
+- 静态托管（生产 `SERVE_STATIC_CLIENT=true` 分支的 index.html / 预览机器人降级 / 缓存头）尚未移植。生产实际为 `false`，优先级低。
+- 自由格式英文日期解析（`Jan 1 2027`、`01/02/2027`）：Node 的 V8 遗留解析器接受，Go 返回 `INVALID_EXPIRES_AT`。低危，待需要时补。
+- `routes/notifications.go`、`routes/admin_notification_channels.go` 的纯逻辑 Go 单测偏少（目前靠对拍覆盖），后续补。
 
 **参考模块就是「翻译模板」**：新增模块请照 `announcements` 的四层结构写（route → db → 复用 lib/middleware）。
 

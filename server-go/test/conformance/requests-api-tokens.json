@@ -1,0 +1,181 @@
+[
+  { "name": "api-tokens-list-anon", "method": "GET", "path": "/api/api-tokens" },
+  { "name": "api-tokens-list-anon-trailing-slash", "method": "GET", "path": "/api/api-tokens/" },
+  {
+    "name": "api-tokens-create-anon",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "body": { "name": "ci", "scopes": ["profile:read"] }
+  },
+  { "name": "api-tokens-revoke-anon", "method": "DELETE", "path": "/api/api-tokens/1" },
+
+  {
+    "name": "api-tokens-create-invalid-media-type",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/x-www-form-urlencoded" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "api-tokens-create-empty-json",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "api-tokens-create-proto-poisoning",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "__proto__": { "admin": true }, "name": "ci", "scopes": ["profile:read"] }
+  },
+  {
+    "name": "api-tokens-create-constructor-poisoning",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "constructor": { "prototype": { "admin": true } }, "name": "ci", "scopes": ["profile:read"] }
+  },
+  {
+    "name": "api-tokens-create-non-object-body",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "api-tokens-create-null-body",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": null
+  },
+
+  {
+    "name": "api-tokens-list",
+    "method": "GET",
+    "path": "/api/api-tokens",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "api-tokens-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/api-tokens/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "api-tokens-create-missing-name",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "scopes": ["profile:read"] }
+  },
+  {
+    "name": "api-tokens-create-name-not-string",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": 5, "scopes": ["profile:read"] }
+  },
+  {
+    "name": "api-tokens-create-name-too-long",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scopes": ["profile:read"]
+    }
+  },
+  {
+    "name": "api-tokens-create-missing-scopes",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci" }
+  },
+  {
+    "name": "api-tokens-create-empty-scopes",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": [] }
+  },
+  {
+    "name": "api-tokens-create-unknown-scope",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": ["root:everything"] }
+  },
+  {
+    "name": "api-tokens-create-duplicate-scopes",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": ["profile:read", "profile:read"] }
+  },
+  {
+    "name": "api-tokens-create-scopes-not-array",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": "profile:read" }
+  },
+  {
+    "name": "api-tokens-create-invalid-expiry",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": ["profile:read"], "expiresAt": "not-a-date" }
+  },
+  {
+    "name": "api-tokens-create-past-expiry",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": ["profile:read"], "expiresAt": "2000-01-01T00:00:00Z" }
+  },
+  {
+    "name": "api-tokens-create-expiry-not-string",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci", "scopes": ["profile:read"], "expiresAt": 1798761600000 }
+  },
+  {
+    "name": "api-tokens-create-unknown-field-ignored",
+    "method": "POST",
+    "path": "/api/api-tokens",
+    "headers": { "content-type": "application/json" },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "ci-unknown-field", "scopes": ["profile:read"], "privileged": true },
+    "skipBody": true
+  },
+
+  { "name": "api-tokens-revoke-invalid-id-zero", "method": "DELETE", "path": "/api/api-tokens/0", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "api-tokens-revoke-invalid-id-leading-zero", "method": "DELETE", "path": "/api/api-tokens/01", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "api-tokens-revoke-invalid-id-negative", "method": "DELETE", "path": "/api/api-tokens/-1", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "api-tokens-revoke-invalid-id-float", "method": "DELETE", "path": "/api/api-tokens/1.5", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "api-tokens-revoke-invalid-id-text", "method": "DELETE", "path": "/api/api-tokens/abc", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "api-tokens-revoke-id-overflow", "method": "DELETE", "path": "/api/api-tokens/9007199254740993", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "api-tokens-revoke-not-found", "method": "DELETE", "path": "/api/api-tokens/2147483647", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} }
+]

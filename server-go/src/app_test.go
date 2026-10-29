@@ -68,7 +68,12 @@ func TestDemoReadOnlyBlocksMutation(t *testing.T) {
 	}
 }
 
-func TestUnknownAPIRouteIs404(t *testing.T) {
+// Production runs with SERVE_STATIC_CLIENT=false, so app.ts never registers its
+// custom setNotFoundHandler and Fastify's built-in 404 is the wire contract.
+// Verified against fastify 5:
+//
+//	{"message":"Route GET:/api/nope not found","error":"Not Found","statusCode":404}
+func TestUnknownRouteMatchesFastifyDefault404(t *testing.T) {
 	router := app.NewRouter()
 
 	recorder := httptest.NewRecorder()
@@ -77,5 +82,19 @@ func TestUnknownAPIRouteIs404(t *testing.T) {
 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("unknown route status = %d, want 404", recorder.Code)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode 404 body: %v", err)
+	}
+	if body["message"] != "Route GET:/api/does-not-exist not found" {
+		t.Errorf("message = %v, want Fastify's Route <METHOD>:<path> not found", body["message"])
+	}
+	if body["error"] != "Not Found" {
+		t.Errorf("error = %v, want Not Found", body["error"])
+	}
+	if status, ok := body["statusCode"].(float64); !ok || status != 404 {
+		t.Errorf("statusCode = %v, want 404", body["statusCode"])
 	}
 }

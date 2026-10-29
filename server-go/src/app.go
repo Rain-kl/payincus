@@ -4,8 +4,6 @@ package app
 
 import (
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,32 +46,20 @@ func NewRouter() *gin.Engine {
 
 	routes.RegisterAll(router)
 
-	// Mirror the Fastify not-found handler: JSON for API paths, Cloudflare RUM
-	// paths return 204, everything else is a static asset miss.
+	// Fastify's setNotFoundHandler in app.ts is registered only when the backend
+	// serves the static client (NODE_ENV=production && SERVE_STATIC_CLIENT!=false).
+	// Production deploys set SERVE_STATIC_CLIENT=false, so the handler never
+	// registers and the wire contract is Fastify's built-in 404 — verified against
+	// fastify 5:
+	//   {"message":"Route GET:/api/nope not found","error":"Not Found","statusCode":404}
+	// The static-client branch is ported with the static module.
 	router.NoRoute(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if strings.HasPrefix(path, "/cdn-cgi/") {
-			c.Status(http.StatusNoContent)
-			return
-		}
-		if strings.HasPrefix(path, "/api/") {
-			c.JSON(http.StatusNotFound, gin.H{"error": "API 路由不存在"})
-			return
-		}
-		if hasFileExtension(path) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "文件不存在"})
-			return
-		}
-		// Non-API SPA routes fall through to index.html when static serving is
-		// enabled in production; that handler is ported with the static module.
-		c.JSON(http.StatusNotFound, gin.H{"error": "文件不存在"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"message":    "Route " + c.Request.Method + ":" + c.Request.URL.Path + " not found",
+			"error":      "Not Found",
+			"statusCode": http.StatusNotFound,
+		})
 	})
 
 	return router
-}
-
-var fileExtensionPattern = regexp.MustCompile(`\.[a-zA-Z0-9]+$`)
-
-func hasFileExtension(path string) bool {
-	return fileExtensionPattern.MatchString(path)
 }

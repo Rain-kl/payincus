@@ -1,0 +1,194 @@
+[
+  { "name": "notifications-list-anon", "method": "GET", "path": "/api/notifications" },
+  { "name": "notifications-list-slash-anon", "method": "GET", "path": "/api/notifications/" },
+  { "name": "notifications-detail-anon", "method": "GET", "path": "/api/notifications/1" },
+  { "name": "notifications-create-anon", "method": "POST", "path": "/api/notifications", "body": { "type": "webhook", "name": "n", "config": {} } },
+  { "name": "notifications-logs-anon", "method": "GET", "path": "/api/notifications/logs" },
+  { "name": "notifications-stats-anon", "method": "GET", "path": "/api/notifications/stats" },
+  { "name": "notifications-global-channels-anon", "method": "GET", "path": "/api/notifications/global-channels" },
+
+  {
+    "name": "notifications-list",
+    "method": "GET",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-detail-invalid-id",
+    "method": "GET",
+    "path": "/api/notifications/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-detail-zero-id",
+    "method": "GET",
+    "path": "/api/notifications/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-detail-not-found",
+    "method": "GET",
+    "path": "/api/notifications/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-create-missing-type",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "notifications-create-missing-config",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "email", "name": "n" }
+  },
+  {
+    "name": "notifications-create-bad-enum",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "fax", "name": "n", "config": {} }
+  },
+  {
+    "name": "notifications-create-empty-name",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "email", "name": "", "config": {} }
+  },
+  {
+    "name": "notifications-create-long-name",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "email", "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "config": {} }
+  },
+  {
+    "name": "notifications-create-config-array",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "email", "name": "n", "config": [] }
+  },
+  {
+    "name": "notifications-create-bad-enabled",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "email", "name": "n", "config": {}, "enabled": "yes" }
+  },
+  {
+    "name": "notifications-create-non-object-body",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "notifications-create-email-missing-address",
+    "method": "POST",
+    "path": "/api/notifications/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "email", "name": "n", "config": {} }
+  },
+  {
+    "name": "notifications-create-telegram-bad-token",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "telegram", "name": "n", "config": { "botToken": "abc", "chatId": "-1" } }
+  },
+  {
+    "name": "notifications-create-webhook-private-url",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "webhook", "name": "n", "config": { "url": "http://127.0.0.1:9/hook" } }
+  },
+  {
+    "name": "notifications-create-discord-wrong-host",
+    "method": "POST",
+    "path": "/api/notifications",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "type": "discord", "name": "n", "config": { "webhookUrl": "https://example.com/api/webhooks/1" } }
+  },
+  {
+    "name": "notifications-patch-invalid-id",
+    "method": "PATCH",
+    "path": "/api/notifications/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "notifications-patch-empty-name",
+    "method": "PATCH",
+    "path": "/api/notifications/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "name": "" }
+  },
+  {
+    "name": "notifications-patch-bad-enabled",
+    "method": "PATCH",
+    "path": "/api/notifications/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": "x" }
+  },
+  {
+    "name": "notifications-patch-not-found",
+    "method": "PATCH",
+    "path": "/api/notifications/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "notifications-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/notifications/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/notifications/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-test-not-found",
+    "method": "POST",
+    "path": "/api/notifications/2147483000/test",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-toggle-not-found",
+    "method": "POST",
+    "path": "/api/notifications/2147483000/toggle",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-logs",
+    "method": "GET",
+    "path": "/api/notifications/logs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-logs-bad-status",
+    "method": "GET",
+    "path": "/api/notifications/logs?status=bogus&page=abc&pageSize=999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-stats",
+    "method": "GET",
+    "path": "/api/notifications/stats",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "notifications-global-channels",
+    "method": "GET",
+    "path": "/api/notifications/global-channels",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]
