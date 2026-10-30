@@ -138,6 +138,7 @@ enum InstanceTaskType {
   clone
   recreate  // 重建：创建新实例替换旧实例
   change_host // 改节点：在其他节点重建实例并保留数据库实例 ID
+  create    // 创建：节点不可用或执行出错时排队，由 worker 重试
 }
 
 // 实例操作任务状态
@@ -207,6 +208,9 @@ model InstanceTask {
   targetHostId         Int?    @map("target_host_id") // 克隆的目标宿主机
   snapshotName         String? @map("snapshot_name") // 克隆时的快照名称
   newInstanceId        Int?    @map("new_instance_id") // 克隆后的新实例 ID
+  // 创建任务重放所需的完整参数快照（config + userId + resources）。
+  // 只在 taskType=create 时写入，避免回到路由层重新做一次业务计算。
+  payload              Json?   @map("payload")
 
   error      String?
   createdAt  DateTime  @default(now()) @map("created_at")

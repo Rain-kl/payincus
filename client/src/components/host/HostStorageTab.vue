@@ -39,6 +39,36 @@ const unlockError = ref('')
 const lockTarget = ref<StoragePool | null>(null)
 const lockError = ref('')
 const locking = ref(false)
+const revealTarget = ref<StoragePool | null>(null)
+const revealKeyValue = ref('')
+const revealing = ref(false)
+const revealError = ref('')
+function closeReveal() {
+  if (revealing.value) return
+  revealTarget.value = null
+  revealKeyValue.value = ''
+  revealError.value = ''
+}
+async function submitReveal() {
+  if (!revealTarget.value || revealing.value) return
+  const hostId = props.hostId
+  const poolName = revealTarget.value.name
+  revealing.value = true
+  revealError.value = ''
+  revealKeyValue.value = ''
+  try {
+    const result = await api.hosts.revealStorageKey(hostId, poolName)
+    if (props.hostId !== hostId) return
+    revealKeyValue.value = result.key
+  } catch (error: unknown) {
+    if (props.hostId === hostId) revealError.value = error && typeof error === 'object' && 'message' in error ? String(error.message) : '领取密钥未完成，请检查密钥托管状态'
+  } finally { revealing.value = false }
+}
+async function copyRevealKey() {
+  if (!revealKeyValue.value) return
+  try { await navigator.clipboard.writeText(revealKeyValue.value); toast.success('密钥已复制') }
+  catch { toast.error('复制失败，请手动选择复制') }
+}
 function closeLock() {
   if (locking.value) return
   lockTarget.value = null
@@ -565,6 +595,8 @@ async function submitEdit() {
           <div class="flex items-center gap-2 ml-4">
             <button v-if="pool.driver === 'zfs' && pool.status === 'locked' || encryption[pool.name]?.encrypted && (encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked || !!encryption[pool.name]?.pendingRecovery || !encryption[pool.name]?.keySaved)" class="btn-secondary btn-sm" :disabled="unlocking" @click="openUnlock(pool)">{{ encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked && encryption[pool.name]?.state === 'unlocked' ? '继续恢复实例' : encryption[pool.name]?.pendingImport && encryption[pool.name]?.state === 'unlocked' ? '继续导入' : pool.status === 'locked' || encryption[pool.name]?.pendingImport || encryption[pool.name]?.state === 'locked' || encryption[pool.name]?.manualLocked ? '解密磁盘' : '保存解锁密钥' }}</button>
             <button v-if="encryption[pool.name]?.encrypted && !encryption[pool.name]?.pendingImport && encryption[pool.name]?.keySaved && (encryption[pool.name]?.state === 'unlocked' || encryption[pool.name]?.lockPending)" class="btn-secondary btn-sm" :disabled="encryption[pool.name]?.nodeLocked || locking || unlocking || !!encryption[pool.name]?.pendingRecovery && !encryption[pool.name]?.manualLocked" @click="openLock(pool)">{{ encryption[pool.name]?.lockPending ? '重试锁盘' : '加密锁盘' }}</button>
+            <!-- 查看密钥：便于节点端本地解锁 -->
+            <button v-if="encryption[pool.name]?.encrypted && encryption[pool.name]?.keySaved" class="btn-secondary btn-sm" :aria-label="`查看存储池 ${pool.name} 密钥`" @click="revealTarget = pool; submitReveal()">查看密钥</button>
             <!-- 编辑按钮 -->
             <button
               class="btn-secondary btn-sm"
@@ -996,6 +1028,23 @@ async function submitEdit() {
           <button type="submit" class="btn-primary" :disabled="unlocking">{{ unlocking ? '正在校验并解锁…' : '提交并保存' }}</button>
         </div>
       </form>
+    </DrawerModal>
+    <DrawerModal :show="!!revealTarget" title="存储池密钥" :closable="!revealing" :close-on-backdrop="!revealing" @close="closeReveal">
+      <div class="space-y-4">
+        <p class="text-sm text-themed">存储池：{{ revealTarget?.name }}</p>
+        <p class="text-sm text-themed-muted">此密钥由控制端加密托管。可用于在节点终端直接执行 <code>zfs load-key</code> 本地解锁，或在面板不可达时恢复数据。请仅在可信环境中使用。</p>
+        <p v-if="revealError" class="text-sm text-themed" role="alert">{{ revealError }}</p>
+        <div v-if="revealKeyValue">
+          <label class="block text-sm text-themed">ZFS 密钥
+            <input :value="revealKeyValue" class="input mt-1 w-full font-mono" type="text" readonly spellcheck="false" @focus="($event.target as HTMLInputElement).select()" />
+          </label>
+          <p class="mt-2 text-xs text-themed-muted">领取操作已记录审计日志。</p>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn-secondary" :disabled="revealing" @click="closeReveal">关闭</button>
+          <button v-if="revealKeyValue" type="button" class="btn-primary" @click="copyRevealKey">复制密钥</button>
+        </div>
+      </div>
     </DrawerModal>
   </div>
 </template>

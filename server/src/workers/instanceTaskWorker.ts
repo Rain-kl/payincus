@@ -69,10 +69,50 @@ const LIGHT_TASK_CONCURRENCY = 5
 const LIGHT_TASK_NAMES = new Set(['start', 'stop', 'restart'])
 
 // 重量任务类型（需串行执行）
-const HEAVY_TASK_NAMES = new Set(['rebuild', 'clone', 'recreate', 'change_host'])
+const HEAVY_TASK_NAMES = new Set(['rebuild', 'clone', 'recreate', 'change_host', 'create'])
 
 // 重量任务类型数组（用于 Prisma 查询）
-const HEAVY_TASK_TYPES: InstanceTaskType[] = ['rebuild', 'clone', 'recreate', 'change_host' as InstanceTaskType]
+const HEAVY_TASK_TYPES: InstanceTaskType[] = ['rebuild', 'clone', 'recreate', 'change_host' as InstanceTaskType, 'create' as InstanceTaskType]
+
+// 创建任务在节点不可用或执行出错时回退到排队，最多重试这么多次后判定失败。
+const CREATE_TASK_MAX_RETRIES = 5
+
+// The create executor lives in the route module. Injecting it keeps this worker
+// free of a circular import while still replaying the exact provisioning path.
+type CreateTaskPayload = {
+  config: Record<string, unknown>
+  userId: number
+  resources: { cpu: number; memory: number; disk: number }
+}
+
+type CreateTaskExecutor = (instanceId: number, hostId: number, payload: CreateTaskPayload) => Promise<void>
+
+let createTaskExecutor: CreateTaskExecutor | null = null
+
+/** Registered once at startup by the module that owns instance provisioning. */
+export function setCreateTaskExecutor(executor: CreateTaskExecutor): void {
+  createTaskExecutor = executor
+}
+
+// 这些错误代表节点当前不可用，属于可重试的瞬时状态；配额、余额等业务错误必须直接失败。
+const RETRYABLE_CREATE_PATTERNS = [
+  'HOST_OFFLINE',
+  'HOST_UNREACHABLE',
+  '节点离线',
+  '节点不可用',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'socket hang up',
+  'timeout',
+  'Instance startup temporarily unavailable',
+  'not ready',
+  'still in progress'
+]
+
+function isRetryableCreateError(message: string): boolean {
+  return RETRYABLE_CREATE_PATTERNS.some(pattern => message.includes(pattern))
+}
 const ALPINE_BUSY_UPDATE_CANCEL_AFTER_MS = 10_000
 
 let workerInterval: ReturnType<typeof setInterval> | null = null
@@ -585,6 +625,13 @@ async function executeTask(taskId: number): Promise<void> {
       case 'change_host':
         await executeChangeHostTask(task, instance, host, client)
         break
+      case 'create': {
+        if (!createTaskExecutor) throw new Error('创建任务执行器未就绪，等待服务完成初始化')
+        const payload = task.payload as CreateTaskPayload | null
+        if (!payload || typeof payload !== 'object' || !payload.config) throw new Error('创建任务缺少参数快照，无法重试')
+        await createTaskExecutor(task.instanceId, task.hostId, payload)
+        break
+      }
       default:
         throw new Error(`未知任务类型: ${task.taskType}`)
     }
@@ -607,6 +654,27 @@ async function executeTask(taskId: number): Promise<void> {
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     console.error(`[InstanceTaskWorker] 任务 ${taskId} 失败:`, errorMessage)
+
+    // A create task that hit a transient node failure goes back into the queue
+    // instead of failing outright: the customer keeps their reservation and the
+    // node can come back. Genuine business errors still fail immediately.
+    if (task?.taskType === 'create' && isRetryableCreateError(errorMessage) && task.retryCount < CREATE_TASK_MAX_RETRIES) {
+      const requeued = await prisma.instanceTask.updateMany({
+        where: { id: taskId, status: 'PROCESSING' },
+        data: {
+          status: 'PENDING',
+          retryCount: { increment: 1 },
+          startedAt: null,
+          error: `等待节点恢复后重试（第 ${task.retryCount + 1}/${CREATE_TASK_MAX_RETRIES} 次）：${errorMessage}`
+        }
+      })
+      if (requeued.count > 0) {
+        console.warn(`[InstanceTaskWorker] 创建任务 ${taskId} 因节点不可用回到队列，第 ${task.retryCount + 1} 次重试`)
+        recordClientError(task.hostId)
+        return
+      }
+      console.warn(`[InstanceTaskWorker] 任务 ${taskId} 已不处于 PROCESSING，跳过重新入队`)
+    }
 
     const failResult = await prisma.instanceTask.updateMany({
       where: { id: taskId, status: 'PROCESSING' },
@@ -2745,6 +2813,17 @@ export function startInstanceTaskWorker(): void {
   }, TIMEOUT_CHECK_INTERVAL)
 
   console.log('[InstanceTaskWorker] Worker 已启动')
+}
+
+/**
+ * Trigger an immediate queue pass. A node that just reported back should not
+ * wait for the next poll tick before its queued creates resume.
+ */
+export function nudgeInstanceTaskWorker(): void {
+  processQueue().catch(err => {
+    console.error('[InstanceTaskWorker] 唤醒队列处理错误:', err)
+    dbBackoff.arm(err)
+  })
 }
 
 /**

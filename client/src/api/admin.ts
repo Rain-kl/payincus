@@ -1377,6 +1377,7 @@ const api = {
     getStorageEncryption: (id: number, poolName: string): Promise<StorageEncryptionState> => http.get(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`),
     lockStorage: (id: number, poolName: string): Promise<StorageEncryptionState> => http.put(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`, {}, { timeout: TIMEOUT.LONG }),
     unlockStorage: (id: number, poolName: string, key?: string): Promise<StorageEncryptionState> => http.post(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`, key ? { key } : {}, { timeout: TIMEOUT.LONG }),
+    revealStorageKey: (id: number, poolName: string): Promise<{ key: string; fingerprint: string; dataset: string }> => http.post(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption/reveal`, {}),
     getStoragePools: (id: number): Promise<{ pools: Array<{ name: string; driver: string; description: string; status: string; purpose?: 'instance_data' | 'instance_storage' | null; config: Record<string, string>; usedBy: number; space?: { used: number; total: number } | null }> }> =>
       http.get(`/hosts/${id}/storage-pools`),
     createStoragePool: (id: number, data: {

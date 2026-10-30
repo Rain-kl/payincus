@@ -6,6 +6,7 @@ import { recordReport } from '../lib/node-security/report.js'
 import { syncHostGpuReport } from '../db/gpus.js'
 import { recordNetworkStatus } from '../lib/egress/sync.js'
 import { pushNetworkPolicy } from '../lib/egress/realtime.js'
+import { nudgeInstanceTaskWorker } from '../workers/instanceTaskWorker.js'
 /**
  * 宿主机 Agent 路由
  * 负责 Agent 凭据签发、HMAC 鉴权和心跳上报。
@@ -990,11 +991,28 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     }
 
     if (request.body.networkStatus) await recordNetworkStatus(agent.hostId, request.body.networkStatus)
+    // Report the pending create queue so the node reflects real state and the
+    // worker drains it immediately after a node comes back, instead of waiting
+    // for the next poll tick.
+    const queuedCreates = await prisma.instanceTask.findMany({
+      where: { hostId: agent.hostId, taskType: 'create', status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      select: { id: true, instanceId: true, retryCount: true, createdAt: true }
+    })
+    const pendingCreateTasks = queuedCreates.map(task => ({
+      taskId: task.id,
+      instanceId: task.instanceId,
+      retryCount: task.retryCount,
+      createdAt: task.createdAt.toISOString()
+    }))
+    if (pendingCreateTasks.length > 0) nudgeInstanceTaskWorker()
     return {
       ok: true,
       serverTime: now.toISOString(),
       taskPollIntervalSeconds: 15,
       instanceReport,
+      pendingCreateTasks,
       caddy: {
         command: caddyCommand,
         port: caddyCommand === 'install' ? caddyPort : 0

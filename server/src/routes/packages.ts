@@ -1400,6 +1400,10 @@ export default async function packageRoutes(fastify: FastifyInstance) {
         bandwidth_max: pkg.bandwidth_max,
         network_mode: pkg.network_mode,
         instance_type: pkg.instance_type,  // 实例类型
+        // Package egress is edited through this same record; omitting it made the
+        // form fall back to "host" on reload even though the value was saved.
+        egress_mode: (pkg as any).egress_mode ?? 'host',
+        egress_profile_id: (pkg as any).egress_profile_id ?? null,
         gpu_shared: pkg.gpu_shared ?? false,
         gpu_device_ids: pkg.gpu_device_ids ?? [],
         host_ids: (pkg as { host_ids?: number[] }).host_ids || [],

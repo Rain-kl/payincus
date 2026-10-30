@@ -70,6 +70,11 @@ try {
   await assert.rejects(updatePackage(pkg.id, { networkMode: 'public_ipv4' }, true), /NAT container/)
   await updatePackage(pkg.id, { egressMode: 'profile', egressProfileId: profileId }, true)
   assert.equal((await prisma.instance.findUniqueOrThrow({ where: { id: instance.id } })).egressProfileId, profileId)
+  // The edit form reloads through GET /packages/:id; the response must echo the
+  // saved egress binding or the form silently falls back to "host" on reopen.
+  const detail = (await inject('GET', `/api/packages/${pkg.id}`, undefined, 1)).json().package
+  assert.equal(detail.egress_mode, 'profile', 'package detail must return the saved egress mode')
+  assert.equal(detail.egress_profile_id, profileId, 'package detail must return the saved egress profile')
   assert.equal((await bindPackageEgress(prisma, pkg.id, hosts[0], instance.id)).egressProfileId, profileId)
   await assert.rejects(bindPackageEgress(prisma, pkg.id, hosts[1], instance.id), /not permitted/)
   online = false; await assert.rejects(bindPackageEgress(prisma, pkg.id, hosts[0]), /online Agent/); online = true

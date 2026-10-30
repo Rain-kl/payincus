@@ -16,7 +16,7 @@ import * as db from '../db/index.js'
 import { createLog } from '../db/logs.js'
 import { apiError, ErrorCode } from '../lib/errors.js'
 import { prisma } from '../db/prisma.js'
-import { Prisma, type InstanceStatus } from '@prisma/client'
+import { Prisma, type InstanceStatus, type InstanceTaskType } from '@prisma/client'
 import { getIncusClient } from '../lib/incus/index.js'
 import {
   buildInstanceConfig,
@@ -105,6 +105,7 @@ import {
 import { acquireLock, releaseLock } from '../lib/distributed-lock.js'
 
 import { resolveEffectiveSwapSize, resolveIncusSwapValue } from '../lib/instance-swap.js'
+import { setCreateTaskExecutor } from '../workers/instanceTaskWorker.js'
 
 const PORT_MAPPING_LOCK_OPTIONS = {
   expireMs: 120000,
@@ -112,6 +113,52 @@ const PORT_MAPPING_LOCK_OPTIONS = {
   retryIntervalMs: 100
 }
 const MAX_BATCH_PORT_MAPPINGS = 100
+
+/**
+ * Queue a create task when the target node cannot serve the instance right now.
+ * The reservation already committed in the database, so failing here would
+ * charge the customer for nothing; the task worker retries while the node is
+ * unavailable and gives up after a bounded number of attempts.
+ * Returns true when the task was queued instead of dispatched directly.
+ */
+async function enqueueCreateTaskIfNodeUnavailable(
+  instanceId: number,
+  hostId: number,
+  userId: number,
+  config: Record<string, unknown>,
+  resources: { cpu: number; memory: number; disk: number }
+): Promise<boolean> {
+  const statuses = await loadHostServiceStatuses([hostId])
+  if (statuses.get(hostId)?.available) return false
+  try {
+    await prisma.$transaction(async tx => {
+      // Reuse the per-instance lock so a concurrent operator action cannot
+      // interleave with the queued create.
+      const existing = await tx.instanceTask.findFirst({
+        where: { instanceId, taskType: 'create', status: { in: ['PENDING', 'PROCESSING'] } },
+        select: { id: true }
+      })
+      if (existing) return
+      await tx.instanceTask.create({
+        data: {
+          instanceId,
+          hostId,
+          userId,
+          taskType: 'create' as InstanceTaskType,
+          status: 'PENDING',
+          payload: { config, userId, resources } as Prisma.InputJsonObject,
+          error: '节点当前不可用，创建任务已排队等待重试'
+        }
+      })
+    })
+    return true
+  } catch (error) {
+    // A queueing failure must not silently drop the purchase; fall back to the
+    // direct path so the normal error handling and compensation still run.
+    console.error(`[Provisioning] 实例 ${instanceId} 排队失败，回退直接创建:`, error)
+    return false
+  }
+}
 
 async function findNormalPaidCreateReplay(userId: number, idempotencyKey: string) {
   const instance = await prisma.instance.findUnique({
@@ -661,6 +708,13 @@ async function buildChangeHostOptions(instance: {
 }
 
 export default async function instanceRoutes(fastify: FastifyInstance) {
+  // Replay a queued create task through the same provisioning path a fresh
+  // request uses, so retries cannot drift from the original parameters.
+  setCreateTaskExecutor(async (instanceId, hostId, payload) => {
+    const host = await db.getHostById(hostId)
+    if (!host) throw new Error('节点不存在，创建任务无法继续')
+    await createInstanceAsync(instanceId, host as Host, payload.config as Parameters<typeof createInstanceAsync>[2], payload.userId, payload.resources)
+  })
   // 获取实例列表（支持分页和搜索）
   fastify.get<{
     Querystring: {
@@ -2273,7 +2327,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
     // 根据 ioLimitMode 选择性传入 IO 限制参数
     const ioMode = pkgConfig.io_limit_mode || 'throughput'
 
-    createInstanceAsync(instanceId, host, {
+    const createConfig = {
       autoRemotePort: request.body.autoRemotePort,
       name: incusId,
       image: actualImageAlias,
@@ -2311,13 +2365,23 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       bootAutostartPriority: pkgConfig.boot_autostart_priority,
       bootAutostartDelay: pkgConfig.boot_autostart_delay,
       bootHostShutdownTimeout: pkgConfig.boot_host_shutdown_timeout
-    }, user.id, { cpu: requestedCpu, memory: requestedMemory, disk: requestedDisk }).catch(err => {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      fastify.log.error({ err: errorMessage }, `实例 ${instanceId} 创建失败`)
-    })
+    }
+
+    // Reserve the instance immediately, but only start provisioning when the
+    // node can actually serve it. A node that dropped between the availability
+    // check and dispatch keeps the customer's reservation in the queue instead
+    // of failing the purchase; the worker and the node heartbeat both drain it.
+    const queued = await enqueueCreateTaskIfNodeUnavailable(instanceId, host.id, user.id, createConfig, { cpu: requestedCpu, memory: requestedMemory, disk: requestedDisk })
+    if (!queued) {
+      createInstanceAsync(instanceId, host, createConfig, user.id, { cpu: requestedCpu, memory: requestedMemory, disk: requestedDisk }).catch(err => {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        fastify.log.error({ err: errorMessage }, `实例 ${instanceId} 创建失败`)
+      })
+    }
 
     reply.code(202).send({
-      message: 'Instance creating, please refresh later',
+      message: queued ? 'Instance queued, waiting for the node to become available' : 'Instance creating, please refresh later',
+      queued,
       instance: {
         id: instanceId,
         name,
