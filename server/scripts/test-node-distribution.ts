@@ -33,4 +33,30 @@ assert.doesNotMatch(hosts, /function buildHostInstallCommand|installToken = rand
 const regenerate = hosts.slice(hosts.indexOf("'/:id/regenerate-install'"), hosts.indexOf('// 测试宿主机连接（支持节点所有者）'))
 assert.match(regenerate, /issueHostAgentInstallToken\(hostId, true\)/)
 assert.doesNotMatch(regenerate, /prisma\.host\.update|certPath: null|keyPath: null|isInstalled: false/)
+
+// A target added to the build matrix without the installer and the publish
+// steps fails at release time, after a full build, with a duplicate-asset error.
+// The node source lives in its own repository, so these checks only run where a
+// checkout is present; the incus repository's own CI is the authoritative gate.
+const nodeRoot = resolve(root, 'incus')
+if (existsSync(nodeRoot)) {
+  const integration = read('incus/.github/workflows/payincus.yml')
+  const publish = read('incus/.github/workflows/payincus-publish.yml')
+  const installer = read('incus/scripts/payincus/install.sh')
+  const matrixTargets = [...new Set([...integration.matchAll(/^\s+target: (\S+)$/gm)].map(m => m[1]))].sort()
+  assert.ok(matrixTargets.length > 0, 'integration matrix must declare at least one package target')
+  for (const target of matrixTargets) {
+    const distro = target.replace('-', ':')
+    assert.ok(installer.includes(distro), `install.sh must accept the matrix target ${target}`)
+  }
+  // Publish steps must not enumerate targets by hand: every extra target that a
+  // hard-coded list forgets leaves two identically named SHA256SUMS assets.
+  for (const [name, body] of [['payincus.yml', integration], ['payincus-publish.yml', publish]]) {
+    // Only the final publish step is inspected: verification steps may legitimately
+    // enumerate targets, and the workflow name itself contains "Publish".
+    const rename = body.slice(body.lastIndexOf('Publish'))
+    assert.doesNotMatch(rename, /for target in\s+(?:ubuntu|debian)-\S+/, `${name} must derive release targets from the artifacts, not a fixed list`)
+    assert.match(rename, /for folder in release\/payincus-linux-\*/, `${name} must iterate the downloaded artifacts`)
+  }
+}
 console.log('Incus-only node source, installer, distribution and transport boundaries passed')
