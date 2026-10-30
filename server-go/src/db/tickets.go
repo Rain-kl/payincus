@@ -2507,6 +2507,24 @@ func TicketsCreateTicketObjectLink(ctx context.Context, ticketID int32, objectTy
 
 // ==================== small helpers ====================
 
+// TicketsGetAllAdminUserIDs mirrors db/users.ts' getAllAdminUserIds() — ported
+// here so the tickets module does not depend on an unported db/users.ts.
+func TicketsGetAllAdminUserIDs(ctx context.Context) ([]int32, error) {
+	var rows []struct {
+		ID int32 `gorm:"column:id"`
+	}
+	if err := DB.WithContext(ctx).Raw(
+		"SELECT id FROM users WHERE role = 'admin' AND status = 'active'",
+	).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	ids := make([]int32, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	return ids, nil
+}
+
 func nilableString(value string) *string {
 	result := value
 	return &result
