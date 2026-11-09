@@ -233,3 +233,71 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 5. 报告：改了哪些文件 / 为什么 / 风险 / 怎么验证的。
 
 以上任一未满足 = **未完成**。
+
+---
+
+## 9. 剩余施工清单（唯一权威，按此顺序执行，不再逐项确认）
+
+> 规则：从上到下做，每完成一批即提交并更新本清单的勾选框。
+> 顺序理由：**先清无依赖的叶子 → 再补网络/存储基座 → 再攻高危核心（按依赖链）→ 最后做需要长连接的**。
+> 每个模块的验收标准见 §8：build/vet/test 全绿 + 该模块对拍全绿（不可比对的用例标 `skipBody`/`ignoreRateLimit`）。
+
+### Wave A — 无新依赖的叶子模块（先清空，减少待办面积）
+
+- [x] `vip-levels`（已完成）
+- [ ] `vip-benefits`（126）— 依赖 `services/vip-benefits` 的完整版（目前只有 resource-pool 用的切片）
+- [ ] `gpus`（50）— `db/gpus` + `lib/gpu.go`（已就绪）
+- [ ] `instance-advanced-config`（98）
+- [ ] `storage-encryption`（92）— 依赖 `lib/storage/*`
+- [ ] `egress-profiles`（89）
+- [ ] `egress`（155）
+- [ ] `node-security`（162）— 含**指纹固定传输层**（`lib/node-security/transport.ts`），补齐 `lib/incus_client.go` 里现在硬失败的那条分支
+- [ ] `oauth-provider`（328）
+- [ ] `admin-promo-codes`（680）
+- [ ] `admin-entertainment`（1568）— lottery 管理端，依赖已移植的 `db/lottery.go`
+
+### Wave B — 网络与流量（需 IP/流量基座）
+
+- [ ] `ip-addresses`（886）— 需 `lib/ip-calculator`、`lib/network-payload-builder`、`incus-network`
+- [ ] `traffic`（609）— 需 `db/traffic.go`；route 的 3 个 scheduler 调用留 seam，Phase 7 接线
+
+### Wave C — Caddy 与跨节点迁移
+
+- [ ] `lib/caddy-client.go`（394）— proxy-sites 与 transfers 的共同依赖
+- [ ] `proxy-sites`（986）
+- [ ] `transfers`（1152）— 还需 `incus-backups`/`incus-restore`/`incus-pool`
+
+### Wave D — 高危核心（AGENTS.md §2.3：先读后写；按依赖链排序）
+
+> 这一批是线上主流程，**先出 spec 再实现**，每完成一个跑该模块对拍 + 真机流程。
+
+1. [ ] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
+2. [ ] `mail`（2361）— auth 的重置密码/验证邮件依赖它
+3. [ ] `auth`（1436）— 三套鉴权面 + 2FA + OAuth state
+4. [ ] `system-config`（941）
+5. [ ] `hosts`（7987）— 最大单体；含节点健康、隧道控制面
+6. [ ] `packages`（2873）— 依赖 hosts
+7. [ ] `instances`（6894）— 依赖 hosts + packages + 计费
+8. [ ] `instance-billing`（1080）
+9. [ ] `instance-destroy`（1337）
+10. [ ] `backups`（1467）
+11. [ ] `recharge`（3027）— 支付
+12. [ ] `admin-billing`（4786）— 支付/退款/对账
+13. [ ] `public-api`（2396）— `pat_`/`poa_` 鉴权面
+14. [ ] `agent`（1042）— host agent HMAC 鉴权面
+15. [ ] `system-update`（275）— OTA
+
+### Wave E — 长连接与运行时（Phase 7）
+
+- [ ] `terminal`（527）— WebSocket 终端
+- [ ] `spice`（123）— SPICE 控制台
+- [ ] `admin-incus-ui`（723）— Incus UI 隧道
+- [ ] 15 个 worker/scheduler（`traffic-scheduler`、`instance-expiry`、`exchangeDeliveryWorker` 等）
+- [ ] 静态托管（生产 `SERVE_STATIC_CLIENT=false`，优先级最低）
+
+### 已知待办（散件）
+
+- [ ] `lib/invite_pricing.go` → 已在 `db/user_invites.go` 落地，若有用例需要 lib 侧再加
+- [ ] `lib/operation_verification.go` 内的私有 advisory-lock 副本与 `db.AdvisoryTransactionLockString` 归一
+- [ ] `db.GetRedeemCodeHostByID` 在真实 `db/hosts.go` 落地后删除
+- [ ] 存储适配器（`StorageFactory` + 4 provider）→ `routes.StorageConnectionTester` 钩子仍在显式失败
