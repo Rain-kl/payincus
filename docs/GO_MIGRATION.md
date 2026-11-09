@@ -29,6 +29,10 @@
 | **Wave 3 地基 + 模块（已完成）** | `src/lib/mailer.go`（SMTP/模板/13 类邮件，已接线 `OperationVerificationEmailSender`）、`src/lib/notifier.go`、`src/db/inbox.go`、`src/db/notifications.go`、`src/routes/notifications.go`、`src/routes/api_tokens.go`、`src/routes/admin_notification_channels.go`、`src/db/ssh_keys.go` + `src/routes/ssh_keys.go`、`src/db/storage_configs.go` + `src/routes/storage_configs.go` | 邮件/通知/凭证/存储配置；对拍 122 例全绿 |
 | **Wave 4 模块（已完成）** | `src/db/friendships.go` + `src/routes/friends.go`、`src/db/gift_cards.go` + `src/routes/gift_cards.go`、`src/routes/inbox.go`、`src/routes/balance.go`、`src/routes/verification.go`、`src/db/redeem_codes.go` + `src/routes/redeem_codes.go`、`src/db/help.go` + `src/routes/help.go`、`src/routes/orders.go` | 好友/礼品卡/站内信/余额/验证/兑换/帮助/订单 |
 
+| **Wave 5 substrate（已完成）** | `src/lib/bigint_input.go`、`src/lib/timezone.go`、`src/lib/gpu.go`、`src/lib/traffic_utils.go`、`src/lib/permission.go` + `src/db/permission_lookups.go`、`src/lib/incus_client.go` + `src/lib/incus_error.go`、`src/lib/operation_task_log.go` | BigInt 三态解析、业务时区、GPU 准入策略、流量计量、AUTH004 权限边界、Incus mTLS 客户端、长任务日志 |
+| **Wave 5 模块（已完成）** | `src/routes/logs.go`、`src/db/custom_init_commands.go` + `src/routes/custom_init_commands.go`、`src/db/user_invites.go` + `src/routes/user_invites.go`、`src/db/oauth_apps.go` + `src/routes/admin_oauth_apps.go`、`src/routes/tickets.go`（16 路由）、`src/routes/telegram.go`（9 路由）、`src/routes/admin_tasks.go`（含 SSE）、`src/services/promo_*.go` + `src/db/promo_*.go` + `src/routes/promo_codes.go`、`src/routes/admin_statistics.go` + `src/db/checkin_settings.go` | 日志/自定义初始化/邀请/OAuth 应用/工单/Telegram/后台任务/优惠码/管理统计 |
+| **Fastify 请求体生命周期（已完成）** | `src/middleware/request_body.go` + `src/app.go` 的 NoRoute | 复刻 Fastify 在鉴权之后、handler 之前的 body 解析（400/413/415），未匹配路由也先解析 JSON |
+
 ### 对拍基线（真实双跑，同一 PostgreSQL，2026-10-29）
 
 建独立库 `payincus_goparity` → `prisma migrate deploy` → Node:3101 + Go:3102 → 逐组对拍：
