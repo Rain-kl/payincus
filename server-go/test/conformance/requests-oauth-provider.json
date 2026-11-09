@@ -1,0 +1,44 @@
+[
+  { "name": "oauth-provider-scopes", "method": "GET", "path": "/api/oauth-provider/scopes", "skipBody": true },
+
+  { "name": "oauth-provider-consent-anon", "method": "GET", "path": "/api/oauth-provider/authorize/consent?response_type=code&client_id=pocli_missing&redirect_uri=https%3A%2F%2Fexample.com%2Fcb" },
+  { "name": "oauth-provider-consent-invalid-response-type", "method": "GET", "path": "/api/oauth-provider/authorize/consent?response_type=token&client_id=pocli_missing&redirect_uri=https%3A%2F%2Fexample.com%2Fcb", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "oauth-provider-consent-missing-client", "method": "GET", "path": "/api/oauth-provider/authorize/consent?response_type=code", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "oauth-provider-consent-invalid-redirect", "method": "GET", "path": "/api/oauth-provider/authorize/consent?response_type=code&client_id=pocli_missing", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "oauth-provider-consent-invalid-scope", "method": "GET", "path": "/api/oauth-provider/authorize/consent?response_type=code&client_id=pocli_missing&redirect_uri=https%3A%2F%2Fexample.com%2Fcb&scope=nope%3Aread", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "oauth-provider-consent-unknown-client", "method": "GET", "path": "/api/oauth-provider/authorize/consent?response_type=code&client_id=pocli_missing&redirect_uri=https%3A%2F%2Fexample.com%2Fcb", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+
+  { "name": "oauth-provider-authorize-anon", "method": "POST", "path": "/api/oauth-provider/authorize", "body": {} },
+  { "name": "oauth-provider-authorize-unsupported-response-type", "method": "POST", "path": "/api/oauth-provider/authorize", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": { "response_type": "token", "client_id": "pocli_missing", "redirect_uri": "https://example.com/cb" } },
+  { "name": "oauth-provider-authorize-invalid-redirect", "method": "POST", "path": "/api/oauth-provider/authorize", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": { "response_type": "code", "client_id": "pocli_missing" } },
+  { "name": "oauth-provider-authorize-invalid-scope", "method": "POST", "path": "/api/oauth-provider/authorize", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": { "response_type": "code", "client_id": "pocli_missing", "redirect_uri": "https://example.com/cb", "scope": "nope:read" } },
+  { "name": "oauth-provider-authorize-unknown-client", "method": "POST", "path": "/api/oauth-provider/authorize", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": { "response_type": "code", "client_id": "pocli_missing", "redirect_uri": "https://example.com/cb" } },
+  { "name": "oauth-provider-authorize-non-object-body", "method": "POST", "path": "/api/oauth-provider/authorize", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": [] },
+  { "name": "oauth-provider-authorize-no-body", "method": "POST", "path": "/api/oauth-provider/authorize", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+
+  { "name": "oauth-provider-confirm-anon", "method": "POST", "path": "/api/oauth-provider/authorize/confirm", "body": {} },
+  { "name": "oauth-provider-confirm-non-object-body", "method": "POST", "path": "/api/oauth-provider/authorize/confirm", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": [] },
+  { "name": "oauth-provider-confirm-invalid-client", "method": "POST", "path": "/api/oauth-provider/authorize/confirm", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": { "response_type": "code", "redirect_uri": "https://example.com/cb" } },
+
+  { "name": "oauth-provider-token-unsupported-grant", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "password" } },
+  { "name": "oauth-provider-token-missing-client", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "authorization_code" } },
+  { "name": "oauth-provider-token-missing-code", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "authorization_code", "client_id": "pocli_missing", "client_secret": "posec_missing" } },
+  { "name": "oauth-provider-token-missing-redirect", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "authorization_code", "client_id": "pocli_missing", "client_secret": "posec_missing", "code": "poc_missing" } },
+  { "name": "oauth-provider-token-invalid-client", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "authorization_code", "client_id": "pocli_missing", "client_secret": "posec_missing", "code": "poc_missing", "redirect_uri": "https://example.com/cb" } },
+  { "name": "oauth-provider-token-missing-refresh-token", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "refresh_token", "client_id": "pocli_missing", "client_secret": "posec_missing" } },
+  { "name": "oauth-provider-token-invalid-refresh-client", "method": "POST", "path": "/api/oauth-provider/token", "body": { "grant_type": "refresh_token", "client_id": "pocli_missing", "client_secret": "posec_missing", "refresh_token": "por_missing" } },
+  { "name": "oauth-provider-token-null-body", "method": "POST", "path": "/api/oauth-provider/token", "body": null },
+  { "name": "oauth-provider-token-no-body", "method": "POST", "path": "/api/oauth-provider/token" },
+
+  { "name": "oauth-provider-revoke-missing-token", "method": "POST", "path": "/api/oauth-provider/revoke", "body": {} },
+  { "name": "oauth-provider-revoke-non-object-body", "method": "POST", "path": "/api/oauth-provider/revoke", "body": [] },
+  { "name": "oauth-provider-revoke-unknown-token", "method": "POST", "path": "/api/oauth-provider/revoke", "body": { "token": "poa_definitely_not_a_real_token" } },
+
+  { "name": "oauth-provider-authorizations-anon", "method": "GET", "path": "/api/oauth-provider/authorizations" },
+  { "name": "oauth-provider-authorizations", "method": "GET", "path": "/api/oauth-provider/authorizations", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "oauth-provider-authorizations-delete-anon", "method": "DELETE", "path": "/api/oauth-provider/authorizations/1" },
+  { "name": "oauth-provider-authorizations-delete-invalid-id", "method": "DELETE", "path": "/api/oauth-provider/authorizations/abc", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "oauth-provider-authorizations-delete-zero-id", "method": "DELETE", "path": "/api/oauth-provider/authorizations/0", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "oauth-provider-authorizations-delete-not-found", "method": "DELETE", "path": "/api/oauth-provider/authorizations/2147483647", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {} },
+  { "name": "oauth-provider-authorizations-delete-overflow-id", "method": "DELETE", "path": "/api/oauth-provider/authorizations/2147483648", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {}, "skipBody": true }
+]

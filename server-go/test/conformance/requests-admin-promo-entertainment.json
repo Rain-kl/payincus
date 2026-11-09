@@ -1,0 +1,1002 @@
+[
+  {
+    "name": "admin-promos-list-anon",
+    "method": "GET",
+    "path": "/api/admin/promos"
+  },
+  {
+    "name": "admin-coupon-list-anon",
+    "method": "GET",
+    "path": "/api/admin/coupon"
+  },
+  {
+    "name": "admin-promos-create-anon",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-toggle-anon",
+    "method": "PATCH",
+    "path": "/api/admin/promos/1/toggle",
+    "body": {
+      "enabled": true
+    }
+  },
+  {
+    "name": "admin-promos-delete-anon",
+    "method": "DELETE",
+    "path": "/api/admin/promos/1"
+  },
+  {
+    "name": "admin-promos-list-non-admin-nonadmin",
+    "method": "GET",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list",
+    "method": "GET",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-coupon-list",
+    "method": "GET",
+    "path": "/api/admin/coupon",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/admin/promos/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-pagination-defaults",
+    "method": "GET",
+    "path": "/api/admin/promos?page=0&pageSize=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-pagination-clamped",
+    "method": "GET",
+    "path": "/api/admin/promos?page=1&pageSize=5000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-pagination-invalid",
+    "method": "GET",
+    "path": "/api/admin/promos?page=abc&pageSize=abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-filter-type",
+    "method": "GET",
+    "path": "/api/admin/promos?type=ADMIN_PROMO&enabled=true",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-filter-unknown-type",
+    "method": "GET",
+    "path": "/api/admin/promos?type=WHATEVER&enabled=maybe",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-list-filter-search",
+    "method": "GET",
+    "path": "/api/admin/promos?search=parity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-update-invalid-id-text",
+    "method": "PUT",
+    "path": "/api/admin/promos/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "admin-promos-update-invalid-id-zero",
+    "method": "PUT",
+    "path": "/api/admin/promos/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "admin-promos-update-invalid-id-leading-zero",
+    "method": "PUT",
+    "path": "/api/admin/promos/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "admin-promos-update-not-found",
+    "method": "PUT",
+    "path": "/api/admin/promos/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "admin-promos-toggle-invalid-id",
+    "method": "PATCH",
+    "path": "/api/admin/promos/0/toggle",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "enabled": true
+    }
+  },
+  {
+    "name": "admin-promos-toggle-non-boolean",
+    "method": "PATCH",
+    "path": "/api/admin/promos/1/toggle",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "enabled": "yes"
+    }
+  },
+  {
+    "name": "admin-promos-toggle-missing-field",
+    "method": "PATCH",
+    "path": "/api/admin/promos/1/toggle",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-promos-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/admin/promos/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/promos/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-instances-invalid-id",
+    "method": "GET",
+    "path": "/api/admin/promos/-1/instances",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-instances-not-found",
+    "method": "GET",
+    "path": "/api/admin/promos/2147483647/instances",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-instances",
+    "method": "GET",
+    "path": "/api/admin/promos/1/instances?page=1&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-unbind-invalid-params",
+    "method": "POST",
+    "path": "/api/admin/promos/0/unbind/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-unbind-binding-not-found",
+    "method": "POST",
+    "path": "/api/admin/promos/2147483647/unbind/2147483646",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-create-no-body",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-promos-create-empty",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-promos-create-code-not-string",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": 12345,
+      "discountValue": 0.5,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-create-code-too-short",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "ab",
+      "discountValue": 0.5,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-create-code-too-long",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "discountValue": 0.5,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-create-discount-zero",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-create-discount-string",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": "0.5",
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-create-percentage-above-one",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 1.5,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-promos-create-missing-scopes",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5
+    }
+  },
+  {
+    "name": "admin-promos-create-empty-scopes",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "scopes": []
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-scope-package",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "scopes": [
+        {
+          "packageId": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-scope-plan",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "scopes": [
+        {
+          "packageId": 1,
+          "packagePlanId": -2
+        }
+      ]
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-max-total-uses",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true,
+      "maxTotalUses": 0
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-max-uses-per-user",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true,
+      "maxUsesPerUser": 1.5
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-starts-at",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true,
+      "startsAt": "not-a-date"
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-expires-at",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true,
+      "expiresAt": "not-a-date"
+    }
+  },
+  {
+    "name": "admin-promos-create-start-after-expiry",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true,
+      "startsAt": "2026-02-01T00:00:00.000Z",
+      "expiresAt": "2026-01-01T00:00:00.000Z"
+    }
+  },
+  {
+    "name": "admin-promos-create-repeat-missing-cycles",
+    "method": "POST",
+    "path": "/api/admin/promos",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "PARITY01",
+      "discountValue": 0.5,
+      "isGlobal": true,
+      "durationType": "REPEATING"
+    }
+  },
+  {
+    "name": "admin-promos-create-bad-id-for-update-route",
+    "method": "POST",
+    "path": "/api/admin/coupon",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "code": "AB",
+      "discountValue": 0.5,
+      "isGlobal": true
+    }
+  },
+  {
+    "name": "admin-entertainment-lotteries-anon",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries"
+  },
+  {
+    "name": "admin-entertainment-create-lottery-anon",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "body": {
+      "name": "Parity",
+      "costPoints": 100
+    }
+  },
+  {
+    "name": "admin-entertainment-badges-anon",
+    "method": "GET",
+    "path": "/api/admin/entertainment/badges/catalog"
+  },
+  {
+    "name": "admin-entertainment-lotteries-non-admin-nonadmin",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-checkin-settings-non-admin-nonadmin",
+    "method": "GET",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lotteries",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lotteries-filters",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries?isActive=true&page=1&pageSize=10",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lotteries-invalid-pagination",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries?page=abc&pageSize=0&isActive=maybe",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-detail-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-detail-invalid-id-leading-zero",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-detail-invalid-id-text",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-detail-not-found",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-detail",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lotteries/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-create-lottery-no-body",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-create-lottery-empty",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-create-lottery-blank-name",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "   ",
+      "costPoints": 100
+    }
+  },
+  {
+    "name": "admin-entertainment-create-lottery-missing-cost",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-lottery-zero-cost",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity",
+      "costPoints": 0
+    }
+  },
+  {
+    "name": "admin-entertainment-create-lottery-string-cost",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity",
+      "costPoints": "100"
+    }
+  },
+  {
+    "name": "admin-entertainment-update-lottery-invalid-id",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/lotteries/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-update-lottery-not-found",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/lotteries/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-delete-lottery-invalid-id",
+    "method": "DELETE",
+    "path": "/api/admin/entertainment/lotteries/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-delete-lottery-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/entertainment/lotteries/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-create-prize-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries/0/prizes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-create-prize-lottery-not-found",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lotteries/2147483647/prizes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-update-prize-invalid-id",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/prizes/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-update-prize-not-found",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/prizes/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-delete-prize-invalid-id",
+    "method": "DELETE",
+    "path": "/api/admin/entertainment/prizes/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-delete-prize-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/entertainment/prizes/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-notification-invalid-id",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/lotteries/0/notification",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "enabled": true,
+      "type": "webhook",
+      "config": {},
+      "notifyBalance": true,
+      "notifyInstance": true
+    }
+  },
+  {
+    "name": "admin-entertainment-notification-lottery-not-found",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/lotteries/2147483647/notification",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "enabled": true,
+      "type": "webhook",
+      "config": {},
+      "notifyBalance": true,
+      "notifyInstance": true
+    }
+  },
+  {
+    "name": "admin-entertainment-lottery-records",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lottery-records",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-records-filters",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lottery-records?lotteryId=1&prizeType=points&status=pending&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-records-search",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lottery-records?search=admin",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-records-invalid-id",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lottery-records?lotteryId=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-records-invalid-prize-type",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lottery-records?prizeType=gift",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-lottery-records-invalid-status",
+    "method": "GET",
+    "path": "/api/admin/entertainment/lottery-records?status=nope",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-deliver-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lottery-records/0/deliver",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-deliver-not-found",
+    "method": "POST",
+    "path": "/api/admin/entertainment/lottery-records/2147483647/deliver",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-entertainment-user-points",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-ordered",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points?orderBy=totalEarned&order=asc&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-search",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points?search=admin",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-invalid-order-by",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points?orderBy=nope",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-invalid-order",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points?order=sideways",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-detail-invalid-id",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-logs-invalid-id",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points/0/logs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-user-points-logs",
+    "method": "GET",
+    "path": "/api/admin/entertainment/user-points/1/logs?page=1&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-adjust-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/user-points/0/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 10,
+      "remark": "parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-adjust-invalid-amount",
+    "method": "POST",
+    "path": "/api/admin/entertainment/user-points/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 0,
+      "remark": "parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-adjust-amount-above-limit",
+    "method": "POST",
+    "path": "/api/admin/entertainment/user-points/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 1000001,
+      "remark": "parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-adjust-missing-remark",
+    "method": "POST",
+    "path": "/api/admin/entertainment/user-points/1/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 10
+    }
+  },
+  {
+    "name": "admin-entertainment-adjust-user-not-found",
+    "method": "POST",
+    "path": "/api/admin/entertainment/user-points/2147483647/adjust",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "amount": 10,
+      "remark": "parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-checkin-settings",
+    "method": "GET",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-checkin-settings-invalid-enabled",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "enabled": "true"
+    }
+  },
+  {
+    "name": "admin-entertainment-checkin-settings-invalid-require-instance",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "requireInstance": 1
+    }
+  },
+  {
+    "name": "admin-entertainment-checkin-settings-invalid-min",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "minPoints": 0
+    }
+  },
+  {
+    "name": "admin-entertainment-checkin-settings-invalid-max",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "maxPoints": -5
+    }
+  },
+  {
+    "name": "admin-entertainment-checkin-settings-invalid-range",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/checkin/settings",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "minPoints": 10,
+      "maxPoints": 5
+    }
+  },
+  {
+    "name": "admin-entertainment-checkin-logs",
+    "method": "GET",
+    "path": "/api/admin/entertainment/checkin/logs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-checkin-logs-filtered",
+    "method": "GET",
+    "path": "/api/admin/entertainment/checkin/logs?search=admin&dateKey=2026-01-01&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-badges-catalog",
+    "method": "GET",
+    "path": "/api/admin/entertainment/badges/catalog",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-create-series-missing-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges/series",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "Parity",
+      "nameZh": "对齐",
+      "description": "d"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-series-bad-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges/series",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "id": "bad id",
+      "title": "Parity",
+      "nameZh": "对齐",
+      "description": "d"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-series-missing-title",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges/series",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "id": "parity-series",
+      "nameZh": "对齐",
+      "description": "d"
+    }
+  },
+  {
+    "name": "admin-entertainment-update-series-blank-title",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/badges/series/parity-series",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "title": "   "
+    }
+  },
+  {
+    "name": "admin-entertainment-delete-series-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/entertainment/badges/series/parity-missing-series",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-entertainment-create-badge-missing-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "n",
+      "fullLabel": "f",
+      "seriesId": "s",
+      "assetUrl": "/badges/dark/p.svg"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-badge-bad-id",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "id": "bad id",
+      "name": "n",
+      "fullLabel": "f",
+      "seriesId": "s",
+      "assetUrl": "/badges/dark/p.svg"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-badge-missing-asset",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "id": "parity-badge",
+      "name": "n",
+      "fullLabel": "f",
+      "seriesId": "s"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-badge-bad-asset",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "id": "parity-badge",
+      "name": "n",
+      "fullLabel": "f",
+      "seriesId": "s",
+      "assetUrl": "ftp://x/a.svg"
+    }
+  },
+  {
+    "name": "admin-entertainment-create-badge-protocol-relative-asset",
+    "method": "POST",
+    "path": "/api/admin/entertainment/badges",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "id": "parity-badge",
+      "name": "n",
+      "fullLabel": "f",
+      "seriesId": "s",
+      "assetUrl": "//evil.example/a.svg"
+    }
+  },
+  {
+    "name": "admin-entertainment-update-badge-empty-asset",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/badges/parity-badge",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "assetUrl": "   "
+    }
+  },
+  {
+    "name": "admin-entertainment-update-badge-blank-name",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/badges/parity-badge",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "   "
+    }
+  },
+  {
+    "name": "admin-entertainment-update-badge-not-found",
+    "method": "PUT",
+    "path": "/api/admin/entertainment/badges/parity-missing-badge",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity"
+    }
+  },
+  {
+    "name": "admin-entertainment-delete-badge-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/entertainment/badges/parity-missing-badge",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]

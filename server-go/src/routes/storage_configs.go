@@ -269,6 +269,10 @@ type ajvFieldSpec struct {
 	Minimum   float64 // NaN when unset
 	Maximum   float64 // NaN when unset
 	Enum      []string
+	// Pattern is the schema's `pattern`, nil when unset. On failure the message is
+	// the one app.ts' setErrorHandler renders, NOT AJV's raw text — see
+	// ajvPatternMessage.
+	Pattern *regexp.Regexp
 }
 
 // ajvValidated holds the coerced values of a body. Values are `any` and use the
@@ -364,6 +368,9 @@ func ajvCoerceField(field ajvFieldSpec, value any) (any, string) {
 		}
 		if len(field.Enum) > 0 && !ajvEnumContains(field.Enum, text) {
 			return nil, "must be equal to one of the allowed values"
+		}
+		if field.Pattern != nil && !field.Pattern.MatchString(text) {
+			return nil, ajvPatternMessage(field.Name)
 		}
 		if field.MaxLength >= 0 && jsStringLength(text) > field.MaxLength {
 			return nil, field.Name + " is too long"
@@ -1516,4 +1523,22 @@ func prismaRenderValue(value any) string {
 
 func init() {
 	Register(RegisterStorageConfigs)
+}
+
+// ajvPatternMessage mirrors the `pattern` branch of app.ts' setErrorHandler.
+//
+// Fastify never surfaces AJV's raw text here: it maps the failure to
+// "<field> format is invalid", with one special case for username. Verified against
+// the live Node server:
+//
+//	PATCH /api/instances/1/advanced-config {"limitsRead":"100xb"}
+//	  -> {"error":"limitsRead format is invalid","code":"VALIDATION_ERROR"}
+//
+// Emitting AJV's `must match pattern "^([0-9]+...)$"` instead would leak the schema
+// and break clients that match on the message.
+func ajvPatternMessage(fieldName string) string {
+	if fieldName == "username" {
+		return "Username must start with a letter and contain only letters, numbers, underscores, and hyphens"
+	}
+	return fieldName + " format is invalid"
 }

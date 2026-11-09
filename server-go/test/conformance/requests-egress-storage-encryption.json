@@ -1,0 +1,411 @@
+[
+  { "name": "egress-instance-anon", "method": "GET", "path": "/api/instances/1/egress" },
+  { "name": "egress-profiles-list-anon", "method": "GET", "path": "/api/egress/profiles" },
+  {
+    "name": "egress-profiles-create-anon",
+    "method": "POST",
+    "path": "/api/admin/egress-profiles",
+    "body": { "name": "a", "hostIds": [1], "egress": {} }
+  },
+  { "name": "egress-profiles-delete-anon", "method": "DELETE", "path": "/api/admin/egress-profiles/1", "body": {} },
+  { "name": "egress-proxy-nodes-anon", "method": "GET", "path": "/api/admin/proxy-nodes" },
+  { "name": "egress-proxy-probe-hosts-anon", "method": "GET", "path": "/api/admin/proxy-probe-hosts" },
+  {
+    "name": "egress-proxy-import-anon",
+    "method": "POST",
+    "path": "/api/admin/proxy-nodes/import",
+    "body": { "confirm": false, "content": "socks5://example.com:1080" }
+  },
+  { "name": "egress-proxy-node-delete-anon", "method": "DELETE", "path": "/api/admin/proxy-nodes/1", "body": {} },
+  { "name": "egress-network-policy-anon", "method": "GET", "path": "/api/hosts/1/network-policy" },
+  {
+    "name": "egress-network-policy-firewall-anon",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/firewall",
+    "body": { "revision": 0, "value": { "enabled": false, "ingressAction": "allow", "egressAction": "allow", "rules": [] } }
+  },
+  {
+    "name": "egress-proxy-probes-anon",
+    "method": "POST",
+    "path": "/api/admin/proxy-probes",
+    "body": { "hostId": 1, "nodeIds": [1], "probeUrl": "https://1.1.1.1/cdn-cgi/trace" }
+  },
+  { "name": "storage-encryption-anon", "method": "GET", "path": "/api/hosts/1/storage-pools/data/encryption" },
+  {
+    "name": "storage-encryption-reveal-anon",
+    "method": "POST",
+    "path": "/api/hosts/1/storage-pools/data/encryption/reveal",
+    "body": {}
+  },
+
+  {
+    "name": "egress-instance-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/0/egress",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "egress-instance-not-found",
+    "method": "GET",
+    "path": "/api/instances/2147483647/egress",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "egress-profiles-list",
+    "method": "GET",
+    "path": "/api/egress/profiles",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "egress-profiles-create-missing-name",
+    "method": "POST",
+    "path": "/api/admin/egress-profiles",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "hostIds": [1], "egress": {} }
+  },
+  {
+    "name": "egress-profiles-create-duplicate-hosts",
+    "method": "POST",
+    "path": "/api/admin/egress-profiles",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "policy",
+      "hostIds": [1, 1],
+      "egress": {
+        "mode": "direct",
+        "strategy": "failover",
+        "proxyNodeIds": [],
+        "internalCidrs": [],
+        "probeUrl": "https://1.1.1.1/cdn-cgi/trace",
+        "probeIntervalSeconds": 30
+      }
+    }
+  },
+  {
+    "name": "egress-profiles-create-proxy-without-nodes",
+    "method": "POST",
+    "path": "/api/admin/egress-profiles",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "policy",
+      "hostIds": [1],
+      "egress": {
+        "mode": "proxy",
+        "strategy": "failover",
+        "proxyNodeIds": [],
+        "internalCidrs": [],
+        "probeUrl": "https://1.1.1.1/cdn-cgi/trace",
+        "probeIntervalSeconds": 30
+      }
+    }
+  },
+  {
+    "name": "egress-profiles-create-bad-cidr",
+    "method": "POST",
+    "path": "/api/admin/egress-profiles",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "policy",
+      "hostIds": [1],
+      "egress": {
+        "mode": "direct",
+        "strategy": "failover",
+        "proxyNodeIds": [],
+        "internalCidrs": ["10.0.0.0/33"],
+        "probeUrl": "https://1.1.1.1/cdn-cgi/trace",
+        "probeIntervalSeconds": 30
+      }
+    }
+  },
+  {
+    "name": "egress-profiles-create-insecure-probe",
+    "method": "POST",
+    "path": "/api/admin/egress-profiles",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "name": "policy",
+      "hostIds": [1],
+      "egress": {
+        "mode": "direct",
+        "strategy": "failover",
+        "proxyNodeIds": [],
+        "internalCidrs": [],
+        "probeUrl": "http://example.com/probe",
+        "probeIntervalSeconds": 30
+      }
+    }
+  },
+  {
+    "name": "egress-profiles-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/admin/egress-profiles/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "egress-profiles-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/egress-profiles/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "egress-proxy-nodes-list",
+    "method": "GET",
+    "path": "/api/admin/proxy-nodes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "egress-proxy-probe-hosts",
+    "method": "GET",
+    "path": "/api/admin/proxy-probe-hosts",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "egress-proxy-import-missing-confirm",
+    "method": "POST",
+    "path": "/api/admin/proxy-nodes/import",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "content": "socks5://example.com:1080" }
+  },
+  {
+    "name": "egress-proxy-import-both-sources",
+    "method": "POST",
+    "path": "/api/admin/proxy-nodes/import",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "confirm": false,
+      "content": "socks5://example.com:1080",
+      "subscriptionUrl": "https://example.com/sub.txt"
+    }
+  },
+  {
+    "name": "egress-proxy-import-preview-single",
+    "method": "POST",
+    "path": "/api/admin/proxy-nodes/import",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "confirm": false, "content": "socks5://user:password@example.com:1080#Socks" }
+  },
+  {
+    "name": "egress-proxy-import-preview-mixed",
+    "method": "POST",
+    "path": "/api/admin/proxy-nodes/import",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "confirm": false,
+      "content": "socks5://user:password@example.com:1080#Socks\nvless://00000000-0000-4000-8000-000000000001@example.com:443?security=tls&type=ws&host=example.com&path=%2Fproxy#Vless"
+    }
+  },
+  {
+    "name": "egress-proxy-import-preview-singbox",
+    "method": "POST",
+    "path": "/api/admin/proxy-nodes/import",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "confirm": false,
+      "content": "{\"outbounds\":[{\"type\":\"vless\",\"tag\":\"converted\",\"server\":\"example.com\",\"server_port\":443,\"uuid\":\"00000000-0000-4000-8000-000000000001\",\"tls\":{\"enabled\":true,\"server_name\":\"example.com\"},\"transport\":{\"type\":\"ws\",\"path\":\"/ws\"}},{\"type\":\"hysteria2\",\"server\":\"example.com\"}]}"
+    }
+  },
+  {
+    "name": "egress-proxy-node-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/admin/proxy-nodes/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "egress-proxy-node-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/proxy-nodes/2147483647",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "egress-network-policy-invalid-id",
+    "method": "GET",
+    "path": "/api/hosts/0/network-policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "egress-network-policy-not-found",
+    "method": "GET",
+    "path": "/api/hosts/2147483647/network-policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "egress-network-policy-firewall-mixed-families",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/firewall",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "revision": 0,
+      "value": {
+        "enabled": true,
+        "ingressAction": "allow",
+        "egressAction": "allow",
+        "rules": [
+          {
+            "direction": "egress",
+            "action": "drop",
+            "protocol": "tcp",
+            "source": "1.2.3.4",
+            "destination": "::/0",
+            "sourcePort": "",
+            "destinationPort": "",
+            "description": "mixed",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "egress-network-policy-firewall-ports-on-icmp",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/firewall",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "revision": 0,
+      "value": {
+        "enabled": true,
+        "ingressAction": "allow",
+        "egressAction": "allow",
+        "rules": [
+          {
+            "direction": "egress",
+            "action": "drop",
+            "protocol": "icmp4",
+            "source": "",
+            "destination": "1.2.3.4",
+            "sourcePort": "80",
+            "destinationPort": "",
+            "description": "bad ports",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "egress-network-policy-firewall-bad-cidr",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/firewall",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "revision": 0,
+      "value": {
+        "enabled": true,
+        "ingressAction": "allow",
+        "egressAction": "allow",
+        "rules": [
+          {
+            "direction": "egress",
+            "action": "drop",
+            "protocol": "tcp",
+            "source": "1.2.3.4; drop",
+            "destination": "",
+            "sourcePort": "",
+            "destinationPort": "25,465,1000-2000",
+            "description": "bad source",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "egress-network-policy-firewall-missing-revision",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/firewall",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "value": { "enabled": false, "ingressAction": "allow", "egressAction": "allow", "rules": [] } }
+  },
+  {
+    "name": "egress-network-policy-egress-invalid-binding",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/egress",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "revision": 0, "value": { "egressMode": "bogus" } }
+  },
+  {
+    "name": "egress-network-policy-egress-invalid-profile",
+    "method": "PUT",
+    "path": "/api/hosts/1/network-policy/egress",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "revision": 0, "value": { "egressMode": "profile", "egressProfileId": 0 } }
+  },
+  {
+    "name": "egress-proxy-probes-missing-nodeIds",
+    "method": "POST",
+    "path": "/api/admin/proxy-probes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "hostId": 1, "probeUrl": "https://1.1.1.1/cdn-cgi/trace" }
+  },
+  {
+    "name": "egress-proxy-probes-duplicate-nodeIds",
+    "method": "POST",
+    "path": "/api/admin/proxy-probes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "hostId": 1, "nodeIds": [1, 1], "probeUrl": "https://1.1.1.1/cdn-cgi/trace" }
+  },
+  {
+    "name": "egress-proxy-probes-insecure-url",
+    "method": "POST",
+    "path": "/api/admin/proxy-probes",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "hostId": 1, "nodeIds": [1], "probeUrl": "http://example.com/probe" }
+  },
+  {
+    "name": "storage-encryption-invalid-id",
+    "method": "GET",
+    "path": "/api/hosts/0/storage-pools/data/encryption",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-encryption-invalid-pool-name",
+    "method": "GET",
+    "path": "/api/hosts/1/storage-pools/-bad/encryption",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-encryption-out-of-range-id",
+    "method": "GET",
+    "path": "/api/hosts/9999999999/storage-pools/data/encryption",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-encryption-node-not-found",
+    "method": "GET",
+    "path": "/api/hosts/2147483647/storage-pools/data/encryption",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "storage-encryption-bad-key",
+    "method": "POST",
+    "path": "/api/hosts/2147483647/storage-pools/data/encryption",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "key": "not-a-key" }
+  },
+  {
+    "name": "storage-encryption-put-bad-key",
+    "method": "PUT",
+    "path": "/api/hosts/2147483647/storage-pools/data/encryption",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "key": "not-a-key" }
+  },
+  {
+    "name": "storage-encryption-reveal-invalid-id",
+    "method": "POST",
+    "path": "/api/hosts/0/storage-pools/data/encryption/reveal",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "storage-encryption-reveal-node-not-found",
+    "method": "POST",
+    "path": "/api/hosts/2147483647/storage-pools/data/encryption/reveal",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  }
+]
