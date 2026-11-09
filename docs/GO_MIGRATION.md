@@ -269,6 +269,8 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 ### Wave D — 高危核心（AGENTS.md §2.3：先读后写；按依赖链排序）
 
+> **施工依据：[`docs/WAVE_D_SPEC.md`](WAVE_D_SPEC.md)** —— 全局不变量（单实例状态、三套鉴权面、金额路径、advisory lock 命名空间）、逐模块契约、反向鉴权测试、真机验证要求都在那份文件里。动工前必读。
+
 > 这一批是线上主流程，**先出 spec 再实现**，每完成一个跑该模块对拍 + 真机流程。
 
 1. [ ] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
