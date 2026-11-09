@@ -392,6 +392,7 @@ const (
 	InstanceTaskTypeClone      InstanceTaskType = "clone"
 	InstanceTaskTypeRecreate   InstanceTaskType = "recreate"
 	InstanceTaskTypeChangeHost InstanceTaskType = "change_host"
+	InstanceTaskTypeCreate     InstanceTaskType = "create"
 )
 
 // InstanceTaskStatus mirrors the Prisma enum InstanceTaskStatus.
@@ -908,6 +909,7 @@ type InstanceTask struct {
 	TargetHostID         *int32             `gorm:"column:target_host_id" json:"targetHostId"`
 	SnapshotName         *string            `gorm:"column:snapshot_name" json:"snapshotName"`
 	NewInstanceID        *int32             `gorm:"column:new_instance_id" json:"newInstanceId"`
+	Payload              datatypes.JSON     `gorm:"column:payload" json:"payload"`
 	Error                *string            `gorm:"column:error" json:"error"`
 	CreatedAt            time.Time          `gorm:"column:created_at" json:"createdAt"`
 	StartedAt            *time.Time         `gorm:"column:started_at" json:"startedAt"`
@@ -1448,7 +1450,7 @@ type Package struct {
 	NodeSelectors           datatypes.JSON       `gorm:"column:node_selectors" json:"nodeSelectors"`
 	Privileged              bool                 `gorm:"column:privileged" json:"privileged"`
 	GPUShared               bool                 `gorm:"column:gpu_shared" json:"gpuShared"`
-	GPUDeviceIds            []int32              `gorm:"column:gpu_device_ids" json:"gpuDeviceIds"`
+	GPUDeviceIds            []int32              `gorm:"column:gpu_device_ids;serializer:json" json:"gpuDeviceIds"`
 	Nested                  bool                 `gorm:"column:nested" json:"nested"`
 	Active                  bool                 `gorm:"column:active" json:"active"`
 	PortLimit               int32                `gorm:"column:port_limit" json:"portLimit"`
@@ -2951,7 +2953,7 @@ type PackagePlan struct {
 	Name              string           `gorm:"column:name" json:"name"`
 	Description       *string          `gorm:"column:description" json:"description"`
 	GPUShared         *bool            `gorm:"column:gpu_shared" json:"gpuShared"`
-	GPUDeviceIds      []int32          `gorm:"column:gpu_device_ids" json:"gpuDeviceIds"`
+	GPUDeviceIds      []int32          `gorm:"column:gpu_device_ids;serializer:json" json:"gpuDeviceIds"`
 	CPU               int32            `gorm:"column:cpu" json:"cpu"`
 	Memory            int32            `gorm:"column:memory" json:"memory"`
 	Disk              int32            `gorm:"column:disk" json:"disk"`
@@ -3561,7 +3563,7 @@ type EgressProfile struct {
 	Name           string                     `gorm:"column:name" json:"name"`
 	Active         bool                       `gorm:"column:active" json:"active"`
 	Egress         datatypes.JSON             `gorm:"column:egress" json:"egress"`
-	AllowedHostIds []int32                    `gorm:"column:allowed_host_ids" json:"allowedHostIds"`
+	AllowedHostIds []int32                    `gorm:"column:allowed_host_ids;serializer:json" json:"allowedHostIds"`
 	CreatedAt      time.Time                  `gorm:"column:created_at" json:"createdAt"`
 	UpdatedAt      time.Time                  `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 	Packages       []Package                  `gorm:"-" json:"packages,omitempty"`

@@ -11,6 +11,40 @@ import BadgeCenter from '@/components/entertainment/BadgeCenter.vue'
 import BadgeRewardModal from '@/components/entertainment/BadgeRewardModal.vue'
 import VipBenefitHall from '@/components/entertainment/VipBenefitHall.vue'
 import type { BadgeOwnership } from '@/types/api'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Select
+} from '@/components/ui'
+import {
+  Activity,
+  AlertCircle,
+  ArrowUpDown,
+  Award,
+  CalendarCheck,
+  CheckCircle2,
+  Coins,
+  Cpu,
+  Crown,
+  Gift,
+  HardDrive,
+  HelpCircle,
+  Layers,
+  Sparkles,
+  X,
+  Zap
+} from 'lucide-vue-next'
+import {
+  confettiPalette,
+  prizeColorPalette,
+  defaultPrizeColor,
+  wheelGradientPalette,
+  defaultWheelGradient
+} from '@/theme/entertainment-palette'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -224,7 +258,7 @@ const getActionName = (action: string) => {
 
 // 生成彩色纸屑粒子
 const generateConfetti = () => {
-  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd']
+  const colors = confettiPalette
   const particles: typeof confettiParticles.value = []
   for (let i = 0; i < 50; i++) {
     particles.push({ id: i, x: Math.random() * 100, delay: Math.random() * 0.5, color: colors[Math.floor(Math.random() * colors.length)], size: Math.random() * 8 + 4 })
@@ -776,35 +810,12 @@ function getPointsLogTypeName(type: string): string {
 }
 
 function getPrizeColor(type: string): string {
-  const map: Record<string, string> = {
-    nothing: '#9CA3AF',
-    points: '#F59E0B',
-    balance: '#10B981',
-    badge: '#0EA5E9',
-    instance: '#8B5CF6',
-    cpu: '#3B82F6',     // 蓝色 - CPU
-    memory: '#EC4899',  // 粉色 - 内存
-    disk: '#F97316',    // 橙色 - 硬盘
-    traffic: '#06B6D4'  // 青色 - 流量
-  }
-  return map[type] || '#6B7280'
+  return prizeColorPalette[type] || defaultPrizeColor
 }
 
 // 为转盘奖品区域生成渐变色
 function getWheelGradientColor(type: string, index: number): string {
-  // 使用更丰富的配色方案
-  const colorSchemes: Record<string, string[]> = {
-    nothing: ['#9CA3AF', '#6B7280'],      // 灰色系
-    points: ['#FBBF24', '#F59E0B'],       // 金色系
-    balance: ['#34D399', '#10B981'],      // 绿色系
-    badge: ['#38BDF8', '#0EA5E9'],        // 天蓝色系
-    instance: ['#A78BFA', '#8B5CF6'],     // 紫色系
-    cpu: ['#60A5FA', '#3B82F6'],          // 蓝色系 - CPU
-    memory: ['#F472B6', '#EC4899'],       // 粉色系 - 内存
-    disk: ['#FB923C', '#F97316'],         // 橙色系 - 硬盘
-    traffic: ['#22D3EE', '#06B6D4']       // 青色系 - 流量
-  }
-  const colors = colorSchemes[type] || ['#9CA3AF', '#6B7280']
+  const colors = wheelGradientPalette[type] || defaultWheelGradient
   // 交替使用深浅色增加对比
   return index % 2 === 0 ? colors[0] : colors[1]
 }
@@ -858,156 +869,166 @@ function getWheelTextTransform(index: number, total: number): string {
   const textRotation = angle + 90
   return `translate(${x}, ${y}) rotate(${textRotation})`
 }
+
+const resourceTypeOptions = computed(() => [
+  { label: `CPU (${resourcePool.value.cpu}%)`, value: 'c' },
+  { label: `${t('checkin.memory')} (${resourcePool.value.memory} MB)`, value: 'r' },
+  { label: `${t('checkin.disk')} (${resourcePool.value.disk} MB)`, value: 'd' },
+  { label: `${t('checkin.traffic')} (${resourcePool.value.traffic} GB)`, value: 't' }
+])
+
 </script>
 
 <template>
-  <div class="kawaii-page animate-fade-in">
-    <!-- 页面标题 -->
-    <header class="mb-6 flex flex-col gap-4 border-b border-themed pb-5 sm:flex-row sm:items-end sm:justify-between">
-      <div class="min-w-0">
-        <h1 class="text-2xl font-semibold tracking-tight text-themed">{{ $t('entertainment.title') }}</h1>
-        <p class="mt-1.5 text-sm text-themed-muted">{{ $t('entertainment.description') }}</p>
-      </div>
-    </header>
+  <div class="kawaii-page space-y-6 animate-fade-in pb-12">
+    <!-- Apple HIG PageHeader -->
+    <PageHeader
+      :title="$t('entertainment.title')"
+      :description="$t('entertainment.description')"
+    />
 
-    <!-- 主选项卡（Nimbus 下划线选项卡） -->
-    <nav class="mb-6 flex flex-wrap items-center gap-x-1 border-b border-themed">
+    <!-- 主选项卡（Apple HIG Segmented Control） -->
+    <div class="inline-flex items-center rounded-2xl bg-[var(--bg-surface-soft)] p-1.5 border border-[var(--border-color)] gap-1 flex-wrap">
       <button
-        class="relative flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium transition-colors"
-        :class="mainTab === 'vip' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+        :class="mainTab === 'vip'
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
         @click="mainTab = 'vip'"
       >
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H4.5a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-        </svg>
+        <Crown class="h-4 w-4 text-amber-500" />
         <span>{{ $t('entertainment.mainTabs.vipBenefits') }}</span>
-        <span v-show="mainTab === 'vip'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
       </button>
 
-      <!-- 抽奖选项卡 -->
       <button
-        class="relative flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium transition-colors"
-        :class="mainTab === 'lottery' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+        :class="mainTab === 'lottery'
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
         @click="mainTab = 'lottery'"
       >
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <Sparkles class="h-4 w-4 text-[var(--accent)]" />
         <span>{{ $t('entertainment.mainTabs.lottery') }}</span>
-        <span v-show="mainTab === 'lottery'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
       </button>
 
-      <!-- 签到选项卡：暂时下线，保留实现供后续改版复用 -->
       <button
         v-if="checkinFeatureEnabled"
-        class="relative flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium transition-colors"
-        :class="mainTab === 'checkin' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+        :class="mainTab === 'checkin'
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
         @click="mainTab = 'checkin'"
       >
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        <CalendarCheck class="h-4 w-4 text-emerald-500" />
         <span>{{ $t('entertainment.mainTabs.checkin') }}</span>
-        <span v-show="mainTab === 'checkin'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
       </button>
 
       <button
-        class="relative flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium transition-colors"
-        :class="mainTab === 'badge' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+        :class="mainTab === 'badge'
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
         @click="badgeInitialTab = 'draw'; mainTab = 'badge'"
       >
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8l1.902 3.854L18 12.472l-3 2.924.708 4.128L12 17.5l-3.708 2.024L9 15.396l-3-2.924 4.098-.618L12 8z" />
-        </svg>
+        <Award class="h-4 w-4 text-purple-500" />
         <span>{{ $t('entertainment.mainTabs.badge') }}</span>
-        <span v-show="mainTab === 'badge'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
       </button>
-    </nav>
+    </div>
 
+    <!-- VIP权益大厅 -->
     <div v-show="mainTab === 'vip'">
       <VipBenefitHall />
     </div>
 
     <!-- ==================== 抽奖功能区域 ==================== -->
-    <div v-show="mainTab === 'lottery'">
+    <div v-show="mainTab === 'lottery'" class="space-y-6">
       <!-- 积分卡片 -->
-      <div class="mb-6 rounded-xl border border-themed bg-themed-surface p-5 shadow-sm">
+      <Card padding="md">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-              <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-              </svg>
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <Coins class="w-6 h-6 text-amber-500" />
             </div>
             <div>
-              <div class="text-sm text-themed-muted">{{ $t('entertainment.currentPoints') }}</div>
-              <div class="text-2xl font-bold text-themed font-mono tabular-nums">{{ points.points.toLocaleString() }}</div>
+              <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('entertainment.currentPoints') }}</div>
+              <div class="text-2xl font-bold text-[var(--text-primary)] font-mono tabular-nums tracking-tight">
+                {{ points.points.toLocaleString() }}
+              </div>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <!-- 十连抽按钮 -->
-            <button 
+            <Button 
               v-if="selectedLottery"
-              class="btn btn-primary flex items-center gap-1"
+              variant="primary"
+              size="sm"
               :disabled="isMultiDrawing || isSpinning || points.points < selectedLottery.costPoints * 10"
+              :loading="isMultiDrawing"
               @click="multiDraw"
             >
-              <svg v-if="isMultiDrawing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
+              <template #icon>
+                <Zap class="w-4 h-4" />
+              </template>
               {{ $t('entertainment.multiDraw') }}
-              <span class="text-xs opacity-75">({{ selectedLottery.costPoints * 10 }}{{ $t('entertainment.pointsUnit') }})</span>
-            </button>
+              <span class="text-xs opacity-80 font-mono">({{ selectedLottery.costPoints * 10 }}{{ $t('entertainment.pointsUnit') }})</span>
+            </Button>
             <!-- 兑换积分按钮 -->
-            <button 
-              class="btn btn-primary"
+            <Button 
+              variant="secondary"
+              size="sm"
               :disabled="converting || points.convertiblePoints <= 0"
+              :loading="converting"
               @click="convertPoints"
             >
-              <svg v-if="converting" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <template #icon>
+                <ArrowUpDown class="w-4 h-4" />
+              </template>
               {{ $t('entertainment.convertPoints') }}
-              <span v-if="points.convertiblePoints > 0" class="ml-1 text-xs opacity-75">
+              <span v-if="points.convertiblePoints > 0" class="ml-1 text-xs text-[var(--accent)] font-semibold font-mono">
                 (+{{ points.convertiblePoints }})
               </span>
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       <!-- 子 TAB 切换 -->
-      <nav class="mb-6 flex flex-wrap items-center gap-x-1 border-b border-themed">
+      <div class="inline-flex items-center rounded-xl bg-[var(--bg-surface-soft)] p-1 border border-[var(--border-color)] gap-1">
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="activeTab === 'lottery' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="activeTab === 'lottery'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchTab('lottery')"
         >
           {{ $t('entertainment.tabs.lottery') }}
-          <span v-show="activeTab === 'lottery'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="activeTab === 'records' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="activeTab === 'records'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchTab('records')"
         >
           {{ $t('entertainment.tabs.records') }}
-          <span v-show="activeTab === 'records'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="activeTab === 'points' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="activeTab === 'points'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchTab('points')"
         >
           {{ $t('entertainment.tabs.points') }}
-          <span v-show="activeTab === 'points'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
-      </nav>
+      </div>
 
       <!-- 抽奖 TAB -->
       <div v-show="activeTab === 'lottery'" class="space-y-6">
@@ -1016,192 +1037,180 @@ function getWheelTextTransform(index: number, total: number): string {
           <button
             v-for="lottery in lotteries"
             :key="lottery.id"
-            class="px-4 py-2 rounded-lg border text-sm font-medium transition-colors"
+            type="button"
+            class="px-4 py-2 rounded-full border text-sm font-medium transition-all duration-200 active:scale-[0.98]"
             :class="selectedLottery?.id === lottery.id
-              ? 'border-primary-500 bg-primary-500/10 text-primary-500'
-              : 'border-themed text-themed-muted hover:border-themed-hover hover:text-themed'"
+              ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] font-semibold shadow-sm'
+              : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]'"
             @click="selectLottery(lottery)"
           >
             {{ lottery.name }}
-            <span class="text-xs opacity-75 ml-1 font-mono tabular-nums">({{ lottery.costPoints }}{{ $t('entertainment.pointsUnit') }})</span>
+            <span class="text-xs opacity-80 ml-1 font-mono tabular-nums">({{ lottery.costPoints }}{{ $t('entertainment.pointsUnit') }})</span>
           </button>
         </div>
 
         <!-- 无活动提示 -->
-        <div v-if="!lotteriesLoading && lotteries.length === 0" class="rounded-xl border border-themed bg-themed-surface p-8 text-center shadow-sm">
-          <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-            </svg>
-          </div>
-          <p class="text-themed-muted">{{ $t('entertainment.noActiveLotteries') }}</p>
-        </div>
+        <Card v-if="!lotteriesLoading && lotteries.length === 0" padding="none">
+          <EmptyState :title="$t('entertainment.noActiveLotteries')" />
+        </Card>
 
         <!-- 抽奖转盘 -->
         <div v-else-if="selectedLottery" class="flex flex-col items-center">
-          <!-- 转盘容器 -->
-          <div class="relative w-72 h-72 sm:w-96 sm:h-96 mb-8">
-            <!-- 最外层底座阴影 -->
-            <div class="absolute inset-[-8px] sm:inset-[-12px] rounded-full bg-gray-300 dark:bg-gray-600 shadow-lg"></div>
-          
-            <!-- 外圈金属装饰环 -->
-            <div class="absolute inset-[-4px] sm:inset-[-6px] rounded-full bg-amber-400 shadow-md">
-              <!-- 灯泡装饰 - 奇偶交替闪烁 -->
-              <div class="absolute inset-0">
-                <div 
-                  v-for="i in 16" 
-                  :key="i"
-                  class="absolute w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-100"
-                  :class="[
-                    isSpinning && (i % 2 === bulbPhase) 
-                      ? 'bg-white shadow-lg shadow-white/80 scale-110' 
-                      : 'bg-amber-200/80 shadow-sm'
-                  ]"
-                  :style="{
-                    left: `calc(50% + ${Math.cos((i - 1) * 22.5 * Math.PI / 180) * 48}% - 5px)`,
-                    top: `calc(50% + ${Math.sin((i - 1) * 22.5 * Math.PI / 180) * 48}% - 5px)`
-                  }"
-                ></div>
-              </div>
-            </div>
-          
-            <!-- 内圈边框 -->
-            <div class="absolute inset-1 sm:inset-2 rounded-full bg-gray-200 dark:bg-gray-700 shadow-inner"></div>
-          
-            <!-- 转盘主体 -->
-            <div 
-              class="absolute inset-3 sm:inset-4 rounded-full overflow-hidden shadow-inner wheel-spin"
-              :style="{ 
-                transform: `rotate(${wheelRotation}deg)`,
-                transitionDuration: isSpinning ? '2s' : '0s',
-                transitionTimingFunction: isSpinning 
-                  ? 'cubic-bezier(0.17, 0.67, 0.12, 0.99)' // 慢启动 → 快速旋转 → 慢减速
-                  : 'ease-out'
-              }"
-            >
-              <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-lg">
-                <!-- 定义渐变 -->
-                <defs>
-                  <radialGradient id="wheelGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="rgba(255,255,255,0.3)" />
-                    <stop offset="100%" stop-color="rgba(255,255,255,0)" />
-                  </radialGradient>
-                  <filter id="prizeShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="1" stdDeviation="1" flood-opacity="0.3" />
-                  </filter>
-                </defs>
-              
-                <!-- 奖品扇区 -->
-                <g v-for="(prize, idx) in wheelPrizes" :key="prize.id">
-                  <!-- 扇区背景 -->
-                  <path
-                    :d="getWheelSegmentPath(Number(idx), wheelPrizes.length)"
-                    :fill="getWheelGradientColor(prize.type, Number(idx))"
-                    stroke="rgba(255,255,255,0.5)"
-                    stroke-width="1"
-                  />
-                  <!-- 扇区分隔线 -->
-                  <path
-                    :d="getWheelSegmentPath(Number(idx), wheelPrizes.length)"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.8)"
-                    stroke-width="2"
-                  />
-                  <!-- 奖品文字 -->
-                  <text
-                    :transform="getWheelTextTransform(Number(idx), wheelPrizes.length)"
-                    fill="white"
-                    font-size="9"
-                    font-weight="600"
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    filter="url(#prizeShadow)"
-                    style="text-shadow: 0 1px 2px rgba(0,0,0,0.5)"
-                  >
-                    {{ prize.name.length > 5 ? prize.name.slice(0, 5) + '..' : prize.name }}
-                  </text>
-                </g>
-              
-                <!-- 中心光晕 -->
-                <circle cx="100" cy="100" r="100" fill="url(#wheelGlow)" />
-              </svg>
-            </div>
-
-            <!-- 指针 - 更精致的设计 -->
-            <div class="absolute top-[-2px] sm:top-[-4px] left-1/2 -translate-x-1/2 z-30">
-              <div class="relative">
-                <!-- 指针阴影 -->
-                <div class="absolute top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[14px] border-r-[14px] border-t-[32px] sm:border-l-[16px] sm:border-r-[16px] sm:border-t-[40px] border-l-transparent border-r-transparent border-t-black/20 blur-sm"></div>
-                <!-- 指针主体 -->
-                <div class="relative w-0 h-0 border-l-[14px] border-r-[14px] border-t-[32px] sm:border-l-[16px] sm:border-r-[16px] sm:border-t-[40px] border-l-transparent border-r-transparent border-t-red-500">
-                  <!-- 指针高光 -->
-                  <div class="absolute -top-[32px] sm:-top-[40px] left-[-4px] w-0 h-0 border-l-[4px] border-r-[4px] border-t-[20px] sm:border-t-[26px] border-l-transparent border-r-transparent border-t-red-400"></div>
+          <Card padding="lg" class="w-full flex flex-col items-center">
+            <!-- 转盘容器 -->
+            <div class="relative w-72 h-72 sm:w-96 sm:h-96 mb-8">
+              <!-- 最外层底座阴影 -->
+              <div class="absolute inset-[-8px] sm:inset-[-12px] rounded-full bg-gray-300 dark:bg-gray-700/60 shadow-md"></div>
+            
+              <!-- 外圈金属装饰环 -->
+              <div class="absolute inset-[-4px] sm:inset-[-6px] rounded-full bg-amber-400 shadow-sm">
+                <!-- 灯泡装饰 - 奇偶交替闪烁 -->
+                <div class="absolute inset-0">
+                  <div 
+                    v-for="i in 16" 
+                    :key="i"
+                    class="absolute w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition-all duration-100"
+                    :class="[
+                      isSpinning && (i % 2 === bulbPhase) 
+                        ? 'bg-white shadow-md shadow-white/80 scale-110' 
+                        : 'bg-amber-200/80 shadow-sm'
+                    ]"
+                    :style="{
+                      left: `calc(50% + ${Math.cos((i - 1) * 22.5 * Math.PI / 180) * 48}% - 5px)`,
+                      top: `calc(50% + ${Math.sin((i - 1) * 22.5 * Math.PI / 180) * 48}% - 5px)`
+                    }"
+                  ></div>
                 </div>
-                <!-- 指针底座 -->
-                <div class="absolute top-[28px] sm:top-[36px] left-1/2 -translate-x-1/2 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500 shadow-md"></div>
               </div>
+            
+              <!-- 内圈边框 -->
+              <div class="absolute inset-1 sm:inset-2 rounded-full bg-gray-200 dark:bg-gray-700 border border-[var(--border-color)]"></div>
+            
+              <!-- 转盘主体 -->
+              <div 
+                class="absolute inset-3 sm:inset-4 rounded-full overflow-hidden wheel-spin"
+                :style="{ 
+                  transform: `rotate(${wheelRotation}deg)`,
+                  transitionDuration: isSpinning ? '2s' : '0s',
+                  transitionTimingFunction: isSpinning 
+                    ? 'cubic-bezier(0.17, 0.67, 0.12, 0.99)'
+                    : 'ease-out'
+                }"
+              >
+                <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                  <defs>
+                    <radialGradient id="wheelGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stop-color="rgba(255,255,255,0.3)" />
+                      <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+                    </radialGradient>
+                    <filter id="prizeShadow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-opacity="0.3" />
+                    </filter>
+                  </defs>
+                
+                  <!-- 奖品扇区 -->
+                  <g v-for="(prize, idx) in wheelPrizes" :key="prize.id">
+                    <path
+                      :d="getWheelSegmentPath(Number(idx), wheelPrizes.length)"
+                      :fill="getWheelGradientColor(prize.type, Number(idx))"
+                      stroke="rgba(255,255,255,0.5)"
+                      stroke-width="1"
+                    />
+                    <path
+                      :d="getWheelSegmentPath(Number(idx), wheelPrizes.length)"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.8)"
+                      stroke-width="2"
+                    />
+                    <text
+                      :transform="getWheelTextTransform(Number(idx), wheelPrizes.length)"
+                      fill="white"
+                      font-size="9"
+                      font-weight="600"
+                      text-anchor="middle"
+                      dominant-baseline="middle"
+                      filter="url(#prizeShadow)"
+                      style="text-shadow: 0 1px 2px rgba(0,0,0,0.5)"
+                    >
+                      {{ prize.name.length > 5 ? prize.name.slice(0, 5) + '..' : prize.name }}
+                    </text>
+                  </g>
+                
+                  <circle cx="100" cy="100" r="100" fill="url(#wheelGlow)" />
+                </svg>
+              </div>
+
+              <!-- 指针 -->
+              <div class="absolute top-[-2px] sm:top-[-4px] left-1/2 -translate-x-1/2 z-30">
+                <div class="relative">
+                  <div class="absolute top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[14px] border-r-[14px] border-t-[32px] sm:border-l-[16px] sm:border-r-[16px] sm:border-t-[40px] border-l-transparent border-r-transparent border-t-black/20 blur-sm"></div>
+                  <div class="relative w-0 h-0 border-l-[14px] border-r-[14px] border-t-[32px] sm:border-l-[16px] sm:border-r-[16px] sm:border-t-[40px] border-l-transparent border-r-transparent border-t-red-500">
+                    <div class="absolute -top-[32px] sm:-top-[40px] left-[-4px] w-0 h-0 border-l-[4px] border-r-[4px] border-t-[20px] sm:border-t-[26px] border-l-transparent border-r-transparent border-t-red-400"></div>
+                  </div>
+                  <div class="absolute top-[28px] sm:top-[36px] left-1/2 -translate-x-1/2 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500 shadow-md"></div>
+                </div>
+              </div>
+
+              <!-- 中心按钮 -->
+              <button
+                class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 sm:w-24 sm:h-24 rounded-full z-20 group transition-all duration-200 active:scale-95"
+                :class="{ 'animate-pulse-slow': !isSpinning && points.points >= selectedLottery.costPoints }"
+                :disabled="isSpinning || points.points < selectedLottery.costPoints"
+                @click="spin"
+              >
+                <!-- 按钮外圈 -->
+                <div class="absolute inset-0 rounded-full bg-amber-500 shadow-md group-hover:bg-amber-400 transition-all"></div>
+                <!-- 按钮内圈 -->
+                <div class="absolute inset-1 rounded-full bg-red-500 group-hover:bg-red-400 transition-all"></div>
+                <!-- 按钮高光 -->
+                <div class="absolute inset-2 rounded-full bg-white/20"></div>
+                <!-- 按钮文字 -->
+                <span class="relative z-10 text-white text-base sm:text-lg font-bold drop-shadow-md">
+                  <span v-if="isSpinning" class="inline-flex">
+                    <span class="animate-bounce" style="animation-delay: 0ms">.</span>
+                    <span class="animate-bounce" style="animation-delay: 100ms">.</span>
+                    <span class="animate-bounce" style="animation-delay: 200ms">.</span>
+                  </span>
+                  <span v-else>{{ $t('entertainment.spin') }}</span>
+                </span>
+                <!-- 禁用遮罩 -->
+                <div 
+                  v-if="points.points < selectedLottery.costPoints"
+                  class="absolute inset-0 rounded-full bg-gray-900/50 cursor-not-allowed"
+                ></div>
+              </button>
             </div>
 
-            <!-- 中心按钮 -->
-            <button
-              class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 sm:w-24 sm:h-24 rounded-full z-20 group"
-              :class="{ 'animate-pulse-slow': !isSpinning && points.points >= selectedLottery.costPoints }"
-              :disabled="isSpinning || points.points < selectedLottery.costPoints"
-              @click="spin"
-            >
-              <!-- 按钮外圈 -->
-              <div class="absolute inset-0 rounded-full bg-amber-500 shadow-md group-hover:bg-amber-400 transition-all"></div>
-              <!-- 按钮内圈 -->
-              <div class="absolute inset-1 rounded-full bg-red-500 shadow-inner group-hover:bg-red-400 transition-all"></div>
-              <!-- 按钮高光 -->
-              <div class="absolute inset-2 rounded-full bg-gradient-to-b from-white/30 to-transparent"></div>
-              <!-- 按钮文字 -->
-              <span class="relative z-10 text-white text-base sm:text-lg font-bold drop-shadow-md">
-                <span v-if="isSpinning" class="inline-flex">
-                  <span class="animate-bounce" style="animation-delay: 0ms">.</span>
-                  <span class="animate-bounce" style="animation-delay: 100ms">.</span>
-                  <span class="animate-bounce" style="animation-delay: 200ms">.</span>
-                </span>
-                <span v-else>{{ $t('entertainment.spin') }}</span>
-              </span>
-              <!-- 禁用遮罩 -->
-              <div 
-                v-if="points.points < selectedLottery.costPoints"
-                class="absolute inset-0 rounded-full bg-gray-900/50 cursor-not-allowed"
-              ></div>
-            </button>
-          </div>
-
-          <!-- 消耗提示 -->
-          <div class="flex items-center gap-2 text-sm">
-            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span class="text-themed-muted">
-              {{ $t('entertainment.spinCost', { points: selectedLottery.costPoints }) }}
-            </span>
-          </div>
+            <!-- 消耗提示 -->
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)] font-medium">
+              <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+              <span>{{ $t('entertainment.spinCost', { points: selectedLottery.costPoints }) }}</span>
+            </div>
+          </Card>
 
           <!-- 奖品列表 -->
           <div class="w-full mt-6">
-            <h3 class="text-sm font-medium text-themed mb-3">{{ $t('entertainment.prizeList') }}</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <h3 class="text-sm font-semibold tracking-tight text-[var(--text-primary)] mb-3 flex items-center gap-2">
+              <Gift class="w-4 h-4 text-[var(--accent)]" />
+              {{ $t('entertainment.prizeList') }}
+            </h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div
                 v-for="prize in wheelPrizes"
                 :key="prize.id"
-                class="nimbus-lift rounded-lg border border-themed bg-themed-surface p-3 text-center shadow-sm"
+                class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 text-center shadow-sm hover:border-[var(--border-hover)] transition-all duration-200"
               >
                 <div
                   class="w-3 h-3 rounded-full mx-auto mb-2"
                   :style="{ backgroundColor: getPrizeColor(prize.type) }"
                 ></div>
-                <div class="text-sm text-themed font-medium truncate">{{ prize.name }}</div>
-                <div class="text-xs text-themed-muted">{{ getPrizeTypeName(prize.type) }}</div>
+                <div class="text-sm text-[var(--text-primary)] font-medium truncate">{{ prize.name }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ getPrizeTypeName(prize.type) }}</div>
                 <!-- 概率和数量 -->
-                <div class="text-xs text-themed-muted mt-1 space-y-0.5">
-                  <div>{{ $t('entertainment.probability') }}: <span class="font-mono tabular-nums">{{ prize.probability }}%</span></div>
+                <div class="text-xs text-[var(--text-tertiary)] mt-2 space-y-0.5">
+                  <div>{{ $t('entertainment.probability') }}: <span class="font-mono tabular-nums text-[var(--text-secondary)]">{{ prize.probability }}%</span></div>
                   <div v-if="prize.totalQuantity !== null">
-                    {{ $t('entertainment.remaining') }}: <span class="font-mono tabular-nums">{{ prize.remainQuantity ?? 0 }}/{{ prize.totalQuantity }}</span>
+                    {{ $t('entertainment.remaining') }}: <span class="font-mono tabular-nums text-[var(--text-secondary)]">{{ prize.remainQuantity ?? 0 }}/{{ prize.totalQuantity }}</span>
                   </div>
                 </div>
               </div>
@@ -1211,14 +1220,14 @@ function getWheelTextTransform(index: number, total: number): string {
       </div>
 
       <!-- 抽奖记录 TAB -->
-      <div v-show="activeTab === 'records'" class="rounded-xl border border-themed bg-themed-surface shadow-sm">
+      <div v-show="activeTab === 'records'" class="rounded-2xl border border-themed bg-themed-surface shadow-sm overflow-hidden">
         <!-- 筛选栏 -->
         <div class="flex items-center gap-4 p-4 border-b border-themed">
           <div class="flex items-center gap-2">
             <span class="text-sm text-themed-muted">{{ $t('entertainment.prizeType') }}:</span>
             <select 
               v-model="recordsTypeFilter" 
-              class="input py-1.5 px-3 min-w-[100px] text-sm"
+              class="input py-1.5 px-3 min-w-[100px] text-sm rounded-xl"
               @change="recordsPage = 1; loadRecords()"
             >
               <option value="">{{ $t('common.all') }}</option>
@@ -1234,15 +1243,10 @@ function getWheelTextTransform(index: number, total: number): string {
             </select>
           </div>
         </div>
-        <div v-if="recordsLoading" class="p-8 text-center text-themed-muted">
+        <div v-if="recordsLoading" class="p-12 text-center text-themed-muted">
           {{ $t('common.loading') }}...
         </div>
-        <div v-else-if="records.length === 0" class="flex flex-col items-center gap-3 p-10 text-center">
-          <span class="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">
-            <svg class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6M9 16h4" /></svg>
-          </span>
-          <p class="text-themed-muted">{{ $t('entertainment.noRecords') }}</p>
-        </div>
+        <EmptyState v-else-if="records.length === 0" :title="$t('entertainment.noRecords')" />
         <template v-else>
           <div class="space-y-3 p-4 lg:hidden">
             <div
@@ -1256,7 +1260,7 @@ function getWheelTextTransform(index: number, total: number): string {
                   <p class="mt-1 truncate text-xs text-themed-muted">{{ rec.prizeName || '-' }}</p>
                 </div>
                 <span
-                  class="inline-flex shrink-0 items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium"
+                  class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
                   :style="{
                     backgroundColor: getPrizeColor(rec.prizeType) + '20',
                     color: getPrizeColor(rec.prizeType)
@@ -1282,7 +1286,7 @@ function getWheelTextTransform(index: number, total: number): string {
                 </div>
                 <div>
                   <dt class="text-xs text-themed-muted">{{ $t('entertainment.time') }}</dt>
-                  <dd class="mt-1 text-themed">{{ formatDate(rec.createdAt) }}</dd>
+                  <dd class="mt-1 text-themed font-mono">{{ formatDate(rec.createdAt) }}</dd>
                 </div>
               </dl>
             </div>
@@ -1300,7 +1304,7 @@ function getWheelTextTransform(index: number, total: number): string {
                 </tr>
               </thead>
               <tbody class="divide-y divide-themed">
-                <tr v-for="rec in records" :key="rec.id" class="hover:bg-themed-hover">
+                <tr v-for="rec in records" :key="rec.id" class="hover:bg-themed-hover transition-colors">
                   <td class="px-4 py-3 text-sm text-themed">
                     <div class="truncate">{{ rec.lotteryName || '-' }}</div>
                   </td>
@@ -1309,7 +1313,7 @@ function getWheelTextTransform(index: number, total: number): string {
                   </td>
                   <td class="px-4 py-3 text-sm">
                     <span
-                      class="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium"
+                      class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
                       :style="{
                         backgroundColor: getPrizeColor(rec.prizeType) + '20',
                         color: getPrizeColor(rec.prizeType)
@@ -1319,7 +1323,7 @@ function getWheelTextTransform(index: number, total: number): string {
                     </span>
                   </td>
                   <td class="px-4 py-3 text-sm text-themed">
-                    <div class="truncate">
+                    <div class="truncate font-mono">
                       <template v-if="rec.prizeType === 'points'">+{{ rec.prizeValue }} {{ $t('entertainment.pointsUnit') }}</template>
                       <template v-else-if="rec.prizeType === 'balance'">+¥{{ (rec.prizeValue / 100).toFixed(2) }}</template>
                       <template v-else-if="rec.prizeType === 'badge'">{{ rec.prizeName || $t('entertainment.prizeTypes.badge') }}</template>
@@ -1331,7 +1335,7 @@ function getWheelTextTransform(index: number, total: number): string {
                       <template v-else>-</template>
                     </div>
                   </td>
-                  <td class="px-4 py-3 text-sm text-themed-muted">{{ formatDate(rec.createdAt) }}</td>
+                  <td class="px-4 py-3 text-sm text-themed-muted font-mono">{{ formatDate(rec.createdAt) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1344,7 +1348,7 @@ function getWheelTextTransform(index: number, total: number): string {
               <span>{{ $t('common.perPage') }}</span>
               <select
                 :value="recordsPageSize"
-                class="input w-20 py-1 text-sm"
+                class="input w-20 py-1 text-sm rounded-xl"
                 @change="recordsPageSize = Number(($event.target as HTMLSelectElement).value); recordsPage = 1; loadRecords()"
               >
                 <option v-for="size in recordsPageSizeOptions" :key="size" :value="size">{{ size }}</option>
@@ -1354,15 +1358,15 @@ function getWheelTextTransform(index: number, total: number): string {
             <!-- 分页导航 -->
             <div v-if="recordsTotalPages > 1" class="flex items-center gap-2">
               <button
-                class="btn btn-sm btn-ghost"
+                class="inline-flex items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
                 :disabled="recordsPage <= 1"
                 @click="recordsPage--; loadRecords()"
               >
                 {{ $t('common.prevPage') }}
               </button>
-              <span class="text-sm text-themed-muted">{{ recordsPage }} / {{ recordsTotalPages }}</span>
+              <span class="text-sm text-themed-muted font-mono">{{ recordsPage }} / {{ recordsTotalPages }}</span>
               <button
-                class="btn btn-sm btn-ghost"
+                class="inline-flex items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
                 :disabled="recordsPage >= recordsTotalPages"
                 @click="recordsPage++; loadRecords()"
               >
@@ -1374,16 +1378,11 @@ function getWheelTextTransform(index: number, total: number): string {
       </div>
 
       <!-- 积分明细 TAB -->
-      <div v-show="activeTab === 'points'" class="rounded-xl border border-themed bg-themed-surface shadow-sm">
-        <div v-if="pointsLogsLoading" class="p-8 text-center text-themed-muted">
+      <div v-show="activeTab === 'points'" class="rounded-2xl border border-themed bg-themed-surface shadow-sm overflow-hidden">
+        <div v-if="pointsLogsLoading" class="p-12 text-center text-themed-muted">
           {{ $t('common.loading') }}...
         </div>
-        <div v-else-if="pointsLogs.length === 0" class="flex flex-col items-center gap-3 p-10 text-center">
-          <span class="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">
-            <svg class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5v9M14.5 9.5c0-1.1-1.1-2-2.5-2s-2.5.9-2.5 2 1.1 1.7 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2-2.5-.9-2.5-2" /></svg>
-          </span>
-          <p class="text-themed-muted">{{ $t('entertainment.noPointsLogs') }}</p>
-        </div>
+        <EmptyState v-else-if="pointsLogs.length === 0" :title="$t('entertainment.noPointsLogs')" />
         <template v-else>
           <div class="space-y-3 p-4 lg:hidden">
             <div
@@ -1396,18 +1395,18 @@ function getWheelTextTransform(index: number, total: number): string {
                   <p class="truncate text-sm font-medium text-themed">{{ getPointsLogTypeName(log.type) }}</p>
                   <p class="mt-1 truncate text-xs text-themed-muted">{{ log.remark || '-' }}</p>
                 </div>
-                <span class="shrink-0 text-sm font-semibold" :class="log.amount >= 0 ? 'text-green-500' : 'text-red-500'">
+                <span class="shrink-0 text-sm font-semibold font-mono tabular-nums" :class="log.amount >= 0 ? 'text-green-500' : 'text-red-500'">
                   {{ log.amount >= 0 ? '+' : '' }}{{ log.amount }}
                 </span>
               </div>
               <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt class="text-xs text-themed-muted">{{ $t('entertainment.pointsAfter') }}</dt>
-                  <dd class="mt-1 font-medium text-themed">{{ log.pointsAfter }}</dd>
+                  <dd class="mt-1 font-medium text-themed font-mono tabular-nums">{{ log.pointsAfter }}</dd>
                 </div>
                 <div>
                   <dt class="text-xs text-themed-muted">{{ $t('entertainment.time') }}</dt>
-                  <dd class="mt-1 text-themed">{{ formatDate(log.createdAt) }}</dd>
+                  <dd class="mt-1 text-themed font-mono">{{ formatDate(log.createdAt) }}</dd>
                 </div>
               </dl>
             </div>
@@ -1425,16 +1424,16 @@ function getWheelTextTransform(index: number, total: number): string {
                 </tr>
               </thead>
               <tbody class="divide-y divide-themed">
-                <tr v-for="log in pointsLogs" :key="log.id" class="hover:bg-themed-hover">
-                  <td class="px-4 py-3 text-sm text-themed">{{ getPointsLogTypeName(log.type) }}</td>
-                  <td class="px-4 py-3 text-sm" :class="log.amount >= 0 ? 'text-green-500' : 'text-red-500'">
+                <tr v-for="log in pointsLogs" :key="log.id" class="hover:bg-themed-hover transition-colors">
+                  <td class="px-4 py-3 text-sm text-themed font-medium">{{ getPointsLogTypeName(log.type) }}</td>
+                  <td class="px-4 py-3 text-sm font-semibold font-mono tabular-nums" :class="log.amount >= 0 ? 'text-green-500' : 'text-red-500'">
                     {{ log.amount >= 0 ? '+' : '' }}{{ log.amount }}
                   </td>
-                  <td class="px-4 py-3 text-sm text-themed">{{ log.pointsAfter }}</td>
+                  <td class="px-4 py-3 text-sm text-themed font-mono tabular-nums">{{ log.pointsAfter }}</td>
                   <td class="px-4 py-3 text-sm text-themed-muted">
                     <div class="truncate">{{ log.remark || '-' }}</div>
                   </td>
-                  <td class="px-4 py-3 text-sm text-themed-muted">{{ formatDate(log.createdAt) }}</td>
+                  <td class="px-4 py-3 text-sm text-themed-muted font-mono">{{ formatDate(log.createdAt) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1443,15 +1442,15 @@ function getWheelTextTransform(index: number, total: number): string {
           <!-- 分页 -->
           <div v-if="pointsLogsTotalPages > 1" class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 p-4 border-t border-themed sm:flex sm:justify-center">
             <button
-              class="btn btn-sm btn-ghost justify-self-start"
+              class="btn btn-sm btn-ghost justify-self-start rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
               :disabled="pointsLogsPage <= 1"
               @click="pointsLogsPage--; loadPointsLogs()"
             >
               {{ $t('common.prevPage') }}
             </button>
-            <span class="text-sm text-themed-muted justify-self-center">{{ pointsLogsPage }} / {{ pointsLogsTotalPages }}</span>
+            <span class="text-sm text-themed-muted justify-self-center font-mono">{{ pointsLogsPage }} / {{ pointsLogsTotalPages }}</span>
             <button
-              class="btn btn-sm btn-ghost justify-self-end"
+              class="btn btn-sm btn-ghost justify-self-end rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"
               :disabled="pointsLogsPage >= pointsLogsTotalPages"
               @click="pointsLogsPage++; loadPointsLogs()"
             >
@@ -1470,119 +1469,127 @@ function getWheelTextTransform(index: number, total: number): string {
     <!-- ==================== 签到功能区域 ==================== -->
     <div v-show="checkinFeatureEnabled && mainTab === 'checkin'" class="space-y-6">
       <!-- 资源池卡片（总览） -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-        <div class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-3 sm:p-4 shadow-sm">
-          <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card padding="sm" class="hover:border-[var(--border-hover)] transition-all duration-200">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+              <Cpu class="w-5 h-5 text-blue-500" />
             </div>
             <div class="min-w-0">
-              <div class="text-xs text-themed-muted">CPU</div>
-              <div class="text-sm sm:text-lg font-bold text-blue-500 whitespace-nowrap font-mono tabular-nums">{{ resourcePool.cpu }}%</div>
+              <div class="text-xs text-[var(--text-secondary)] font-medium">CPU</div>
+              <div class="text-base sm:text-lg font-bold text-blue-500 whitespace-nowrap font-mono tabular-nums tracking-tight">
+                {{ resourcePool.cpu }}%
+              </div>
             </div>
           </div>
-        </div>
-        <div class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-3 sm:p-4 shadow-sm">
-          <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
+        </Card>
+        <Card padding="sm" class="hover:border-[var(--border-hover)] transition-all duration-200">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+              <Layers class="w-5 h-5 text-purple-500" />
             </div>
             <div class="min-w-0">
-              <div class="text-xs text-themed-muted">{{ $t('checkin.memory') }}</div>
-              <div class="text-sm sm:text-lg font-bold text-purple-500 whitespace-nowrap font-mono tabular-nums">{{ resourcePool.memory }} MB</div>
+              <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.memory') }}</div>
+              <div class="text-base sm:text-lg font-bold text-purple-500 whitespace-nowrap font-mono tabular-nums tracking-tight">
+                {{ resourcePool.memory }} MB
+              </div>
             </div>
           </div>
-        </div>
-        <div class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-3 sm:p-4 shadow-sm">
-          <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-              </svg>
+        </Card>
+        <Card padding="sm" class="hover:border-[var(--border-hover)] transition-all duration-200">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <HardDrive class="w-5 h-5 text-amber-500" />
             </div>
             <div class="min-w-0">
-              <div class="text-xs text-themed-muted">{{ $t('checkin.disk') }}</div>
-              <div class="text-sm sm:text-lg font-bold text-amber-500 whitespace-nowrap font-mono tabular-nums">{{ resourcePool.disk }} MB</div>
+              <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.disk') }}</div>
+              <div class="text-base sm:text-lg font-bold text-amber-500 whitespace-nowrap font-mono tabular-nums tracking-tight">
+                {{ resourcePool.disk }} MB
+              </div>
             </div>
           </div>
-        </div>
-        <div class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-3 sm:p-4 shadow-sm">
-          <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
+        </Card>
+        <Card padding="sm" class="hover:border-[var(--border-hover)] transition-all duration-200">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Activity class="w-5 h-5 text-emerald-500" />
             </div>
             <div class="min-w-0">
-              <div class="text-xs text-themed-muted">{{ $t('checkin.traffic') }}</div>
-              <div class="text-sm sm:text-lg font-bold text-emerald-500 whitespace-nowrap font-mono tabular-nums">{{ resourcePool.traffic }} GB</div>
+              <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.traffic') }}</div>
+              <div class="text-base sm:text-lg font-bold text-emerald-500 whitespace-nowrap font-mono tabular-nums tracking-tight">
+                {{ resourcePool.traffic }} GB
+              </div>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
       <!-- 签到子TAB切换 -->
-      <nav class="flex flex-wrap items-center gap-x-1 border-b border-themed">
+      <div class="inline-flex items-center rounded-xl bg-[var(--bg-surface-soft)] p-1 border border-[var(--border-color)] gap-1 flex-wrap">
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="checkinTab === 'checkin' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="checkinTab === 'checkin'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchCheckinTab('checkin')"
         >
           {{ $t('checkin.tabCheckin') }}
-          <span v-show="checkinTab === 'checkin'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="checkinTab === 'redeem' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="checkinTab === 'redeem'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchCheckinTab('redeem')"
         >
           {{ $t('checkin.tabRedeem') }}
-          <span v-show="checkinTab === 'redeem'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="checkinTab === 'pool' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="checkinTab === 'pool'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchCheckinTab('pool')"
         >
           {{ $t('checkin.tabPool') }}
-          <span v-show="checkinTab === 'pool'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
         <button
-          class="relative px-3.5 py-2.5 text-sm font-medium transition-colors"
-          :class="checkinTab === 'logs' ? 'text-primary-500' : 'text-themed-muted hover:text-themed'"
+          type="button"
+          class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+          :class="checkinTab === 'logs'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           @click="switchCheckinTab('logs')"
         >
           {{ $t('checkin.tabLogs') }}
-          <span v-show="checkinTab === 'logs'" class="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-primary-500"></span>
         </button>
-      </nav>
+      </div>
 
       <!-- 签到子TAB: 签到 -->
-      <div v-show="checkinTab === 'checkin'" class="rounded-xl border border-themed bg-themed-surface p-6 shadow-sm">
+      <Card v-show="checkinTab === 'checkin'" padding="md">
         <div v-if="checkinStatus" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div class="rounded-lg border border-themed bg-themed-secondary p-3">
-            <div class="text-xs text-themed-muted">{{ $t('checkin.currentPoints') }}</div>
-            <div class="mt-1 text-xl font-semibold text-themed font-mono tabular-nums">{{ checkinStatus.currentPoints }}</div>
+          <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+            <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.currentPoints') }}</div>
+            <div class="mt-1 text-xl font-bold text-[var(--text-primary)] font-mono tabular-nums">{{ checkinStatus.currentPoints }}</div>
           </div>
-          <div class="rounded-lg border border-themed bg-themed-secondary p-3">
-            <div class="text-xs text-themed-muted">{{ $t('checkin.todayRange') }}</div>
-            <div class="mt-1 text-xl font-semibold text-amber-500 font-mono tabular-nums">{{ checkinStatus.minPoints }}-{{ checkinStatus.maxPoints }}</div>
+          <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+            <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.todayRange') }}</div>
+            <div class="mt-1 text-xl font-bold text-amber-500 font-mono tabular-nums">{{ checkinStatus.minPoints }}-{{ checkinStatus.maxPoints }}</div>
           </div>
-          <div class="rounded-lg border border-themed bg-themed-secondary p-3">
-            <div class="text-xs text-themed-muted">{{ $t('checkin.streakDays') }}</div>
-            <div class="mt-1 text-xl font-semibold text-emerald-500 font-mono tabular-nums">{{ checkinStatus.streakDays }}</div>
+          <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+            <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.streakDays') }}</div>
+            <div class="mt-1 text-xl font-bold text-emerald-500 font-mono tabular-nums">{{ checkinStatus.streakDays }}</div>
           </div>
-          <div class="rounded-lg border border-themed bg-themed-secondary p-3">
-            <div class="text-xs text-themed-muted">{{ $t('checkin.monthCheckins') }}</div>
-            <div class="mt-1 text-xl font-semibold text-blue-500 font-mono tabular-nums">{{ checkinStatus.monthCheckins }}</div>
+          <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+            <div class="text-xs text-[var(--text-secondary)] font-medium">{{ $t('checkin.monthCheckins') }}</div>
+            <div class="mt-1 text-xl font-bold text-[var(--accent)] font-mono tabular-nums">{{ checkinStatus.monthCheckins }}</div>
           </div>
         </div>
 
-        <div class="flex flex-col items-center">
+        <div class="flex flex-col items-center py-6">
           <!-- 签到礼盒动画 -->
           <div class="relative w-48 h-48 mb-6">
             <!-- 纸屑动画 -->
@@ -1590,7 +1597,7 @@ function getWheelTextTransform(index: number, total: number): string {
               <div
                 v-for="particle in confettiParticles"
                 :key="particle.id"
-                class="absolute"
+                class="absolute animate-confetti"
                 :style="{
                   left: `${particle.x}%`,
                   top: '-10%',
@@ -1598,7 +1605,7 @@ function getWheelTextTransform(index: number, total: number): string {
                   height: `${particle.size}px`,
                   backgroundColor: particle.color,
                   animationDelay: `${particle.delay}s`,
-                  borderRadius: Math.random() > 0.5 ? '50%' : '0'
+                  borderRadius: particle.id % 2 === 0 ? '50%' : '2px'
                 }"
               ></div>
             </div>
@@ -1610,155 +1617,162 @@ function getWheelTextTransform(index: number, total: number): string {
                 v-if="checkinPhase === 'idle' || checkinPhase === 'shaking' || checkinPhase === 'opening'"
                 :class="[
                   checkinStatus?.hasCheckedIn || checkinStatus?.enabled === false || (checkinStatus?.requireInstance && !checkinStatus?.hasInstances)
-                    ? 'cursor-not-allowed opacity-60'
-                    : 'cursor-pointer'
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer active:scale-95 transition-transform duration-200'
                 ]"
                 @click="checkinStatus?.hasCheckedIn || checkinStatus?.enabled === false || (checkinStatus?.requireInstance && !checkinStatus?.hasInstances) ? null : doCheckin()"
               >
-                <!-- 礼盒图标 - 只有这里应用shake动画 -->
+                <!-- 礼盒图标 -->
                 <div 
                   :class="[
-                    'w-32 h-32 mx-auto rounded-lg bg-amber-500 flex items-center justify-center shadow-sm transition-all duration-200',
+                    'w-32 h-32 mx-auto rounded-3xl bg-amber-500 flex items-center justify-center shadow-md transition-all duration-300',
                     {
-                      'hover:shadow-md': checkinPhase === 'idle'
+                      'hover:scale-105 hover:bg-amber-400': checkinPhase === 'idle' && !checkinStatus?.hasCheckedIn && checkinStatus?.enabled !== false && !(checkinStatus?.requireInstance && !checkinStatus?.hasInstances),
+                      'animate-shake-box': checkinPhase === 'shaking',
+                      'animate-open-box': checkinPhase === 'opening'
                     }
                   ]"
                 >
-                  <svg class="w-16 h-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                  </svg>
+                  <Gift class="w-16 h-16 text-white stroke-[1.75]" />
                 </div>
               </div>
               
               <!-- 签到结果显示 -->
-              <div v-else-if="checkinPhase === 'revealing' || checkinPhase === 'done'" class="text-center">
-                <div :class="['w-24 h-24 mx-auto mb-4 rounded-lg flex items-center justify-center', getResourceBgColor(checkinResult?.type || 'c')]">
-                  <span :class="['text-3xl font-bold', getResourceColor(checkinResult?.type || 'c')]">
+              <div v-else-if="checkinPhase === 'revealing' || checkinPhase === 'done'" class="text-center animate-scale-in">
+                <div :class="['w-24 h-24 mx-auto mb-4 rounded-2xl border flex items-center justify-center shadow-sm', getResourceBgColor(checkinResult?.type || 'c'), 'border-current/20']">
+                  <span :class="['text-3xl font-bold font-mono tracking-tight', getResourceColor(checkinResult?.type || 'c')]">
                     +{{ checkinResult?.value }}{{ getResourceUnit(checkinResult?.type || 'c') }}
                   </span>
                 </div>
-                <p class="text-lg font-semibold text-themed">{{ getResourceTypeName(checkinResult?.type || 'c') }}</p>
-                <p class="text-sm text-themed-muted mt-1">{{ $t('checkin.pointsAdded', { points: checkinResult?.bonusPoints }) }}</p>
+                <p class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ getResourceTypeName(checkinResult?.type || 'c') }}</p>
+                <p class="text-sm text-[var(--text-secondary)] mt-1 font-mono">{{ $t('checkin.pointsAdded', { points: checkinResult?.bonusPoints }) }}</p>
               </div>
             </div>
           </div>
 
-          <!-- 签到提示文字 - 在动画容器外部，不受动画影响 -->
-          <p v-if="checkinPhase === 'idle' && !checkinStatus?.hasCheckedIn && checkinStatus?.enabled !== false && !(checkinStatus?.requireInstance && !checkinStatus?.hasInstances)" class="text-sm text-themed-muted mb-4">
+          <!-- 签到提示文字 -->
+          <p v-if="checkinPhase === 'idle' && !checkinStatus?.hasCheckedIn && checkinStatus?.enabled !== false && !(checkinStatus?.requireInstance && !checkinStatus?.hasInstances)" class="text-sm text-[var(--text-secondary)] mb-4">
             {{ $t('checkin.clickToCheckin') }}
           </p>
 
           <!-- 签到状态 -->
           <div v-if="checkinStatus" class="text-center">
-            <!-- 签到结果显示时不显示"今日已签到"，因为结果本身就说明已签到 -->
-            <div v-if="checkinStatus.hasCheckedIn && checkinPhase === 'idle'" class="flex items-center justify-center gap-2 text-emerald-500 mb-4">
-              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{{ $t('checkin.alreadyCheckedIn') }}</span>
+            <div v-if="checkinStatus.hasCheckedIn && checkinPhase === 'idle'" class="inline-flex items-center mb-4">
+              <Badge variant="success" size="md">
+                <CheckCircle2 class="w-3.5 h-3.5 mr-1" />
+                <span>{{ $t('checkin.alreadyCheckedIn') }}</span>
+              </Badge>
             </div>
-            <div v-else-if="checkinStatus.enabled === false && checkinPhase === 'idle'" class="text-amber-500 text-sm mb-4">
-              {{ $t('checkin.disabled') }}
+            <div v-else-if="checkinStatus.enabled === false && checkinPhase === 'idle'" class="inline-flex items-center mb-4">
+              <Badge variant="warning" size="md">
+                <AlertCircle class="w-3.5 h-3.5 mr-1" />
+                <span>{{ $t('checkin.disabled') }}</span>
+              </Badge>
             </div>
-            <div v-else-if="checkinStatus.requireInstance && !checkinStatus.hasInstances && checkinPhase === 'idle'" class="text-amber-500 text-sm mb-4">
-              {{ $t('checkin.noInstances') }}
+            <div v-else-if="checkinStatus.requireInstance && !checkinStatus.hasInstances && checkinPhase === 'idle'" class="inline-flex items-center mb-4">
+              <Badge variant="warning" size="md">
+                <AlertCircle class="w-3.5 h-3.5 mr-1" />
+                <span>{{ $t('checkin.noInstances') }}</span>
+              </Badge>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       <!-- 签到子TAB: 兑换码 -->
-      <div v-show="checkinTab === 'redeem'" class="rounded-xl border border-themed bg-themed-surface p-6 shadow-sm">
-        <h3 class="text-lg font-medium text-themed mb-4">{{ $t('checkin.redeemSystemCode') }}</h3>
-        <div class="space-y-4">
+      <Card v-show="checkinTab === 'redeem'" padding="md">
+        <template #header>
+          <div class="border-b border-[var(--border-color)] pb-4 mb-5">
+            <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('checkin.redeemSystemCode') }}</h3>
+          </div>
+        </template>
+        <div class="space-y-4 max-w-xl">
           <div>
-            <label class="block text-sm text-themed-muted mb-1">{{ $t('checkin.enterCode') }}</label>
-            <input
+            <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ $t('checkin.enterCode') }}</label>
+            <Input
               v-model="redeemCodeInput"
               type="text"
-              class="input w-full"
               :placeholder="$t('checkin.systemCodePlaceholder')"
             />
           </div>
           <!-- 系统码必须选择实例 -->
           <div>
-            <label class="block text-sm text-themed-muted mb-1">{{ $t('checkin.targetInstance') }}</label>
+            <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ $t('checkin.targetInstance') }}</label>
             <InstanceSelector
               v-model="redeemSelectedInstance"
               :instances="poolInstances"
               :placeholder="$t('checkin.selectInstance')"
             />
           </div>
-          <div class="rounded-lg border border-themed bg-themed-secondary p-3 text-xs text-themed-muted">
+          <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 text-xs text-[var(--text-secondary)] leading-relaxed">
             <p>{{ $t('checkin.systemCodeHint') }}</p>
           </div>
-          <button
-            class="btn btn-primary w-full"
+          <Button
+            variant="primary"
+            block
             :disabled="redeemLoading || !redeemCodeInput.trim() || !redeemSelectedInstance"
+            :loading="redeemLoading"
             @click="redeemCode"
           >
-            <svg v-if="redeemLoading" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
             {{ $t('checkin.redeem') }}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       <!-- 签到子TAB: 资源池应用 -->
-      <div v-show="checkinTab === 'pool'" class="rounded-xl border border-themed bg-themed-surface p-6 shadow-sm">
-        <h3 class="text-lg font-medium text-themed mb-4">{{ $t('checkin.applyToInstance') }}</h3>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="block text-sm text-themed-muted mb-1">{{ $t('checkin.resourceType') }}</label>
-            <select v-model="applyForm.resourceType" class="input w-full">
-              <option value="c">CPU ({{ resourcePool.cpu }}%)</option>
-              <option value="r">{{ $t('checkin.memory') }} ({{ resourcePool.memory }} MB)</option>
-              <option value="d">{{ $t('checkin.disk') }} ({{ resourcePool.disk }} MB)</option>
-              <option value="t">{{ $t('checkin.traffic') }} ({{ resourcePool.traffic }} GB)</option>
-            </select>
+      <Card v-show="checkinTab === 'pool'" padding="md">
+        <template #header>
+          <div class="border-b border-[var(--border-color)] pb-4 mb-5">
+            <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('checkin.applyToInstance') }}</h3>
           </div>
-          <div>
-            <label class="block text-sm text-themed-muted mb-1">{{ $t('checkin.amount') }}</label>
-            <input
-              v-model.number="applyForm.amount"
-              type="number"
-              min="1"
-              class="input w-full"
-            />
+        </template>
+        <div class="space-y-4 max-w-xl">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ $t('checkin.resourceType') }}</label>
+              <Select
+                v-model="applyForm.resourceType"
+                :options="resourceTypeOptions"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ $t('checkin.amount') }}</label>
+              <Input
+                v-model.number="applyForm.amount"
+                type="number"
+                :min="1"
+              />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ $t('checkin.targetInstance') }}</label>
+              <InstanceSelector
+                v-model="applyForm.instanceId"
+                :instances="poolInstances"
+                :placeholder="$t('checkin.selectInstance')"
+              />
+            </div>
           </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm text-themed-muted mb-1">{{ $t('checkin.targetInstance') }}</label>
-            <InstanceSelector
-              v-model="applyForm.instanceId"
-              :instances="poolInstances"
-              :placeholder="$t('checkin.selectInstance')"
-            />
+          <!-- KVM 实例限制提示 -->
+          <div class="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-500 space-y-1">
+            <p>{{ $t('checkin.kvmHint') }}</p>
           </div>
+          <Button
+            variant="primary"
+            block
+            :disabled="applyLoading || !applyForm.instanceId || applyForm.amount <= 0"
+            :loading="applyLoading"
+            @click="applyResource"
+          >
+            {{ $t('checkin.apply') }}
+          </Button>
         </div>
-        <!-- KVM 实例限制提示 -->
-        <div class="text-xs text-amber-500 mt-2 space-y-1">
-          <p>{{ $t('checkin.kvmHint') }}</p>
-        </div>
-        <button
-          class="btn btn-primary w-full mt-4"
-          :disabled="applyLoading || !applyForm.instanceId || applyForm.amount <= 0"
-          @click="applyResource"
-        >
-          <svg v-if="applyLoading" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          {{ $t('checkin.apply') }}
-        </button>
-      </div>
+      </Card>
 
       <!-- 签到子TAB: 记录 -->
-      <div v-show="checkinTab === 'logs'" class="rounded-xl border border-themed bg-themed-surface shadow-sm">
+      <div v-show="checkinTab === 'logs'" class="rounded-2xl border border-themed bg-themed-surface shadow-sm overflow-hidden">
         <!-- 筛选 -->
-        <div class="flex flex-wrap gap-4 p-4 border-b border-themed">
-          <select v-model="poolLogsFilter.action" class="input py-1.5 text-sm" @change="poolLogsPage = 1; loadPoolLogs()">
+        <div class="flex flex-wrap gap-3 p-4 border-b border-themed">
+          <select v-model="poolLogsFilter.action" class="input py-1.5 px-3 text-sm rounded-xl" @change="poolLogsPage = 1; loadPoolLogs()">
             <option value="">{{ $t('checkin.allActions') }}</option>
             <option value="checkin">{{ $t('checkin.actionCheckin') }}</option>
             <option value="redeem">{{ $t('checkin.actionRedeem') }}</option>
@@ -1767,7 +1781,7 @@ function getWheelTextTransform(index: number, total: number): string {
             <option value="lottery">{{ $t('checkin.actionLottery') }}</option>
             <option value="system_redeem">{{ $t('checkin.actionSystemRedeem') }}</option>
           </select>
-          <select v-model="poolLogsFilter.resourceType" class="input py-1.5 text-sm" @change="poolLogsPage = 1; loadPoolLogs()">
+          <select v-model="poolLogsFilter.resourceType" class="input py-1.5 px-3 text-sm rounded-xl" @change="poolLogsPage = 1; loadPoolLogs()">
             <option value="">{{ $t('checkin.allResources') }}</option>
             <option value="c">CPU</option>
             <option value="r">{{ $t('checkin.memory') }}</option>
@@ -1776,8 +1790,8 @@ function getWheelTextTransform(index: number, total: number): string {
           </select>
         </div>
         
-        <div v-if="poolLogsLoading" class="p-8 text-center text-themed-muted">{{ $t('common.loading') }}...</div>
-        <div v-else-if="poolLogs.length === 0" class="p-8 text-center text-themed-muted">{{ $t('checkin.noLogs') }}</div>
+        <div v-if="poolLogsLoading" class="p-12 text-center text-themed-muted">{{ $t('common.loading') }}...</div>
+        <EmptyState v-else-if="poolLogs.length === 0" :title="$t('checkin.noLogs')" />
         <template v-else>
           <div class="space-y-3 p-4 lg:hidden">
             <div
@@ -1790,20 +1804,20 @@ function getWheelTextTransform(index: number, total: number): string {
                   <p class="truncate text-sm font-medium text-themed">{{ getActionName(log.action) }}</p>
                   <p class="mt-1 truncate text-xs text-themed-muted">{{ log.instance?.name || '-' }}</p>
                 </div>
-                <span :class="['shrink-0 rounded px-2 py-0.5 text-xs font-medium', getResourceBgColor(log.resourceType), getResourceColor(log.resourceType)]">
+                <span :class="['shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium', getResourceBgColor(log.resourceType), getResourceColor(log.resourceType)]">
                   {{ getResourceTypeName(log.resourceType) }}
                 </span>
               </div>
               <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt class="text-xs text-themed-muted">{{ $t('checkin.amount') }}</dt>
-                  <dd class="mt-1 font-semibold" :class="log.amount >= 0 ? 'text-emerald-500' : 'text-red-500'">
+                  <dd class="mt-1 font-semibold font-mono tabular-nums" :class="log.amount >= 0 ? 'text-emerald-500' : 'text-red-500'">
                     {{ log.amount >= 0 ? '+' : '' }}{{ log.amount }}{{ getResourceUnit(log.resourceType) }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-xs text-themed-muted">{{ $t('checkin.time') }}</dt>
-                  <dd class="mt-1 text-themed">{{ new Date(log.createdAt).toLocaleString() }}</dd>
+                  <dd class="mt-1 text-themed font-mono">{{ new Date(log.createdAt).toLocaleString() }}</dd>
                 </div>
               </dl>
             </div>
@@ -1821,20 +1835,20 @@ function getWheelTextTransform(index: number, total: number): string {
                 </tr>
               </thead>
               <tbody class="divide-y divide-themed">
-                <tr v-for="log in poolLogs" :key="log.id" class="hover:bg-themed-hover">
-                  <td class="px-4 py-3 text-sm text-themed">{{ getActionName(log.action) }}</td>
+                <tr v-for="log in poolLogs" :key="log.id" class="hover:bg-themed-hover transition-colors">
+                  <td class="px-4 py-3 text-sm text-themed font-medium">{{ getActionName(log.action) }}</td>
                   <td class="px-4 py-3 text-sm">
-                    <span :class="['rounded px-2 py-0.5 text-xs font-medium', getResourceBgColor(log.resourceType), getResourceColor(log.resourceType)]">
+                    <span :class="['rounded-full px-2.5 py-0.5 text-xs font-medium', getResourceBgColor(log.resourceType), getResourceColor(log.resourceType)]">
                       {{ getResourceTypeName(log.resourceType) }}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-sm" :class="log.amount >= 0 ? 'text-emerald-500' : 'text-red-500'">
+                  <td class="px-4 py-3 text-sm font-semibold font-mono tabular-nums" :class="log.amount >= 0 ? 'text-emerald-500' : 'text-red-500'">
                     {{ log.amount >= 0 ? '+' : '' }}{{ log.amount }}{{ getResourceUnit(log.resourceType) }}
                   </td>
                   <td class="px-4 py-3 text-sm text-themed-muted">
                     <div class="truncate">{{ log.instance?.name || '-' }}</div>
                   </td>
-                  <td class="px-4 py-3 text-sm text-themed-muted">{{ new Date(log.createdAt).toLocaleString() }}</td>
+                  <td class="px-4 py-3 text-sm text-themed-muted font-mono">{{ new Date(log.createdAt).toLocaleString() }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1842,11 +1856,11 @@ function getWheelTextTransform(index: number, total: number): string {
 
           <!-- 分页 -->
           <div v-if="poolLogsTotalPages > 1" class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 p-4 border-t border-themed sm:flex sm:justify-center">
-            <button class="btn btn-sm btn-ghost justify-self-start" :disabled="poolLogsPage <= 1" @click="poolLogsPage--; loadPoolLogs()">
+            <button class="btn btn-sm btn-ghost justify-self-start rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none" :disabled="poolLogsPage <= 1" @click="poolLogsPage--; loadPoolLogs()">
               {{ $t('common.prevPage') }}
             </button>
-            <span class="text-sm text-themed-muted justify-self-center">{{ poolLogsPage }} / {{ poolLogsTotalPages }}</span>
-            <button class="btn btn-sm btn-ghost justify-self-end" :disabled="poolLogsPage >= poolLogsTotalPages" @click="poolLogsPage++; loadPoolLogs()">
+            <span class="text-sm text-themed-muted justify-self-center font-mono">{{ poolLogsPage }} / {{ poolLogsTotalPages }}</span>
+            <button class="btn btn-sm btn-ghost justify-self-end rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none" :disabled="poolLogsPage >= poolLogsTotalPages" @click="poolLogsPage++; loadPoolLogs()">
               {{ $t('common.nextPage') }}
             </button>
           </div>
@@ -1877,30 +1891,26 @@ function getWheelTextTransform(index: number, total: number): string {
       >
         <div 
           v-if="showResultModal" 
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           @click.self="closeResultModal"
         >
-          <div class="w-full max-w-sm animate-scale-in rounded-xl border border-themed bg-themed-surface p-6 text-center shadow-xl">
+          <div class="w-full max-w-sm animate-scale-in rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 text-center shadow-xl">
             <div v-if="spinResult?.prizeType === 'nothing'" class="mb-4">
-              <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-tertiary)]">
+                <HelpCircle class="w-8 h-8" />
               </div>
-              <h3 class="text-lg font-medium text-themed">{{ $t('entertainment.betterLuckNextTime') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ spinResult?.prizeName }}</p>
+              <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('entertainment.betterLuckNextTime') }}</h3>
+              <p class="text-sm text-[var(--text-secondary)] mt-1">{{ spinResult?.prizeName }}</p>
             </div>
             <div v-else class="mb-4">
-              <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-amber-500/10 flex items-center justify-center">
-                <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
+              <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <Sparkles class="w-8 h-8 text-amber-500" />
               </div>
-              <h3 class="text-lg font-medium text-themed">{{ $t('entertainment.congratulations') }}</h3>
+              <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('entertainment.congratulations') }}</h3>
               <p class="text-xl font-bold mt-2" :style="{ color: getPrizeColor(spinResult?.prizeType) }">
                 {{ spinResult?.prizeName }}
               </p>
-              <p class="text-sm text-themed-muted mt-2">
+              <p class="text-sm text-[var(--text-secondary)] mt-2">
                 <template v-if="spinResult?.prizeType === 'points'">
                   {{ $t('entertainment.wonPoints', { points: spinResult.prizeValue }) }}
                 </template>
@@ -1927,9 +1937,9 @@ function getWheelTextTransform(index: number, total: number): string {
                 </template>
               </p>
             </div>
-            <button class="btn btn-primary w-full" @click="closeResultModal">
+            <Button variant="primary" block @click="closeResultModal">
               {{ $t('common.confirm') }}
-            </button>
+            </Button>
           </div>
         </div>
       </Transition>
@@ -1954,36 +1964,35 @@ function getWheelTextTransform(index: number, total: number): string {
       >
         <div 
           v-if="showMultiDrawModal" 
-          class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           @click.self="closeMultiDrawModal"
         >
-          <div class="w-full max-w-lg animate-scale-in rounded-xl border border-themed bg-themed-surface p-6 shadow-xl">
+          <div class="w-full max-w-lg animate-scale-in rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-medium text-themed">{{ $t('entertainment.multiDrawResults') }}</h3>
+              <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('entertainment.multiDrawResults') }}</h3>
               <button 
-                class="p-1 hover:bg-themed-hover rounded-lg transition-colors"
+                type="button"
+                class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
                 @click="closeMultiDrawModal"
               >
-                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X class="w-4 h-4" />
               </button>
             </div>
             
             <!-- 结果列表 -->
-            <div class="max-h-80 overflow-y-auto space-y-2 mb-4">
+            <div class="max-h-80 overflow-y-auto space-y-2 mb-4 pr-1">
               <div 
                 v-for="(result, idx) in multiDrawResults" 
                 :key="result.id"
-                class="flex items-center gap-3 p-3 rounded-lg bg-themed-hover"
+                class="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]"
               >
-                <span class="text-sm text-themed-muted w-6">#{{ idx + 1 }}</span>
+                <span class="text-xs text-[var(--text-tertiary)] font-mono w-6">#{{ idx + 1 }}</span>
                 <div 
-                  class="w-3 h-3 rounded-full flex-shrink-0"
+                  class="w-3 h-3 rounded-full shrink-0"
                   :style="{ backgroundColor: getPrizeColor(result.prizeType) }"
                 ></div>
-                <span class="text-sm text-themed flex-1 truncate">{{ result.prizeName }}</span>
-                <span class="text-xs text-themed-muted">
+                <span class="text-sm text-[var(--text-primary)] font-medium flex-1 truncate">{{ result.prizeName }}</span>
+                <span class="text-xs text-[var(--text-secondary)] font-mono">
                   <template v-if="result.prizeType === 'points'">+{{ result.prizeValue }} {{ $t('entertainment.pointsUnit') }}</template>
                   <template v-else-if="result.prizeType === 'balance'">+¥{{ (result.prizeValue / 100).toFixed(2) }}</template>
                   <template v-else-if="result.prizeType === 'badge'">+1 {{ $t('entertainment.badgeUnit') }}</template>
@@ -1998,72 +2007,75 @@ function getWheelTextTransform(index: number, total: number): string {
             </div>
 
             <!-- 统计摘要 -->
-            <div class="border-t border-themed pt-4 mb-4">
+            <div class="border-t border-[var(--border-color)] pt-4 mb-4">
               <div class="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span class="text-themed-muted">{{ $t('entertainment.totalDraws') }}:</span>
-                  <span class="text-themed font-medium ml-2 font-mono tabular-nums">{{ multiDrawResults.length }}</span>
+                  <span class="text-[var(--text-secondary)]">{{ $t('entertainment.totalDraws') }}:</span>
+                  <span class="text-[var(--text-primary)] font-semibold ml-2 font-mono tabular-nums">{{ multiDrawResults.length }}</span>
                 </div>
                 <div>
-                  <span class="text-themed-muted">{{ $t('entertainment.totalPointsSpent') }}:</span>
-                  <span class="text-themed font-medium ml-2 font-mono tabular-nums">{{ multiDrawResults.reduce((sum, r) => sum + r.pointsSpent, 0) }}</span>
+                  <span class="text-[var(--text-secondary)]">{{ $t('entertainment.totalPointsSpent') }}:</span>
+                  <span class="text-[var(--text-primary)] font-semibold ml-2 font-mono tabular-nums">{{ multiDrawResults.reduce((sum, r) => sum + r.pointsSpent, 0) }}</span>
                 </div>
               </div>
               <!-- 奖品统计：显示各类奖品总值 -->
-              <div class="flex flex-wrap gap-2 mt-3">
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('balance') + '20', color: getPrizeColor('balance') }">
+              <div class="flex flex-wrap gap-1.5 mt-3">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('balance') + '20', color: getPrizeColor('balance') }">
                   {{ $t('entertainment.prizeTypes.balance') }}: {{ multiDrawSummary.balance.toFixed(2) }}
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('badge') + '20', color: getPrizeColor('badge') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('badge') + '20', color: getPrizeColor('badge') }">
                   {{ $t('entertainment.prizeTypes.badge') }}: {{ multiDrawSummary.badge }} {{ $t('entertainment.badgeUnit') }}
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('instance') + '20', color: getPrizeColor('instance') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('instance') + '20', color: getPrizeColor('instance') }">
                   {{ $t('entertainment.prizeTypes.instance') }}: {{ multiDrawSummary.instance }} {{ $t('entertainment.instanceUnit') }}
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('cpu') + '20', color: getPrizeColor('cpu') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('cpu') + '20', color: getPrizeColor('cpu') }">
                   CPU: {{ multiDrawSummary.cpu }}%
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('memory') + '20', color: getPrizeColor('memory') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('memory') + '20', color: getPrizeColor('memory') }">
                   {{ $t('entertainment.prizeTypes.memory') }}: {{ multiDrawSummary.memory }}MB
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('disk') + '20', color: getPrizeColor('disk') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('disk') + '20', color: getPrizeColor('disk') }">
                   {{ $t('entertainment.prizeTypes.disk') }}: {{ multiDrawSummary.disk }}MB
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('traffic') + '20', color: getPrizeColor('traffic') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('traffic') + '20', color: getPrizeColor('traffic') }">
                   {{ $t('entertainment.prizeTypes.traffic') }}: {{ multiDrawSummary.traffic }}GB
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('points') + '20', color: getPrizeColor('points') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('points') + '20', color: getPrizeColor('points') }">
                   {{ $t('entertainment.prizeTypes.points') }}: {{ multiDrawSummary.points }}
                 </div>
-                <div class="flex items-center gap-1.5 px-2 py-1 rounded text-xs" :style="{ backgroundColor: getPrizeColor('nothing') + '20', color: getPrizeColor('nothing') }">
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium" :style="{ backgroundColor: getPrizeColor('nothing') + '20', color: getPrizeColor('nothing') }">
                   {{ $t('entertainment.prizeTypes.nothing') }}: {{ multiDrawSummary.nothing }}
                 </div>
               </div>
             </div>
 
             <!-- 错误提示 -->
-            <div v-if="multiDrawError" class="text-sm text-amber-500 bg-amber-500/10 rounded-lg p-3 mb-4">
+            <div v-if="multiDrawError" class="text-sm text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-4">
               {{ $t('entertainment.multiDrawStopped') }}: {{ multiDrawError }}
             </div>
 
             <!-- 按钮组: 确认(30%) + 再次十连(70%) -->
             <div class="flex gap-2">
-              <button 
-                class="btn btn-secondary flex-[3]"
+              <Button 
+                variant="secondary"
+                class="flex-[3]"
                 @click="closeMultiDrawModal"
               >
                 {{ $t('common.confirm') }}
-              </button>
-              <button 
-                class="btn btn-primary flex-[7] flex items-center justify-center gap-1"
+              </Button>
+              <Button 
+                variant="primary"
+                class="flex-[7]"
                 :disabled="isMultiDrawing || !selectedLottery || points.points < selectedLottery.costPoints * 10"
+                :loading="isMultiDrawing"
                 @click="multiDrawAgain"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+                <template #icon>
+                  <Zap class="w-4 h-4" />
+                </template>
                 {{ $t('entertainment.multiDrawAgain') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2073,20 +2085,13 @@ function getWheelTextTransform(index: number, total: number): string {
 </template>
 
 <style scoped>
-/* Nimbus 卡片悬浮微交互 */
-.nimbus-lift { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-.nimbus-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -8px rgb(16 24 40 / .18); }
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-lift, .nimbus-lift:hover { transition: none; transform: none; }
-}
-
 /* 转盘旋转动画 */
 .wheel-spin {
   transition-property: transform;
   will-change: transform;
 }
 
-/* 慢速脉冲动画 - 吸引注意力 */
+/* 慢速脉冲动画 */
 @keyframes pulse-slow {
   0%, 100% {
     transform: translate(-50%, -50%) scale(1);
@@ -2102,26 +2107,14 @@ function getWheelTextTransform(index: number, total: number): string {
   animation: pulse-slow 2s ease-in-out infinite;
 }
 
-/* 灯泡闪烁效果 */
-@keyframes bulb-blink {
-  0%, 50%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 4px 2px rgba(255, 255, 255, 0.6);
-  }
-  25%, 75% {
-    opacity: 0.6;
-    box-shadow: none;
-  }
-}
-
-/* 中奖弹窗动画 */
+/* 弹窗动画 */
 .animate-scale-in {
-  animation: scale-in 0.3s ease-out;
+  animation: scale-in 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 @keyframes scale-in {
   from {
-    transform: scale(0.9);
+    transform: scale(0.96);
     opacity: 0;
   }
   to {
@@ -2130,70 +2123,70 @@ function getWheelTextTransform(index: number, total: number): string {
   }
 }
 
-/* 签到礼盒摇晃动画 - Q弹效果 */
+/* 签到礼盒摇晃动画 */
 @keyframes shake-box {
   0%, 100% { 
     transform: rotate(0deg) scale(1); 
   }
   10% { 
-    transform: rotate(-12deg) scale(1.05); 
+    transform: rotate(-8deg) scale(1.03); 
   }
   20% { 
-    transform: rotate(10deg) scale(1.08); 
+    transform: rotate(8deg) scale(1.05); 
   }
   30% { 
-    transform: rotate(-10deg) scale(1.05); 
+    transform: rotate(-6deg) scale(1.03); 
   }
   40% { 
-    transform: rotate(8deg) scale(1.08); 
+    transform: rotate(6deg) scale(1.05); 
   }
   50% { 
-    transform: rotate(-6deg) scale(1.05); 
+    transform: rotate(-4deg) scale(1.02); 
   }
   60% { 
-    transform: rotate(6deg) scale(1.08); 
+    transform: rotate(4deg) scale(1.04); 
   }
   70% { 
-    transform: rotate(-4deg) scale(1.05); 
+    transform: rotate(-2deg) scale(1.02); 
   }
   80% { 
-    transform: rotate(3deg) scale(1.03); 
+    transform: rotate(2deg) scale(1.01); 
   }
   90% { 
-    transform: rotate(-2deg) scale(1.01); 
+    transform: rotate(-1deg) scale(1); 
   }
 }
 
 .animate-shake-box {
-  animation: shake-box 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
+  animation: shake-box 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
   transform-origin: center bottom;
 }
 
-/* 签到礼盒打开动画 - Q弹效果 */
+/* 签到礼盒打开动画 */
 @keyframes open-box {
   0% { 
     transform: scale(1) rotate(0deg); 
   }
   20% { 
-    transform: scale(1.15) rotate(-3deg); 
+    transform: scale(1.1) rotate(-2deg); 
   }
   40% { 
-    transform: scale(1.2) rotate(2deg); 
+    transform: scale(1.15) rotate(1deg); 
   }
   60% { 
-    transform: scale(1.1) rotate(-1deg); 
+    transform: scale(1.08) rotate(-1deg); 
   }
   80% { 
-    transform: scale(0.95) rotate(0deg); 
+    transform: scale(0.96) rotate(0deg); 
   }
   100% { 
-    transform: scale(0.8) rotate(0deg); 
+    transform: scale(0.85) rotate(0deg); 
     opacity: 0; 
   }
 }
 
 .animate-open-box {
-  animation: open-box 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  animation: open-box 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   transform-origin: center center;
 }
 
@@ -2210,6 +2203,17 @@ function getWheelTextTransform(index: number, total: number): string {
 }
 
 .animate-confetti {
-  animation: confetti 2s ease-out forwards;
+  animation: confetti 2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-slow,
+  .animate-shake-box,
+  .animate-open-box,
+  .animate-confetti,
+  .wheel-spin {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 </style>

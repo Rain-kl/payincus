@@ -1,9 +1,35 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  AlertCircle,
+  Banknote,
+  CheckCircle2,
+  Coins,
+  CreditCard,
+  Globe,
+  Pencil,
+  Plus,
+  RotateCw,
+  Sliders,
+  Trash2,
+  Wallet
+} from 'lucide-vue-next'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
-import SkeletonLoader from '@/components/SkeletonLoader.vue'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Select
+} from '@/components/ui'
+import DrawerModal from '@/components/DrawerModal.vue'
+import { useReveal } from '@/composables/useReveal'
+
+defineOptions({ name: 'AdminPaymentProvidersView' })
 
 const props = withDefaults(defineProps<{
   embedded?: boolean
@@ -14,11 +40,14 @@ const props = withDefaults(defineProps<{
 const { t } = useI18n()
 const toast = useToast()
 
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
+
 // 支付渠道列表
 const providers = ref<any[]>([])
 const loading = ref(true)
 
-// 编辑/创建弹窗
+// 编辑/创建抽屉
 const showModal = ref(false)
 const isEditing = ref(false)
 const modalLoading = ref(false)
@@ -34,7 +63,7 @@ const formData = ref({
   } as Record<string, unknown>,
   methods: [] as string[],
   minAmount: 1,
-  maxAmount: null as number | null,
+  maxAmount: undefined as number | undefined,
   feeRate: 0,
   feeFixed: 0,
   sortOrder: 0
@@ -43,6 +72,11 @@ const formData = ref({
 const DEFAULT_YIPAY_METHODS = ['alipay', 'wxpay']
 const YIPAY_METHODS = ['alipay', 'wxpay', 'qqpay']
 const IMPLEMENTED_PROVIDER_TYPES = new Set(['yipay', 'heleket', 'antom', 'manual'])
+
+// 统计指标
+const activeCount = computed(() => providers.value.filter(p => p.status === 'active').length)
+const testingCount = computed(() => providers.value.filter(p => p.status === 'testing').length)
+const disabledCount = computed(() => providers.value.filter(p => p.status === 'disabled').length)
 
 function getConfigMethodFees(config: Record<string, unknown>): Record<string, { feeRate?: number; feeFixed?: number }> {
   const raw = (config as any).methodFees
@@ -131,10 +165,51 @@ const providerTypes = computed(() => [
 
 // 状态选项
 const statusOptions = computed(() => [
-  { value: 'active', label: t('admin.paymentProviders.statusActive'), class: 'badge-success' },
-  { value: 'disabled', label: t('admin.paymentProviders.statusDisabled'), class: 'badge-error' },
-  { value: 'testing', label: t('admin.paymentProviders.statusTesting'), class: 'badge-warning' }
+  { value: 'active', label: t('admin.paymentProviders.statusActive') },
+  { value: 'disabled', label: t('admin.paymentProviders.statusDisabled') },
+  { value: 'testing', label: t('admin.paymentProviders.statusTesting') }
 ])
+
+function getStatusVariant(status: string): 'success' | 'warning' | 'default' {
+  switch (status) {
+    case 'active':
+      return 'success'
+    case 'testing':
+      return 'warning'
+    case 'disabled':
+    default:
+      return 'default'
+  }
+}
+
+function getTypeName(type: string): string {
+  const typeKeyMap: Record<string, string> = {
+    yipay: 'yipay',
+    heleket: 'heleket',
+    antom: 'antom',
+    stripe: 'stripe',
+    alipay_direct: 'alipayDirect',
+    wechat_direct: 'wechatDirect',
+    manual: 'manual'
+  }
+  const key = typeKeyMap[type]
+  return key ? t(`admin.paymentProviders.providerTypes.${key}`) : type
+}
+
+function getProviderIcon(type: string) {
+  switch (type) {
+    case 'yipay':
+      return Wallet
+    case 'antom':
+      return Globe
+    case 'heleket':
+      return Coins
+    case 'manual':
+      return Banknote
+    default:
+      return CreditCard
+  }
+}
 
 // 删除确认弹窗
 const showDeleteModal = ref(false)
@@ -151,7 +226,7 @@ async function loadProviders() {
     const res = await api.admin.getPaymentProviders()
     providers.value = res.providers || []
   } catch (err: any) {
-    toast.error(t('admin.paymentProviders.loadFailed') + ': ' + err.message)
+    toast.error(t('admin.paymentProviders.loadFailed') + ': ' + (err?.response?.data?.message || err?.message || String(err)))
   } finally {
     loading.value = false
   }
@@ -256,7 +331,7 @@ function openCreateModal() {
     config: getDefaultConfig('yipay', 'v2'),
     methods: getDefaultMethods('yipay'),
     minAmount: 1,
-    maxAmount: null,
+    maxAmount: undefined,
     feeRate: 0,
     feeFixed: 0,
     sortOrder: 0
@@ -266,11 +341,10 @@ function openCreateModal() {
 
 function openEditModal(provider: any) {
   isEditing.value = true
-  // 确保 config 字段有默认值
   const version = provider.config?.version || 'v2'
   const defaultConfig = getDefaultConfig(provider.type, version)
   const mergedConfig = { ...defaultConfig, ...(provider.config || {}) }
-  
+
   formData.value = {
     id: provider.id,
     name: provider.name,
@@ -278,10 +352,10 @@ function openEditModal(provider: any) {
     config: mergedConfig,
     methods: provider.methods?.length ? provider.methods : getDefaultMethods(provider.type),
     minAmount: provider.minAmount,
-    maxAmount: provider.maxAmount,
-    feeRate: provider.feeRate * 100, // 转换为百分比显示
-    feeFixed: provider.feeFixed,
-    sortOrder: provider.sortOrder
+    maxAmount: provider.maxAmount !== null && provider.maxAmount !== undefined ? Number(provider.maxAmount) : undefined,
+    feeRate: (Number(provider.feeRate) || 0) * 100, // 转换为百分比显示
+    feeFixed: Number(provider.feeFixed) || 0,
+    sortOrder: Number(provider.sortOrder) || 0
   }
   showModal.value = true
 }
@@ -319,21 +393,27 @@ async function saveProvider() {
     toast.error(t('admin.paymentProviders.nameRequired'))
     return
   }
-  
+
   modalLoading.value = true
   try {
+    const minAmountNum = Number(formData.value.minAmount)
+    const maxAmountNum = formData.value.maxAmount !== null && formData.value.maxAmount !== undefined && (formData.value.maxAmount as unknown as string) !== ''
+      ? Number(formData.value.maxAmount)
+      : null
+    const sortOrderNum = Number(formData.value.sortOrder) || 0
+
     const data = {
       name: formData.value.name.trim(),
       type: formData.value.type,
       config: buildConfigForSave(),
       methods: formData.value.methods,
-      minAmount: formData.value.minAmount,
-      maxAmount: formData.value.maxAmount,
-      feeRate: formData.value.type === 'yipay' ? 0 : formData.value.feeRate / 100, // 转换回小数
-      feeFixed: formData.value.type === 'yipay' ? 0 : formData.value.feeFixed,
-      sortOrder: formData.value.sortOrder
+      minAmount: Number.isFinite(minAmountNum) ? minAmountNum : 1,
+      maxAmount: maxAmountNum !== null && Number.isFinite(maxAmountNum) ? maxAmountNum : null,
+      feeRate: formData.value.type === 'yipay' ? 0 : (Number(formData.value.feeRate) || 0) / 100, // 转换回小数
+      feeFixed: formData.value.type === 'yipay' ? 0 : (Number(formData.value.feeFixed) || 0),
+      sortOrder: Number.isFinite(sortOrderNum) ? sortOrderNum : 0
     }
-    
+
     if (isEditing.value) {
       await api.admin.updatePaymentProvider(formData.value.id, data)
       toast.success(t('admin.paymentProviders.updateSuccess'))
@@ -341,11 +421,11 @@ async function saveProvider() {
       await api.admin.createPaymentProvider(data)
       toast.success(t('admin.paymentProviders.createSuccess'))
     }
-    
+
     showModal.value = false
     await loadProviders()
   } catch (err: any) {
-    toast.error((isEditing.value ? t('admin.paymentProviders.updateFailed') : t('admin.paymentProviders.createFailed')) + ': ' + err.message)
+    toast.error((isEditing.value ? t('admin.paymentProviders.updateFailed') : t('admin.paymentProviders.createFailed')) + ': ' + (err?.response?.data?.message || err?.message || String(err)))
   } finally {
     modalLoading.value = false
   }
@@ -354,10 +434,11 @@ async function saveProvider() {
 async function updateStatus(provider: any, newStatus: string) {
   try {
     await api.admin.updatePaymentProviderStatus(provider.id, newStatus)
+    provider.status = newStatus
     toast.success(t('admin.paymentProviders.statusUpdateSuccess'))
     await loadProviders()
   } catch (err: any) {
-    toast.error(t('admin.paymentProviders.statusUpdateFailed') + ': ' + err.message)
+    toast.error(t('admin.paymentProviders.statusUpdateFailed') + ': ' + (err?.response?.data?.message || err?.message || String(err)))
   }
 }
 
@@ -368,7 +449,7 @@ function confirmDelete(provider: any) {
 
 async function deleteProvider() {
   if (!deleteTarget.value) return
-  
+
   deleteLoading.value = true
   try {
     await api.admin.deletePaymentProvider(deleteTarget.value.id)
@@ -377,18 +458,10 @@ async function deleteProvider() {
     deleteTarget.value = null
     await loadProviders()
   } catch (err: any) {
-    toast.error(t('admin.paymentProviders.deleteFailed') + ': ' + err.message)
+    toast.error(t('admin.paymentProviders.deleteFailed') + ': ' + (err?.response?.data?.message || err?.message || String(err)))
   } finally {
     deleteLoading.value = false
   }
-}
-
-function getTypeName(type: string): string {
-  return providerTypes.value.find(t => t.value === type)?.label || type
-}
-
-function getStatusInfo(status: string) {
-  return statusOptions.value.find(s => s.value === status) || { label: status, class: '' }
 }
 
 function togglePaymentMethod(method: string) {
@@ -402,484 +475,840 @@ function togglePaymentMethod(method: string) {
 </script>
 
 <template>
-  <div :class="['animate-fade-in', props.embedded ? 'space-y-4' : 'kawaii-page space-y-6']">
+  <div ref="revealRoot" :class="['animate-fade-in', props.embedded ? 'space-y-4' : 'space-y-6']">
     <!-- 页面头部 -->
-    <div class="page-header flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="page-title">{{ $t('admin.paymentProviders.title') }}</h1>
-        <p class="text-sm text-themed-muted mt-1">{{ $t('admin.paymentProviders.description') }}</p>
-      </div>
-      <button class="btn btn-primary" @click="openCreateModal">
-        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ $t('admin.paymentProviders.add') }}
-      </button>
-    </div>
+    <PageHeader
+      :title="t('admin.paymentProviders.title')"
+      :description="t('admin.paymentProviders.description')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :loading="loading"
+          @click="loadProviders"
+        >
+          <template #icon>
+            <RotateCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          </template>
+          {{ t('giftCards.refresh') }}
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          @click="openCreateModal"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2.5]" />
+          </template>
+          {{ t('admin.paymentProviders.add') }}
+        </Button>
+      </template>
+    </PageHeader>
 
-    <!-- 加载中 -->
-    <SkeletonLoader v-if="loading" :count="3" />
-
-    <!-- 支付渠道列表 -->
-    <div v-else-if="providers.length > 0" class="space-y-4">
-      <div
-        v-for="provider in providers"
-        :key="provider.id"
-        class="card p-4 pp-reveal"
-      >
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-3">
-              <h3 class="font-medium text-themed">{{ provider.name }}</h3>
-              <span :class="['badge', getStatusInfo(provider.status).class]">
-                {{ getStatusInfo(provider.status).label }}
-              </span>
-              <span class="badge badge-info">{{ getTypeName(provider.type) }}</span>
-            </div>
-            
-            <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div class="text-2xs uppercase tracking-wide text-themed-muted">{{ $t('admin.paymentProviders.minAmount') }}</div>
-                <div class="mt-0.5 text-sm text-themed tabular-nums">¥{{ provider.minAmount }}</div>
-              </div>
-              <div>
-                <div class="text-2xs uppercase tracking-wide text-themed-muted">{{ $t('admin.paymentProviders.maxAmount') }}</div>
-                <div class="mt-0.5 text-sm text-themed tabular-nums">{{ provider.maxAmount ? `¥${provider.maxAmount}` : $t('common.unlimited') }}</div>
-              </div>
-              <div>
-                <div class="text-2xs uppercase tracking-wide text-themed-muted">{{ $t('admin.paymentProviders.feeRate') }}</div>
-                <div class="mt-0.5 text-sm text-themed tabular-nums">{{ (provider.feeRate * 100).toFixed(2) }}%</div>
-              </div>
-              <div>
-                <div class="text-2xs uppercase tracking-wide text-themed-muted">{{ $t('admin.paymentProviders.feeFixed') }}</div>
-                <div class="mt-0.5 text-sm text-themed tabular-nums">¥{{ provider.feeFixed }}</div>
-              </div>
-            </div>
-
-            <div class="mt-3 text-xs text-themed-muted">
-              <span class="text-2xs uppercase tracking-wide">{{ $t('admin.paymentProviders.methods') }}</span>
-              <span class="ml-1.5 text-themed">{{ getProviderMethodSummary(provider) }}</span>
-            </div>
-          </div>
-          
-          <div class="flex flex-wrap items-center gap-2 lg:ml-4 lg:justify-end">
-            <!-- 状态切换 -->
-            <select
-              :value="provider.status"
-              class="input input-sm w-24"
-              @change="(e) => updateStatus(provider, (e.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-            
-            <button class="btn btn-sm btn-ghost" @click="openEditModal(provider)">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-            
-            <button class="btn btn-sm btn-ghost text-rose-600 dark:text-rose-400" @click="confirmDelete(provider)">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+    <!-- 概览指标卡 -->
+    <div data-reveal class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.paymentProviders.title') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <CreditCard class="w-4 h-4" />
           </div>
         </div>
-      </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+          {{ providers.length }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.paymentProviders.statusActive') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] text-[var(--success)] border border-[color-mix(in_srgb,var(--success)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <CheckCircle2 class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--success)]">
+          {{ activeCount }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.paymentProviders.statusTesting') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Sliders class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--warning)]">
+          {{ testingCount }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.paymentProviders.statusDisabled') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--text-tertiary)_12%,var(--bg-surface))] text-[var(--text-tertiary)] border border-[color-mix(in_srgb,var(--text-tertiary)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <AlertCircle class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-tertiary)]">
+          {{ disabledCount }}
+        </div>
+      </Card>
+    </div>
+
+    <!-- 加载骨架屏 -->
+    <div v-if="loading && providers.length === 0" class="space-y-4">
+      <Card v-for="i in 3" :key="`skeleton-${i}`" loading padding="md" />
+    </div>
+
+    <!-- 支付渠道卡片列表 -->
+    <div v-else-if="providers.length > 0" data-reveal class="space-y-4">
+      <Card
+        v-for="provider in providers"
+        :key="provider.id"
+        hoverable
+        padding="md"
+        class="group transition-all duration-300"
+      >
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <!-- 渠道基本信息与图标 -->
+          <div class="min-w-0 flex-1">
+            <div class="flex items-start gap-3.5">
+              <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] shrink-0 group-hover:scale-105 transition-transform duration-300">
+                <component :is="getProviderIcon(provider.type)" class="w-5 h-5 stroke-[2]" />
+              </div>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="font-semibold text-base md:text-lg tracking-tight text-[var(--text-primary)] truncate">
+                    {{ provider.name }}
+                  </h3>
+                  <Badge :variant="getStatusVariant(provider.status)" dot size="sm">
+                    {{ statusOptions.find(s => s.value === provider.status)?.label || provider.status }}
+                  </Badge>
+                  <Badge variant="info" size="sm">
+                    {{ getTypeName(provider.type) }}
+                  </Badge>
+                  <span v-if="provider.sortOrder" class="font-mono text-xs text-[var(--text-tertiary)]">
+                    #{{ provider.sortOrder }}
+                  </span>
+                </div>
+
+                <div class="text-xs font-mono text-[var(--text-tertiary)] mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span>ID: {{ provider.id }}</span>
+                  <span v-if="provider.config?.apiurl" class="font-sans text-[var(--text-secondary)] truncate max-w-sm">
+                    {{ provider.config.apiurl }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 参数配置网格 -->
+            <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  {{ t('admin.paymentProviders.minAmount') }}
+                </div>
+                <div class="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                  ¥{{ provider.minAmount }}
+                </div>
+              </div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  {{ t('admin.paymentProviders.maxAmount') }}
+                </div>
+                <div class="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                  {{ provider.maxAmount ? `¥${provider.maxAmount}` : t('common.unlimited') }}
+                </div>
+              </div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  {{ t('admin.paymentProviders.feeRate') }}
+                </div>
+                <div class="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--accent)]">
+                  {{ (provider.feeRate * 100).toFixed(2) }}%
+                </div>
+              </div>
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                  {{ t('admin.paymentProviders.feeFixed') }}
+                </div>
+                <div class="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                  ¥{{ provider.feeFixed }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 支持的支付方式及费率 -->
+            <div class="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-xs pt-0.5">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] shrink-0">
+                  {{ t('admin.paymentProviders.methods') }}:
+                </span>
+                <span class="text-[var(--text-secondary)] truncate">
+                  {{ getProviderMethodSummary(provider) }}
+                </span>
+              </div>
+
+              <div v-if="provider.type === 'manual' && provider.config?.instructions" class="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                <span class="font-medium text-[var(--text-secondary)]">说明已配置</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧操作栏 -->
+          <div class="flex flex-wrap items-center gap-2 lg:ml-4 lg:justify-end shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-[var(--border-color)]">
+            <div class="w-28">
+              <Select
+                :model-value="provider.status"
+                :options="statusOptions"
+                size="sm"
+                @change="(val: any) => updateStatus(provider, String(val))"
+              />
+            </div>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              @click="openEditModal(provider)"
+            >
+              <template #icon>
+                <Pencil class="w-3.5 h-3.5" />
+              </template>
+              {{ t('admin.paymentProviders.edit') }}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+              @click="confirmDelete(provider)"
+            >
+              <template #icon>
+                <Trash2 class="w-3.5 h-3.5" />
+              </template>
+              {{ t('admin.paymentProviders.delete') }}
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
 
     <!-- 空状态 -->
-    <div v-else class="card flex flex-col items-center gap-4 p-12 text-center">
-      <span class="flex h-14 w-14 items-center justify-center rounded-full bg-themed-secondary text-themed-muted">
-        <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-        </svg>
-      </span>
-      <p class="text-sm text-themed-muted">{{ $t('admin.paymentProviders.empty') }}</p>
-      <button class="btn btn-primary" @click="openCreateModal">
-        {{ $t('admin.paymentProviders.add') }}
-      </button>
-    </div>
+    <Card v-else data-reveal padding="lg">
+      <EmptyState
+        :title="t('admin.paymentProviders.empty')"
+        :description="t('admin.paymentProviders.noProviders')"
+      >
+        <template #icon>
+          <CreditCard class="w-7 h-7 stroke-[1.5]" />
+        </template>
+        <template #action>
+          <Button variant="primary" size="md" @click="openCreateModal">
+            <template #icon>
+              <Plus class="w-4 h-4 stroke-[2.5]" />
+            </template>
+            {{ t('admin.paymentProviders.add') }}
+          </Button>
+        </template>
+      </EmptyState>
+    </Card>
 
-    <!-- 创建/编辑弹窗 -->
-    <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-        <div class="modal-content max-w-2xl">
-          <div class="modal-header">
-            <h3 class="modal-title">
-              {{ isEditing ? $t('admin.paymentProviders.edit') : $t('admin.paymentProviders.add') }}
-            </h3>
-            <button class="btn btn-ghost btn-sm" @click="showModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+    <!-- 创建/编辑渠道抽屉（DrawerModal） -->
+    <DrawerModal
+      v-model="showModal"
+      :title="isEditing ? t('admin.paymentProviders.edit') : t('admin.paymentProviders.add')"
+      max-width="max-w-2xl"
+    >
+      <div class="space-y-4 text-sm">
+        <div>
+          <Input
+            v-model="formData.name"
+            :label="t('admin.paymentProviders.name') + ' *'"
+            :placeholder="t('admin.paymentProviders.namePlaceholder')"
+          />
+        </div>
+
+        <div>
+          <Select
+            v-model="formData.type"
+            :label="t('admin.paymentProviders.type')"
+            :options="providerTypes"
+            :disabled="isEditing"
+            @change="handleProviderTypeChange(formData.type)"
+          />
+        </div>
+
+        <!-- 易支付配置 -->
+        <template v-if="formData.type === 'yipay'">
+          <div>
+            <Select
+              v-model="(formData.config as any).version"
+              :label="t('admin.paymentProviders.config.sdkVersion') + ' *'"
+              :options="[
+                { value: 'v1', label: t('admin.paymentProviders.config.yipayVersionV1') },
+                { value: 'v2', label: t('admin.paymentProviders.config.yipayVersionV2') }
+              ]"
+              :hint="(formData.config as any).version === 'v1'
+                ? t('admin.paymentProviders.config.yipayVersionV1Hint')
+                : t('admin.paymentProviders.config.yipayVersionV2Hint')"
+              @change="formData.config = getDefaultConfig('yipay', (formData.config as any).version)"
+            />
           </div>
-          
-          <div class="modal-body space-y-4">
+
+          <div>
+            <Input
+              v-model="(formData.config as any).apiurl"
+              :label="t('admin.paymentProviders.config.apiurl') + ' *'"
+              :placeholder="t('admin.paymentProviders.config.yipayApiUrlPlaceholder')"
+              :hint="t('admin.paymentProviders.config.yipayApiUrlHint')"
+            />
+          </div>
+
+          <div>
+            <Input
+              v-model="(formData.config as any).pid"
+              :label="t('admin.paymentProviders.config.pid') + ' *'"
+              :placeholder="t('admin.paymentProviders.config.yipayPidPlaceholder')"
+              class="font-mono"
+            />
+          </div>
+
+          <!-- V1 版本: MD5密钥 -->
+          <template v-if="(formData.config as any).version === 'v1'">
             <div>
-              <label class="label">{{ $t('admin.paymentProviders.name') }} *</label>
-              <input v-model="formData.name" type="text" class="input w-full" :placeholder="$t('admin.paymentProviders.namePlaceholder')" />
+              <Input
+                v-model="(formData.config as any).key"
+                type="password"
+                :label="t('admin.paymentProviders.config.key') + ' *'"
+                :placeholder="getSecretPlaceholder('key', t('admin.paymentProviders.config.yipayKeyPlaceholder'))"
+                :hint="getSecretHint('key', t('admin.paymentProviders.config.yipayKeyHint'))"
+                class="font-mono"
+              />
             </div>
-            
+          </template>
+
+          <!-- V2 版本: RSA密钥对 -->
+          <template v-else>
             <div>
-              <label class="label">{{ $t('admin.paymentProviders.type') }}</label>
-              <select v-model="formData.type" class="input w-full" :disabled="isEditing" @change="handleProviderTypeChange(formData.type)">
-                <option v-for="opt in providerTypes" :key="opt.value" :value="opt.value" :disabled="opt.disabled">
-                  {{ opt.label }}
-                </option>
-              </select>
+              <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+                {{ t('admin.paymentProviders.config.platformPublicKey') }} *
+              </label>
+              <textarea
+                v-model="(formData.config as any).platform_public_key"
+                class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-xs font-mono focus:outline-none transition-all duration-200 resize-none h-24"
+                :placeholder="t('admin.paymentProviders.config.platformPublicKeyPlaceholder')"
+              ></textarea>
+              <p class="text-xs text-[var(--text-tertiary)] mt-1">{{ t('admin.paymentProviders.config.platformPublicKeyHint') }}</p>
             </div>
-            
-            <!-- 易支付配置 -->
-            <template v-if="formData.type === 'yipay'">
-              <!-- 版本选择 -->
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.sdkVersion') }} *</label>
-                <select 
-                  v-model="(formData.config as any).version" 
-                  class="input w-full"
-                  @change="formData.config = getDefaultConfig('yipay', (formData.config as any).version)"
-                >
-                  <option value="v1">{{ $t('admin.paymentProviders.config.yipayVersionV1') }}</option>
-                  <option value="v2">{{ $t('admin.paymentProviders.config.yipayVersionV2') }}</option>
-                </select>
-                <p class="text-xs text-themed-muted mt-1">
-                  {{ (formData.config as any).version === 'v1' 
-                    ? $t('admin.paymentProviders.config.yipayVersionV1Hint')
-                    : $t('admin.paymentProviders.config.yipayVersionV2Hint')
-                  }}
-                </p>
-              </div>
 
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.apiurl') }} *</label>
-                <input v-model="(formData.config as any).apiurl" type="text" class="input w-full" :placeholder="$t('admin.paymentProviders.config.yipayApiUrlPlaceholder')" />
-                <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.yipayApiUrlHint') }}</p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.pid') }} *</label>
-                <input v-model="(formData.config as any).pid" type="text" class="input w-full" :placeholder="$t('admin.paymentProviders.config.yipayPidPlaceholder')" />
-              </div>
+            <div>
+              <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+                {{ t('admin.paymentProviders.config.merchantPrivateKey') }} *
+              </label>
+              <textarea
+                v-model="(formData.config as any).merchant_private_key"
+                class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-xs font-mono focus:outline-none transition-all duration-200 resize-none h-24"
+                :placeholder="getSecretPlaceholder('merchant_private_key', t('admin.paymentProviders.config.merchantPrivateKeyPlaceholder'))"
+              ></textarea>
+              <p class="text-xs text-[var(--text-tertiary)] mt-1">{{ getSecretHint('merchant_private_key', t('admin.paymentProviders.config.merchantPrivateKeyHint')) }}</p>
+            </div>
+          </template>
 
-              <!-- V1 版本: MD5密钥 -->
-              <template v-if="(formData.config as any).version === 'v1'">
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.key') }} *</label>
-                  <input v-model="(formData.config as any).key" type="password" class="input w-full font-mono" :placeholder="getSecretPlaceholder('key', $t('admin.paymentProviders.config.yipayKeyPlaceholder'))" />
-                  <p class="text-xs text-themed-muted mt-1">{{ getSecretHint('key', $t('admin.paymentProviders.config.yipayKeyHint')) }}</p>
-                </div>
-              </template>
-
-              <!-- V2 版本: RSA密钥对 -->
-              <template v-else>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.platformPublicKey') }} *</label>
-                  <textarea v-model="(formData.config as any).platform_public_key" class="input w-full h-24 resize-none font-mono text-xs" :placeholder="$t('admin.paymentProviders.config.platformPublicKeyPlaceholder')"></textarea>
-                  <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.platformPublicKeyHint') }}</p>
-                </div>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.merchantPrivateKey') }} *</label>
-                  <textarea v-model="(formData.config as any).merchant_private_key" class="input w-full h-24 resize-none font-mono text-xs" :placeholder="getSecretPlaceholder('merchant_private_key', $t('admin.paymentProviders.config.merchantPrivateKeyPlaceholder'))"></textarea>
-                  <p class="text-xs text-themed-muted mt-1">{{ getSecretHint('merchant_private_key', $t('admin.paymentProviders.config.merchantPrivateKeyHint')) }}</p>
-                </div>
-              </template>
-
-              <!-- 支付方式选择（V1/V2通用） -->
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.paymentMethods') }}</label>
-                <div class="mt-2 space-y-2">
-                  <div
-                    v-for="method in YIPAY_METHODS"
-                    :key="method"
-                    class="rounded-lg border border-themed p-3"
-                  >
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <label class="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          :checked="formData.methods.includes(method)"
-                          class="checkbox checkbox-primary"
-                          @change="togglePaymentMethod(method)"
-                        />
-                        <span class="text-themed">{{ $t(`wallet.paymentMethods.${method}`) }}</span>
-                      </label>
-                      <div class="flex items-center gap-2 sm:w-44">
-                        <span class="whitespace-nowrap text-xs text-themed-muted">{{ $t('admin.paymentProviders.feeRate') }}</span>
-                        <input
-                          :value="getYipayMethodFeePercent(method)"
-                          type="number"
-                          class="input w-full font-mono tabular-nums"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          :disabled="!formData.methods.includes(method)"
-                          @input="setYipayMethodFeePercent(method, ($event.target as HTMLInputElement).value)"
-                        />
-                        <span class="text-sm text-themed-muted">%</span>
-                      </div>
-                    </div>
+          <!-- 支付方式选择（V1/V2通用） -->
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-2">
+              {{ t('admin.paymentProviders.paymentMethods') }}
+            </label>
+            <div class="space-y-2">
+              <div
+                v-for="method in YIPAY_METHODS"
+                :key="method"
+                class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 transition-colors duration-200"
+              >
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      :checked="formData.methods.includes(method)"
+                      class="h-4 w-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                      @change="togglePaymentMethod(method)"
+                    />
+                    <span class="text-sm font-medium text-[var(--text-primary)]">{{ t(`wallet.paymentMethods.${method}`) }}</span>
+                  </label>
+                  <div class="flex items-center gap-2 sm:w-48">
+                    <span class="whitespace-nowrap text-xs text-[var(--text-secondary)] shrink-0">{{ t('admin.paymentProviders.feeRate') }}</span>
+                    <Input
+                      :model-value="getYipayMethodFeePercent(method)"
+                      type="number"
+                      size="sm"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      class="font-mono tabular-nums flex-1"
+                      :disabled="!formData.methods.includes(method)"
+                      @update:model-value="(val: any) => setYipayMethodFeePercent(method, val)"
+                    >
+                      <template #suffix>
+                        <span class="text-xs text-[var(--text-tertiary)] font-medium">%</span>
+                      </template>
+                    </Input>
                   </div>
                 </div>
-                <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.yipayMethodsHint') }}</p>
-                <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.yipayMethodFeeHint') }}</p>
-              </div>
-            </template>
-
-            <!-- Heleket 配置 -->
-            <template v-else-if="formData.type === 'heleket'">
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.apiurl') }} *</label>
-                <input v-model="(formData.config as any).apiurl" type="text" class="input w-full" placeholder="https://api.heleket.com" />
-                <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.heleketApiUrlHint') }}</p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.heleketMerchantUuid') }} *</label>
-                <input v-model="(formData.config as any).merchant_uuid" type="text" class="input w-full font-mono" :placeholder="$t('admin.paymentProviders.config.heleketMerchantUuid')" />
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.heleketApiKey') }} *</label>
-                <input v-model="(formData.config as any).api_key" type="password" class="input w-full font-mono" :placeholder="getSecretPlaceholder('api_key', $t('admin.paymentProviders.config.heleketApiKey'))" />
-                <p class="text-xs text-themed-muted mt-1">{{ getSecretHint('api_key', '') }}</p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.heleketInvoiceCurrency') }}</label>
-                <input v-model="(formData.config as any).currency" type="text" class="input w-full uppercase" placeholder="CNY" />
-                <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.heleketCurrencyHint') }}</p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.heleketLifetime') }}</label>
-                <input v-model.number="(formData.config as any).lifetime" type="number" class="input w-full" min="300" max="43200" step="1" placeholder="3600" />
-                <p class="text-xs text-themed-muted mt-1">{{ $t('admin.paymentProviders.config.heleketLifetimeHint') }}</p>
-              </div>
-            </template>
-
-            <!-- Antom Hosted Checkout 配置 -->
-            <template v-else-if="formData.type === 'antom'">
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomEnvironment') }} *</label>
-                  <select v-model="(formData.config as any).environment" class="input w-full">
-                    <option value="sandbox">{{ $t('admin.paymentProviders.config.antomSandbox') }}</option>
-                    <option value="production">{{ $t('admin.paymentProviders.config.antomProduction') }}</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomEndpoint') }} *</label>
-                  <select v-model="(formData.config as any).apiurl" class="input w-full">
-                    <option value="https://open-sea-global.alipay.com">Asia</option>
-                    <option value="https://open-na-global.alipay.com">North America</option>
-                    <option value="https://open.antglobal-us.com">US Merchant</option>
-                    <option value="https://open-de-global.alipay.com">Europe</option>
-                  </select>
-                </div>
-              </div>
-              <p class="text-xs text-themed-muted">{{ $t('admin.paymentProviders.config.antomEnvironmentHint') }}</p>
-
-              <div>
-                <label class="label">Client ID *</label>
-                <input v-model="(formData.config as any).clientId" type="text" class="input w-full font-mono" placeholder="SANDBOX_..." />
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.antomPublicKey') }} *</label>
-                <textarea v-model="(formData.config as any).antom_public_key" class="input h-28 w-full resize-none font-mono text-xs" :placeholder="$t('admin.paymentProviders.config.antomPublicKeyPlaceholder')"></textarea>
-                <p class="mt-1 text-xs text-themed-muted">{{ $t('admin.paymentProviders.config.antomPublicKeyHint') }}</p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.merchantPrivateKey') }} *</label>
-                <textarea v-model="(formData.config as any).merchant_private_key" class="input h-28 w-full resize-none font-mono text-xs" :placeholder="getSecretPlaceholder('merchant_private_key', $t('admin.paymentProviders.config.merchantPrivateKeyPlaceholder'))"></textarea>
-                <p class="mt-1 text-xs text-themed-muted">{{ getSecretHint('merchant_private_key', $t('admin.paymentProviders.config.antomPrivateKeyHint')) }}</p>
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomCurrency') }} *</label>
-                  <input v-model="(formData.config as any).currency" type="text" class="input w-full uppercase" placeholder="USD" maxlength="3" />
-                </div>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomCurrencyRate') }} *</label>
-                  <input v-model.number="(formData.config as any).currencyRate" type="number" class="input w-full" min="0.000001" step="0.000001" />
-                </div>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomCurrencyExponent') }} *</label>
-                  <input v-model.number="(formData.config as any).currencyExponent" type="number" class="input w-full" min="0" max="3" step="1" />
-                </div>
-              </div>
-              <p class="text-xs text-themed-muted">{{ $t('admin.paymentProviders.config.antomCurrencyHint') }}</p>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomMerchantRegion') }}</label>
-                  <input v-model="(formData.config as any).merchantRegion" type="text" class="input w-full uppercase" placeholder="SG" maxlength="2" />
-                </div>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomSettlementCurrency') }}</label>
-                  <input v-model="(formData.config as any).settlementCurrency" type="text" class="input w-full uppercase" placeholder="USD" maxlength="3" />
-                </div>
-                <div>
-                  <label class="label">Key Version</label>
-                  <input v-model.number="(formData.config as any).keyVersion" type="number" class="input w-full" min="0" max="999" step="1" />
-                </div>
-                <div>
-                  <label class="label">{{ $t('admin.paymentProviders.config.antomSessionExpiry') }}</label>
-                  <input v-model.number="(formData.config as any).sessionExpiryMinutes" type="number" class="input w-full" min="5" max="60" step="1" />
-                </div>
-              </div>
-              <div class="rounded-lg bg-themed-secondary px-3 py-2 text-xs text-themed-muted">
-                {{ $t('admin.paymentProviders.config.antomCallbackHint') }}
-              </div>
-            </template>
-            
-            <!-- Stripe 配置 -->
-            <template v-else-if="formData.type === 'stripe'">
-              <div>
-                <label class="label">Publishable Key *</label>
-                <input v-model="(formData.config as any).publishable_key" type="text" class="input w-full" placeholder="pk_live_..." />
-              </div>
-              <div>
-                <label class="label">Secret Key *</label>
-                <input v-model="(formData.config as any).secret_key" type="password" class="input w-full" placeholder="sk_live_..." />
-              </div>
-              <div>
-                <label class="label">Webhook Secret</label>
-                <input v-model="(formData.config as any).webhook_secret" type="password" class="input w-full" placeholder="whsec_..." />
-              </div>
-            </template>
-            
-            <!-- 支付宝直连配置 -->
-            <template v-else-if="formData.type === 'alipay_direct'">
-              <div>
-                <label class="label">App ID *</label>
-                <input v-model="(formData.config as any).app_id" type="text" class="input w-full" />
-              </div>
-              <div>
-                <label class="label">应用私钥 *</label>
-                <textarea v-model="(formData.config as any).private_key" class="input w-full h-24 resize-none font-mono text-xs"></textarea>
-              </div>
-              <div>
-                <label class="label">支付宝公钥 *</label>
-                <textarea v-model="(formData.config as any).public_key" class="input w-full h-24 resize-none font-mono text-xs"></textarea>
-              </div>
-            </template>
-            
-            <!-- 微信直连配置 -->
-            <template v-else-if="formData.type === 'wechat_direct'">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="label">App ID *</label>
-                  <input v-model="(formData.config as any).app_id" type="text" class="input w-full" />
-                </div>
-                <div>
-                  <label class="label">商户号 *</label>
-                  <input v-model="(formData.config as any).mch_id" type="text" class="input w-full" />
-                </div>
-              </div>
-              <div>
-                <label class="label">API 密钥 *</label>
-                <input v-model="(formData.config as any).api_key" type="password" class="input w-full" />
-              </div>
-            </template>
-            
-            <!-- 人工充值配置 -->
-            <template v-else-if="formData.type === 'manual'">
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.config.instructions') }}</label>
-                <textarea v-model="(formData.config as any).instructions" class="input w-full h-24 resize-none" :placeholder="$t('admin.paymentProviders.config.instructionsPlaceholder')"></textarea>
-              </div>
-            </template>
-            
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.minAmount') }}</label>
-                <input v-model.number="formData.minAmount" type="number" class="input w-full font-mono tabular-nums" min="0" step="0.01" />
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.maxAmount') }}</label>
-                <input v-model.number="formData.maxAmount" type="number" class="input w-full font-mono tabular-nums" min="0" step="0.01" :placeholder="$t('common.unlimited')" />
               </div>
             </div>
-            
-            <div v-if="formData.type !== 'yipay'" class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.feeRate') }} (%)</label>
-                <input v-model.number="formData.feeRate" type="number" class="input w-full font-mono tabular-nums" min="0" max="100" step="0.01" />
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.paymentProviders.feeFixed') }}</label>
-                <input v-model.number="formData.feeFixed" type="number" class="input w-full font-mono tabular-nums" min="0" step="0.01" />
-              </div>
-            </div>
-            <div v-else class="rounded-lg bg-themed-secondary px-3 py-2 text-xs text-themed-muted">
-              {{ $t('admin.paymentProviders.config.yipayFeeFieldHint') }}
-            </div>
-            
+            <p class="text-xs text-[var(--text-tertiary)] mt-1.5">{{ t('admin.paymentProviders.config.yipayMethodsHint') }}</p>
+            <p class="text-xs text-[var(--text-tertiary)] mt-0.5">{{ t('admin.paymentProviders.config.yipayMethodFeeHint') }}</p>
+          </div>
+        </template>
+
+        <!-- Heleket 配置 -->
+        <template v-else-if="formData.type === 'heleket'">
+          <div>
+            <Input
+              v-model="(formData.config as any).apiurl"
+              :label="t('admin.paymentProviders.config.apiurl') + ' *'"
+              placeholder="https://api.heleket.com"
+              :hint="t('admin.paymentProviders.config.heleketApiUrlHint')"
+            />
+          </div>
+          <div>
+            <Input
+              v-model="(formData.config as any).merchant_uuid"
+              :label="t('admin.paymentProviders.config.heleketMerchantUuid') + ' *'"
+              :placeholder="t('admin.paymentProviders.config.heleketMerchantUuid')"
+              class="font-mono"
+            />
+          </div>
+          <div>
+            <Input
+              v-model="(formData.config as any).api_key"
+              type="password"
+              :label="t('admin.paymentProviders.config.heleketApiKey') + ' *'"
+              :placeholder="getSecretPlaceholder('api_key', t('admin.paymentProviders.config.heleketApiKey'))"
+              :hint="getSecretHint('api_key', '')"
+              class="font-mono"
+            />
+          </div>
+          <div>
+            <Input
+              v-model="(formData.config as any).currency"
+              :label="t('admin.paymentProviders.config.heleketInvoiceCurrency')"
+              class="uppercase"
+              placeholder="CNY"
+              :hint="t('admin.paymentProviders.config.heleketCurrencyHint')"
+            />
+          </div>
+          <div>
+            <Input
+              v-model.number="(formData.config as any).lifetime"
+              type="number"
+              :label="t('admin.paymentProviders.config.heleketLifetime')"
+              min="300"
+              max="43200"
+              step="1"
+              placeholder="3600"
+              :hint="t('admin.paymentProviders.config.heleketLifetimeHint')"
+            />
+          </div>
+        </template>
+
+        <!-- Antom Hosted Checkout 配置 -->
+        <template v-else-if="formData.type === 'antom'">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label class="label">{{ $t('admin.paymentProviders.sortOrder') }}</label>
-              <input v-model.number="formData.sortOrder" type="number" class="input w-full font-mono tabular-nums" min="0" />
+              <Select
+                v-model="(formData.config as any).environment"
+                :label="t('admin.paymentProviders.config.antomEnvironment') + ' *'"
+                :options="[
+                  { value: 'sandbox', label: t('admin.paymentProviders.config.antomSandbox') },
+                  { value: 'production', label: t('admin.paymentProviders.config.antomProduction') }
+                ]"
+              />
+            </div>
+            <div>
+              <Select
+                v-model="(formData.config as any).apiurl"
+                :label="t('admin.paymentProviders.config.antomEndpoint') + ' *'"
+                :options="[
+                  { value: 'https://open-sea-global.alipay.com', label: 'Asia' },
+                  { value: 'https://open-na-global.alipay.com', label: 'North America' },
+                  { value: 'https://open.antglobal-us.com', label: 'US Merchant' },
+                  { value: 'https://open-de-global.alipay.com', label: 'Europe' }
+                ]"
+              />
             </div>
           </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showModal = false">{{ $t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="modalLoading" @click="saveProvider">
-              {{ modalLoading ? $t('common.saving') : $t('common.save') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+          <p class="text-xs text-[var(--text-tertiary)] -mt-2">{{ t('admin.paymentProviders.config.antomEnvironmentHint') }}</p>
 
-    <!-- 删除确认弹窗 -->
-    <Teleport to="body">
-      <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
-        <div class="modal-content max-w-sm">
-          <div class="modal-header">
-            <h3 class="modal-title text-rose-600 dark:text-rose-400">{{ $t('admin.paymentProviders.deleteConfirm') }}</h3>
+          <div>
+            <Input
+              v-model="(formData.config as any).clientId"
+              label="Client ID *"
+              class="font-mono"
+              placeholder="SANDBOX_..."
+            />
           </div>
-          <div class="modal-body">
-            <p class="text-themed-secondary">
-              {{ $t('admin.paymentProviders.deleteWarning', { name: deleteTarget?.name }) }}
-            </p>
+
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+              {{ t('admin.paymentProviders.config.antomPublicKey') }} *
+            </label>
+            <textarea
+              v-model="(formData.config as any).antom_public_key"
+              class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-xs font-mono focus:outline-none transition-all duration-200 resize-none h-28"
+              :placeholder="t('admin.paymentProviders.config.antomPublicKeyPlaceholder')"
+            ></textarea>
+            <p class="mt-1 text-xs text-[var(--text-tertiary)]">{{ t('admin.paymentProviders.config.antomPublicKeyHint') }}</p>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showDeleteModal = false">{{ $t('common.cancel') }}</button>
-            <button class="btn btn-error" :disabled="deleteLoading" @click="deleteProvider">
-              {{ deleteLoading ? $t('common.deleting') : $t('common.delete') }}
-            </button>
+
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+              {{ t('admin.paymentProviders.config.merchantPrivateKey') }} *
+            </label>
+            <textarea
+              v-model="(formData.config as any).merchant_private_key"
+              class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-xs font-mono focus:outline-none transition-all duration-200 resize-none h-28"
+              :placeholder="getSecretPlaceholder('merchant_private_key', t('admin.paymentProviders.config.merchantPrivateKeyPlaceholder'))"
+            ></textarea>
+            <p class="mt-1 text-xs text-[var(--text-tertiary)]">{{ getSecretHint('merchant_private_key', t('admin.paymentProviders.config.antomPrivateKeyHint')) }}</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <Input
+                v-model="(formData.config as any).currency"
+                :label="t('admin.paymentProviders.config.antomCurrency') + ' *'"
+                class="uppercase"
+                placeholder="USD"
+                :maxlength="3"
+              />
+            </div>
+            <div>
+              <Input
+                v-model.number="(formData.config as any).currencyRate"
+                type="number"
+                :label="t('admin.paymentProviders.config.antomCurrencyRate') + ' *'"
+                class="font-mono tabular-nums"
+                min="0.000001"
+                step="0.000001"
+              />
+            </div>
+            <div>
+              <Input
+                v-model.number="(formData.config as any).currencyExponent"
+                type="number"
+                :label="t('admin.paymentProviders.config.antomCurrencyExponent') + ' *'"
+                class="font-mono tabular-nums"
+                min="0"
+                max="3"
+                step="1"
+              />
+            </div>
+          </div>
+          <p class="text-xs text-[var(--text-tertiary)] -mt-2">{{ t('admin.paymentProviders.config.antomCurrencyHint') }}</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Input
+                v-model="(formData.config as any).merchantRegion"
+                :label="t('admin.paymentProviders.config.antomMerchantRegion')"
+                class="uppercase"
+                placeholder="SG"
+                :maxlength="2"
+              />
+            </div>
+            <div>
+              <Input
+                v-model="(formData.config as any).settlementCurrency"
+                :label="t('admin.paymentProviders.config.antomSettlementCurrency')"
+                class="uppercase"
+                placeholder="USD"
+                :maxlength="3"
+              />
+            </div>
+            <div>
+              <Input
+                v-model.number="(formData.config as any).keyVersion"
+                type="number"
+                label="Key Version"
+                class="font-mono tabular-nums"
+                min="0"
+                max="999"
+                step="1"
+              />
+            </div>
+            <div>
+              <Input
+                v-model.number="(formData.config as any).sessionExpiryMinutes"
+                type="number"
+                :label="t('admin.paymentProviders.config.antomSessionExpiry')"
+                class="font-mono tabular-nums"
+                min="5"
+                max="60"
+                step="1"
+              />
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-xs text-[var(--text-secondary)] leading-relaxed">
+            {{ t('admin.paymentProviders.config.antomCallbackHint') }}
+          </div>
+        </template>
+
+        <!-- Stripe 配置 -->
+        <template v-else-if="formData.type === 'stripe'">
+          <div>
+            <Input
+              v-model="(formData.config as any).publishable_key"
+              label="Publishable Key *"
+              class="font-mono"
+              placeholder="pk_live_..."
+            />
+          </div>
+          <div>
+            <Input
+              v-model="(formData.config as any).secret_key"
+              type="password"
+              label="Secret Key *"
+              class="font-mono"
+              placeholder="sk_live_..."
+            />
+          </div>
+          <div>
+            <Input
+              v-model="(formData.config as any).webhook_secret"
+              type="password"
+              label="Webhook Secret"
+              class="font-mono"
+              placeholder="whsec_..."
+            />
+          </div>
+        </template>
+
+        <!-- 支付宝直连配置 -->
+        <template v-else-if="formData.type === 'alipay_direct'">
+          <div>
+            <Input
+              v-model="(formData.config as any).app_id"
+              label="App ID *"
+              class="font-mono"
+            />
+          </div>
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+              应用私钥 *
+            </label>
+            <textarea
+              v-model="(formData.config as any).private_key"
+              class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-xs font-mono focus:outline-none transition-all duration-200 resize-none h-24"
+            ></textarea>
+          </div>
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+              支付宝公钥 *
+            </label>
+            <textarea
+              v-model="(formData.config as any).public_key"
+              class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-xs font-mono focus:outline-none transition-all duration-200 resize-none h-24"
+            ></textarea>
+          </div>
+        </template>
+
+        <!-- 微信直连配置 -->
+        <template v-else-if="formData.type === 'wechat_direct'">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Input
+                v-model="(formData.config as any).app_id"
+                label="App ID *"
+                class="font-mono"
+              />
+            </div>
+            <div>
+              <Input
+                v-model="(formData.config as any).mch_id"
+                label="商户号 *"
+                class="font-mono"
+              />
+            </div>
+          </div>
+          <div>
+            <Input
+              v-model="(formData.config as any).api_key"
+              type="password"
+              label="API 密钥 *"
+              class="font-mono"
+            />
+          </div>
+        </template>
+
+        <!-- 人工充值配置 -->
+        <template v-else-if="formData.type === 'manual'">
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+              {{ t('admin.paymentProviders.config.instructions') }}
+            </label>
+            <textarea
+              v-model="(formData.config as any).instructions"
+              class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-sm focus:outline-none transition-all duration-200 resize-none h-28"
+              :placeholder="t('admin.paymentProviders.config.instructionsPlaceholder')"
+            ></textarea>
+          </div>
+        </template>
+
+        <!-- 通用额度配置 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Input
+              v-model.number="formData.minAmount"
+              type="number"
+              min="0"
+              step="0.01"
+              :label="t('admin.paymentProviders.minAmount')"
+              class="font-mono tabular-nums"
+            >
+              <template #prefix><span class="text-xs text-[var(--text-tertiary)]">¥</span></template>
+            </Input>
+          </div>
+          <div>
+            <Input
+              :model-value="formData.maxAmount ?? ''"
+              type="number"
+              min="0"
+              step="0.01"
+              :label="t('admin.paymentProviders.maxAmount')"
+              :placeholder="t('common.unlimited')"
+              class="font-mono tabular-nums"
+              @update:model-value="(val: any) => formData.maxAmount = (val === '' || val === null || val === undefined) ? undefined : Number(val)"
+            >
+              <template #prefix><span class="text-xs text-[var(--text-tertiary)]">¥</span></template>
+            </Input>
+          </div>
+        </div>
+
+        <!-- 费率配置 -->
+        <div v-if="formData.type !== 'yipay'" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Input
+              v-model.number="formData.feeRate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              :label="t('admin.paymentProviders.feeRate') + ' (%)'"
+              class="font-mono tabular-nums"
+            >
+              <template #suffix><span class="text-xs text-[var(--text-tertiary)]">%</span></template>
+            </Input>
+          </div>
+          <div>
+            <Input
+              v-model.number="formData.feeFixed"
+              type="number"
+              min="0"
+              step="0.01"
+              :label="t('admin.paymentProviders.feeFixed')"
+              class="font-mono tabular-nums"
+            >
+              <template #prefix><span class="text-xs text-[var(--text-tertiary)]">¥</span></template>
+            </Input>
+          </div>
+        </div>
+        <div v-else class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs text-[var(--text-secondary)] leading-relaxed">
+          {{ t('admin.paymentProviders.config.yipayFeeFieldHint') }}
+        </div>
+
+        <!-- 排序权重 -->
+        <div>
+          <Input
+            v-model.number="formData.sortOrder"
+            type="number"
+            min="0"
+            :label="t('admin.paymentProviders.sortOrder')"
+            class="font-mono tabular-nums"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="modalLoading"
+            @click="showModal = false"
+          >
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            :loading="modalLoading"
+            :disabled="modalLoading"
+            @click="saveProvider"
+          >
+            {{ modalLoading ? t('common.saving') : t('common.save') }}
+          </Button>
+        </div>
+      </template>
+    </DrawerModal>
+
+    <!-- 删除确认抽屉（DrawerModal） -->
+    <DrawerModal
+      v-model="showDeleteModal"
+      :title="t('admin.paymentProviders.deleteConfirm')"
+      max-width="max-w-md"
+    >
+      <div class="py-2 space-y-3">
+        <div class="flex items-start gap-3 p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--error)_24%,var(--border-color))] bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))]">
+          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--error)_15%,var(--bg-surface))] text-[var(--error)] shrink-0">
+            <Trash2 class="w-4 h-4" />
+          </div>
+          <div class="text-xs leading-relaxed text-[var(--text-secondary)]">
+            {{ t('admin.paymentProviders.deleteWarning', { name: deleteTarget?.name }) }}
           </div>
         </div>
       </div>
-    </Teleport>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="deleteLoading"
+            @click="showDeleteModal = false"
+          >
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            :loading="deleteLoading"
+            :disabled="deleteLoading"
+            @click="deleteProvider"
+          >
+            {{ deleteLoading ? t('common.deleting') : t('common.delete') }}
+          </Button>
+        </div>
+      </template>
+    </DrawerModal>
   </div>
 </template>
 
 <style scoped>
-.pp-reveal {
-  animation: pp-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.pp-reveal:nth-child(2) { animation-delay: 0.04s; }
-.pp-reveal:nth-child(3) { animation-delay: 0.08s; }
-.pp-reveal:nth-child(4) { animation-delay: 0.12s; }
-.pp-reveal:nth-child(5) { animation-delay: 0.16s; }
-.pp-reveal:nth-child(n + 6) { animation-delay: 0.2s; }
-
-@keyframes pp-rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .pp-reveal {
-    animation: none;
-  }
-  .animate-fade-in,
-  .animate-fade-in *,
-  .animate-fade-in *::before,
-  .animate-fade-in *::after {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
+  .animate-fade-in {
+    animation: none !important;
   }
 }
 </style>

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/format"
 	"os"
 	"regexp"
 	"strings"
@@ -166,6 +167,12 @@ func main() {
 		buf.WriteString(fmt.Sprintf("func (%s) TableName() string { return %q }\n\n", m.Name, m.Table))
 	}
 
+	formatted, formatErr := format.Source(buf.Bytes())
+	if formatErr == nil {
+		buf.Reset()
+		buf.Write(formatted)
+	}
+
 	if err := os.WriteFile(*outPath, buf.Bytes(), 0o644); err != nil {
 		fatal("write output: %v", err)
 	}
@@ -208,6 +215,15 @@ func buildTags(f field, composite bool) string {
 		gormParts = append(gormParts, "-")
 	} else {
 		gormParts = append(gormParts, "column:"+f.Column)
+		// A Prisma scalar list (Int[], String[], …) is a PostgreSQL array. Without
+		// a serializer GORM fails schema parsing with
+		//   failed to parse field: GPUDeviceIds, error: unsupported data type: &[]
+		// so every model-based Find/First on such a table would panic at runtime.
+		// json is the right (de)serializer: pgx round-trips the array fine and the
+		// JSON shape stays identical to Prisma's.
+		if f.List {
+			gormParts = append(gormParts, "serializer:json")
+		}
 		if f.IsID || composite {
 			gormParts = append(gormParts, "primaryKey")
 		}

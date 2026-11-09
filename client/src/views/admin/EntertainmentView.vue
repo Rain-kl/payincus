@@ -1,15 +1,47 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  Award,
+  Bell,
+  CalendarCheck,
+  Check,
+  Gift,
+  Loader2,
+  Pencil,
+  Plus,
+  RotateCw,
+  Search,
+  Sparkles,
+  Trash2,
+  Trophy,
+  Users,
+  X
+} from 'lucide-vue-next'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
 import { useBadgeStore } from '@/stores/badges'
 import { useTabQuery } from '@/composables/useTabQuery'
+import { useReveal } from '@/composables/useReveal'
 import type { BadgeCatalogItem, BadgeSeriesItem } from '@/types/api'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Pagination
+} from '@/components/ui'
+
+defineOptions({ name: 'AdminEntertainmentView' })
 
 const { t } = useI18n()
 const toast = useToast()
 const badgeStore = useBadgeStore()
+
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
 
 // 当前 TAB
 type EntertainmentTab = 'lotteries' | 'records' | 'users' | 'badges' | 'checkin'
@@ -42,6 +74,7 @@ const usersPage = ref(1)
 const usersPageSize = ref(100)
 const usersTotal = ref(0)
 
+// 签到设置与日志
 const checkinSettings = ref({
   enabled: true,
   minPoints: 1,
@@ -89,12 +122,9 @@ const notificationForm = ref({
   type: 'telegram' as 'telegram' | 'discord' | 'webhook',
   notifyBalance: true,
   notifyInstance: true,
-  // Telegram 配置
   telegramBotToken: '',
   telegramChatId: '',
-  // Discord 配置
   discordWebhookUrl: '',
-  // Webhook 配置
   webhookUrl: '',
   webhookSecret: ''
 })
@@ -113,6 +143,7 @@ const deletingSeriesId = ref<string | null>(null)
 const deletingBadgeId = ref<string | null>(null)
 const savingSeries = ref(false)
 const savingBadge = ref(false)
+
 const seriesForm = ref({
   id: '',
   title: '',
@@ -124,6 +155,7 @@ const seriesForm = ref({
   displayOrder: 0,
   isActive: true
 })
+
 const badgeForm = ref({
   id: '',
   name: '',
@@ -142,6 +174,52 @@ const badgeForm = ref({
 const filteredBadges = computed(() => {
   if (selectedBadgeSeriesId.value === 'all') return badges.value
   return badges.value.filter(badge => badge.seriesId === selectedBadgeSeriesId.value)
+})
+
+// 顶部仪表盘指标
+const activeLotteriesCount = computed(() => lotteries.value.filter(l => l.isActive).length)
+const totalDrawsSum = computed(() => lotteries.value.reduce((acc, l) => acc + (Number(l.totalDraws) || 0), 0))
+
+// TAB 切换配置
+const tabs = computed<Array<{ key: EntertainmentTab; label: string; icon: any; count?: number }>>(() => [
+  {
+    key: 'lotteries',
+    label: t('entertainment.admin.tabs.lotteries'),
+    icon: Sparkles,
+    count: lotteriesTotal.value || lotteries.value.length || undefined
+  },
+  {
+    key: 'records',
+    label: t('entertainment.admin.tabs.records'),
+    icon: Trophy,
+    count: recordsTotal.value || undefined
+  },
+  {
+    key: 'users',
+    label: t('entertainment.admin.tabs.users'),
+    icon: Users,
+    count: usersTotal.value || undefined
+  },
+  {
+    key: 'badges',
+    label: t('entertainment.admin.tabs.badges'),
+    icon: Award,
+    count: badges.value.length || undefined
+  },
+  {
+    key: 'checkin',
+    label: t('entertainment.admin.tabs.checkin'),
+    icon: CalendarCheck
+  }
+])
+
+const isTabLoading = computed(() => {
+  if (activeTab.value === 'lotteries') return lotteriesLoading.value
+  if (activeTab.value === 'records') return recordsLoading.value
+  if (activeTab.value === 'users') return usersLoading.value
+  if (activeTab.value === 'badges') return badgesLoading.value
+  if (activeTab.value === 'checkin') return checkinLogsLoading.value || checkinSettingsLoading.value
+  return false
 })
 
 onMounted(() => {
@@ -219,6 +297,14 @@ function loadTabData(tab: EntertainmentTab) {
 function switchTab(tab: EntertainmentTab) {
   activeTab.value = tab
   loadTabData(tab)
+}
+
+function refreshCurrentTab() {
+  if (activeTab.value === 'lotteries') void loadLotteries()
+  else if (activeTab.value === 'records') void loadRecords()
+  else if (activeTab.value === 'users') void loadUsers()
+  else if (activeTab.value === 'badges') void loadBadgeCatalog()
+  else if (activeTab.value === 'checkin') void loadCheckinAdminData()
 }
 
 async function loadCheckinAdminData() {
@@ -371,7 +457,7 @@ async function openPrizesModal(lottery: any) {
 // 添加奖品
 function addPrize() {
   prizes.value.push({
-    id: 0, // 0 表示新奖品
+    id: 0,
     name: '',
     type: 'nothing',
     value: 0,
@@ -389,7 +475,6 @@ function removePrize(index: number) {
 
 // 保存奖品
 async function savePrizes() {
-  // 验证
   for (const prize of prizes.value) {
     if (!prize.name.trim()) {
       toast.warning(t('entertainment.admin.enterPrizeName'))
@@ -407,23 +492,20 @@ async function savePrizes() {
     const existingPrizes = editingPrizes.value.prizes || []
     const existingIds = existingPrizes.map((p: any) => p.id)
     const newPrizeIds = prizes.value.filter(p => p.id).map(p => p.id)
-    
-    // 删除不在新列表中的奖品
+
     for (const existingId of existingIds) {
       if (!newPrizeIds.includes(existingId)) {
         await api.entertainment.adminDeletePrize(existingId)
       }
     }
-    
-    // 更新或创建奖品
+
     for (let i = 0; i < prizes.value.length; i++) {
       const prize = prizes.value[i]
-      // 计算新的剩余数量（如果有补充）
       let newRemainQuantity = prize.remainQuantity
       if (prize.replenishAmount && prize.replenishAmount > 0) {
         newRemainQuantity = (prize.remainQuantity || 0) + prize.replenishAmount
       }
-      
+
       const prizeData = {
         name: prize.name.trim(),
         type: prize.type,
@@ -434,16 +516,14 @@ async function savePrizes() {
         displayOrder: i,
         instanceDesc: prize.type === 'instance' ? prize.instanceDesc : undefined
       }
-      
+
       if (prize.id && existingIds.includes(prize.id)) {
-        // 更新现有奖品
         await api.entertainment.adminUpdatePrize(prize.id, prizeData)
       } else {
-        // 创建新奖品
         await api.entertainment.adminCreatePrize(lotteryId, prizeData)
       }
     }
-    
+
     toast.success(t('entertainment.admin.savePrizesSuccess'))
     showPrizesModal.value = false
     loadLotteries()
@@ -454,8 +534,13 @@ async function savePrizes() {
   }
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString()
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '-'
+  try {
+    return new Date(dateStr).toLocaleString()
+  } catch {
+    return String(dateStr)
+  }
 }
 
 function getPrizeTypeName(type: string): string {
@@ -472,11 +557,6 @@ function getPrizeTypeName(type: string): string {
   }
   return map[type] || type
 }
-
-const lotteriesTotalPages = computed(() => Math.ceil(lotteriesTotal.value / lotteriesPageSize.value))
-const recordsTotalPages = computed(() => Math.ceil(recordsTotal.value / recordsPageSize.value))
-const usersTotalPages = computed(() => Math.ceil(usersTotal.value / usersPageSize.value))
-const checkinLogsTotalPages = computed(() => Math.ceil(checkinLogsTotal.value / checkinLogsPageSize.value))
 
 // 打开通知配置弹窗
 function openNotificationModal(lottery: any) {
@@ -513,8 +593,7 @@ function openNotificationModal(lottery: any) {
 // 保存通知配置
 async function saveNotification() {
   const form = notificationForm.value
-  
-  // 根据类型构建配置
+
   let config: Record<string, string> = {}
   if (form.type === 'telegram') {
     if (!form.telegramBotToken || !form.telegramChatId) {
@@ -535,7 +614,7 @@ async function saveNotification() {
     }
     config = { url: form.webhookUrl, secret: form.webhookSecret }
   }
-  
+
   savingNotification.value = true
   try {
     await api.entertainment.adminUpdateNotification(editingNotification.value.id, {
@@ -747,883 +826,1088 @@ function getSeriesTitle(seriesId: string): string {
 </script>
 
 <template>
-  <div class="kawaii-page animate-fade-in">
+  <div ref="revealRoot" class="space-y-6 animate-fade-in">
     <!-- 页面标题 -->
-    <div class="page-header">
-      <div class="flex items-center gap-3">
-        <span class="nimbus-title-icon">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a3 3 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a3 3 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z" />
-          </svg>
-        </span>
-        <div>
-          <h1 class="page-title">{{ $t('entertainment.admin.title') }}</h1>
-          <p class="page-description">{{ $t('entertainment.admin.description') }}</p>
-        </div>
-      </div>
-      <button v-if="activeTab === 'lotteries'" class="btn btn-primary" @click="openCreateLotteryModal">
-        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ $t('entertainment.admin.createLottery') }}
-      </button>
-      <div v-else-if="activeTab === 'badges'" class="flex gap-2">
-        <button class="btn btn-secondary" @click="openCreateSeriesModal">
-          {{ $t('entertainment.admin.badgeCatalog.addSeries') }}
-        </button>
-        <button class="btn btn-primary" :disabled="badgeSeries.length === 0" @click="openCreateBadgeModal(selectedBadgeSeriesId)">
-          {{ $t('entertainment.admin.badgeCatalog.addBadge') }}
-        </button>
-      </div>
-    </div>
-
-    <!-- TAB 切换 -->
-    <div class="mb-6 flex flex-wrap gap-1 border-b border-themed">
-      <button
-        class="-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'lotteries'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('lotteries')"
-      >
-        {{ $t('entertainment.admin.tabs.lotteries') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'records'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('records')"
-      >
-        {{ $t('entertainment.admin.tabs.records') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'users'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('users')"
-      >
-        {{ $t('entertainment.admin.tabs.users') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'badges'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('badges')"
-      >
-        {{ $t('entertainment.admin.tabs.badges') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'checkin'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('checkin')"
-      >
-        {{ $t('entertainment.admin.tabs.checkin') }}
-      </button>
-    </div>
-
-    <div v-show="activeTab === 'checkin'" class="space-y-6">
-      <div class="card p-4">
-        <div class="flex flex-col lg:flex-row lg:items-end gap-4">
-          <label class="flex items-center gap-2 min-w-36">
-            <input v-model="checkinSettings.enabled" type="checkbox" class="checkbox" />
-            <span class="text-sm text-themed">{{ $t('entertainment.admin.checkin.enabled') }}</span>
-          </label>
-          <label class="flex-1 min-w-40">
-            <span class="block text-sm text-themed-muted mb-1">{{ $t('entertainment.admin.checkin.minPoints') }}</span>
-            <input v-model.number="checkinSettings.minPoints" type="number" min="1" class="input w-full" />
-          </label>
-          <label class="flex-1 min-w-40">
-            <span class="block text-sm text-themed-muted mb-1">{{ $t('entertainment.admin.checkin.maxPoints') }}</span>
-            <input v-model.number="checkinSettings.maxPoints" type="number" min="1" class="input w-full" />
-          </label>
-          <label class="flex items-center gap-2 min-w-44">
-            <input v-model="checkinSettings.requireInstance" type="checkbox" class="checkbox" />
-            <span class="text-sm text-themed">{{ $t('entertainment.admin.checkin.requireInstance') }}</span>
-          </label>
-          <button
-            class="btn btn-primary"
-            :disabled="savingCheckinSettings || checkinSettingsLoading"
-            @click="saveCheckinSettings"
+    <PageHeader
+      :title="t('entertainment.admin.title')"
+      :description="t('entertainment.admin.description')"
+    >
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            :loading="isTabLoading"
+            @click="refreshCurrentTab"
           >
-            {{ savingCheckinSettings ? $t('common.saving') : $t('common.save') }}
-          </button>
-        </div>
-      </div>
+            <template #icon>
+              <RotateCw class="w-4 h-4" :class="{ 'animate-spin': isTabLoading }" />
+            </template>
+            {{ t('common.refresh') || '刷新' }}
+          </Button>
 
-      <div class="card">
-        <div class="p-4 border-b border-themed flex flex-wrap gap-3 items-center">
-          <input
-            v-model="checkinLogsSearch"
-            type="text"
-            class="input"
-            :placeholder="$t('entertainment.admin.searchUser')"
-            @keyup.enter="searchCheckinLogs"
-          />
-          <input
-            v-model="checkinLogsDateKey"
-            type="date"
-            class="input"
-            @change="searchCheckinLogs"
-          />
-          <button class="btn btn-ghost" @click="searchCheckinLogs">{{ $t('common.search') }}</button>
+          <Button
+            v-if="activeTab === 'lotteries'"
+            variant="primary"
+            size="sm"
+            @click="openCreateLotteryModal"
+          >
+            <template #icon>
+              <Plus class="w-4 h-4" />
+            </template>
+            {{ t('entertainment.admin.createLottery') }}
+          </Button>
+
+          <template v-else-if="activeTab === 'badges'">
+            <Button variant="secondary" size="sm" @click="openCreateSeriesModal">
+              <template #icon>
+                <Plus class="w-4 h-4" />
+              </template>
+              {{ t('entertainment.admin.badgeCatalog.addSeries') }}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              :disabled="badgeSeries.length === 0"
+              @click="openCreateBadgeModal(selectedBadgeSeriesId)"
+            >
+              <template #icon>
+                <Sparkles class="w-4 h-4" />
+              </template>
+              {{ t('entertainment.admin.badgeCatalog.addBadge') }}
+            </Button>
+          </template>
         </div>
-        <div v-if="checkinLogsLoading" class="p-8 text-center text-themed-muted">
-          {{ $t('common.loading') }}...
+      </template>
+    </PageHeader>
+
+    <!-- 概览指标卡 -->
+    <div data-reveal class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('entertainment.admin.active') }} {{ t('entertainment.admin.tabs.lotteries') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Sparkles class="w-4 h-4" />
+          </div>
         </div>
-        <div v-else-if="checkinLogs.length === 0" class="p-8 text-center text-themed-muted">
-          {{ $t('entertainment.admin.checkin.noLogs') }}
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+          {{ activeLotteriesCount }} <span class="text-xs font-normal text-[var(--text-tertiary)]">/ {{ lotteriesTotal || lotteries.length }}</span>
         </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('entertainment.admin.totalDraws') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] text-[var(--success)] border border-[color-mix(in_srgb,var(--success)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Trophy class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--success)]">
+          {{ totalDrawsSum.toLocaleString() }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('entertainment.admin.tabs.users') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Users class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--warning)]">
+          {{ (usersTotal || users.length).toLocaleString() }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('entertainment.admin.badgeCatalog.badges.title') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Award class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+          {{ badges.length }} <span class="text-xs font-normal text-[var(--text-tertiary)]">{{ t('entertainment.admin.badgeCatalog.series.title') }}: {{ badgeSeries.length }}</span>
+        </div>
+      </Card>
+    </div>
+
+    <!-- Apple 风格分段控制器 (Segmented Tab Control) -->
+    <div data-reveal class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        type="button"
+        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none cursor-pointer"
+        :class="activeTab === tab.key
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+        @click="switchTab(tab.key)"
+      >
+        <component :is="tab.icon" class="w-4 h-4 stroke-[1.8]" />
+        <span>{{ tab.label }}</span>
+        <Badge
+          v-if="tab.count !== undefined"
+          size="sm"
+          :variant="activeTab === tab.key ? 'info' : 'default'"
+        >
+          {{ tab.count }}
+        </Badge>
+      </button>
+    </div>
+
+    <!-- 1. 签到设置与日志 TAB -->
+    <div v-show="activeTab === 'checkin'" class="space-y-6">
+      <!-- 签到设置卡片 -->
+      <Card data-reveal padding="md">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border-color)]">
+          <div>
+            <h3 class="text-base font-semibold text-[var(--text-primary)]">
+              {{ $t('entertainment.admin.tabs.checkin') }}
+            </h3>
+            <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+              {{ $t('entertainment.admin.description') }}
+            </p>
+          </div>
+          <Badge :variant="checkinSettings.enabled ? 'success' : 'default'" size="sm">
+            {{ checkinSettings.enabled ? $t('common.active') : $t('common.inactive') }}
+          </Badge>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div>
+            <span class="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">
+              {{ $t('entertainment.admin.checkin.minPoints') }}
+            </span>
+            <Input
+              v-model.number="checkinSettings.minPoints"
+              type="number"
+              :min="1"
+              size="md"
+              placeholder="1"
+            />
+          </div>
+          <div>
+            <span class="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">
+              {{ $t('entertainment.admin.checkin.maxPoints') }}
+            </span>
+            <Input
+              v-model.number="checkinSettings.maxPoints"
+              type="number"
+              :min="1"
+              size="md"
+              placeholder="500"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                v-model="checkinSettings.enabled"
+                type="checkbox"
+                class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
+              />
+              <span class="text-xs font-medium text-[var(--text-primary)]">{{ $t('entertainment.admin.checkin.enabled') }}</span>
+            </label>
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                v-model="checkinSettings.requireInstance"
+                type="checkbox"
+                class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
+              />
+              <span class="text-xs font-medium text-[var(--text-primary)]">{{ $t('entertainment.admin.checkin.requireInstance') }}</span>
+            </label>
+          </div>
+          <div class="flex justify-end">
+            <Button
+              variant="primary"
+              size="md"
+              block
+              :loading="savingCheckinSettings"
+              :disabled="checkinSettingsLoading"
+              @click="saveCheckinSettings"
+            >
+              <template #icon>
+                <Check class="w-4 h-4" />
+              </template>
+              {{ savingCheckinSettings ? $t('common.saving') : $t('common.save') }}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <!-- 签到日志卡片 -->
+      <Card data-reveal padding="none" class="overflow-hidden">
+        <!-- 搜索与筛选工具栏 -->
+        <div class="p-4 border-b border-[var(--border-color)] flex flex-wrap gap-3 items-center justify-between">
+          <div class="flex flex-wrap items-center gap-3 flex-1">
+            <div class="w-full sm:w-64">
+              <Input
+                v-model="checkinLogsSearch"
+                size="sm"
+                :placeholder="$t('entertainment.admin.searchUser')"
+                @enter="searchCheckinLogs"
+              >
+                <template #prefix>
+                  <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+                </template>
+              </Input>
+            </div>
+            <div class="w-full sm:w-44">
+              <input
+                v-model="checkinLogsDateKey"
+                type="date"
+                class="w-full h-8 px-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
+                @change="searchCheckinLogs"
+              />
+            </div>
+            <Button variant="secondary" size="sm" @click="searchCheckinLogs">
+              <template #icon>
+                <Search class="w-3.5 h-3.5" />
+              </template>
+              {{ $t('common.search') }}
+            </Button>
+          </div>
+        </div>
+
+        <div v-if="checkinLogsLoading" class="p-12 text-center text-[var(--text-secondary)]">
+          <Loader2 class="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+          <span>{{ $t('common.loading') }}...</span>
+        </div>
+        <EmptyState
+          v-else-if="checkinLogs.length === 0"
+          :title="$t('entertainment.admin.checkin.noLogs')"
+        />
         <template v-else>
+          <!-- 移动端卡片 (极度关键守卫) -->
           <div class="space-y-3 p-4 lg:hidden">
             <div
               v-for="record in checkinLogs"
               :key="record.id"
-              class="rounded-lg border border-themed bg-themed-surface p-4 shadow-sm"
+              class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-sm hover:border-[var(--border-hover)] transition-all duration-200"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-semibold text-themed">{{ record.username }} #{{ record.userId }}</div>
-                  <div class="mt-1 text-xs text-themed-muted">{{ record.dateKey }}</div>
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">
+                    {{ record.username }} <span class="font-mono text-xs text-[var(--text-tertiary)]">#{{ record.userId }}</span>
+                  </div>
+                  <div class="mt-1 font-mono text-xs text-[var(--text-secondary)]">{{ record.dateKey }}</div>
                 </div>
-                <div class="shrink-0 text-sm font-semibold text-amber-500">+{{ record.points }}</div>
+                <div class="shrink-0 font-mono text-sm font-semibold text-[var(--warning)]">+{{ record.points }}</div>
               </div>
-              <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
+              <div class="mt-3 grid grid-cols-2 gap-3 text-xs pt-3 border-t border-[var(--border-color)]">
                 <div>
-                  <div class="text-themed-muted">{{ $t('entertainment.admin.checkin.streakDays') }}</div>
-                  <div class="mt-1 font-medium text-themed">{{ record.streakDays }}</div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.checkin.streakDays') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--text-primary)]">{{ record.streakDays }}</div>
                 </div>
                 <div>
-                  <div class="text-themed-muted">IP</div>
-                  <div class="mt-1 break-all font-medium text-themed">{{ record.ipAddress || '-' }}</div>
+                  <div class="text-[var(--text-secondary)]">IP</div>
+                  <div class="mt-1 break-all font-mono font-medium text-[var(--text-secondary)]">{{ record.ipAddress || '-' }}</div>
                 </div>
                 <div class="col-span-2">
-                  <div class="text-themed-muted">{{ $t('entertainment.admin.checkin.time') }}</div>
-                  <div class="mt-1 font-medium text-themed">{{ formatDate(record.createdAt) }}</div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.checkin.time') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--text-secondary)]">{{ formatDate(record.createdAt) }}</div>
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- PC 端定宽表格 (极度关键守卫) -->
           <div class="hidden overflow-hidden lg:block">
             <table class="w-full table-fixed">
-              <thead>
-                <tr class="border-b border-themed">
-                  <th class="nimbus-th w-[22%]">{{ $t('entertainment.admin.user') }}</th>
-                  <th class="nimbus-th w-[14%]">{{ $t('entertainment.admin.checkin.date') }}</th>
-                  <th class="nimbus-th w-[12%]">{{ $t('entertainment.admin.checkin.points') }}</th>
-                  <th class="nimbus-th w-[12%]">{{ $t('entertainment.admin.checkin.streakDays') }}</th>
-                  <th class="nimbus-th w-[18%]">IP</th>
-                  <th class="nimbus-th w-[22%]">{{ $t('entertainment.admin.checkin.time') }}</th>
+              <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+                <tr>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[22%]">{{ $t('entertainment.admin.user') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[14%]">{{ $t('entertainment.admin.checkin.date') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('entertainment.admin.checkin.points') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('entertainment.admin.checkin.streakDays') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[18%]">IP</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[22%]">{{ $t('entertainment.admin.checkin.time') }}</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-themed">
-                <tr v-for="record in checkinLogs" :key="record.id" class="nimbus-row">
-                  <td class="truncate px-4 py-3 text-sm text-themed">{{ record.username }} #{{ record.userId }}</td>
-                  <td class="truncate px-4 py-3 text-sm text-themed tabular-nums">{{ record.dateKey }}</td>
-                  <td class="px-4 py-3 text-sm font-medium text-amber-500 tabular-nums">+{{ record.points }}</td>
-                  <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ record.streakDays }}</td>
-                  <td class="truncate px-4 py-3 text-sm text-themed-muted tabular-nums">{{ record.ipAddress || '-' }}</td>
-                  <td class="truncate px-4 py-3 text-sm text-themed-muted tabular-nums">{{ formatDate(record.createdAt) }}</td>
+              <tbody class="divide-y divide-[var(--border-color)]">
+                <tr v-for="record in checkinLogs" :key="record.id" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors duration-150">
+                  <td class="truncate px-4 py-3 text-sm text-[var(--text-primary)]">
+                    <span class="font-medium">{{ record.username }}</span>
+                    <span class="ml-1.5 font-mono text-xs text-[var(--text-tertiary)]">#{{ record.userId }}</span>
+                  </td>
+                  <td class="truncate px-4 py-3 text-sm font-mono text-[var(--text-primary)] tabular-nums">{{ record.dateKey }}</td>
+                  <td class="px-4 py-3 text-sm font-mono font-medium text-[var(--warning)] tabular-nums">+{{ record.points }}</td>
+                  <td class="px-4 py-3 text-sm font-mono text-[var(--text-primary)] tabular-nums">{{ record.streakDays }}</td>
+                  <td class="truncate px-4 py-3 text-sm font-mono text-[var(--text-secondary)] tabular-nums">{{ record.ipAddress || '-' }}</td>
+                  <td class="truncate px-4 py-3 text-sm font-mono text-[var(--text-secondary)] tabular-nums">{{ formatDate(record.createdAt) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div v-if="checkinLogsTotalPages > 1" class="flex justify-center items-center gap-2 p-4 border-t border-themed">
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="checkinLogsPage <= 1"
-              @click="checkinLogsPage--; loadCheckinLogs()"
-            >
-              {{ $t('common.prevPage') }}
-            </button>
-            <span class="text-sm text-themed-muted">{{ checkinLogsPage }} / {{ checkinLogsTotalPages }}</span>
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="checkinLogsPage >= checkinLogsTotalPages"
-              @click="checkinLogsPage++; loadCheckinLogs()"
-            >
-              {{ $t('common.nextPage') }}
-            </button>
+
+          <!-- 分页 -->
+          <div v-if="checkinLogsTotal > checkinLogsPageSize" class="p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-between">
+            <span class="text-xs text-[var(--text-secondary)]">
+              {{ $t('common.total') || '共' }} <span class="font-mono tabular-nums text-[var(--text-primary)] font-medium">{{ checkinLogsTotal }}</span> {{ $t('common.items') || '条' }}
+            </span>
+            <Pagination
+              :page="checkinLogsPage"
+              :page-size="checkinLogsPageSize"
+              :total="checkinLogsTotal"
+              :show-total="false"
+              @update:page="val => { checkinLogsPage = val; loadCheckinLogs() }"
+            />
           </div>
         </template>
-      </div>
+      </Card>
     </div>
 
-    <!-- 抽奖活动 TAB -->
-    <div v-show="activeTab === 'lotteries'" class="card">
-      <div v-if="lotteriesLoading" class="p-8 text-center text-themed-muted">
-        {{ $t('common.loading') }}...
-      </div>
-      <div v-else-if="lotteries.length === 0" class="p-8 text-center text-themed-muted">
-        {{ $t('entertainment.admin.noLotteries') }}
-      </div>
-      <template v-else>
-        <div class="space-y-3 p-4 lg:hidden">
-          <div
-            v-for="lottery in lotteries"
-            :key="lottery.id"
-            class="rounded-lg border border-themed bg-themed-surface p-4 shadow-sm"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-themed">{{ lottery.name }}</div>
-                <div v-if="lottery.description" class="mt-1 line-clamp-2 text-xs text-themed-muted">
-                  {{ lottery.description }}
-                </div>
-              </div>
-              <span :class="['badge badge-sm shrink-0', lottery.isActive ? 'badge-success' : 'badge-ghost']">
-                {{ lottery.isActive ? $t('entertainment.admin.active') : $t('entertainment.admin.inactive') }}
-              </span>
-            </div>
-            <div class="mt-3 grid grid-cols-3 gap-3 text-xs">
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.costPoints') }}</div>
-                <div class="mt-1 font-medium text-themed">{{ lottery.costPoints }}</div>
-              </div>
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.prizes') }}</div>
-                <div class="mt-1 font-medium text-themed">{{ lottery.prizesCount || lottery.prizes?.length || 0 }}</div>
-              </div>
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.totalDraws') }}</div>
-                <div class="mt-1 font-medium text-themed">{{ lottery.totalDraws }}</div>
-              </div>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button class="btn btn-xs btn-ghost" :title="$t('entertainment.admin.managePrizes')" @click="openPrizesModal(lottery)">
-                {{ $t('entertainment.admin.managePrizes') }}
-              </button>
-              <button
-                class="btn btn-xs btn-ghost"
-                :class="{ 'text-green-500': lottery.notificationConfig?.enabled }"
-                :title="$t('entertainment.admin.notification.title')"
-                @click="openNotificationModal(lottery)"
-              >
-                {{ $t('entertainment.admin.notification.title') }}
-              </button>
-              <button class="btn btn-xs btn-ghost" @click="openEditLotteryModal(lottery)">
-                {{ $t('common.edit') }}
-              </button>
-              <button
-                v-if="deleteConfirmId !== lottery.id"
-                class="btn btn-xs btn-ghost text-red-500"
-                @click="deleteConfirmId = lottery.id"
-              >
-                {{ $t('common.delete') }}
-              </button>
-              <template v-else>
-                <button
-                  class="btn btn-xs btn-error"
-                  :disabled="deleting"
-                  @click="deleteLottery(lottery.id)"
-                >
-                  {{ $t('common.confirm') }}
-                </button>
-                <button
-                  class="btn btn-xs btn-ghost"
-                  @click="deleteConfirmId = null"
-                >
-                  {{ $t('common.cancel') }}
-                </button>
-              </template>
-            </div>
-          </div>
+    <!-- 2. 抽奖活动 TAB -->
+    <div v-show="activeTab === 'lotteries'" class="space-y-6">
+      <Card data-reveal padding="none" class="overflow-hidden">
+        <div v-if="lotteriesLoading" class="p-12 text-center text-[var(--text-secondary)]">
+          <Loader2 class="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+          <span>{{ $t('common.loading') }}...</span>
         </div>
-        <div class="hidden overflow-hidden lg:block">
-          <table class="w-full table-fixed">
-            <thead>
-              <tr class="border-b border-themed">
-                <th class="nimbus-th w-[30%]">{{ $t('entertainment.admin.lotteryName') }}</th>
-                <th class="nimbus-th w-[12%]">{{ $t('entertainment.admin.costPoints') }}</th>
-                <th class="nimbus-th w-[10%]">{{ $t('entertainment.admin.prizes') }}</th>
-                <th class="nimbus-th w-[12%]">{{ $t('entertainment.admin.totalDraws') }}</th>
-                <th class="nimbus-th w-[12%]">{{ $t('entertainment.admin.status') }}</th>
-                <th class="nimbus-th w-[24%]">{{ $t('common.actions') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-themed">
-              <tr v-for="lottery in lotteries" :key="lottery.id" class="nimbus-row">
-                <td class="px-4 py-3">
-                  <div class="truncate text-sm font-medium text-themed">{{ lottery.name }}</div>
-                  <div v-if="lottery.description" class="truncate text-xs text-themed-muted">
+        <EmptyState
+          v-else-if="lotteries.length === 0"
+          :title="$t('entertainment.admin.noLotteries')"
+        >
+          <template #action>
+            <Button variant="primary" size="sm" @click="openCreateLotteryModal">
+              <template #icon>
+                <Plus class="w-4 h-4" />
+              </template>
+              {{ $t('entertainment.admin.createLottery') }}
+            </Button>
+          </template>
+        </EmptyState>
+        <template v-else>
+          <!-- 移动端卡片 (极度关键守卫) -->
+          <div class="space-y-3 p-4 lg:hidden">
+            <div
+              v-for="lottery in lotteries"
+              :key="lottery.id"
+              class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-sm hover:border-[var(--border-hover)] transition-all duration-200"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ lottery.name }}</div>
+                  <div v-if="lottery.description" class="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">
                     {{ lottery.description }}
                   </div>
-                </td>
-                <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ lottery.costPoints }}</td>
-                <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ lottery.prizesCount || lottery.prizes?.length || 0 }}</td>
-                <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ lottery.totalDraws }}</td>
-                <td class="px-4 py-3">
-                  <span :class="['badge badge-sm', lottery.isActive ? 'badge-success' : 'badge-ghost']">
-                    {{ lottery.isActive ? $t('entertainment.admin.active') : $t('entertainment.admin.inactive') }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
-                    <div class="relative inline-flex items-center group/tooltip">
-                      <button
-                        type="button"
-                        class="p-1 rounded text-themed-muted hover:text-themed transition-colors focus:outline-none cursor-pointer"
-                        :aria-label="$t('entertainment.admin.managePrizes')"
-                        @click="openPrizesModal(lottery)"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H4.5a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21" />
-                        </svg>
-                      </button>
-                      <span
-                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
-                        role="tooltip"
-                      >
-                        {{ $t('entertainment.admin.managePrizes') }}
-                      </span>
-                    </div>
-                    <div class="relative inline-flex items-center group/tooltip">
-                      <button
-                        type="button"
-                        class="p-1 rounded transition-colors focus:outline-none cursor-pointer"
-                        :class="lottery.notificationConfig?.enabled ? 'text-[var(--success)] hover:brightness-110' : 'text-themed-muted hover:text-themed'"
-                        :aria-label="$t('entertainment.admin.notification.title')"
-                        @click="openNotificationModal(lottery)"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                      </button>
-                      <span
-                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
-                        role="tooltip"
-                      >
-                        {{ $t('entertainment.admin.notification.title') }}
-                      </span>
-                    </div>
-                    <div class="relative inline-flex items-center group/tooltip">
-                      <button
-                        type="button"
-                        class="p-1 rounded text-themed-muted hover:text-themed transition-colors focus:outline-none cursor-pointer"
-                        :aria-label="$t('entertainment.admin.editLottery')"
-                        @click="openEditLotteryModal(lottery)"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <span
-                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
-                        role="tooltip"
-                      >
-                        {{ $t('entertainment.admin.editLottery') }}
-                      </span>
-                    </div>
-                    <div v-if="deleteConfirmId !== lottery.id" class="relative inline-flex items-center group/tooltip">
-                      <button
-                        type="button"
-                        class="p-1 rounded text-rose-500 hover:text-rose-600 transition-colors focus:outline-none cursor-pointer"
-                        :aria-label="$t('common.delete')"
-                        @click="deleteConfirmId = lottery.id"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                      <span
-                        class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
-                        role="tooltip"
-                      >
-                        {{ $t('common.delete') }}
-                      </span>
-                    </div>
-                    <template v-else>
-                      <div class="inline-flex items-center gap-1">
-                        <button
-                          type="button"
-                          class="px-1.5 py-0.5 text-xs rounded font-medium bg-[var(--error)] text-white hover:brightness-110 transition-colors cursor-pointer"
-                          :disabled="deleting"
-                          @click="deleteLottery(lottery.id)"
-                        >
-                          {{ $t('common.confirm') }}
-                        </button>
-                        <button
-                          type="button"
-                          class="px-1.5 py-0.5 text-xs rounded text-themed-muted hover:text-themed transition-colors cursor-pointer"
-                          @click="deleteConfirmId = null"
-                        >
-                          {{ $t('common.cancel') }}
-                        </button>
-                      </div>
-                    </template>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- 分页 -->
-        <div v-if="lotteriesTotalPages > 1" class="flex justify-center items-center gap-2 p-4 border-t border-themed">
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="lotteriesPage <= 1"
-            @click="lotteriesPage--; loadLotteries()"
-          >
-            {{ $t('common.prevPage') }}
-          </button>
-          <span class="text-sm text-themed-muted">{{ lotteriesPage }} / {{ lotteriesTotalPages }}</span>
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="lotteriesPage >= lotteriesTotalPages"
-            @click="lotteriesPage++; loadLotteries()"
-          >
-            {{ $t('common.nextPage') }}
-          </button>
-        </div>
-      </template>
-    </div>
-
-    <!-- 中奖记录 TAB -->
-    <div v-show="activeTab === 'records'" class="card">
-      <!-- 搜索和筛选 -->
-      <div class="p-4 border-b border-themed flex flex-wrap gap-3 items-center">
-        <!-- 用户名搜索 -->
-        <div class="flex items-center gap-2">
-          <input
-            v-model="recordsSearch"
-            type="text"
-            class="input input-sm w-40"
-            :placeholder="$t('entertainment.admin.searchUser')"
-            @keyup.enter="searchRecords"
-          />
-          <button class="btn btn-sm btn-primary" @click="searchRecords">
-            {{ $t('common.search') }}
-          </button>
-        </div>
-        <!-- 奖品类型筛选 -->
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-themed-muted">{{ $t('entertainment.admin.prizeType') }}:</span>
-          <select v-model="recordsPrizeType" class="input input-sm" @change="searchRecords">
-            <option value="">{{ $t('common.all') }}</option>
-            <option value="nothing">{{ $t('entertainment.prizeTypes.nothing') }}</option>
-            <option value="points">{{ $t('entertainment.prizeTypes.points') }}</option>
-            <option value="balance">{{ $t('entertainment.prizeTypes.balance') }}</option>
-            <option value="badge">{{ $t('entertainment.prizeTypes.badge') }}</option>
-            <option value="instance">{{ $t('entertainment.prizeTypes.instance') }}</option>
-            <option value="cpu">{{ $t('entertainment.prizeTypes.cpu') }}</option>
-            <option value="memory">{{ $t('entertainment.prizeTypes.memory') }}</option>
-            <option value="disk">{{ $t('entertainment.prizeTypes.disk') }}</option>
-            <option value="traffic">{{ $t('entertainment.prizeTypes.traffic') }}</option>
-          </select>
-        </div>
-      </div>
-      
-      <div v-if="recordsLoading" class="p-8 text-center text-themed-muted">
-        {{ $t('common.loading') }}...
-      </div>
-      <div v-else-if="records.length === 0" class="p-8 text-center text-themed-muted">
-        {{ $t('entertainment.admin.noRecords') }}
-      </div>
-      <template v-else>
-        <div class="space-y-3 p-4 lg:hidden">
-          <div
-            v-for="rec in records"
-            :key="rec.id"
-            class="rounded-lg border border-themed bg-themed-surface p-4 shadow-sm"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-themed">{{ rec.username || rec.userId }}</div>
-                <div class="mt-1 truncate text-xs text-themed-muted">{{ rec.lotteryName || '-' }}</div>
+                </div>
+                <Badge :variant="lottery.isActive ? 'success' : 'default'" size="sm" class="shrink-0">
+                  {{ lottery.isActive ? $t('entertainment.admin.active') : $t('entertainment.admin.inactive') }}
+                </Badge>
               </div>
-              <span class="badge badge-sm shrink-0">{{ getPrizeTypeName(rec.prizeType) }}</span>
-            </div>
-            <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.prize') }}</div>
-                <div class="mt-1 font-medium text-themed">{{ rec.prizeName || '-' }}</div>
-              </div>
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.value') }}</div>
-                <div class="mt-1 font-medium text-themed">
-                  <template v-if="rec.prizeType === 'points'">+{{ rec.prizeValue }}</template>
-                  <template v-else-if="rec.prizeType === 'balance'">+¥{{ (rec.prizeValue / 100).toFixed(2) }}</template>
-                  <template v-else-if="rec.prizeType === 'badge'">{{ rec.prizeName || $t('entertainment.prizeTypes.badge') }}</template>
-                  <template v-else-if="rec.prizeType === 'instance'">{{ rec.instanceDesc || $t('entertainment.wonInstance') }}</template>
-                  <template v-else-if="rec.prizeType === 'cpu'">+{{ rec.prizeValue }}%</template>
-                  <template v-else-if="rec.prizeType === 'memory'">+{{ rec.prizeValue }}MB</template>
-                  <template v-else-if="rec.prizeType === 'disk'">+{{ rec.prizeValue }}MB</template>
-                  <template v-else-if="rec.prizeType === 'traffic'">+{{ rec.prizeValue }}GB</template>
-                  <template v-else>-</template>
+              <div class="mt-3 grid grid-cols-3 gap-3 text-xs pt-3 border-t border-[var(--border-color)]">
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.costPoints') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--text-primary)]">{{ lottery.costPoints }}</div>
+                </div>
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.prizes') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--text-primary)]">{{ lottery.prizesCount || lottery.prizes?.length || 0 }}</div>
+                </div>
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.totalDraws') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--text-primary)]">{{ lottery.totalDraws }}</div>
                 </div>
               </div>
-              <div class="col-span-2">
-                <div class="text-themed-muted">{{ $t('entertainment.time') }}</div>
-                <div class="mt-1 font-medium text-themed">{{ formatDate(rec.createdAt) }}</div>
+              <div class="mt-4 flex flex-wrap gap-2 pt-3 border-t border-[var(--border-color)]">
+                <Button variant="secondary" size="sm" :title="$t('entertainment.admin.managePrizes')" @click="openPrizesModal(lottery)">
+                  <template #icon>
+                    <Gift class="w-3.5 h-3.5" />
+                  </template>
+                  {{ $t('entertainment.admin.managePrizes') }}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :title="$t('entertainment.admin.notification.title')"
+                  @click="openNotificationModal(lottery)"
+                >
+                  <template #icon>
+                    <Bell class="w-3.5 h-3.5" :class="lottery.notificationConfig?.enabled ? 'text-[var(--success)]' : ''" />
+                  </template>
+                  {{ $t('entertainment.admin.notification.title') }}
+                </Button>
+                <Button variant="secondary" size="sm" @click="openEditLotteryModal(lottery)">
+                  <template #icon>
+                    <Pencil class="w-3.5 h-3.5" />
+                  </template>
+                  {{ $t('common.edit') }}
+                </Button>
+                <Button
+                  v-if="deleteConfirmId !== lottery.id"
+                  variant="ghost"
+                  size="sm"
+                  class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+                  @click="deleteConfirmId = lottery.id"
+                >
+                  <template #icon>
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </template>
+                  {{ $t('common.delete') }}
+                </Button>
+                <template v-else>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    :disabled="deleting"
+                    @click="deleteLottery(lottery.id)"
+                  >
+                    {{ $t('common.confirm') }}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    @click="deleteConfirmId = null"
+                  >
+                    {{ $t('common.cancel') }}
+                  </Button>
+                </template>
               </div>
             </div>
           </div>
-        </div>
-        <div class="hidden overflow-hidden lg:block">
-          <table class="w-full table-fixed">
-            <thead>
-              <tr class="border-b border-themed">
-                <th class="nimbus-th w-[18%]">{{ $t('entertainment.admin.user') }}</th>
-                <th class="nimbus-th w-[20%]">{{ $t('entertainment.admin.lotteryName') }}</th>
-                <th class="nimbus-th w-[20%]">{{ $t('entertainment.admin.prize') }}</th>
-                <th class="nimbus-th w-[13%]">{{ $t('entertainment.admin.prizeType') }}</th>
-                <th class="nimbus-th w-[14%]">{{ $t('entertainment.admin.value') }}</th>
-                <th class="nimbus-th w-[15%]">{{ $t('entertainment.time') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-themed">
-              <tr v-for="rec in records" :key="rec.id" class="nimbus-row">
-                <td class="truncate px-4 py-3 text-sm text-themed">{{ rec.username || rec.userId }}</td>
-                <td class="truncate px-4 py-3 text-sm text-themed">{{ rec.lotteryName || '-' }}</td>
-                <td class="truncate px-4 py-3 text-sm text-themed">{{ rec.prizeName || '-' }}</td>
-                <td class="px-4 py-3 text-sm">
-                  <span class="badge badge-sm">{{ getPrizeTypeName(rec.prizeType) }}</span>
-                </td>
-                <td class="truncate px-4 py-3 text-sm text-themed tabular-nums">
-                  <template v-if="rec.prizeType === 'points'">+{{ rec.prizeValue }}</template>
-                  <template v-else-if="rec.prizeType === 'balance'">+¥{{ (rec.prizeValue / 100).toFixed(2) }}</template>
-                  <template v-else-if="rec.prizeType === 'badge'">{{ rec.prizeName || $t('entertainment.prizeTypes.badge') }}</template>
-                  <template v-else-if="rec.prizeType === 'instance'">{{ rec.instanceDesc || $t('entertainment.wonInstance') }}</template>
-                  <template v-else-if="rec.prizeType === 'cpu'">+{{ rec.prizeValue }}%</template>
-                  <template v-else-if="rec.prizeType === 'memory'">+{{ rec.prizeValue }}MB</template>
-                  <template v-else-if="rec.prizeType === 'disk'">+{{ rec.prizeValue }}MB</template>
-                  <template v-else-if="rec.prizeType === 'traffic'">+{{ rec.prizeValue }}GB</template>
-                  <template v-else>-</template>
-                </td>
-                <td class="truncate px-4 py-3 text-sm text-themed-muted tabular-nums">{{ formatDate(rec.createdAt) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- 分页 -->
-        <div class="flex flex-col gap-3 p-4 border-t border-themed sm:flex-row sm:items-center sm:justify-between">
-          <!-- 每页数量 -->
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-themed-muted">{{ $t('common.perPage') }}:</span>
-            <select 
-              v-model.number="recordsPageSize" 
-              class="input input-sm w-20"
-              @change="recordsPage = 1; loadRecords()"
-            >
-              <option :value="10">10</option>
-              <option :value="20">20</option>
-              <option :value="50">50</option>
-              <option :value="100">100</option>
-            </select>
+
+          <!-- PC 端定宽表格 (极度关键守卫) -->
+          <div class="hidden overflow-hidden lg:block">
+            <table class="w-full table-fixed">
+              <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+                <tr>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[30%]">{{ $t('entertainment.admin.lotteryName') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('entertainment.admin.costPoints') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[10%]">{{ $t('entertainment.admin.prizes') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('entertainment.admin.totalDraws') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('entertainment.admin.status') }}</th>
+                  <th class="text-right text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[24%]">{{ $t('common.actions') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[var(--border-color)]">
+                <tr v-for="lottery in lotteries" :key="lottery.id" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors duration-150">
+                  <td class="px-4 py-3.5">
+                    <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ lottery.name }}</div>
+                    <div v-if="lottery.description" class="truncate text-xs text-[var(--text-secondary)] mt-0.5">
+                      {{ lottery.description }}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3.5 text-sm font-mono text-[var(--text-primary)] tabular-nums">{{ lottery.costPoints }}</td>
+                  <td class="px-4 py-3.5 text-sm font-mono text-[var(--text-primary)] tabular-nums">{{ lottery.prizesCount || lottery.prizes?.length || 0 }}</td>
+                  <td class="px-4 py-3.5 text-sm font-mono text-[var(--text-primary)] tabular-nums">{{ lottery.totalDraws }}</td>
+                  <td class="px-4 py-3.5">
+                    <Badge :variant="lottery.isActive ? 'success' : 'default'" size="sm">
+                      {{ lottery.isActive ? $t('entertainment.admin.active') : $t('entertainment.admin.inactive') }}
+                    </Badge>
+                  </td>
+                  <td class="px-4 py-3.5 text-right">
+                    <div class="flex items-center justify-end gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :title="$t('entertainment.admin.managePrizes')"
+                        @click="openPrizesModal(lottery)"
+                      >
+                        <template #icon>
+                          <Gift class="w-3.5 h-3.5" />
+                        </template>
+                        {{ $t('entertainment.admin.managePrizes') }}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :title="$t('entertainment.admin.notification.title')"
+                        @click="openNotificationModal(lottery)"
+                      >
+                        <template #icon>
+                          <Bell class="w-3.5 h-3.5" :class="lottery.notificationConfig?.enabled ? 'text-[var(--success)]' : ''" />
+                        </template>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :title="$t('common.edit')"
+                        @click="openEditLotteryModal(lottery)"
+                      >
+                        <template #icon>
+                          <Pencil class="w-3.5 h-3.5" />
+                        </template>
+                      </Button>
+                      <div v-if="deleteConfirmId !== lottery.id">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+                          :title="$t('common.delete')"
+                          @click="deleteConfirmId = lottery.id"
+                        >
+                          <template #icon>
+                            <Trash2 class="w-3.5 h-3.5" />
+                          </template>
+                        </Button>
+                      </div>
+                      <template v-else>
+                        <div class="inline-flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            :disabled="deleting"
+                            @click="deleteLottery(lottery.id)"
+                          >
+                            {{ $t('common.confirm') }}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            @click="deleteConfirmId = null"
+                          >
+                            {{ $t('common.cancel') }}
+                          </Button>
+                        </div>
+                      </template>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <!-- 分页按钮 -->
-          <div class="flex items-center gap-2">
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="recordsPage <= 1"
-              @click="recordsPage--; loadRecords()"
-            >
-              {{ $t('common.prevPage') }}
-            </button>
-            <span class="text-sm text-themed-muted">{{ recordsPage }} / {{ recordsTotalPages || 1 }}</span>
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="recordsPage >= recordsTotalPages"
-              @click="recordsPage++; loadRecords()"
-            >
-              {{ $t('common.nextPage') }}
-            </button>
+
+          <!-- 分页 -->
+          <div v-if="lotteriesTotal > lotteriesPageSize" class="p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-between">
+            <span class="text-xs text-[var(--text-secondary)]">
+              {{ $t('common.total') || '共' }} <span class="font-mono tabular-nums text-[var(--text-primary)] font-medium">{{ lotteriesTotal }}</span> {{ $t('common.items') || '条' }}
+            </span>
+            <Pagination
+              :page="lotteriesPage"
+              :page-size="lotteriesPageSize"
+              :total="lotteriesTotal"
+              :show-total="false"
+              @update:page="val => { lotteriesPage = val; loadLotteries() }"
+            />
           </div>
-        </div>
-      </template>
+        </template>
+      </Card>
     </div>
 
-    <!-- 用户积分 TAB -->
-    <div v-show="activeTab === 'users'" class="card">
-      <div v-if="usersLoading" class="p-8 text-center text-themed-muted">
-        {{ $t('common.loading') }}...
-      </div>
-      <div v-else-if="users.length === 0" class="p-8 text-center text-themed-muted">
-        {{ $t('entertainment.admin.noUsers') }}
-      </div>
-      <template v-else>
-        <div class="space-y-3 p-4 lg:hidden">
-          <div
-            v-for="user in users"
-            :key="user.userId"
-            class="rounded-lg border border-themed bg-themed-surface p-4 shadow-sm"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="truncate text-sm font-semibold text-themed">{{ user.username || user.userId }}</div>
-                <div class="mt-1 text-xs text-themed-muted">{{ $t('entertainment.admin.currentPoints') }}</div>
-              </div>
-              <div class="shrink-0 text-sm font-semibold text-amber-500">{{ user.points?.toLocaleString() }}</div>
+    <!-- 3. 中奖记录 TAB -->
+    <div v-show="activeTab === 'records'" class="space-y-6">
+      <Card data-reveal padding="none" class="overflow-hidden">
+        <!-- 搜索和筛选 -->
+        <div class="p-4 border-b border-[var(--border-color)] flex flex-wrap gap-3 items-center justify-between">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="w-full sm:w-56">
+              <Input
+                v-model="recordsSearch"
+                size="sm"
+                :placeholder="$t('entertainment.admin.searchUser')"
+                @enter="searchRecords"
+              >
+                <template #prefix>
+                  <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+                </template>
+              </Input>
             </div>
-            <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.totalEarned') }}</div>
-                <div class="mt-1 font-medium text-green-500">+{{ user.totalEarned?.toLocaleString() }}</div>
-              </div>
-              <div>
-                <div class="text-themed-muted">{{ $t('entertainment.admin.totalSpent') }}</div>
-                <div class="mt-1 font-medium text-red-500">-{{ user.totalSpent?.toLocaleString() }}</div>
-              </div>
-              <div class="col-span-2">
-                <div class="text-themed-muted">{{ $t('entertainment.admin.lastConvertedAt') }}</div>
-                <div class="mt-1 font-medium text-themed">{{ user.lastConvertedAt ? formatDate(user.lastConvertedAt) : '-' }}</div>
-              </div>
+            <Button variant="primary" size="sm" @click="searchRecords">
+              <template #icon>
+                <Search class="w-3.5 h-3.5" />
+              </template>
+              {{ $t('common.search') }}
+            </Button>
+
+            <div class="flex items-center gap-2 ml-0 sm:ml-2">
+              <span class="text-xs text-[var(--text-secondary)]">{{ $t('entertainment.admin.prizeType') }}:</span>
+              <select
+                v-model="recordsPrizeType"
+                class="h-8 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
+                @change="searchRecords"
+              >
+                <option value="">{{ $t('common.all') }}</option>
+                <option value="nothing">{{ $t('entertainment.prizeTypes.nothing') }}</option>
+                <option value="points">{{ $t('entertainment.prizeTypes.points') }}</option>
+                <option value="balance">{{ $t('entertainment.prizeTypes.balance') }}</option>
+                <option value="badge">{{ $t('entertainment.prizeTypes.badge') }}</option>
+                <option value="instance">{{ $t('entertainment.prizeTypes.instance') }}</option>
+                <option value="cpu">{{ $t('entertainment.prizeTypes.cpu') }}</option>
+                <option value="memory">{{ $t('entertainment.prizeTypes.memory') }}</option>
+                <option value="disk">{{ $t('entertainment.prizeTypes.disk') }}</option>
+                <option value="traffic">{{ $t('entertainment.prizeTypes.traffic') }}</option>
+              </select>
             </div>
           </div>
         </div>
-        <div class="hidden overflow-hidden lg:block">
-          <table class="w-full table-fixed">
-            <thead>
-              <tr class="border-b border-themed">
-                <th class="nimbus-th w-[28%]">{{ $t('entertainment.admin.user') }}</th>
-                <th class="nimbus-th w-[16%]">{{ $t('entertainment.admin.currentPoints') }}</th>
-                <th class="nimbus-th w-[16%]">{{ $t('entertainment.admin.totalEarned') }}</th>
-                <th class="nimbus-th w-[16%]">{{ $t('entertainment.admin.totalSpent') }}</th>
-                <th class="nimbus-th w-[24%]">{{ $t('entertainment.admin.lastConvertedAt') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-themed">
-              <tr v-for="user in users" :key="user.userId" class="nimbus-row">
-                <td class="truncate px-4 py-3 text-sm text-themed">{{ user.username || user.userId }}</td>
-                <td class="px-4 py-3 text-sm font-medium text-amber-500 tabular-nums">{{ user.points?.toLocaleString() }}</td>
-                <td class="px-4 py-3 text-sm text-green-500 tabular-nums">+{{ user.totalEarned?.toLocaleString() }}</td>
-                <td class="px-4 py-3 text-sm text-red-500 tabular-nums">-{{ user.totalSpent?.toLocaleString() }}</td>
-                <td class="truncate px-4 py-3 text-sm text-themed-muted tabular-nums">
-                  {{ user.lastConvertedAt ? formatDate(user.lastConvertedAt) : '-' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+
+        <div v-if="recordsLoading" class="p-12 text-center text-[var(--text-secondary)]">
+          <Loader2 class="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+          <span>{{ $t('common.loading') }}...</span>
         </div>
-        
-        <!-- 分页 -->
-        <div v-if="usersTotalPages > 1" class="flex justify-center items-center gap-2 p-4 border-t border-themed">
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="usersPage <= 1"
-            @click="usersPage--; loadUsers()"
-          >
-            {{ $t('common.prevPage') }}
-          </button>
-          <span class="text-sm text-themed-muted">{{ usersPage }} / {{ usersTotalPages }}</span>
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="usersPage >= usersTotalPages"
-            @click="usersPage++; loadUsers()"
-          >
-            {{ $t('common.nextPage') }}
-          </button>
-        </div>
-      </template>
+        <EmptyState
+          v-else-if="records.length === 0"
+          :title="$t('entertainment.admin.noRecords')"
+        />
+        <template v-else>
+          <!-- 移动端卡片 (极度关键守卫) -->
+          <div class="space-y-3 p-4 lg:hidden">
+            <div
+              v-for="rec in records"
+              :key="rec.id"
+              class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-sm hover:border-[var(--border-hover)] transition-all duration-200"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ rec.username || rec.userId }}</div>
+                  <div class="mt-1 truncate text-xs text-[var(--text-secondary)]">{{ rec.lotteryName || '-' }}</div>
+                </div>
+                <Badge variant="info" size="sm" class="shrink-0">{{ getPrizeTypeName(rec.prizeType) }}</Badge>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-3 text-xs pt-3 border-t border-[var(--border-color)]">
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.prize') }}</div>
+                  <div class="mt-1 font-medium text-[var(--text-primary)]">{{ rec.prizeName || '-' }}</div>
+                </div>
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.value') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--text-primary)]">
+                    <template v-if="rec.prizeType === 'points'">+{{ rec.prizeValue }}</template>
+                    <template v-else-if="rec.prizeType === 'balance'">+¥{{ (rec.prizeValue / 100).toFixed(2) }}</template>
+                    <template v-else-if="rec.prizeType === 'badge'">{{ rec.prizeName || $t('entertainment.prizeTypes.badge') }}</template>
+                    <template v-else-if="rec.prizeType === 'instance'">{{ rec.instanceDesc || $t('entertainment.wonInstance') }}</template>
+                    <template v-else-if="rec.prizeType === 'cpu'">+{{ rec.prizeValue }}%</template>
+                    <template v-else-if="rec.prizeType === 'memory'">+{{ rec.prizeValue }}MB</template>
+                    <template v-else-if="rec.prizeType === 'disk'">+{{ rec.prizeValue }}MB</template>
+                    <template v-else-if="rec.prizeType === 'traffic'">+{{ rec.prizeValue }}GB</template>
+                    <template v-else>-</template>
+                  </div>
+                </div>
+                <div class="col-span-2">
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.time') }}</div>
+                  <div class="mt-1 font-mono text-[var(--text-secondary)]">{{ formatDate(rec.createdAt) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PC 端定宽表格 (极度关键守卫) -->
+          <div class="hidden overflow-hidden lg:block">
+            <table class="w-full table-fixed">
+              <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+                <tr>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[18%]">{{ $t('entertainment.admin.user') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[20%]">{{ $t('entertainment.admin.lotteryName') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[20%]">{{ $t('entertainment.admin.prize') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[13%]">{{ $t('entertainment.admin.prizeType') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[14%]">{{ $t('entertainment.admin.value') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[15%]">{{ $t('entertainment.time') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[var(--border-color)]">
+                <tr v-for="rec in records" :key="rec.id" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors duration-150">
+                  <td class="truncate px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]">{{ rec.username || rec.userId }}</td>
+                  <td class="truncate px-4 py-3.5 text-sm text-[var(--text-secondary)]">{{ rec.lotteryName || '-' }}</td>
+                  <td class="truncate px-4 py-3.5 text-sm text-[var(--text-primary)] font-medium">{{ rec.prizeName || '-' }}</td>
+                  <td class="px-4 py-3.5 text-sm">
+                    <Badge variant="info" size="sm">{{ getPrizeTypeName(rec.prizeType) }}</Badge>
+                  </td>
+                  <td class="truncate px-4 py-3.5 text-sm font-mono text-[var(--text-primary)] tabular-nums">
+                    <template v-if="rec.prizeType === 'points'">+{{ rec.prizeValue }}</template>
+                    <template v-else-if="rec.prizeType === 'balance'">+¥{{ (rec.prizeValue / 100).toFixed(2) }}</template>
+                    <template v-else-if="rec.prizeType === 'badge'">{{ rec.prizeName || $t('entertainment.prizeTypes.badge') }}</template>
+                    <template v-else-if="rec.prizeType === 'instance'">{{ rec.instanceDesc || $t('entertainment.wonInstance') }}</template>
+                    <template v-else-if="rec.prizeType === 'cpu'">+{{ rec.prizeValue }}%</template>
+                    <template v-else-if="rec.prizeType === 'memory'">+{{ rec.prizeValue }}MB</template>
+                    <template v-else-if="rec.prizeType === 'disk'">+{{ rec.prizeValue }}MB</template>
+                    <template v-else-if="rec.prizeType === 'traffic'">+{{ rec.prizeValue }}GB</template>
+                    <template v-else>-</template>
+                  </td>
+                  <td class="truncate px-4 py-3.5 text-sm font-mono text-[var(--text-secondary)] tabular-nums">{{ formatDate(rec.createdAt) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页与每页条数 -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-[var(--text-secondary)]">{{ $t('common.perPage') }}:</span>
+              <select 
+                v-model.number="recordsPageSize" 
+                class="h-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
+                @change="recordsPage = 1; loadRecords()"
+              >
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+              <span class="text-xs text-[var(--text-secondary)] ml-2">
+                {{ $t('common.total') || '共' }} <span class="font-mono tabular-nums text-[var(--text-primary)] font-medium">{{ recordsTotal }}</span> {{ $t('common.items') || '条' }}
+              </span>
+            </div>
+            <Pagination
+              :page="recordsPage"
+              :page-size="recordsPageSize"
+              :total="recordsTotal"
+              :show-total="false"
+              @update:page="val => { recordsPage = val; loadRecords() }"
+            />
+          </div>
+        </template>
+      </Card>
     </div>
 
-    <!-- 徽章管理 TAB -->
+    <!-- 4. 用户积分 TAB -->
+    <div v-show="activeTab === 'users'" class="space-y-6">
+      <Card data-reveal padding="none" class="overflow-hidden">
+        <div v-if="usersLoading" class="p-12 text-center text-[var(--text-secondary)]">
+          <Loader2 class="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+          <span>{{ $t('common.loading') }}...</span>
+        </div>
+        <EmptyState
+          v-else-if="users.length === 0"
+          :title="$t('entertainment.admin.noUsers')"
+        />
+        <template v-else>
+          <!-- 移动端卡片 (极度关键守卫) -->
+          <div class="space-y-3 p-4 lg:hidden">
+            <div
+              v-for="user in users"
+              :key="user.userId"
+              class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-sm hover:border-[var(--border-hover)] transition-all duration-200"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ user.username || user.userId }}</div>
+                  <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ $t('entertainment.admin.currentPoints') }}</div>
+                </div>
+                <div class="shrink-0 font-mono text-sm font-semibold text-[var(--warning)]">{{ user.points?.toLocaleString() }}</div>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-3 text-xs pt-3 border-t border-[var(--border-color)]">
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.totalEarned') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--success)]">+{{ user.totalEarned?.toLocaleString() }}</div>
+                </div>
+                <div>
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.totalSpent') }}</div>
+                  <div class="mt-1 font-mono font-medium text-[var(--error)]">-{{ user.totalSpent?.toLocaleString() }}</div>
+                </div>
+                <div class="col-span-2">
+                  <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.lastConvertedAt') }}</div>
+                  <div class="mt-1 font-mono text-[var(--text-secondary)]">{{ user.lastConvertedAt ? formatDate(user.lastConvertedAt) : '-' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PC 端定宽表格 (极度关键守卫) -->
+          <div class="hidden overflow-hidden lg:block">
+            <table class="w-full table-fixed">
+              <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+                <tr>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[28%]">{{ $t('entertainment.admin.user') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[16%]">{{ $t('entertainment.admin.currentPoints') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[16%]">{{ $t('entertainment.admin.totalEarned') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[16%]">{{ $t('entertainment.admin.totalSpent') }}</th>
+                  <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[24%]">{{ $t('entertainment.admin.lastConvertedAt') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[var(--border-color)]">
+                <tr v-for="user in users" :key="user.userId" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors duration-150">
+                  <td class="truncate px-4 py-3.5 text-sm font-medium text-[var(--text-primary)]">{{ user.username || user.userId }}</td>
+                  <td class="px-4 py-3.5 text-sm font-mono font-semibold text-[var(--warning)] tabular-nums">{{ user.points?.toLocaleString() }}</td>
+                  <td class="px-4 py-3.5 text-sm font-mono text-[var(--success)] tabular-nums">+{{ user.totalEarned?.toLocaleString() }}</td>
+                  <td class="px-4 py-3.5 text-sm font-mono text-[var(--error)] tabular-nums">-{{ user.totalSpent?.toLocaleString() }}</td>
+                  <td class="truncate px-4 py-3.5 text-sm font-mono text-[var(--text-secondary)] tabular-nums">
+                    {{ user.lastConvertedAt ? formatDate(user.lastConvertedAt) : '-' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div v-if="usersTotal > usersPageSize" class="p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-between">
+            <span class="text-xs text-[var(--text-secondary)]">
+              {{ $t('common.total') || '共' }} <span class="font-mono tabular-nums text-[var(--text-primary)] font-medium">{{ usersTotal }}</span> {{ $t('common.items') || '条' }}
+            </span>
+            <Pagination
+              :page="usersPage"
+              :page-size="usersPageSize"
+              :total="usersTotal"
+              :show-total="false"
+              @update:page="val => { usersPage = val; loadUsers() }"
+            />
+          </div>
+        </template>
+      </Card>
+    </div>
+
+    <!-- 5. 徽章管理 TAB -->
     <div v-show="activeTab === 'badges'" class="space-y-6">
-      <div v-if="badgesLoading" class="card p-8 text-center text-themed-muted">
-        {{ $t('common.loading') }}...
+      <div v-if="badgesLoading" class="p-12 text-center text-[var(--text-secondary)]">
+        <Loader2 class="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+        <span>{{ $t('common.loading') }}...</span>
       </div>
       <template v-else>
         <div class="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-          <div class="card">
-            <div class="p-4 border-b border-themed flex items-center justify-between">
+          <!-- 系列列表 Card -->
+          <Card data-reveal padding="none" class="overflow-hidden">
+            <div class="p-4 border-b border-[var(--border-color)] flex items-center justify-between">
               <div>
-                <div class="text-base font-semibold text-themed">{{ $t('entertainment.admin.badgeCatalog.series.title') }}</div>
-                <div class="text-xs text-themed-muted mt-1">{{ $t('entertainment.admin.badgeCatalog.series.description') }}</div>
+                <div class="text-sm font-semibold text-[var(--text-primary)]">{{ $t('entertainment.admin.badgeCatalog.series.title') }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ $t('entertainment.admin.badgeCatalog.series.description') }}</div>
               </div>
-              <button class="btn btn-sm btn-primary" @click="openCreateSeriesModal">{{ $t('entertainment.admin.badgeCatalog.series.add') }}</button>
+              <Button variant="secondary" size="sm" @click="openCreateSeriesModal">
+                <template #icon>
+                  <Plus class="w-3.5 h-3.5" />
+                </template>
+                {{ $t('entertainment.admin.badgeCatalog.series.add') }}
+              </Button>
             </div>
-            <div class="divide-y divide-themed">
+            <div class="divide-y divide-[var(--border-color)]">
+              <!-- 全部系列按钮 -->
               <button
-                class="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-themed-hover"
-                :class="selectedBadgeSeriesId === 'all' ? 'bg-themed-secondary' : ''"
+                type="button"
+                class="w-full px-4 py-3 text-left flex items-center justify-between transition-colors select-none cursor-pointer"
+                :class="selectedBadgeSeriesId === 'all' ? 'bg-[var(--bg-surface-soft)] font-semibold' : 'hover:bg-[var(--bg-surface-soft)]/50'"
                 @click="selectedBadgeSeriesId = 'all'"
               >
-                <span class="text-sm font-medium text-themed">{{ $t('entertainment.admin.badgeCatalog.series.all') }}</span>
-                <span class="badge badge-sm">{{ badges.length }}</span>
+                <span class="text-sm text-[var(--text-primary)]">{{ $t('entertainment.admin.badgeCatalog.series.all') }}</span>
+                <Badge size="sm" :variant="selectedBadgeSeriesId === 'all' ? 'info' : 'default'">
+                  {{ badges.length }}
+                </Badge>
               </button>
-              <div v-for="series in badgeSeries" :key="series.id" class="p-4 hover:bg-themed-hover">
+
+              <!-- 系列项目 -->
+              <div
+                v-for="series in badgeSeries"
+                :key="series.id"
+                class="p-4 transition-colors"
+                :class="selectedBadgeSeriesId === series.id ? 'bg-[var(--bg-surface-soft)]' : 'hover:bg-[var(--bg-surface-soft)]/40'"
+              >
                 <div class="flex items-start justify-between gap-3">
-                  <button class="min-w-0 text-left flex-1" @click="selectedBadgeSeriesId = series.id">
+                  <button
+                    type="button"
+                    class="min-w-0 text-left flex-1 cursor-pointer select-none"
+                    @click="selectedBadgeSeriesId = series.id"
+                  >
                     <div class="flex items-center gap-2">
-                      <span class="text-sm font-semibold text-themed truncate">{{ series.nameZh }}</span>
-                      <span :class="['badge badge-sm', series.isActive ? 'badge-success' : 'badge-ghost']">
+                      <span class="text-sm font-semibold text-[var(--text-primary)] truncate">{{ series.nameZh }}</span>
+                      <Badge size="sm" :variant="series.isActive ? 'success' : 'default'">
                         {{ series.isActive ? $t('common.active') : $t('common.inactive') }}
-                      </span>
+                      </Badge>
                     </div>
-                    <div class="text-xs text-themed-muted mt-1 truncate">{{ series.title }}</div>
-                    <div class="text-xs text-themed-faint mt-1">
+                    <div class="text-xs text-[var(--text-secondary)] mt-1 truncate">{{ series.title }}</div>
+                    <div class="text-xs text-[var(--text-tertiary)] mt-1 font-mono">
                       {{ $t('entertainment.admin.badgeCatalog.series.enabledCount', { active: series.activeBadgeCount || 0, total: series.badgeCount || 0 }) }}
                     </div>
                   </button>
-                  <div class="flex gap-1">
-                    <button class="btn btn-xs btn-ghost" @click="openEditSeriesModal(series)">{{ $t('common.edit') }}</button>
+                  <div class="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" @click="openEditSeriesModal(series)">
+                      <template #icon>
+                        <Pencil class="w-3.5 h-3.5" />
+                      </template>
+                      {{ $t('common.edit') }}
+                    </Button>
                     <template v-if="deletingSeriesId === series.id">
-                      <button class="btn btn-xs btn-error" @click="deleteSeries(series.id)">{{ $t('common.confirm') }}</button>
-                      <button class="btn btn-xs btn-ghost" @click="deletingSeriesId = null">{{ $t('common.cancel') }}</button>
+                      <Button size="sm" variant="danger" @click="deleteSeries(series.id)">
+                        {{ $t('common.confirm') }}
+                      </Button>
+                      <Button size="sm" variant="secondary" @click="deletingSeriesId = null">
+                        {{ $t('common.cancel') }}
+                      </Button>
                     </template>
-                    <button v-else class="btn btn-xs btn-ghost text-red-500" @click="deletingSeriesId = series.id">{{ $t('common.delete') }}</button>
+                    <Button
+                      v-else
+                      size="sm"
+                      variant="ghost"
+                      class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+                      @click="deletingSeriesId = series.id"
+                    >
+                      <template #icon>
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </template>
+                      {{ $t('common.delete') }}
+                    </Button>
                   </div>
                 </div>
               </div>
-              <div v-if="badgeSeries.length === 0" class="p-6 text-center text-themed-muted">
+              <div v-if="badgeSeries.length === 0" class="p-8 text-center text-xs text-[var(--text-secondary)]">
                 {{ $t('entertainment.admin.badgeCatalog.series.empty') }}
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div class="card">
-            <div class="p-4 border-b border-themed flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <!-- 徽章列表 Card -->
+          <Card data-reveal padding="none" class="overflow-hidden">
+            <div class="p-4 border-b border-[var(--border-color)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div class="text-base font-semibold text-themed">{{ $t('entertainment.admin.badgeCatalog.badges.title') }}</div>
-                <div class="text-xs text-themed-muted mt-1">
+                <div class="text-sm font-semibold text-[var(--text-primary)]">{{ $t('entertainment.admin.badgeCatalog.badges.title') }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">
                   {{ $t('entertainment.admin.badgeCatalog.badges.currentFilter', { name: selectedBadgeSeriesId === 'all' ? $t('entertainment.admin.badgeCatalog.series.all') : getSeriesTitle(selectedBadgeSeriesId) }) }}
                 </div>
               </div>
-              <button class="btn btn-sm btn-primary" :disabled="badgeSeries.length === 0" @click="openCreateBadgeModal(selectedBadgeSeriesId)">
+              <Button
+                variant="primary"
+                size="sm"
+                :disabled="badgeSeries.length === 0"
+                @click="openCreateBadgeModal(selectedBadgeSeriesId)"
+              >
+                <template #icon>
+                  <Plus class="w-3.5 h-3.5" />
+                </template>
                 {{ $t('entertainment.admin.badgeCatalog.addBadge') }}
-              </button>
+              </Button>
             </div>
-            <div v-if="filteredBadges.length === 0" class="p-8 text-center text-themed-muted">
-              {{ $t('entertainment.admin.badgeCatalog.badges.empty') }}
-            </div>
+
+            <EmptyState
+              v-if="filteredBadges.length === 0"
+              :title="$t('entertainment.admin.badgeCatalog.badges.empty')"
+            />
             <template v-else>
+              <!-- 移动端卡片 (极度关键守卫) -->
               <div class="space-y-3 p-4 lg:hidden">
                 <div
                   v-for="badge in filteredBadges"
                   :key="badge.id"
-                  class="rounded-lg border border-themed bg-themed-surface p-4 shadow-sm"
+                  class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-sm hover:border-[var(--border-hover)] transition-all duration-200"
                 >
                   <div class="flex items-start gap-3">
-                    <img :src="badge.assetUrlLight || badge.assetUrl" :alt="badge.fullLabel" class="h-11 w-11 shrink-0 rounded-lg object-contain" loading="lazy" />
+                    <img :src="badge.assetUrlLight || badge.assetUrl" :alt="badge.fullLabel" class="h-11 w-11 shrink-0 rounded-xl object-contain bg-[var(--bg-surface-soft)] p-1 border border-[var(--border-color)]" loading="lazy" />
                     <div class="min-w-0 flex-1">
-                      <div class="truncate text-sm font-semibold text-themed">{{ badge.name }}</div>
-                      <div class="mt-1 truncate text-xs text-themed-muted">{{ badge.fullLabel }}</div>
-                      <div class="mt-1 break-all text-xs text-themed-faint">{{ badge.id }}</div>
+                      <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ badge.name }}</div>
+                      <div class="mt-0.5 truncate text-xs text-[var(--text-secondary)]">{{ badge.fullLabel }}</div>
+                      <div class="mt-0.5 break-all font-mono text-[11px] text-[var(--text-tertiary)]">{{ badge.id }}</div>
                     </div>
-                    <span :class="['badge badge-sm shrink-0', badge.isActive && badge.seriesIsActive ? 'badge-success' : 'badge-ghost']">
+                    <Badge :variant="badge.isActive && badge.seriesIsActive ? 'success' : 'default'" size="sm" class="shrink-0">
                       {{ badge.isActive && badge.seriesIsActive ? $t('entertainment.admin.badgeCatalog.badges.drawable') : $t('entertainment.admin.badgeCatalog.badges.notDrawable') }}
-                    </span>
+                    </Badge>
                   </div>
-                  <div class="mt-3 space-y-2 text-xs">
+                  <div class="mt-3 space-y-2 text-xs pt-3 border-t border-[var(--border-color)]">
                     <div class="flex justify-between gap-3">
-                      <span class="text-themed-muted">{{ $t('entertainment.admin.badgeCatalog.badges.tableSeries') }}</span>
-                      <span class="min-w-0 truncate font-medium text-themed">{{ badge.seriesNameZh || badge.seriesTitle }}</span>
+                      <span class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.badgeCatalog.badges.tableSeries') }}</span>
+                      <span class="min-w-0 truncate font-medium text-[var(--text-primary)]">{{ badge.seriesNameZh || badge.seriesTitle }}</span>
                     </div>
                     <div>
-                      <div class="text-themed-muted">{{ $t('entertainment.admin.badgeCatalog.badges.tableAssetUrl') }}</div>
-                      <div class="mt-1 break-all font-medium text-themed">{{ badge.assetUrl }}</div>
+                      <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.badgeCatalog.badges.tableAssetUrl') }}</div>
+                      <div class="mt-1 break-all font-mono text-[11px] text-[var(--text-secondary)]">{{ badge.assetUrl }}</div>
                     </div>
                     <div>
-                      <div class="text-themed-muted">{{ $t('entertainment.admin.badgeCatalog.badges.tableUsage') }}</div>
-                      <div class="mt-1 font-medium text-themed">
+                      <div class="text-[var(--text-secondary)]">{{ $t('entertainment.admin.badgeCatalog.badges.tableUsage') }}</div>
+                      <div class="mt-1 font-mono text-[var(--text-primary)]">
                         {{ $t('entertainment.admin.badgeCatalog.badges.usage', { ownership: badge.ownershipCount || 0, avatar: badge.avatarUseCount || 0, instance: badge.instanceUseCount || 0 }) }}
                       </div>
                     </div>
                   </div>
-                  <div class="mt-4 flex flex-wrap gap-2">
-                    <button class="btn btn-xs btn-ghost" @click="openEditBadgeModal(badge)">{{ $t('common.edit') }}</button>
+                  <div class="mt-4 flex flex-wrap gap-2 pt-3 border-t border-[var(--border-color)]">
+                    <Button size="sm" variant="secondary" @click="openEditBadgeModal(badge)">
+                      <template #icon>
+                        <Pencil class="w-3.5 h-3.5" />
+                      </template>
+                      {{ $t('common.edit') }}
+                    </Button>
                     <template v-if="deletingBadgeId === badge.id">
-                      <button class="btn btn-xs btn-error" @click="deleteBadge(badge.id)">{{ $t('common.confirm') }}</button>
-                      <button class="btn btn-xs btn-ghost" @click="deletingBadgeId = null">{{ $t('common.cancel') }}</button>
+                      <Button size="sm" variant="danger" @click="deleteBadge(badge.id)">
+                        {{ $t('common.confirm') }}
+                      </Button>
+                      <Button size="sm" variant="secondary" @click="deletingBadgeId = null">
+                        {{ $t('common.cancel') }}
+                      </Button>
                     </template>
-                    <button v-else class="btn btn-xs btn-ghost text-red-500" @click="deletingBadgeId = badge.id">{{ $t('common.delete') }}</button>
+                    <Button
+                      v-else
+                      size="sm"
+                      variant="ghost"
+                      class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+                      @click="deletingBadgeId = badge.id"
+                    >
+                      <template #icon>
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </template>
+                      {{ $t('common.delete') }}
+                    </Button>
                   </div>
                 </div>
               </div>
+
+              <!-- PC 端定宽表格 (极度关键守卫) -->
               <div class="hidden overflow-hidden lg:block">
                 <table class="w-full table-fixed">
-                  <thead>
-                    <tr class="border-b border-themed">
-                      <th class="nimbus-th w-[26%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableBadge') }}</th>
-                      <th class="nimbus-th w-[15%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableSeries') }}</th>
-                      <th class="nimbus-th w-[20%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableAssetUrl') }}</th>
-                      <th class="nimbus-th w-[12%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableStatus') }}</th>
-                      <th class="nimbus-th w-[15%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableUsage') }}</th>
-                      <th class="nimbus-th w-[12%]">{{ $t('common.actions') }}</th>
+                  <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+                    <tr>
+                      <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[26%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableBadge') }}</th>
+                      <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[15%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableSeries') }}</th>
+                      <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[20%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableAssetUrl') }}</th>
+                      <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableStatus') }}</th>
+                      <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[15%]">{{ $t('entertainment.admin.badgeCatalog.badges.tableUsage') }}</th>
+                      <th class="text-right text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none w-[12%]">{{ $t('common.actions') }}</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-themed">
-                    <tr v-for="badge in filteredBadges" :key="badge.id" class="nimbus-row">
+                  <tbody class="divide-y divide-[var(--border-color)]">
+                    <tr v-for="badge in filteredBadges" :key="badge.id" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors duration-150">
                       <td class="px-4 py-3">
                         <div class="flex items-center gap-3">
-                          <img :src="badge.assetUrlLight || badge.assetUrl" :alt="badge.fullLabel" class="h-10 w-10 shrink-0 rounded-lg object-contain" loading="lazy" />
+                          <img :src="badge.assetUrlLight || badge.assetUrl" :alt="badge.fullLabel" class="h-10 w-10 shrink-0 rounded-xl object-contain bg-[var(--bg-surface-soft)] p-1 border border-[var(--border-color)]" loading="lazy" />
                           <div class="min-w-0">
-                            <div class="truncate text-sm font-semibold text-themed">{{ badge.name }}</div>
-                            <div class="truncate text-xs text-themed-muted">{{ badge.fullLabel }}</div>
-                            <div class="truncate text-xs text-themed-faint">{{ badge.id }}</div>
+                            <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ badge.name }}</div>
+                            <div class="truncate text-xs text-[var(--text-secondary)]">{{ badge.fullLabel }}</div>
+                            <div class="truncate font-mono text-[11px] text-[var(--text-tertiary)]">{{ badge.id }}</div>
                           </div>
                         </div>
                       </td>
-                      <td class="truncate px-4 py-3 text-sm text-themed">{{ badge.seriesNameZh || badge.seriesTitle }}</td>
-                      <td class="truncate px-4 py-3 text-xs text-themed-muted">{{ badge.assetUrl }}</td>
+                      <td class="truncate px-4 py-3 text-sm text-[var(--text-primary)] font-medium">{{ badge.seriesNameZh || badge.seriesTitle }}</td>
+                      <td class="truncate px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{{ badge.assetUrl }}</td>
                       <td class="px-4 py-3">
-                        <span :class="['badge badge-sm', badge.isActive && badge.seriesIsActive ? 'badge-success' : 'badge-ghost']">
+                        <Badge :variant="badge.isActive && badge.seriesIsActive ? 'success' : 'default'" size="sm">
                           {{ badge.isActive && badge.seriesIsActive ? $t('entertainment.admin.badgeCatalog.badges.drawable') : $t('entertainment.admin.badgeCatalog.badges.notDrawable') }}
-                        </span>
+                        </Badge>
                       </td>
-                      <td class="px-4 py-3 text-xs text-themed-muted">
+                      <td class="px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">
                         {{ $t('entertainment.admin.badgeCatalog.badges.usage', { ownership: badge.ownershipCount || 0, avatar: badge.avatarUseCount || 0, instance: badge.instanceUseCount || 0 }) }}
                       </td>
-                      <td class="px-4 py-3">
-                        <div class="flex items-center gap-2">
-                          <div class="relative inline-flex items-center group/tooltip">
-                            <button
-                              type="button"
-                              class="p-1 rounded text-themed-muted hover:text-themed transition-colors focus:outline-none cursor-pointer"
-                              :aria-label="$t('common.edit')"
-                              @click="openEditBadgeModal(badge)"
-                            >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <span
-                              class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
-                              role="tooltip"
-                            >
-                              {{ $t('common.edit') }}
-                            </span>
-                          </div>
-                          <div v-if="deletingBadgeId !== badge.id" class="relative inline-flex items-center group/tooltip">
-                            <button
-                              type="button"
-                              class="p-1 rounded text-rose-500 hover:text-rose-600 transition-colors focus:outline-none cursor-pointer"
-                              :aria-label="$t('common.delete')"
+                      <td class="px-4 py-3 text-right">
+                        <div class="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            :title="$t('common.edit')"
+                            @click="openEditBadgeModal(badge)"
+                          >
+                            <template #icon>
+                              <Pencil class="w-3.5 h-3.5" />
+                            </template>
+                          </Button>
+                          <div v-if="deletingBadgeId !== badge.id">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+                              :title="$t('common.delete')"
                               @click="deletingBadgeId = badge.id"
                             >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                            <span
-                              class="pointer-events-none invisible group-hover/tooltip:visible absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30 whitespace-nowrap rounded px-2 py-0.5 text-xs bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-strong)] shadow-md"
-                              role="tooltip"
-                            >
-                              {{ $t('common.delete') }}
-                            </span>
+                              <template #icon>
+                                <Trash2 class="w-3.5 h-3.5" />
+                              </template>
+                            </Button>
                           </div>
                           <template v-else>
                             <div class="inline-flex items-center gap-1">
-                              <button
-                                type="button"
-                                class="px-1.5 py-0.5 text-xs rounded font-medium bg-[var(--error)] text-white hover:brightness-110 transition-colors cursor-pointer"
+                              <Button
+                                size="sm"
+                                variant="danger"
                                 @click="deleteBadge(badge.id)"
                               >
                                 {{ $t('common.confirm') }}
-                              </button>
-                              <button
-                                type="button"
-                                class="px-1.5 py-0.5 text-xs rounded text-themed-muted hover:text-themed transition-colors cursor-pointer"
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
                                 @click="deletingBadgeId = null"
                               >
                                 {{ $t('common.cancel') }}
-                              </button>
+                              </Button>
                             </div>
                           </template>
                         </div>
@@ -1633,16 +1917,16 @@ function getSeriesTitle(seriesId: string): string {
                 </table>
               </div>
             </template>
-          </div>
+          </Card>
         </div>
       </template>
     </div>
 
-    <!-- 创建/编辑抽奖弹窗 -->
+    <!-- 1. 创建/编辑抽奖弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div 
-          v-if="showLotteryModal" 
+        <div
+          v-if="showLotteryModal"
           class="modal-overlay"
           @click.self="showLotteryModal = false"
         >
@@ -1652,127 +1936,135 @@ function getSeriesTitle(seriesId: string): string {
               <h3 class="modal-title">
                 {{ editingLottery ? $t('entertainment.admin.editLottery') : $t('entertainment.admin.createLottery') }}
               </h3>
-              <button class="btn btn-ghost btn-sm" @click="showLotteryModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors select-none cursor-pointer"
+                @click="showLotteryModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
-            
+
             <div class="modal-body space-y-4">
               <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.lotteryName') }}</label>
-                <input 
+                <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.lotteryName') }}</label>
+                <Input
                   v-model="lotteryForm.name"
-                  type="text" 
-                  class="input w-full"
                   :placeholder="$t('entertainment.admin.enterLotteryName')"
                 />
               </div>
-              
+
               <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.lotteryDesc') }}</label>
-                <textarea 
+                <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.lotteryDesc') }}</label>
+                <textarea
                   v-model="lotteryForm.description"
-                  class="input w-full h-20 resize-none"
+                  class="w-full h-20 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all resize-none"
                   :placeholder="$t('entertainment.admin.enterDescription')"
                 ></textarea>
               </div>
-              
+
               <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.costPoints') }}</label>
-                <input 
+                <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.costPoints') }}</label>
+                <Input
                   v-model.number="lotteryForm.costPoints"
-                  type="number" 
-                  class="input w-full"
-                  min="1"
+                  type="number"
+                  :min="1"
                 />
               </div>
-              
+
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.startAt') }}</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.startAt') }}</label>
+                  <input
                     v-model="lotteryForm.startAt"
-                    type="date" 
-                    class="input w-full"
+                    type="date"
+                    class="w-full h-10 px-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.endAt') }}</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.endAt') }}</label>
+                  <input
                     v-model="lotteryForm.endAt"
-                    type="date" 
-                    class="input w-full"
+                    type="date"
+                    class="w-full h-10 px-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
                   />
                 </div>
               </div>
-              
-              <div class="flex items-center gap-2">
-                <input 
-                  id="isActive"
-                  v-model="lotteryForm.isActive" 
-                  type="checkbox"
-                  class="checkbox"
-                />
-                <label for="isActive" class="text-sm text-themed">{{ $t('entertainment.admin.isActive') }}</label>
+
+              <div class="pt-2">
+                <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    id="isActive"
+                    v-model="lotteryForm.isActive"
+                    type="checkbox"
+                    class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
+                  />
+                  <span class="text-sm font-medium text-[var(--text-primary)]">{{ $t('entertainment.admin.isActive') }}</span>
+                </label>
               </div>
             </div>
-            
+
             <div class="modal-footer">
-              <button class="btn btn-secondary" @click="showLotteryModal = false">{{ $t('common.cancel') }}</button>
-              <button class="btn btn-primary" :disabled="savingLottery" @click="saveLottery">
+              <Button variant="secondary" @click="showLotteryModal = false">
+                {{ $t('common.cancel') }}
+              </Button>
+              <Button variant="primary" :loading="savingLottery" @click="saveLottery">
                 {{ savingLottery ? $t('common.saving') : $t('common.save') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- 奖品管理弹窗 -->
+    <!-- 2. 奖品管理弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div 
-          v-if="showPrizesModal" 
+        <div
+          v-if="showPrizesModal"
           class="modal-overlay"
           @click.self="showPrizesModal = false"
         >
           <div class="modal-backdrop" @click="showPrizesModal = false"></div>
           <div class="modal-content max-w-2xl">
             <div class="modal-header">
-              <h3 class="modal-title">
+              <h3 class="modal-title truncate">
                 {{ $t('entertainment.admin.managePrizes') }} - {{ editingPrizes?.name }}
               </h3>
               <div class="flex items-center gap-2">
-                <button class="btn btn-sm btn-primary" @click="addPrize">
-                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                  </svg>
+                <Button variant="primary" size="sm" @click="addPrize">
+                  <template #icon>
+                    <Plus class="w-3.5 h-3.5" />
+                  </template>
                   {{ $t('entertainment.admin.addPrize') }}
-                </button>
-                <button class="btn btn-ghost btn-sm" @click="showPrizesModal = false">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                </Button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors select-none cursor-pointer"
+                  @click="showPrizesModal = false"
+                >
+                  <X class="w-4 h-4" />
                 </button>
               </div>
             </div>
-            
-            <div class="modal-body space-y-3">
-              <div 
-                v-for="(prize, index) in prizes" 
+
+            <div class="modal-body space-y-4">
+              <div
+                v-for="(prize, index) in prizes"
                 :key="index"
-                class="p-3.5 border border-themed rounded-lg bg-themed-secondary"
+                class="p-4 border border-[var(--border-color)] rounded-2xl bg-[var(--bg-surface-soft)] space-y-3"
               >
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs text-themed-muted mb-1">{{ $t('entertainment.admin.prizeName') }}</label>
-                    <input v-model="prize.name" type="text" class="input input-sm w-full" />
+                    <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.prizeName') }}</label>
+                    <Input v-model="prize.name" size="sm" />
                   </div>
                   <div>
-                    <label class="block text-xs text-themed-muted mb-1">{{ $t('entertainment.admin.prizeType') }}</label>
-                    <select v-model="prize.type" class="input input-sm w-full">
+                    <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.prizeType') }}</label>
+                    <select
+                      v-model="prize.type"
+                      class="w-full h-8 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
+                    >
                       <option value="nothing">{{ $t('entertainment.prizeTypes.nothing') }}</option>
                       <option value="points">{{ $t('entertainment.prizeTypes.points') }}</option>
                       <option value="balance">{{ $t('entertainment.prizeTypes.balance') }}</option>
@@ -1785,18 +2077,19 @@ function getSeriesTitle(seriesId: string): string {
                     </select>
                   </div>
                 </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div v-if="prize.type !== 'nothing' && prize.type !== 'badge'">
-                    <label class="block text-xs text-themed-muted mb-1">
+                    <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
                       {{ prize.type === 'balance' ? $t('entertainment.admin.balanceValue') : $t('entertainment.admin.prizeValue') }}
-                      <span v-if="prize.type === 'cpu'" class="text-themed-muted">(%)</span>
-                      <span v-else-if="prize.type === 'memory' || prize.type === 'disk'" class="text-themed-muted">(MB)</span>
-                      <span v-else-if="prize.type === 'traffic'" class="text-themed-muted">(GB)</span>
+                      <span v-if="prize.type === 'cpu'" class="text-[var(--text-tertiary)]">(%)</span>
+                      <span v-else-if="prize.type === 'memory' || prize.type === 'disk'" class="text-[var(--text-tertiary)]">(MB)</span>
+                      <span v-else-if="prize.type === 'traffic'" class="text-[var(--text-tertiary)]">(GB)</span>
                     </label>
-                    <input 
-                      v-model.number="prize.value" 
-                      type="number" 
-                      class="input input-sm w-full"
+                    <Input
+                      v-model.number="prize.value"
+                      type="number"
+                      size="sm"
                       :placeholder="prize.type === 'balance' ? $t('entertainment.admin.balanceCents') : 
                         prize.type === 'cpu' ? $t('entertainment.admin.cpuPercent') :
                         prize.type === 'memory' ? $t('entertainment.admin.memoryMB') :
@@ -1805,15 +2098,21 @@ function getSeriesTitle(seriesId: string): string {
                     />
                   </div>
                   <div>
-                    <label class="block text-xs text-themed-muted mb-1">{{ $t('entertainment.admin.probability') }}</label>
-                    <input v-model.number="prize.probability" type="number" class="input input-sm w-full" min="0.01" step="0.01" />
+                    <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.probability') }}</label>
+                    <Input
+                      v-model.number="prize.probability"
+                      type="number"
+                      size="sm"
+                      :min="0.01"
+                      :step="0.01"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs text-themed-muted mb-1">{{ $t('entertainment.admin.quantity') }}</label>
-                    <input 
-                      v-model.number="prize.totalQuantity" 
-                      type="number" 
-                      class="input input-sm w-full" 
+                    <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.quantity') }}</label>
+                    <Input
+                      v-model.number="prize.totalQuantity"
+                      type="number"
+                      size="sm"
                       :placeholder="$t('entertainment.admin.unlimited')"
                       :disabled="prize.type === 'points' || prize.type === 'nothing'"
                       :title="(prize.type === 'points' || prize.type === 'nothing') ? $t('entertainment.admin.noQuantityForType') : ''"
@@ -1821,182 +2120,198 @@ function getSeriesTitle(seriesId: string): string {
                   </div>
                   <!-- 补充库存（仅对有数量限制的非 points/nothing 奖品显示） -->
                   <div v-if="prize.id && prize.type !== 'points' && prize.type !== 'nothing' && prize.totalQuantity">
-                    <label class="block text-xs text-themed-muted mb-1">
+                    <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
                       {{ $t('entertainment.admin.replenish') }}
-                      <span class="text-themed-muted">({{ $t('entertainment.admin.remaining') }}: {{ prize.remainQuantity ?? 0 }})</span>
+                      <span class="text-[var(--text-tertiary)]">({{ $t('entertainment.admin.remaining') }}: {{ prize.remainQuantity ?? 0 }})</span>
                     </label>
-                    <input 
-                      v-model.number="prize.replenishAmount" 
-                      type="number" 
-                      class="input input-sm w-full" 
-                      min="0"
+                    <Input
+                      v-model.number="prize.replenishAmount"
+                      type="number"
+                      size="sm"
+                      :min="0"
                       :placeholder="$t('entertainment.admin.replenishPlaceholder')"
                     />
                   </div>
                 </div>
-                <div v-if="prize.type === 'instance'" class="mt-2">
-                  <label class="block text-xs text-themed-muted mb-1">{{ $t('entertainment.admin.instanceDesc') }}</label>
-                  <input v-model="prize.instanceDesc" type="text" class="input input-sm w-full" :placeholder="$t('entertainment.admin.instanceDescPlaceholder')" />
+
+                <div v-if="prize.type === 'instance'">
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.instanceDesc') }}</label>
+                  <Input
+                    v-model="prize.instanceDesc"
+                    size="sm"
+                    :placeholder="$t('entertainment.admin.instanceDescPlaceholder')"
+                  />
                 </div>
-                <div class="flex justify-end mt-2">
-                  <button class="btn btn-xs btn-ghost text-red-500" @click="removePrize(index)">
+
+                <div class="flex justify-end pt-2 border-t border-[var(--border-color)]">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
+                    @click="removePrize(index)"
+                  >
+                    <template #icon>
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </template>
                     {{ $t('common.delete') }}
-                  </button>
+                  </Button>
                 </div>
               </div>
-              
-              <div v-if="prizes.length === 0" class="text-center text-themed-muted py-4">
-                {{ $t('entertainment.admin.noPrizes') }}
+
+              <div v-if="prizes.length === 0" class="py-8">
+                <EmptyState :title="$t('entertainment.admin.noPrizes')" />
               </div>
             </div>
-            
+
             <div class="modal-footer">
-              <button class="btn btn-secondary" @click="showPrizesModal = false">{{ $t('common.cancel') }}</button>
-              <button class="btn btn-primary" :disabled="savingPrizes" @click="savePrizes">
+              <Button variant="secondary" @click="showPrizesModal = false">
+                {{ $t('common.cancel') }}
+              </Button>
+              <Button variant="primary" :loading="savingPrizes" @click="savePrizes">
                 {{ savingPrizes ? $t('common.saving') : $t('common.save') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- 通知配置弹窗 -->
+    <!-- 3. 通知配置弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div 
-          v-if="showNotificationModal" 
+        <div
+          v-if="showNotificationModal"
           class="modal-overlay"
           @click.self="showNotificationModal = false"
         >
           <div class="modal-backdrop" @click="showNotificationModal = false"></div>
           <div class="modal-content max-w-xl">
             <div class="modal-header">
-              <h3 class="modal-title">
+              <h3 class="modal-title truncate">
                 {{ $t('entertainment.admin.notification.title') }} - {{ editingNotification?.name }}
               </h3>
-              <button class="btn btn-ghost btn-sm" @click="showNotificationModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors select-none cursor-pointer"
+                @click="showNotificationModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
-            
+
             <div class="modal-body space-y-4">
               <!-- 启用开关 -->
-              <div class="flex items-center justify-between">
-                <label class="text-sm font-medium text-themed">{{ $t('entertainment.admin.notification.enabled') }}</label>
-                <label class="relative inline-flex items-center cursor-pointer">
+              <div class="flex items-center justify-between p-3 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div>
+                  <div class="text-sm font-semibold text-[var(--text-primary)]">{{ $t('entertainment.admin.notification.enabled') }}</div>
+                  <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ $t('entertainment.admin.notification.title') }}</div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer select-none">
                   <input v-model="notificationForm.enabled" type="checkbox" class="sr-only peer">
-                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                  <div class="w-11 h-6 bg-[var(--bg-tertiary)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
                 </label>
               </div>
-              
+
               <!-- 通知方式选择 -->
               <div>
-                <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.notification.type') }}</label>
-                <select v-model="notificationForm.type" class="input w-full">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.notification.type') }}</label>
+                <select
+                  v-model="notificationForm.type"
+                  class="w-full h-10 px-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
+                >
                   <option value="telegram">Telegram</option>
                   <option value="discord">Discord</option>
                   <option value="webhook">Webhook</option>
                 </select>
               </div>
-              
+
               <!-- Telegram 配置 -->
               <template v-if="notificationForm.type === 'telegram'">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">Bot Token</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Bot Token</label>
+                  <Input
                     v-model="notificationForm.telegramBotToken"
-                    type="text" 
-                    class="input w-full"
                     placeholder="123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">Chat ID</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Chat ID</label>
+                  <Input
                     v-model="notificationForm.telegramChatId"
-                    type="text" 
-                    class="input w-full"
                     placeholder="-1001234567890"
                   />
                 </div>
               </template>
-              
+
               <!-- Discord 配置 -->
               <template v-if="notificationForm.type === 'discord'">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">Webhook URL</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Webhook URL</label>
+                  <Input
                     v-model="notificationForm.discordWebhookUrl"
-                    type="text" 
-                    class="input w-full"
                     placeholder="https://discord.com/api/webhooks/..."
                   />
                 </div>
               </template>
-              
+
               <!-- Webhook 配置 -->
               <template v-if="notificationForm.type === 'webhook'">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">Webhook URL</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Webhook URL</label>
+                  <Input
                     v-model="notificationForm.webhookUrl"
-                    type="text" 
-                    class="input w-full"
                     placeholder="https://your-server.com/webhook"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.notification.secret') }}</label>
-                  <input 
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.notification.secret') }}</label>
+                  <Input
                     v-model="notificationForm.webhookSecret"
-                    type="text" 
-                    class="input w-full"
                     :placeholder="$t('entertainment.admin.notification.secretPlaceholder')"
                   />
                 </div>
               </template>
-              
+
               <!-- 通知条件 -->
-              <div class="border-t border-themed pt-4">
-                <label class="block text-sm font-medium text-themed mb-2">{{ $t('entertainment.admin.notification.conditions') }}</label>
+              <div class="border-t border-[var(--border-color)] pt-4">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-2">{{ $t('entertainment.admin.notification.conditions') }}</label>
                 <div class="space-y-2">
-                  <div class="flex items-center gap-2">
-                    <input 
+                  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
                       id="notifyBalance"
-                      v-model="notificationForm.notifyBalance" 
+                      v-model="notificationForm.notifyBalance"
                       type="checkbox"
-                      class="checkbox"
+                      class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
                     />
-                    <label for="notifyBalance" class="text-sm text-themed">{{ $t('entertainment.admin.notification.notifyBalance') }}</label>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <input 
+                    <span class="text-sm text-[var(--text-primary)]">{{ $t('entertainment.admin.notification.notifyBalance') }}</span>
+                  </label>
+                  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
                       id="notifyInstance"
-                      v-model="notificationForm.notifyInstance" 
+                      v-model="notificationForm.notifyInstance"
                       type="checkbox"
-                      class="checkbox"
+                      class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
                     />
-                    <label for="notifyInstance" class="text-sm text-themed">{{ $t('entertainment.admin.notification.notifyInstance') }}</label>
-                  </div>
+                    <span class="text-sm text-[var(--text-primary)]">{{ $t('entertainment.admin.notification.notifyInstance') }}</span>
+                  </label>
                 </div>
               </div>
             </div>
-            
+
             <div class="modal-footer">
-              <button class="btn btn-secondary" @click="showNotificationModal = false">{{ $t('common.cancel') }}</button>
-              <button class="btn btn-primary" :disabled="savingNotification" @click="saveNotification">
+              <Button variant="secondary" @click="showNotificationModal = false">
+                {{ $t('common.cancel') }}
+              </Button>
+              <Button variant="primary" :loading="savingNotification" @click="saveNotification">
                 {{ savingNotification ? $t('common.saving') : $t('common.save') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- 系列编辑弹窗 -->
+    <!-- 4. 系列编辑弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
         <div
@@ -2010,64 +2325,89 @@ function getSeriesTitle(seriesId: string): string {
               <h3 class="modal-title">
                 {{ editingSeries ? $t('entertainment.admin.badgeCatalog.series.editTitle') : $t('entertainment.admin.badgeCatalog.series.createTitle') }}
               </h3>
-              <button class="btn btn-ghost btn-sm" @click="showSeriesModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors select-none cursor-pointer"
+                @click="showSeriesModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
+
             <div class="modal-body space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.id') }}</label>
-                  <input v-model="seriesForm.id" type="text" class="input w-full" :disabled="!!editingSeries" placeholder="supreme" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.id') }}</label>
+                  <Input
+                    v-model="seriesForm.id"
+                    :disabled="!!editingSeries"
+                    placeholder="supreme"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sort') }}</label>
-                  <input v-model.number="seriesForm.displayOrder" type="number" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.sort') }}</label>
+                  <Input
+                    v-model.number="seriesForm.displayOrder"
+                    type="number"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.nameZh') }}</label>
-                  <input v-model="seriesForm.nameZh" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.nameZh') }}</label>
+                  <Input v-model="seriesForm.nameZh" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.nameEn') }}</label>
-                  <input v-model="seriesForm.nameEn" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.nameEn') }}</label>
+                  <Input v-model="seriesForm.nameEn" />
                 </div>
                 <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.titleLabel') }}</label>
-                  <input v-model="seriesForm.title" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.series.titlePlaceholder')" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.titleLabel') }}</label>
+                  <Input
+                    v-model="seriesForm.title"
+                    :placeholder="$t('entertainment.admin.badgeCatalog.series.titlePlaceholder')"
+                  />
                 </div>
                 <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.descriptionLabel') }}</label>
-                  <textarea v-model="seriesForm.description" class="input w-full h-20 resize-none"></textarea>
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.descriptionLabel') }}</label>
+                  <textarea
+                    v-model="seriesForm.description"
+                    class="w-full h-20 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all resize-none"
+                  ></textarea>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sourceId') }}</label>
-                  <input v-model="seriesForm.sourceId" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.sourceId') }}</label>
+                  <Input v-model="seriesForm.sourceId" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.series.sourceLabel') }}</label>
-                  <input v-model="seriesForm.sourceLabel" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.series.sourceLabel') }}</label>
+                  <Input v-model="seriesForm.sourceLabel" />
                 </div>
-                <label class="flex items-center gap-2 sm:col-span-2 text-sm text-themed">
-                  <input v-model="seriesForm.isActive" type="checkbox" class="checkbox" />
-                  {{ $t('entertainment.admin.badgeCatalog.series.enable') }}
-                </label>
+                <div class="sm:col-span-2 pt-2">
+                  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      v-model="seriesForm.isActive"
+                      type="checkbox"
+                      class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
+                    />
+                    <span class="text-sm font-medium text-[var(--text-primary)]">{{ $t('entertainment.admin.badgeCatalog.series.enable') }}</span>
+                  </label>
+                </div>
               </div>
             </div>
+
             <div class="modal-footer">
-              <button class="btn btn-secondary" @click="showSeriesModal = false">{{ $t('common.cancel') }}</button>
-              <button class="btn btn-primary" :disabled="savingSeries" @click="saveSeries">
+              <Button variant="secondary" @click="showSeriesModal = false">
+                {{ $t('common.cancel') }}
+              </Button>
+              <Button variant="primary" :loading="savingSeries" @click="saveSeries">
                 {{ savingSeries ? $t('common.saving') : $t('common.save') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- 徽章编辑弹窗 -->
+    <!-- 5. 徽章编辑弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
         <div
@@ -2081,90 +2421,134 @@ function getSeriesTitle(seriesId: string): string {
               <h3 class="modal-title">
                 {{ editingBadge ? $t('entertainment.admin.badgeCatalog.badges.editTitle') : $t('entertainment.admin.badgeCatalog.badges.createTitle') }}
               </h3>
-              <button class="btn btn-ghost btn-sm" @click="showBadgeModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors select-none cursor-pointer"
+                @click="showBadgeModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
+
             <div class="modal-body space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.id') }}</label>
-                  <input v-model="badgeForm.id" type="text" class="input w-full" :disabled="!!editingBadge" placeholder="elite" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.id') }}</label>
+                  <Input
+                    v-model="badgeForm.id"
+                    :disabled="!!editingBadge"
+                    placeholder="elite"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.series') }}</label>
-                  <select v-model="badgeForm.seriesId" class="input w-full">
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.series') }}</label>
+                  <select
+                    v-model="badgeForm.seriesId"
+                    class="w-full h-10 px-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 transition-all cursor-pointer"
+                  >
                     <option v-for="series in badgeSeries" :key="series.id" :value="series.id">
                       {{ series.nameZh }} · {{ series.id }}
                     </option>
                   </select>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.name') }}</label>
-                  <input v-model="badgeForm.name" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.name') }}</label>
+                  <Input v-model="badgeForm.name" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.nameEn') }}</label>
-                  <input v-model="badgeForm.nameEn" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.nameEn') }}</label>
+                  <Input v-model="badgeForm.nameEn" />
                 </div>
                 <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.fullLabel') }}</label>
-                  <input v-model="badgeForm.fullLabel" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.badges.fullLabelPlaceholder')" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.fullLabel') }}</label>
+                  <Input
+                    v-model="badgeForm.fullLabel"
+                    :placeholder="$t('entertainment.admin.badgeCatalog.badges.fullLabelPlaceholder')"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sourceId') }}</label>
-                  <input v-model="badgeForm.sourceId" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.sourceId') }}</label>
+                  <Input v-model="badgeForm.sourceId" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sourceLabel') }}</label>
-                  <input v-model="badgeForm.sourceLabel" type="text" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.sourceLabel') }}</label>
+                  <Input v-model="badgeForm.sourceLabel" />
                 </div>
                 <div class="sm:col-span-2">
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrl') }}</label>
-                  <input v-model="badgeForm.assetUrl" type="text" class="input w-full" :placeholder="$t('entertainment.admin.badgeCatalog.badges.assetUrlPlaceholder')" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrl') }}</label>
+                  <Input
+                    v-model="badgeForm.assetUrl"
+                    :placeholder="$t('entertainment.admin.badgeCatalog.badges.assetUrlPlaceholder')"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlDark') }}</label>
-                  <input v-model="badgeForm.assetUrlDark" type="text" class="input w-full" placeholder="/badges/dark/elite.svg" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlDark') }}</label>
+                  <Input
+                    v-model="badgeForm.assetUrlDark"
+                    placeholder="/badges/dark/elite.svg"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlLight') }}</label>
-                  <input v-model="badgeForm.assetUrlLight" type="text" class="input w-full" placeholder="/badges/light/elite.svg" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.assetUrlLight') }}</label>
+                  <Input
+                    v-model="badgeForm.assetUrlLight"
+                    placeholder="/badges/light/elite.svg"
+                  />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ $t('entertainment.admin.badgeCatalog.badges.sort') }}</label>
-                  <input v-model.number="badgeForm.displayOrder" type="number" class="input w-full" />
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">{{ $t('entertainment.admin.badgeCatalog.badges.sort') }}</label>
+                  <Input
+                    v-model.number="badgeForm.displayOrder"
+                    type="number"
+                  />
                 </div>
-                <label class="flex items-center gap-2 text-sm text-themed self-end pb-3">
-                  <input v-model="badgeForm.isActive" type="checkbox" class="checkbox" />
-                  {{ $t('entertainment.admin.badgeCatalog.badges.enable') }}
-                </label>
+                <div class="flex items-end pb-3">
+                  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      v-model="badgeForm.isActive"
+                      type="checkbox"
+                      class="w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer"
+                    />
+                    <span class="text-sm font-medium text-[var(--text-primary)]">{{ $t('entertainment.admin.badgeCatalog.badges.enable') }}</span>
+                  </label>
+                </div>
               </div>
-              <div class="mt-4 rounded-lg border border-themed p-4 bg-themed-secondary">
-                <div class="text-sm font-medium text-themed mb-3">{{ $t('entertainment.admin.badgeCatalog.badges.preview') }}</div>
+
+              <!-- 实时预览 Card -->
+              <div class="mt-4 rounded-2xl border border-[var(--border-color)] p-4 bg-[var(--bg-surface-soft)]">
+                <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3">
+                  {{ $t('entertainment.admin.badgeCatalog.badges.preview') }}
+                </div>
                 <div class="flex items-center gap-4">
                   <img
                     v-if="badgeForm.assetUrl"
                     :src="badgeForm.assetUrlLight || badgeForm.assetUrl"
                     :alt="badgeForm.fullLabel || badgeForm.id"
-                    class="w-16 h-16 object-contain rounded-xl"
+                    class="w-16 h-16 object-contain rounded-2xl bg-[var(--bg-surface)] p-2 border border-[var(--border-color)] shadow-sm"
                     loading="lazy"
                   />
                   <div>
-                    <div class="text-base font-semibold text-themed">{{ badgeForm.name || $t('entertainment.admin.badgeCatalog.badges.previewName') }}</div>
-                    <div class="text-sm text-themed-muted">{{ badgeForm.fullLabel || $t('entertainment.admin.badgeCatalog.badges.previewLabel') }}</div>
-                    <div class="text-xs text-themed-faint mt-1">{{ badgeForm.id || 'badge-id' }}</div>
+                    <div class="text-base font-semibold text-[var(--text-primary)]">
+                      {{ badgeForm.name || $t('entertainment.admin.badgeCatalog.badges.previewName') }}
+                    </div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-0.5">
+                      {{ badgeForm.fullLabel || $t('entertainment.admin.badgeCatalog.badges.previewLabel') }}
+                    </div>
+                    <div class="font-mono text-[11px] text-[var(--text-tertiary)] mt-1">
+                      {{ badgeForm.id || 'badge-id' }}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
             <div class="modal-footer">
-              <button class="btn btn-secondary" @click="showBadgeModal = false">{{ $t('common.cancel') }}</button>
-              <button class="btn btn-primary" :disabled="savingBadge" @click="saveBadge">
+              <Button variant="secondary" @click="showBadgeModal = false">
+                {{ $t('common.cancel') }}
+              </Button>
+              <Button variant="primary" :loading="savingBadge" @click="saveBadge">
                 {{ savingBadge ? $t('common.saving') : $t('common.save') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2172,103 +2556,3 @@ function getSeriesTitle(seriesId: string): string {
     </Teleport>
   </div>
 </template>
-
-<style scoped>
-/* Nimbus admin kit */
-.nimbus-title-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  color: var(--kawaii-primary);
-  background: color-mix(in srgb, var(--kawaii-primary) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 28%, transparent);
-}
-
-.nimbus-stat {
-  position: relative;
-  overflow: hidden;
-}
-
-.nimbus-stat::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 2.25rem;
-  height: 2px;
-  background: var(--kawaii-primary);
-  border-radius: 0 0 2px 0;
-}
-
-.nimbus-stat-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--kawaii-faint);
-}
-
-.nimbus-stat-value {
-  margin-top: 0.5rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.1;
-  color: var(--kawaii-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.nimbus-th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--kawaii-faint);
-  white-space: nowrap;
-}
-
-.nimbus-row {
-  transition: background-color 0.12s ease;
-}
-
-.nimbus-row:hover {
-  background: color-mix(in srgb, var(--kawaii-primary) 5%, transparent);
-}
-
-.nimbus-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
-  background: color-mix(in srgb, currentColor 10%, transparent);
-}
-
-.nimbus-pill .dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 9999px;
-  background: currentColor;
-}
-
-.nimbus-field-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--kawaii-muted);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-row {
-    transition: none;
-  }
-}
-</style>

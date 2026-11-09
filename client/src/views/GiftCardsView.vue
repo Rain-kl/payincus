@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Copy, Eye, EyeOff } from 'lucide-vue-next'
+import { Copy, Eye, EyeOff, Gift, PlusCircle, RefreshCw, ShieldCheck, Sparkles } from 'lucide-vue-next'
 import api from '@/api'
-import IconButton from '@/components/IconButton.vue'
 import { useToast } from '@/stores/toast'
 import { useThemeStore } from '@/stores/theme'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  type BadgeVariant
+} from '@/components/ui'
 import type { GiftCardRecord, GiftCardStatus } from '@/types/api'
 
 const { t, locale } = useI18n()
@@ -14,13 +24,16 @@ const toast = useToast()
 const themeStore = useThemeStore()
 
 const redeemCode = ref('')
-const generateAmount = ref<number | null>(null)
+const generateAmount = ref<number | string>('')
 const generateRemark = ref('')
 const cards = ref<GiftCardRecord[]>([])
 const loading = ref(false)
 const redeeming = ref(false)
 const generating = ref(false)
 const statusFilter = ref<GiftCardStatus | ''>('')
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 const lastGeneratedCode = ref('')
 const revealedCodeIds = ref<Set<number>>(new Set())
 const turnstileEnabled = ref(false)
@@ -60,13 +73,19 @@ function statusLabel(status: GiftCardStatus): string {
   return t(`giftCards.status.${status}`)
 }
 
-function statusClass(status: GiftCardStatus): string {
-  return {
-    active: 'text-green-500',
-    used: 'text-themed-muted',
-    disabled: 'text-gray-400 dark:text-gray-500',
-    expired: 'text-red-500'
-  }[status]
+function badgeVariant(status: GiftCardStatus): BadgeVariant {
+  switch (status) {
+    case 'active':
+      return 'success'
+    case 'used':
+      return 'default'
+    case 'disabled':
+      return 'warning'
+    case 'expired':
+      return 'error'
+    default:
+      return 'default'
+  }
 }
 
 function maskGiftCardCode(code: string): string {
@@ -109,11 +128,12 @@ async function loadCards(): Promise<void> {
   loading.value = true
   try {
     const response = await api.giftCards.mine({
-      page: 1,
-      pageSize: 100,
+      page: page.value,
+      pageSize: pageSize.value,
       status: statusFilter.value || undefined
     })
     cards.value = response.records
+    total.value = response.total
     revealedCodeIds.value = new Set()
   } catch (err: any) {
     toast.error(t('giftCards.toast.loadFailed', { message: err?.message || String(err) }))
@@ -184,6 +204,7 @@ async function redeemGiftCard(): Promise<void> {
     const response = await api.giftCards.redeem(code, token)
     toast.success(t('giftCards.toast.redeemSuccess', { amount: formatMoney(response.amount) }))
     redeemCode.value = ''
+    page.value = 1
     await loadCards()
   } catch (err: any) {
     toast.error(t('giftCards.toast.redeemFailed', { message: err?.message || String(err) }))
@@ -206,8 +227,9 @@ async function generateGiftCard(): Promise<void> {
     const response = await api.giftCards.generate(amount, generateRemark.value.trim() || undefined, token)
     lastGeneratedCode.value = response.giftCard.code
     toast.success(t('giftCards.toast.generateSuccess', { balance: formatMoney(response.newBalance) }))
-    generateAmount.value = null
+    generateAmount.value = ''
     generateRemark.value = ''
+    page.value = 1
     await loadCards()
   } catch (err: any) {
     toast.error(t('giftCards.toast.generateFailed', { message: err?.message || String(err) }))
@@ -222,200 +244,365 @@ async function copyCode(code: string): Promise<void> {
   toast.success(t('giftCards.toast.copied'))
 }
 
+function onStatusFilterChange(): void {
+  page.value = 1
+  loadCards()
+}
+
+function onPageChange(newPage: number): void {
+  page.value = newPage
+  loadCards()
+}
+
+function onPageSizeChange(newSize: number): void {
+  pageSize.value = newSize
+  page.value = 1
+  loadCards()
+}
+
+function onPaginationChange(payload: { page: number; pageSize: number }): void {
+  page.value = payload.page
+  pageSize.value = payload.pageSize
+  loadCards()
+}
+
 onMounted(async () => {
   await Promise.all([loadTurnstileConfig(), loadCards()])
 })
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ t('nav.giftCards') }}</h1>
-        <p class="page-description">{{ t('giftCards.description') }}</p>
+  <div class="kawaii-page space-y-6 md:space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
+    <!-- Apple HIG Page Header -->
+    <PageHeader
+      :title="t('nav.giftCards')"
+      :description="t('giftCards.description')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :loading="loading"
+          @click="loadCards"
+        >
+          <template #icon>
+            <RefreshCw class="w-3.5 h-3.5 stroke-[2]" />
+          </template>
+          {{ loading ? t('giftCards.loading') : t('giftCards.refresh') }}
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- Last Generated Code Notice -->
+    <div
+      v-if="lastGeneratedCode"
+      class="rounded-2xl border border-[color-mix(in_srgb,var(--warning)_30%,var(--border-color))] bg-[color-mix(in_srgb,var(--warning)_8%,var(--bg-surface))] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300"
+    >
+      <div class="flex items-center gap-2.5 text-sm font-semibold text-[var(--warning)]">
+        <Sparkles class="h-4 w-4 shrink-0 stroke-[2]" />
+        <span>{{ t('giftCards.lastCodeNotice') }}</span>
       </div>
-      <button class="btn btn-secondary" :disabled="loading" @click="loadCards">
-        <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
-        {{ loading ? t('giftCards.loading') : t('giftCards.refresh') }}
-      </button>
+      <div class="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+        <code class="min-w-0 flex-1 break-all rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2.5 font-mono text-xs tabular-nums text-[var(--text-primary)] shadow-sm">
+          {{ lastGeneratedCode }}
+        </code>
+        <Button
+          variant="secondary"
+          size="sm"
+          class="shrink-0"
+          @click="copyCode(lastGeneratedCode)"
+        >
+          <template #icon>
+            <Copy class="w-3.5 h-3.5" />
+          </template>
+          {{ t('giftCards.copy') }}
+        </Button>
+      </div>
     </div>
 
-    <div v-if="lastGeneratedCode" class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-      <div class="flex items-center gap-2 text-sm font-semibold">
-        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-        {{ t('giftCards.lastCodeNotice') }}
+    <!-- Turnstile Challenge Card (if required) -->
+    <Card v-if="isTurnstileChallengeAvailable" padding="md">
+      <div class="flex items-start gap-3.5">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
+          <ShieldCheck class="h-5 w-5 stroke-[2]" />
+        </div>
+        <div class="min-w-0">
+          <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+            {{ t('giftCards.turnstileTitle') }}
+          </h2>
+          <p class="mt-1 text-sm text-[var(--text-secondary)]">
+            {{ t('giftCards.turnstileDescription') }}
+          </p>
+        </div>
       </div>
-      <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <code class="min-w-0 flex-1 break-all rounded-lg bg-white/70 p-2.5 font-mono text-xs tabular-nums dark:bg-black/30">{{ lastGeneratedCode }}</code>
-        <button class="btn btn-sm btn-secondary shrink-0" @click="copyCode(lastGeneratedCode)">{{ t('giftCards.copy') }}</button>
+      <div class="mt-4">
+        <TurnstileWidget
+          ref="turnstileRef"
+          v-model="turnstileToken"
+          :site-key="turnstileSiteKey"
+          :theme="themeStore.isDark ? 'dark' : 'light'"
+          action="gift_card"
+          @verify="onTurnstileVerify"
+          @expire="onTurnstileExpire"
+          @error="onTurnstileError"
+        />
       </div>
-    </div>
+    </Card>
 
+    <!-- Action Cards Grid -->
     <div class="grid gap-6 lg:grid-cols-2">
-      <section v-if="isTurnstileChallengeAvailable" class="rounded-xl border border-themed bg-themed-surface p-6 lg:col-span-2">
-        <div class="flex items-start gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-          </span>
-          <div class="min-w-0">
-            <h2 class="text-base font-semibold text-themed">{{ t('giftCards.turnstileTitle') }}</h2>
-            <p class="mt-1 text-sm text-themed-muted">{{ t('giftCards.turnstileDescription') }}</p>
+      <!-- Redeem Gift Card Card -->
+      <Card padding="md">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
+            <Gift class="h-5 w-5 stroke-[2]" />
+          </div>
+          <div>
+            <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('giftCards.redeemTitle') }}
+            </h2>
           </div>
         </div>
-        <div class="mt-4">
-          <TurnstileWidget
-            ref="turnstileRef"
-            v-model="turnstileToken"
-            :site-key="turnstileSiteKey"
-            :theme="themeStore.isDark ? 'dark' : 'light'"
-            action="gift_card"
-            @verify="onTurnstileVerify"
-            @expire="onTurnstileExpire"
-            @error="onTurnstileError"
-          />
-        </div>
-      </section>
-
-      <section class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-6 shadow-sm">
-        <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-          </span>
-          <h2 class="text-base font-semibold text-themed">{{ t('giftCards.redeemTitle') }}</h2>
-        </div>
-        <div class="mt-4 flex flex-col gap-3 sm:flex-row">
-          <input v-model="redeemCode" class="input flex-1 font-mono" :placeholder="t('giftCards.redeemPlaceholder')" />
-          <button class="btn btn-primary shrink-0" :disabled="redeeming || !redeemCode.trim()" @click="redeemGiftCard">
+        <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div class="flex-1">
+            <Input
+              v-model="redeemCode"
+              class="font-mono text-sm"
+              :placeholder="t('giftCards.redeemPlaceholder')"
+              clearable
+              @enter="redeemGiftCard"
+            />
+          </div>
+          <Button
+            variant="primary"
+            class="shrink-0"
+            :loading="redeeming"
+            :disabled="redeeming || !redeemCode.trim()"
+            @click="redeemGiftCard"
+          >
             {{ redeeming ? t('giftCards.redeeming') : t('giftCards.redeem') }}
-          </button>
+          </Button>
         </div>
-      </section>
+      </Card>
 
-      <section class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-6 shadow-sm">
+      <!-- Generate Gift Card Card -->
+      <Card padding="md">
         <div class="flex items-center gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-          </span>
-          <h2 class="text-base font-semibold text-themed">{{ t('giftCards.generateTitle') }}</h2>
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
+            <PlusCircle class="h-5 w-5 stroke-[2]" />
+          </div>
+          <div>
+            <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('giftCards.generateTitle') }}
+            </h2>
+          </div>
         </div>
-        <div class="mt-4 grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)_auto]">
-          <input v-model.number="generateAmount" class="input font-mono tabular-nums" type="number" min="0.01" max="10000" step="0.01" :placeholder="t('giftCards.amountPlaceholder')" />
-          <input v-model="generateRemark" class="input" maxlength="200" :placeholder="t('giftCards.remarkPlaceholder')" />
-          <button class="btn btn-primary shrink-0" :disabled="generating || !generateAmount" @click="generateGiftCard">
+        <div class="mt-5 grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)_auto]">
+          <Input
+            v-model="generateAmount"
+            type="number"
+            class="font-mono tabular-nums text-sm"
+            :placeholder="t('giftCards.amountPlaceholder')"
+          />
+          <Input
+            v-model="generateRemark"
+            :maxlength="200"
+            class="text-sm"
+            :placeholder="t('giftCards.remarkPlaceholder')"
+            @enter="generateGiftCard"
+          />
+          <Button
+            variant="primary"
+            class="shrink-0"
+            :loading="generating"
+            :disabled="generating || !generateAmount || Number(generateAmount) <= 0"
+            @click="generateGiftCard"
+          >
             {{ generating ? t('giftCards.generating') : t('giftCards.generate') }}
-          </button>
+          </Button>
         </div>
-      </section>
+      </Card>
     </div>
 
-    <section class="rounded-xl border border-themed bg-themed-surface p-6 shadow-sm">
+    <!-- Gift Cards History Card -->
+    <Card padding="md">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 class="text-base font-semibold text-themed">{{ t('giftCards.mineTitle') }}</h2>
-          <p class="mt-1 text-sm font-mono tabular-nums text-themed-muted">{{ t('giftCards.activeTotal', { amount: formatMoney(totalActiveValue) }) }}</p>
+          <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+            {{ t('giftCards.mineTitle') }}
+          </h2>
+          <p class="mt-1 text-sm font-mono tabular-nums text-[var(--text-secondary)]">
+            {{ t('giftCards.activeTotal', { amount: formatMoney(totalActiveValue) }) }}
+          </p>
         </div>
-        <select v-model="statusFilter" class="input w-full md:w-44" @change="loadCards">
-          <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
+        <div class="w-full md:w-48">
+          <Select
+            v-model="statusFilter"
+            :options="statusOptions"
+            size="sm"
+            @change="onStatusFilterChange"
+          />
+        </div>
       </div>
 
+      <!-- Mobile List View -->
       <div class="mt-5 space-y-3 lg:hidden">
-        <div v-for="card in cards" :key="card.id" class="nimbus-lift rounded-xl border border-themed bg-themed p-4">
+        <div
+          v-for="card in cards"
+          :key="card.id"
+          class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] hover:border-[var(--border-hover)]"
+        >
           <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="text-xs uppercase tracking-wide text-themed-muted">{{ t('giftCards.code') }}</div>
-              <code class="mt-1 block break-all font-mono text-xs text-themed">{{ displayCardCode(card) }}</code>
+            <div class="min-w-0 flex-1">
+              <div class="text-xs uppercase tracking-wider text-[var(--text-tertiary)] font-medium">
+                {{ t('giftCards.code') }}
+              </div>
+              <code class="mt-1 block break-all font-mono text-xs text-[var(--text-primary)]">
+                {{ displayCardCode(card) }}
+              </code>
             </div>
-            <span class="shrink-0 text-sm font-medium" :class="statusClass(card.status)">{{ statusLabel(card.status) }}</span>
+            <Badge :variant="badgeVariant(card.status)" :dot="card.status === 'active'" size="sm">
+              {{ statusLabel(card.status) }}
+            </Badge>
           </div>
-          <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div class="mt-3.5 grid grid-cols-2 gap-3 text-sm border-t border-[var(--border-color)] pt-3">
             <div>
-              <div class="text-xs uppercase tracking-wide text-themed-muted">{{ t('giftCards.amount') }}</div>
-              <div class="font-mono font-semibold tabular-nums text-themed">{{ formatMoney(card.balanceValue) }}</div>
+              <div class="text-xs uppercase tracking-wider text-[var(--text-tertiary)] font-medium">
+                {{ t('giftCards.amount') }}
+              </div>
+              <div class="mt-0.5 font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                {{ formatMoney(card.balanceValue) }}
+              </div>
             </div>
             <div>
-              <div class="text-xs uppercase tracking-wide text-themed-muted">{{ t('giftCards.expiresAt') }}</div>
-              <div class="text-themed">{{ formatDate(card.expiresAt) }}</div>
+              <div class="text-xs uppercase tracking-wider text-[var(--text-tertiary)] font-medium">
+                {{ t('giftCards.expiresAt') }}
+              </div>
+              <div class="mt-0.5 text-xs text-[var(--text-secondary)]">
+                {{ formatDate(card.expiresAt) }}
+              </div>
             </div>
           </div>
           <div class="mt-4 flex gap-2">
-            <button class="btn btn-sm btn-secondary flex-1" @click="toggleCodeReveal(card)">
+            <Button
+              variant="secondary"
+              size="sm"
+              class="flex-1"
+              @click="toggleCodeReveal(card)"
+            >
+              <template #icon>
+                <EyeOff v-if="isCodeRevealed(card)" class="w-3.5 h-3.5" />
+                <Eye v-else class="w-3.5 h-3.5" />
+              </template>
               {{ isCodeRevealed(card) ? t('giftCards.hideCode') : t('giftCards.showCode') }}
-            </button>
-            <button class="btn btn-sm btn-secondary flex-1" @click="copyCode(card.code)">{{ t('giftCards.copy') }}</button>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              class="flex-1"
+              @click="copyCode(card.code)"
+            >
+              <template #icon>
+                <Copy class="w-3.5 h-3.5" />
+              </template>
+              {{ t('giftCards.copy') }}
+            </Button>
           </div>
         </div>
-        <div v-if="!loading && cards.length === 0" class="flex flex-col items-center gap-3 rounded-xl border border-dashed border-themed py-12 text-center">
-          <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-themed-secondary text-themed-faint">
-            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-          </span>
-          <p class="text-sm text-themed-muted">{{ t('giftCards.empty') }}</p>
+
+        <div v-if="!loading && cards.length === 0" class="rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-surface-soft)]/50">
+          <EmptyState :title="t('giftCards.empty')" />
         </div>
       </div>
 
+      <!-- Desktop Table View -->
       <div class="mt-5 hidden overflow-hidden lg:block">
-        <table class="w-full table-fixed text-sm">
-          <colgroup>
-            <col style="width: 28%" />
-            <col style="width: 16%" />
-            <col style="width: 14%" />
-            <col style="width: 24%" />
-            <col style="width: 18%" />
-          </colgroup>
-          <thead class="border-b border-themed text-left text-xs uppercase tracking-wide text-themed-muted">
-            <tr>
-              <th class="py-3 pr-4 font-medium">{{ t('giftCards.code') }}</th>
-              <th class="py-3 pr-4 font-medium">{{ t('giftCards.amount') }}</th>
-              <th class="py-3 pr-4 font-medium">{{ t('giftCards.statusTitle') }}</th>
-              <th class="py-3 pr-4 font-medium">{{ t('giftCards.expiresAt') }}</th>
-              <th class="py-3 pr-4 font-medium">{{ t('giftCards.action') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="card in cards" :key="card.id" class="border-b border-themed transition-colors hover:bg-themed-hover">
-              <td class="py-3 pr-4 font-mono text-xs text-themed">
-                <span class="block truncate">{{ displayCardCode(card) }}</span>
-              </td>
-              <td class="py-3 pr-4 font-mono tabular-nums text-themed">{{ formatMoney(card.balanceValue) }}</td>
-              <td class="py-3 pr-4 font-medium" :class="statusClass(card.status)">{{ statusLabel(card.status) }}</td>
-              <td class="py-3 pr-4 text-themed-muted">{{ formatDate(card.expiresAt) }}</td>
-              <td class="py-3 pr-4 whitespace-nowrap">
-                <div class="flex items-center gap-1">
-                  <IconButton :label="isCodeRevealed(card) ? t('giftCards.hideCode') : t('giftCards.showCode')" @click="toggleCodeReveal(card)"><EyeOff v-if="isCodeRevealed(card)" /><Eye v-else /></IconButton>
-                  <IconButton :label="t('giftCards.copy')" @click="copyCode(card.code)"><Copy /></IconButton>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!loading && cards.length === 0">
-              <td colspan="5" class="py-12 text-center">
-                <div class="flex flex-col items-center gap-3">
-                  <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-themed-secondary text-themed-faint">
-                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-                  </span>
-                  <p class="text-sm text-themed-muted">{{ t('giftCards.empty') }}</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)]">
+          <table class="w-full table-fixed text-sm">
+            <colgroup>
+              <col style="width: 28%" />
+              <col style="width: 16%" />
+              <col style="width: 14%" />
+              <col style="width: 24%" />
+              <col style="width: 18%" />
+            </colgroup>
+            <thead class="border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-left text-xs uppercase tracking-wider text-[var(--text-tertiary)] select-none">
+              <tr>
+                <th class="py-3.5 px-4 font-semibold">{{ t('giftCards.code') }}</th>
+                <th class="py-3.5 px-4 font-semibold">{{ t('giftCards.amount') }}</th>
+                <th class="py-3.5 px-4 font-semibold">{{ t('giftCards.statusTitle') }}</th>
+                <th class="py-3.5 px-4 font-semibold">{{ t('giftCards.expiresAt') }}</th>
+                <th class="py-3.5 px-4 font-semibold">{{ t('giftCards.action') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="card in cards"
+                :key="card.id"
+                class="transition-colors duration-150 hover:bg-[var(--bg-surface-soft)]"
+              >
+                <td class="py-3.5 px-4 font-mono text-xs text-[var(--text-primary)]">
+                  <span class="block truncate">{{ displayCardCode(card) }}</span>
+                </td>
+                <td class="py-3.5 px-4 font-mono font-medium tabular-nums text-[var(--text-primary)]">
+                  {{ formatMoney(card.balanceValue) }}
+                </td>
+                <td class="py-3.5 px-4">
+                  <Badge :variant="badgeVariant(card.status)" :dot="card.status === 'active'" size="sm">
+                    {{ statusLabel(card.status) }}
+                  </Badge>
+                </td>
+                <td class="py-3.5 px-4 text-xs text-[var(--text-secondary)]">
+                  {{ formatDate(card.expiresAt) }}
+                </td>
+                <td class="py-3.5 px-4 whitespace-nowrap">
+                  <div class="flex items-center gap-1.5">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="!min-h-[32px] !h-8 !w-8 !p-0 rounded-full"
+                      :title="isCodeRevealed(card) ? t('giftCards.hideCode') : t('giftCards.showCode')"
+                      :aria-label="isCodeRevealed(card) ? t('giftCards.hideCode') : t('giftCards.showCode')"
+                      @click="toggleCodeReveal(card)"
+                    >
+                      <EyeOff v-if="isCodeRevealed(card)" class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                      <Eye v-else class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="!min-h-[32px] !h-8 !w-8 !p-0 rounded-full"
+                      :title="t('giftCards.copy')"
+                      :aria-label="t('giftCards.copy')"
+                      @click="copyCode(card.code)"
+                    >
+                      <Copy class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!loading && cards.length === 0">
+                <td colspan="5" class="py-12 text-center">
+                  <EmptyState :title="t('giftCards.empty')" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </section>
+
+      <!-- Pagination -->
+      <div v-if="total > 0" class="mt-6 border-t border-[var(--border-color)] pt-4">
+        <Pagination
+          :page="page"
+          :page-size="pageSize"
+          :total="total"
+          :page-size-options="[10, 20, 50, 100]"
+          @update:page="onPageChange"
+          @update:page-size="onPageSizeChange"
+          @change="onPaginationChange"
+        />
+      </div>
+    </Card>
   </div>
 </template>
-
-<style scoped>
-.nimbus-lift {
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-.nimbus-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px rgb(16 24 40 / 0.18);
-}
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-lift,
-  .nimbus-lift:hover {
-    transition: none;
-    transform: none;
-  }
-}
-</style>
