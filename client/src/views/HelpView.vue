@@ -2,9 +2,28 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  Search,
+  BookOpen,
+  ChevronRight,
+  ArrowLeft,
+  Clock,
+  AlertCircle
+} from 'lucide-vue-next'
 import api from '@/api'
 import { parseMarkdown } from '@/utils/markdown'
 import { helpPath } from '@/utils/app-paths'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  EmptyState,
+  Input,
+  Pagination
+} from '@/components/ui'
+
+defineOptions({ name: 'HelpView' })
 
 const route = useRoute()
 const router = useRouter()
@@ -46,19 +65,19 @@ interface CategoryWithCount {
 const categories = ref<CategoryWithCount[]>([])
 const selectedCategory = ref<string>(typeof route.query.category === 'string' ? route.query.category : '')
 
-// 分类配置（从服务器加载）
+// 分类配置（从服务器加载，默认语义色彩 Token）
 interface Category {
   id: string
   name: string
   color: string
 }
 const categoryConfig = ref<Category[]>([
-  { id: 'general', name: '', color: '#6b7280' },
-  { id: 'getting-started', name: '', color: '#22c55e' },
-  { id: 'instances', name: '', color: '#3b82f6' },
-  { id: 'networking', name: '', color: '#8b5cf6' },
-  { id: 'billing', name: '', color: '#f59e0b' },
-  { id: 'faq', name: '', color: '#ef4444' }
+  { id: 'general', name: '', color: 'var(--text-tertiary)' },
+  { id: 'getting-started', name: '', color: 'var(--success)' },
+  { id: 'instances', name: '', color: 'var(--accent)' },
+  { id: 'networking', name: '', color: 'var(--chart-1)' },
+  { id: 'billing', name: '', color: 'var(--warning)' },
+  { id: 'faq', name: '', color: 'var(--error)' }
 ])
 
 // 计算属性：是否正在查看文章？
@@ -125,7 +144,10 @@ async function loadArticles(): Promise<void> {
   loading.value = true
   loadError.value = ''
   try {
-    const params: { page: number; pageSize: number; category?: string; search?: string } = { page: page.value, pageSize: pageSize.value }
+    const params: { page: number; pageSize: number; category?: string; search?: string } = {
+      page: page.value,
+      pageSize: pageSize.value
+    }
     if (selectedCategory.value) {
       params.category = selectedCategory.value
     }
@@ -192,6 +214,11 @@ function clearSearch(): void {
   loadArticles()
 }
 
+function handlePageChange(newPage: number): void {
+  page.value = newPage
+  loadArticles()
+}
+
 function goBack(): void {
   router.push(helpPath())
 }
@@ -213,7 +240,7 @@ function getCategoryLabel(catId: string): string {
 
 function getCategoryColor(catId: string): string {
   const cat = categoryConfig.value.find(c => c.id === catId)
-  return cat ? cat.color : '#6b7280'
+  return cat ? cat.color : 'var(--accent)'
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -232,196 +259,299 @@ function formatDate(dateStr: string | null | undefined): string {
 </script>
 
 <template>
-  <div class="kawaii-page mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8 animate-fade-in">
-    <div class="space-y-6">
-      <!-- Header -->
-      <div class="page-header">
-        <div>
-          <!-- 详情视图加载中时显示返回按钮和骨架屏 -->
-          <template v-if="isDetailView && !articleLoaded">
-            <div class="mb-3">
-              <button class="btn btn-secondary btn-sm" @click="goBack">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                {{ $t('help.backToHelp') }}
-              </button>
-            </div>
-            <div class="h-7 w-48 bg-themed-tertiary rounded animate-pulse"></div>
-          </template>
-          <!-- 详情视图加载完成后显示文章标题 -->
-          <template v-else-if="isDetailView && currentArticle">
-            <div class="mb-3">
-              <button class="btn btn-secondary btn-sm" @click="goBack">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                {{ $t('help.backToHelp') }}
-              </button>
-            </div>
-            <h1 class="page-title">{{ currentArticle.title }}</h1>
-            <p class="text-sm text-themed-muted">
-              {{ $t('help.updatedAt', { date: formatDate(currentArticle.updated_at) }) }}
-            </p>
-          </template>
-          <!-- 列表视图 -->
-          <template v-else-if="!isDetailView">
-            <h1 class="page-title">{{ $t('help.title') }}</h1>
-            <p class="page-description">{{ $t('help.description') }}</p>
-          </template>
-          <!-- 详情视图 404 情况 -->
-          <template v-else-if="isDetailView && articleLoaded && !currentArticle">
-            <div class="mb-3">
-              <button class="btn btn-secondary btn-sm" @click="goBack">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                {{ $t('help.backToHelp') }}
-              </button>
-            </div>
-            <h1 class="page-title">{{ $t('help.title') }}</h1>
-          </template>
-        </div>
-      </div>
-
-      <!-- Article List View -->
-      <template v-if="!isDetailView">
-        <form class="card p-3" @submit.prevent="applySearch">
-          <label class="sr-only" for="help-search">{{ $t('help.search') }}</label>
-          <div class="flex flex-col gap-3 sm:flex-row">
-            <input
-              id="help-search"
-              v-model="searchQuery"
-              class="input flex-1"
-              type="search"
-              :placeholder="$t('help.search')"
+  <div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8 space-y-8 animate-fade-in">
+    <!-- Header: Detail View -->
+    <PageHeader
+      v-if="isDetailView"
+      :back="true"
+      :back-label="$t('help.backToHelp')"
+      @back="goBack"
+    >
+      <template #title>
+        <div v-if="articleLoading || !articleLoaded" class="h-8 w-60 bg-[var(--bg-surface-soft)] rounded-xl animate-pulse" />
+        <h1 v-else-if="currentArticle" class="text-2xl md:text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+          {{ currentArticle.title }}
+        </h1>
+        <h1 v-else class="text-2xl md:text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+          {{ $t('help.title') }}
+        </h1>
+      </template>
+      <template v-if="isDetailView && currentArticle" #description>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+          <Badge variant="default" size="sm">
+            <span
+              class="w-1.5 h-1.5 rounded-full mr-1 shrink-0"
+              :style="{ backgroundColor: getCategoryColor(currentArticle.category) }"
             />
-            <div class="flex gap-2">
-              <button class="btn btn-primary flex-1 sm:flex-none" type="submit">{{ $t('common.search') }}</button>
-              <button v-if="searchQuery" class="btn btn-secondary flex-1 sm:flex-none" type="button" @click="clearSearch">{{ $t('help.clearSearch') }}</button>
+            {{ getCategoryLabel(currentArticle.category) }}
+          </Badge>
+          <span class="text-xs text-[var(--text-tertiary)] flex items-center gap-1 font-mono">
+            <Clock class="w-3.5 h-3.5 shrink-0" />
+            {{ $t('help.updatedAt', { date: formatDate(currentArticle.updated_at) }) }}
+          </span>
+        </div>
+      </template>
+    </PageHeader>
+
+    <!-- Header: List View -->
+    <PageHeader
+      v-else
+      :title="$t('help.title')"
+      :description="$t('help.description')"
+    >
+      <template #extra>
+        <Badge v-if="total > 0" variant="default" size="md">
+          {{ $t('help.totalArticles', { count: total }) }}
+        </Badge>
+      </template>
+    </PageHeader>
+
+    <!-- ==================== Article List View ==================== -->
+    <div v-if="!isDetailView" class="space-y-6">
+      <!-- Search Bar -->
+      <Card padding="sm" class="shadow-sm">
+        <form @submit.prevent="applySearch">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div class="flex-1">
+              <Input
+                id="help-search"
+                v-model="searchQuery"
+                type="search"
+                size="md"
+                :placeholder="$t('help.search')"
+                :clearable="true"
+                @clear="clearSearch"
+                @enter="applySearch"
+              >
+                <template #prefix>
+                  <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+                </template>
+              </Input>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                class="flex-1 sm:flex-none"
+              >
+                {{ $t('common.search') }}
+              </Button>
+              <Button
+                v-if="searchQuery"
+                type="button"
+                variant="secondary"
+                size="md"
+                class="flex-1 sm:flex-none"
+                @click="clearSearch"
+              >
+                {{ $t('help.clearSearch') }}
+              </Button>
             </div>
           </div>
         </form>
+      </Card>
 
-        <!-- Category Filter -->
-        <div v-if="categories.length > 0" class="flex flex-wrap gap-2">
-          <button
-            :class="['help-chip', !selectedCategory ? 'active' : '']"
-            @click="filterByCategory('')"
+      <!-- Category Filter Capsules -->
+      <div v-if="categories.length > 0" class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          :class="!selectedCategory
+            ? 'bg-[var(--accent)] text-white shadow-sm font-semibold'
+            : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]'"
+          @click="filterByCategory('')"
+        >
+          <span>{{ $t('help.all') }}</span>
+        </button>
+        <button
+          v-for="cat in categories"
+          :key="cat.category"
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          :class="selectedCategory === cat.category
+            ? 'bg-[var(--accent)] text-white shadow-sm font-semibold'
+            : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]'"
+          @click="filterByCategory(cat.category)"
+        >
+          <span
+            class="w-1.5 h-1.5 rounded-full shrink-0"
+            :style="{ backgroundColor: selectedCategory === cat.category ? 'currentColor' : getCategoryColor(cat.category) }"
+          />
+          <span>{{ getCategoryLabel(cat.category) }}</span>
+          <span
+            v-if="cat.count > 0"
+            class="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums leading-none"
+            :class="selectedCategory === cat.category ? 'bg-white/20 text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'"
           >
-            {{ $t('help.all') }}
-          </button>
-          <button
-            v-for="cat in categories"
-            :key="cat.category"
-            :class="['help-chip', selectedCategory === cat.category ? 'active' : '']"
-            @click="filterByCategory(cat.category)"
-          >
-            {{ getCategoryLabel(cat.category) }}
-            <span class="help-chip-count">{{ cat.count }}</span>
-          </button>
-        </div>
+            {{ cat.count }}
+          </span>
+        </button>
+      </div>
 
-        <div v-if="loadError" class="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-500">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span>{{ loadError }}</span>
-            <button class="btn btn-secondary btn-sm" @click="loadArticles">{{ $t('common.retry') }}</button>
-          </div>
-        </div>
-
-        <!-- Loading -->
-        <div v-if="loading" class="card p-8 text-center text-themed-muted">
-          <svg class="w-6 h-6 animate-spin mx-auto" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p class="mt-3 text-sm">{{ $t('help.loading') }}</p>
-        </div>
-      
-        <!-- Empty -->
-        <div v-else-if="articles.length === 0" class="card p-12 text-center">
-          <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-themed-secondary">
-            <svg class="h-7 w-7 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <p class="text-sm text-themed-muted">{{ searchQuery.trim() ? $t('help.noSearchResults') : $t('help.noArticles') }}</p>
-        </div>
-
-        <!-- Article List -->
-        <div v-else class="space-y-3">
-          <RouterLink 
-            v-for="article in articles" 
-            :key="article.id"
-            :to="{ name: 'help-article', params: { slug: article.slug } }"
-            class="help-article-card card block p-4"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <h3 class="break-words text-themed font-medium hover:text-accent transition-colors">{{ article.title }}</h3>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-themed-muted">
-                  <span class="inline-flex items-center gap-1.5 rounded-full bg-themed-secondary px-2.5 py-0.5 text-xs font-medium text-themed-secondary">
-                    <span
-                      class="h-1.5 w-1.5 rounded-full"
-                      :style="{ backgroundColor: getCategoryColor(article.category) }"
-                    ></span>
-                    {{ getCategoryLabel(article.category) }}
-                  </span>
-                  <span class="font-mono text-xs tabular-nums">{{ formatDate(article.updated_at) }}</span>
-                </div>
-              </div>
-              <svg class="mt-0.5 h-5 w-5 shrink-0 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </RouterLink>
-        </div>
-
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex flex-col gap-3 text-sm text-themed-muted sm:flex-row sm:items-center sm:justify-between">
-          <span>{{ $t('help.totalArticles', { count: total }) }}</span>
+      <!-- Load Error Alert -->
+      <div
+        v-if="loadError"
+        class="rounded-2xl border border-[var(--error)]/30 bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))] p-4 text-sm text-[var(--error)] shadow-sm"
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-2">
-            <button :disabled="page <= 1" class="btn btn-ghost btn-sm" @click="page--; loadArticles()">{{ $t('instance.prevPage') }}</button>
-            <span class="font-mono tabular-nums">{{ page }} / {{ totalPages }}</span>
-            <button :disabled="page >= totalPages" class="btn btn-ghost btn-sm" @click="page++; loadArticles()">{{ $t('instance.nextPage') }}</button>
+            <AlertCircle class="w-4 h-4 shrink-0 text-[var(--error)]" />
+            <span>{{ loadError }}</span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            @click="loadArticles"
+          >
+            {{ $t('common.retry') }}
+          </Button>
+        </div>
+      </div>
+
+      <!-- Loading Skeletons -->
+      <div v-if="loading" class="space-y-3">
+        <Card v-for="i in 4" :key="i" padding="md">
+          <div class="animate-pulse flex items-start justify-between gap-4">
+            <div class="flex-1 space-y-2.5">
+              <div class="h-5 bg-[var(--bg-surface-soft)] rounded-md w-2/5"></div>
+              <div class="flex items-center gap-3">
+                <div class="h-4 bg-[var(--bg-surface-soft)] rounded-full w-16"></div>
+                <div class="h-3.5 bg-[var(--bg-surface-soft)] rounded w-24"></div>
+              </div>
+            </div>
+            <div class="h-5 w-5 bg-[var(--bg-surface-soft)] rounded-full"></div>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Empty State -->
+      <Card v-else-if="articles.length === 0" padding="none">
+        <EmptyState
+          :title="searchQuery.trim() ? $t('help.noSearchResults') : $t('help.noArticles')"
+          :description="searchQuery.trim() ? $t('help.description') : ''"
+        >
+          <template #icon>
+            <BookOpen class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template v-if="searchQuery.trim()" #action>
+            <Button variant="secondary" size="sm" @click="clearSearch">
+              {{ $t('help.clearSearch') }}
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
+
+      <!-- Article List Cards -->
+      <div v-else class="space-y-3">
+        <RouterLink
+          v-for="article in articles"
+          :key="article.id"
+          :to="{ name: 'help-article', params: { slug: article.slug } }"
+          class="group block rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 md:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-[var(--border-hover)] transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0 flex-1 space-y-2.5">
+              <h3 class="text-base md:text-lg font-semibold tracking-tight text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors duration-200 break-words">
+                {{ article.title }}
+              </h3>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[var(--text-secondary)]">
+                <Badge variant="default" size="sm">
+                  <span
+                    class="w-1.5 h-1.5 rounded-full shrink-0"
+                    :style="{ backgroundColor: getCategoryColor(article.category) }"
+                  />
+                  <span>{{ getCategoryLabel(article.category) }}</span>
+                </Badge>
+                <span class="font-mono tabular-nums text-[var(--text-tertiary)] flex items-center gap-1">
+                  <Clock class="w-3.5 h-3.5 shrink-0" />
+                  {{ formatDate(article.updated_at) }}
+                </span>
+              </div>
+            </div>
+            <div class="p-2 rounded-full text-[var(--text-tertiary)] group-hover:text-[var(--accent)] group-hover:bg-[var(--bg-surface-soft)] group-hover:translate-x-0.5 transition-all duration-200 shrink-0">
+              <ChevronRight class="w-5 h-5" />
+            </div>
+          </div>
+        </RouterLink>
+      </div>
+
+      <!-- Pagination -->
+      <Pagination
+        v-if="totalPages > 1"
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        @update:page="handlePageChange"
+      >
+        <template #total>
+          {{ $t('help.totalArticles', { count: total }) }}
+        </template>
+      </Pagination>
+    </div>
+
+    <!-- ==================== Article Detail View ==================== -->
+    <div v-else class="space-y-6">
+      <!-- Loading Skeleton -->
+      <Card v-if="articleLoading || !articleLoaded" padding="lg">
+        <div class="animate-pulse space-y-5 py-4">
+          <div class="h-7 bg-[var(--bg-surface-soft)] rounded-xl w-3/4"></div>
+          <div class="flex items-center gap-3">
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-full w-20"></div>
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-md w-28"></div>
+          </div>
+          <div class="pt-6 space-y-3.5">
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-md w-full"></div>
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-md w-11/12"></div>
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-md w-4/5"></div>
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-md w-full"></div>
+            <div class="h-4 bg-[var(--bg-surface-soft)] rounded-md w-2/3"></div>
           </div>
         </div>
-      </template>
+      </Card>
 
-      <!-- Article Detail View -->
-      <template v-else>
-        <!-- Loading（加载中或尚未开始加载时显示） -->
-        <div v-if="articleLoading || !articleLoaded" class="card p-8 text-center text-themed-muted">
-          <svg class="w-6 h-6 animate-spin mx-auto" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p class="mt-3 text-sm">{{ $t('help.loading') }}</p>
-        </div>
+      <!-- Not Found / Error State -->
+      <Card v-else-if="articleLoaded && !currentArticle" padding="none">
+        <EmptyState
+          :title="articleError || $t('help.articleNotFound')"
+          :description="$t('help.loadFailed')"
+        >
+          <template #icon>
+            <AlertCircle class="w-7 h-7 stroke-[1.5] text-[var(--error)]" />
+          </template>
+          <template #action>
+            <Button variant="secondary" size="md" @click="goBack">
+              <ArrowLeft class="w-4 h-4 mr-1.5" />
+              {{ $t('help.backToHelp') }}
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
-        <!-- Not Found（仅在加载完成后且文章为空时显示） -->
-        <div v-else-if="articleLoaded && !currentArticle" class="card p-8 text-center">
-          <svg class="w-12 h-12 mx-auto text-themed-muted mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p class="text-themed-muted mb-4">{{ articleError || $t('help.articleNotFound') }}</p>
-          <button class="btn btn-secondary" @click="goBack">{{ $t('help.backToHelp') }}</button>
-        </div>
+      <!-- Article Content View -->
+      <div v-else class="space-y-6">
+        <Card padding="none" class="shadow-sm">
+          <div class="p-6 md:p-10 markdown-body" v-html="articleHtml" />
+        </Card>
 
-        <!-- Article Content -->
-        <div v-else class="card p-6 md:p-8">
-          <div class="markdown-body" v-html="articleHtml"></div>
+        <!-- Back to help navigation button -->
+        <div class="flex items-center justify-between pt-2">
+          <Button variant="secondary" size="md" @click="goBack">
+            <ArrowLeft class="w-4 h-4 mr-1.5" />
+            {{ $t('help.backToHelp') }}
+          </Button>
         </div>
-      </template>
+      </div>
     </div>
   </div>
 </template>
 
 <style>
-/* ============ Markdown 基础样式 ============ */
+/* ============ Markdown Apple HIG 基础样式 ============ */
 .markdown-body {
   color: var(--text-primary);
-  line-height: 1.7;
+  line-height: 1.75;
+  font-size: 15px;
 }
 
 .markdown-body > *:first-child {
@@ -440,22 +570,23 @@ function formatDate(dateStr: string | null | undefined): string {
 .markdown-body h5,
 .markdown-body h6 {
   color: var(--text-primary);
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  margin-top: 1.6em;
+  margin-bottom: 0.6em;
   font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.3;
 }
 
 .markdown-body h1 { font-size: 1.75em; }
 .markdown-body h2 { 
-  font-size: 1.5em; 
+  font-size: 1.4em; 
   border-bottom: 1px solid var(--border-color); 
-  padding-bottom: 0.3em; 
+  padding-bottom: 0.35em; 
 }
-.markdown-body h3 { font-size: 1.25em; }
-.markdown-body h4 { font-size: 1.1em; }
-.markdown-body h5 { font-size: 1em; }
-.markdown-body h6 { font-size: 0.9em; color: var(--text-secondary); }
+.markdown-body h3 { font-size: 1.2em; }
+.markdown-body h4 { font-size: 1.05em; }
+.markdown-body h5 { font-size: 0.95em; }
+.markdown-body h6 { font-size: 0.875em; color: var(--text-secondary); }
 
 /* 段落 */
 .markdown-body p {
@@ -476,7 +607,8 @@ function formatDate(dateStr: string | null | undefined): string {
 /* 图片 */
 .markdown-body img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
 }
 
 .markdown-body figure {
@@ -515,21 +647,21 @@ function formatDate(dateStr: string | null | undefined): string {
 
 /* 行内代码 */
 .markdown-body code {
-  background: var(--bg-tertiary);
-  padding: 0.2em 0.4em;
+  background: var(--bg-surface-soft);
+  padding: 0.2em 0.45em;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  font-size: 0.9em;
+  font-size: 0.875em;
   font-family: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
 }
 
 /* 代码块 */
 .markdown-body pre {
-  background: var(--bg-tertiary);
-  padding: 1em;
-  border-radius: 8px;
+  background: var(--bg-surface-soft);
+  padding: 1.1em 1.25em;
+  border-radius: 12px;
   overflow-x: auto;
-  margin: 1em 0;
+  margin: 1.2em 0;
   border: 1px solid var(--border-color);
 }
 
@@ -543,9 +675,11 @@ function formatDate(dateStr: string | null | undefined): string {
 
 /* 引用块 */
 .markdown-body blockquote {
-  border-left: 4px solid var(--accent);
-  padding-left: 1em;
-  margin: 1em 0;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-surface-soft);
+  border-radius: 0 10px 10px 0;
+  padding: 0.75em 1.25em;
+  margin: 1.25em 0;
   color: var(--text-secondary);
 }
 
@@ -557,24 +691,26 @@ function formatDate(dateStr: string | null | undefined): string {
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1em 0;
-  font-size: 0.9em;
+  margin: 1.25em 0;
+  font-size: 0.875em;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .markdown-body th,
 .markdown-body td {
   border: 1px solid var(--border-color);
-  padding: 0.6em 1em;
+  padding: 0.65em 1em;
   text-align: left;
 }
 
 .markdown-body th {
-  background: var(--bg-tertiary);
+  background: var(--bg-surface-soft);
   font-weight: 600;
 }
 
 .markdown-body tr:hover td {
-  background: var(--bg-secondary);
+  background: var(--bg-surface-soft);
 }
 
 /* 水平线 */
@@ -605,7 +741,7 @@ function formatDate(dateStr: string | null | undefined): string {
   padding: 0.2em 0.4em;
   font-size: 0.85em;
   font-family: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
-  background: var(--bg-tertiary);
+  background: var(--bg-surface-soft);
   border: 1px solid var(--border-color);
   border-radius: 4px;
   box-shadow: 0 1px 0 var(--border-color);
@@ -616,9 +752,9 @@ function formatDate(dateStr: string | null | undefined): string {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  padding: 1rem;
-  margin: 1rem 0;
-  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  border-radius: 12px;
   border-width: 1px;
 }
 
@@ -725,50 +861,6 @@ function formatDate(dateStr: string | null | undefined): string {
 .light .md-alert-note svg,
 .light .md-alert-note > div {
   color: var(--alert-note);
-}
-
-/* ============ 代码高亮主题适配 ============ */
-/* 已抽为全局共享样式 client/src/styles/markdown-theme.css（GitHub 官方配色） */
-</style>
-
-<style scoped>
-/* 帮助中心分类 chip —— Nimbus 段式胶囊（干净靛蓝/白） */
-.help-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 14px;
-  border-radius: 9999px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
-}
-.help-chip:hover {
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-/* 选中态用 accent（靛蓝）反色文字，深浅色都可读（修复暗色白底白字） */
-.help-chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg-primary);
-}
-.help-chip-count {
-  opacity: 0.6;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.help-article-card {
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-.help-article-card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
 }
 
 @media (prefers-reduced-motion: reduce) {

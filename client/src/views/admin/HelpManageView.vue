@@ -1,16 +1,41 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-vue-next'
+import {
+  Eye,
+  EyeOff,
+  Pencil,
+  Trash2,
+  Plus,
+  RotateCw,
+  Search,
+  BookOpen,
+  FolderPlus,
+  Pin,
+  Layers,
+  Check,
+  X
+} from 'lucide-vue-next'
 import api from '@/api/admin'
 import IconButton from '@/components/IconButton.vue'
+import DrawerModal from '@/components/DrawerModal.vue'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  EmptyState,
+  Input,
+  Select,
+  Pagination
+} from '@/components/ui'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import { parseMarkdown } from '@/utils/markdown'
+
+defineOptions({ name: 'AdminHelpManageView' })
 
 const { t } = useI18n()
 const toast = useToast()
-const themeStore = useThemeStore()
 
 // Article list
 interface HelpArticle {
@@ -28,9 +53,14 @@ interface HelpArticle {
 const articles = ref<HelpArticle[]>([])
 const loading = ref<boolean>(true)
 const page = ref<number>(1)
-const pageSize = ref<number>(100)
+const pageSize = ref<number>(20)
 const total = ref<number>(0)
 const totalPages = ref<number>(0)
+
+// Filters & Search
+const searchQuery = ref<string>('')
+const selectedCategory = ref<string>('all')
+const selectedStatus = ref<'all' | 'published' | 'draft'>('all')
 
 // Editor
 const showEditor = ref<boolean>(false)
@@ -64,7 +94,7 @@ const showMarkdownHelp = ref<boolean>(false)
 type TabType = 'articles' | 'categories'
 const activeTab = ref<TabType>('articles')
 
-// Categories - now dynamic
+// Categories - dynamic
 interface Category {
   id: string
   name: string
@@ -87,14 +117,13 @@ const editingCategoryId = ref<string | null>(null)
 const categoryForm = ref<Category>({ id: '', name: '', color: '#3b82f6' })
 const categoryError = ref<string>('')
 
-// Predefined colors for categories
+// Predefined colors for categories (palette options)
 const categoryColors = [
   '#6b7280', '#ef4444', '#f59e0b', '#22c55e', '#14b8a6', 
   '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
 ]
 
 onMounted(async (): Promise<void> => {
-  // 并行加载分类配置和文章列表
   await Promise.all([loadCategoriesFromServer(), loadArticles()])
 })
 
@@ -107,7 +136,6 @@ async function loadCategoriesFromServer(): Promise<void> {
     }
   } catch (err) {
     console.error('Failed to load category config:', err)
-    // 加载失败时使用默认配置
   }
 }
 
@@ -169,7 +197,6 @@ async function saveCategory(): Promise<void> {
     showCategoryModal.value = false
     toast.success(categoryMode.value === 'create' ? t('admin.helpManage.categoryAdded') : t('admin.helpManage.categoryUpdated'))
   } catch {
-    // 保存失败，回滚操作
     await loadCategoriesFromServer()
   }
 }
@@ -189,7 +216,6 @@ async function deleteCategory(cat: Category): Promise<void> {
     await saveCategoriesToServer()
     toast.success(t('admin.helpManage.categoryDeleted'))
   } catch {
-    // 保存失败，回滚操作
     await loadCategoriesFromServer()
   }
 }
@@ -197,7 +223,17 @@ async function deleteCategory(cat: Category): Promise<void> {
 async function loadArticles(): Promise<void> {
   loading.value = true
   try {
-    const response = await api.help.adminList({ page: page.value, pageSize: pageSize.value })
+    const params: Record<string, unknown> = {
+      page: page.value,
+      pageSize: pageSize.value
+    }
+    if (searchQuery.value.trim()) {
+      params.search = searchQuery.value.trim()
+    }
+    if (selectedCategory.value !== 'all') {
+      params.category = selectedCategory.value
+    }
+    const response = await api.help.adminList(params)
     const data = response as { articles?: HelpArticle[]; total?: number; totalPages?: number }
     articles.value = data.articles || []
     total.value = data.total || 0
@@ -209,6 +245,10 @@ async function loadArticles(): Promise<void> {
   }
 }
 
+async function handleRefresh(): Promise<void> {
+  await Promise.all([loadCategoriesFromServer(), loadArticles()])
+}
+
 function openCreate(): void {
   editorMode.value = 'create'
   editingId.value = null
@@ -216,7 +256,7 @@ function openCreate(): void {
     title: '',
     slug: '',
     content: '',
-    category: 'general',
+    category: categories.value[0]?.id || 'general',
     sortOrder: 0,
     published: true,
     pinned: false
@@ -353,380 +393,661 @@ function getCategoryColor(catId: string): string {
   return cat ? cat.color : '#6b7280'
 }
 
+function getCategoryArticleCount(catId: string): number {
+  return articles.value.filter(a => a.category === catId).length
+}
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString('zh-CN', { 
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' 
   })
 }
+
+// Filtered articles by status (client side)
+const displayedArticles = computed(() => {
+  if (selectedStatus.value === 'published') {
+    return articles.value.filter(a => a.published === 1)
+  }
+  if (selectedStatus.value === 'draft') {
+    return articles.value.filter(a => a.published === 0)
+  }
+  return articles.value
+})
+
+const publishedCount = computed(() => articles.value.filter(a => a.published === 1).length)
+const pinnedCount = computed(() => articles.value.filter(a => a.pinned === 1).length)
+
+// Options for filters and select
+const categoryFilterOptions = computed(() => [
+  { value: 'all', label: t('common.all') },
+  ...categories.value.map(c => ({ value: c.id, label: c.name }))
+])
+
+const statusFilterOptions = computed(() => [
+  { value: 'all', label: t('common.all') },
+  { value: 'published', label: t('admin.helpManage.published') },
+  { value: 'draft', label: t('admin.helpManage.draft') }
+])
+
+const categoryFormOptions = computed(() =>
+  categories.value.map(c => ({ value: c.id, label: c.name }))
+)
+
+const hasActiveFilters = computed(() => {
+  return searchQuery.value.trim() !== '' || selectedCategory.value !== 'all' || selectedStatus.value !== 'all'
+})
+
+function resetFilters(): void {
+  searchQuery.value = ''
+  selectedCategory.value = 'all'
+  selectedStatus.value = 'all'
+  page.value = 1
+  void loadArticles()
+}
 </script>
 
 <template>
   <div class="kawaii-page nimbus-view space-y-6 animate-fade-in">
-    <div class="page-header flex-col sm:flex-row gap-4 sm:gap-0">
-      <div>
-        <h1 class="page-title">{{ t('admin.helpManage.title') }}</h1>
-        <p class="page-description">{{ t('admin.helpManage.description') }}</p>
-      </div>
-      <div class="flex w-full gap-2 sm:w-auto">
-        <button v-if="activeTab === 'categories'" class="btn-secondary flex-1 justify-center sm:flex-none" @click="openAddCategory">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          {{ t('admin.helpManage.addCategory') }}
-        </button>
-        <button v-if="activeTab === 'articles'" class="btn-primary flex-1 justify-center sm:flex-none" @click="openCreate">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
+    <!-- Apple Page Header -->
+    <PageHeader
+      :title="t('admin.helpManage.title')"
+      :description="t('admin.helpManage.description')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :loading="loading"
+          @click="handleRefresh"
+        >
+          <template #icon>
+            <RotateCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          </template>
+          {{ t('common.refresh') }}
+        </Button>
+        <Button
+          v-if="activeTab === 'articles'"
+          variant="primary"
+          size="sm"
+          @click="openCreate"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2.5]" />
+          </template>
           {{ t('admin.helpManage.create') }}
-        </button>
-      </div>
+        </Button>
+        <Button
+          v-if="activeTab === 'categories'"
+          variant="primary"
+          size="sm"
+          @click="openAddCategory"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2.5]" />
+          </template>
+          {{ t('admin.helpManage.addCategory') }}
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- Overview Statistics Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.helpManage.articlesTab') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <BookOpen class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+          {{ total }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.helpManage.published') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] text-[var(--success)] border border-[color-mix(in_srgb,var(--success)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Eye class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--success)]">
+          {{ publishedCount }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.helpManage.categoriesTab') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Layers class="w-4 h-4" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--text-primary)]">
+          {{ categories.length }}
+        </div>
+      </Card>
+
+      <Card hoverable padding="sm" class="group">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            {{ t('admin.helpManage.pinned') }}
+          </span>
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_24%,var(--bg-surface))] group-hover:scale-105 transition-transform duration-300">
+            <Pin class="w-4 h-4 rotate-45" />
+          </div>
+        </div>
+        <div class="mt-3 font-mono text-2xl lg:text-3xl font-semibold tracking-tight tabular-nums text-[var(--warning)]">
+          {{ pinnedCount }}
+        </div>
+      </Card>
     </div>
 
-    <!-- Tab 切换 -->
-    <div class="border-b border-themed overflow-x-auto">
-      <nav class="flex gap-4 sm:gap-6 min-w-max">
+    <!-- Apple Segmented Control for Tabs & Filter Summary -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full w-fit">
         <button
-          :class="[
-            'pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-            activeTab === 'articles'
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
+          type="button"
+          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none"
+          :class="activeTab === 'articles'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
           @click="activeTab = 'articles'"
         >
-          {{ t('admin.helpManage.articlesTab') }}
-          <span class="ml-1.5 rounded-full bg-themed-secondary px-1.5 py-0.5 font-mono text-2xs tabular-nums text-themed-muted">{{ total }}</span>
+          <BookOpen class="w-4 h-4" />
+          <span>{{ t('admin.helpManage.articlesTab') }}</span>
+          <Badge size="sm" :variant="activeTab === 'articles' ? 'info' : 'default'">{{ total }}</Badge>
         </button>
         <button
-          :class="[
-            'pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-            activeTab === 'categories'
-              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
+          type="button"
+          class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none"
+          :class="activeTab === 'categories'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
           @click="activeTab = 'categories'"
         >
-          {{ t('admin.helpManage.categoriesTab') }}
-          <span class="ml-1.5 rounded-full bg-themed-secondary px-1.5 py-0.5 font-mono text-2xs tabular-nums text-themed-muted">{{ categories.length }}</span>
+          <FolderPlus class="w-4 h-4" />
+          <span>{{ t('admin.helpManage.categoriesTab') }}</span>
+          <Badge size="sm" :variant="activeTab === 'categories' ? 'info' : 'default'">{{ categories.length }}</Badge>
         </button>
-      </nav>
+      </div>
+
+      <div v-if="activeTab === 'articles'" class="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+        <span>共 {{ total }} 篇文档</span>
+        <Button
+          v-if="hasActiveFilters"
+          variant="ghost"
+          size="sm"
+          class="text-[var(--text-secondary)]"
+          @click="resetFilters"
+        >
+          重置筛选
+        </Button>
+      </div>
     </div>
 
     <!-- Categories Tab -->
     <div v-if="activeTab === 'categories'" class="space-y-4">
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <div
+      <div v-if="categories.length > 0" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Card
           v-for="cat in categories"
           :key="cat.id"
-          class="nimbus-lift card p-4 hover:border-themed-secondary"
+          hoverable
+          padding="sm"
+          class="group"
         >
           <div class="flex items-center justify-between gap-3">
             <div class="flex min-w-0 items-center gap-3">
-              <div
-                class="h-4 w-4 flex-shrink-0 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/10"
-                :style="{ backgroundColor: cat.color }"
-              ></div>
-              <div class="min-w-0">
-                <div class="truncate font-medium text-themed">{{ cat.name }}</div>
-                <div class="truncate font-mono text-xs text-themed-muted">{{ cat.id }}</div>
-              </div>
-            </div>
-            <div class="flex flex-shrink-0 items-center gap-2">
-              <button class="btn-ghost btn-sm" @click="openEditCategory(cat)">{{ t('common.edit') }}</button>
-              <button class="btn-ghost btn-sm text-error" @click="deleteCategory(cat)">{{ t('common.delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="categories.length === 0" class="card p-8 text-center text-themed-muted">
-        {{ t('admin.helpManage.noCategories') }}
-      </div>
-    </div>
-
-    <!-- Article List -->
-    <div v-if="activeTab === 'articles' && loading" class="card p-8 text-center text-themed-muted">
-      <svg class="w-6 h-6 animate-spin mx-auto" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      <p class="mt-2">{{ t('common.loading') }}</p>
-    </div>
-
-    <div v-else-if="activeTab === 'articles' && articles.length === 0" class="card p-8 text-center">
-      <div class="text-themed-muted text-sm mb-4">{{ t('admin.helpManage.noArticles') }}</div>
-      <button class="btn-secondary btn-sm" @click="openCreate">{{ t('admin.helpManage.createFirst') }}</button>
-    </div>
-
-    <div v-else-if="activeTab === 'articles'" class="space-y-4">
-      <div class="card overflow-hidden">
-        <div class="space-y-3 p-4 lg:hidden">
-          <div
-            v-for="article in articles"
-            :key="article.id"
-            class="rounded-lg border border-themed bg-themed-surface p-4 shadow-sm"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="truncate font-medium text-themed">{{ article.title }}</div>
-                <div class="mt-1 break-all font-mono text-xs text-themed-muted">/help/{{ article.slug }}</div>
-              </div>
-              <span :class="['badge shrink-0', article.published ? 'badge-success' : 'badge-default']">
-                {{ article.published ? t('admin.helpManage.published') : t('admin.helpManage.draft') }}
-              </span>
-            </div>
-            <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-themed-muted">
-              <div class="flex min-w-0 items-center gap-2">
+              <div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
                 <span
-                  class="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                  :style="{ backgroundColor: getCategoryColor(article.category) }"
-                ></span>
-                <span class="truncate text-themed-secondary">{{ getCategoryLabel(article.category) }}</span>
+                  class="w-4 h-4 rounded-full ring-2 ring-[var(--bg-surface)] shadow-sm"
+                  :style="{ backgroundColor: cat.color }"
+                />
               </div>
-              <span class="font-mono tabular-nums">{{ formatDate(article.updated_at) }}</span>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ cat.name }}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="truncate font-mono text-xs text-[var(--text-tertiary)]">{{ cat.id }}</span>
+                  <span class="text-[var(--border-color)]">•</span>
+                  <span class="text-xs text-[var(--text-secondary)]">{{ getCategoryArticleCount(cat.id) }} 篇</span>
+                </div>
+              </div>
             </div>
-            <div class="mt-4 flex flex-wrap gap-2 border-t border-themed pt-3">
-              <button class="btn-ghost btn-sm" @click="openEdit(article)">{{ t('common.edit') }}</button>
-              <button class="btn-ghost btn-sm" @click="togglePublished(article)">
-                {{ article.published ? t('admin.helpManage.hide') : t('admin.helpManage.publish') }}
-              </button>
-              <button class="btn-ghost btn-sm text-error" @click="deleteArticle(article)">{{ t('common.delete') }}</button>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <Button variant="ghost" size="sm" @click="openEditCategory(cat)">
+                {{ t('common.edit') }}
+              </Button>
+              <Button variant="ghost" size="sm" class="text-[var(--error)] hover:text-[var(--error)]" @click="deleteCategory(cat)">
+                {{ t('common.delete') }}
+              </Button>
             </div>
           </div>
-        </div>
-        <div class="hidden overflow-hidden lg:block">
-          <table class="w-full table-fixed">
-            <thead class="bg-themed-tertiary border-b border-themed">
-              <tr>
-                <th class="w-[34%] text-left text-[11px] font-medium text-themed-faint uppercase tracking-[0.06em] px-4 py-3">{{ t('admin.helpManage.articleTitleCol') }}</th>
-                <th class="w-[18%] text-left text-[11px] font-medium text-themed-faint uppercase tracking-[0.06em] px-4 py-3">{{ t('admin.helpManage.categoryCol') }}</th>
-                <th class="w-[12%] text-left text-[11px] font-medium text-themed-faint uppercase tracking-[0.06em] px-4 py-3">{{ t('admin.helpManage.statusCol') }}</th>
-                <th class="w-[18%] text-left text-[11px] font-medium text-themed-faint uppercase tracking-[0.06em] px-4 py-3">{{ t('admin.helpManage.updatedAtCol') }}</th>
-                <th class="w-[18%] text-right text-[11px] font-medium text-themed-faint uppercase tracking-[0.06em] px-4 py-3">{{ t('admin.helpManage.actionsCol') }}</th>
-              </tr>
-            </thead>
-            <tbody class="divide-themed">
-              <tr v-for="article in articles" :key="article.id" class="transition-colors hover:bg-themed-hover">
-                <td class="px-4 py-3">
-                  <div class="truncate text-themed font-medium">{{ article.title }}</div>
-                  <div class="truncate text-xs text-themed-muted font-mono">/help/{{ article.slug }}</div>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span
-                      class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      :style="{ backgroundColor: getCategoryColor(article.category) }"
-                    ></span>
-                    <span class="truncate text-sm text-themed-secondary">{{ getCategoryLabel(article.category) }}</span>
-                  </div>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="['badge', article.published ? 'badge-success' : 'badge-default']">
-                    {{ article.published ? t('admin.helpManage.published') : t('admin.helpManage.draft') }}
-                  </span>
-                </td>
-                <td class="truncate px-4 py-3 text-sm font-mono tabular-nums text-themed-muted">{{ formatDate(article.updated_at) }}</td>
-                <td class="px-4 py-3 text-right">
-                  <div class="flex items-center justify-end gap-1">
-                    <IconButton :label="t('common.edit')" @click="openEdit(article)"><Pencil /></IconButton>
-                    <IconButton :label="article.published ? t('admin.helpManage.hide') : t('admin.helpManage.publish')" @click="togglePublished(article)"><EyeOff v-if="article.published" /><Eye v-else /></IconButton>
-                    <IconButton :label="t('common.delete')" variant="danger" @click="deleteArticle(article)"><Trash2 /></IconButton>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        </Card>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex flex-col gap-3 text-sm text-themed-muted sm:flex-row sm:items-center sm:justify-between">
-        <span>{{ t('admin.helpManage.totalArticles', { count: total }) }}</span>
-        <div class="flex items-center gap-2">
-          <button :disabled="page <= 1" class="btn-ghost btn-sm" @click="page--; loadArticles()">{{ t('admin.helpManage.prevPage') }}</button>
-          <span class="font-mono text-xs tabular-nums">{{ page }} / {{ totalPages }}</span>
-          <button :disabled="page >= totalPages" class="btn-ghost btn-sm" @click="page++; loadArticles()">{{ t('admin.helpManage.nextPage') }}</button>
-        </div>
-      </div>
+      <Card v-else padding="none">
+        <EmptyState
+          :title="t('admin.helpManage.noCategories')"
+          description="创建分类以便更清晰地归类和整理帮助文章"
+        >
+          <template #icon>
+            <FolderPlus class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template #action>
+            <Button variant="primary" size="sm" @click="openAddCategory">
+              <template #icon><Plus class="w-4 h-4 stroke-[2.5]" /></template>
+              {{ t('admin.helpManage.addCategory') }}
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
     </div>
 
-    <!-- Editor Modal -->
+    <!-- Articles Tab -->
+    <div v-else-if="activeTab === 'articles'" class="space-y-4">
+      <!-- Search & Filters Toolbar -->
+      <Card padding="sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+          <div class="lg:col-span-6">
+            <Input
+              v-model="searchQuery"
+              size="sm"
+              placeholder="搜索文档标题或 URL..."
+              clearable
+              @enter="page = 1; loadArticles()"
+              @clear="page = 1; loadArticles()"
+            >
+              <template #prefix>
+                <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+              </template>
+            </Input>
+          </div>
+          <div class="lg:col-span-3">
+            <Select
+              v-model="selectedCategory"
+              size="sm"
+              :options="categoryFilterOptions"
+              @change="page = 1; loadArticles()"
+            />
+          </div>
+          <div class="lg:col-span-3">
+            <Select
+              v-model="selectedStatus"
+              size="sm"
+              :options="statusFilterOptions"
+            />
+          </div>
+        </div>
+      </Card>
+
+      <!-- Loading State -->
+      <Card v-if="loading && articles.length === 0" padding="lg" class="text-center">
+        <div class="flex flex-col items-center justify-center py-12">
+          <RotateCw class="w-8 h-8 animate-spin text-[var(--accent)]" />
+          <p class="text-sm text-[var(--text-secondary)] mt-4 font-medium">{{ t('common.loading') }}</p>
+        </div>
+      </Card>
+
+      <!-- Empty State -->
+      <Card v-else-if="articles.length === 0" padding="none">
+        <EmptyState
+          :title="t('admin.helpManage.noArticles')"
+          :description="hasActiveFilters ? '未找到符合条件的文档，请尝试重置筛选' : '创建第一篇文档，为用户提供清晰明了的指引'"
+        >
+          <template #icon>
+            <BookOpen class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template #action>
+            <Button v-if="hasActiveFilters" variant="secondary" size="sm" @click="resetFilters">
+              重置筛选
+            </Button>
+            <Button v-else variant="primary" size="sm" @click="openCreate">
+              <template #icon><Plus class="w-4 h-4 stroke-[2.5]" /></template>
+              {{ t('admin.helpManage.createFirst') }}
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
+
+      <!-- Main Articles Table & Mobile Cards -->
+      <template v-else>
+        <div class="card overflow-hidden">
+          <!-- Mobile Card List -->
+          <div class="space-y-3 p-4 lg:hidden">
+            <div
+              v-for="article in displayedArticles"
+              :key="article.id"
+              class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-200"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span v-if="article.pinned" class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] shrink-0" :title="t('admin.helpManage.pinned')">
+                      <Pin class="w-3 h-3 rotate-45" />
+                    </span>
+                    <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ article.title }}</div>
+                  </div>
+                  <div class="mt-1 break-all font-mono text-xs text-[var(--text-tertiary)]">/help/{{ article.slug }}</div>
+                </div>
+                <Badge :variant="article.published ? 'success' : 'default'" size="sm" class="shrink-0">
+                  {{ article.published ? t('admin.helpManage.published') : t('admin.helpManage.draft') }}
+                </Badge>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)]">
+                <div class="flex min-w-0 items-center gap-1.5">
+                  <span
+                    class="h-2 w-2 flex-shrink-0 rounded-full"
+                    :style="{ backgroundColor: getCategoryColor(article.category) }"
+                  ></span>
+                  <span class="truncate font-medium">{{ getCategoryLabel(article.category) }}</span>
+                </div>
+                <span class="text-[var(--border-color)]">•</span>
+                <span class="font-mono tabular-nums text-[var(--text-tertiary)]">{{ formatDate(article.updated_at) }}</span>
+              </div>
+
+              <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border-color)] pt-3">
+                <Button variant="ghost" size="sm" @click="openEdit(article)">
+                  <template #icon><Pencil class="w-3.5 h-3.5" /></template>
+                  {{ t('common.edit') }}
+                </Button>
+                <Button variant="ghost" size="sm" @click="togglePublished(article)">
+                  <template #icon>
+                    <EyeOff v-if="article.published" class="w-3.5 h-3.5" />
+                    <Eye v-else class="w-3.5 h-3.5" />
+                  </template>
+                  {{ article.published ? t('admin.helpManage.hide') : t('admin.helpManage.publish') }}
+                </Button>
+                <Button variant="ghost" size="sm" class="text-[var(--error)] hover:text-[var(--error)]" @click="deleteArticle(article)">
+                  <template #icon><Trash2 class="w-3.5 h-3.5" /></template>
+                  {{ t('common.delete') }}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Desktop Fixed-Width Table -->
+          <div class="hidden overflow-hidden lg:block">
+            <table class="w-full table-fixed">
+              <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+                <tr>
+                  <th class="w-[34%] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] px-5 py-3.5 select-none">{{ t('admin.helpManage.articleTitleCol') }}</th>
+                  <th class="w-[18%] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] px-4 py-3.5 select-none">{{ t('admin.helpManage.categoryCol') }}</th>
+                  <th class="w-[12%] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] px-4 py-3.5 select-none">{{ t('admin.helpManage.statusCol') }}</th>
+                  <th class="w-[18%] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] px-4 py-3.5 select-none">{{ t('admin.helpManage.updatedAtCol') }}</th>
+                  <th class="w-[18%] text-right text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] px-5 py-3.5 select-none">{{ t('admin.helpManage.actionsCol') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[var(--border-color)]">
+                <tr
+                  v-for="article in displayedArticles"
+                  :key="article.id"
+                  class="hover:bg-[var(--bg-surface-soft)]/50 transition-colors duration-150"
+                >
+                  <td class="px-5 py-3.5 truncate">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span v-if="article.pinned" class="inline-flex items-center justify-center w-4 h-4 rounded bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] shrink-0" :title="t('admin.helpManage.pinned')">
+                        <Pin class="w-2.5 h-2.5 rotate-45" />
+                      </span>
+                      <span class="truncate font-semibold text-sm text-[var(--text-primary)]">{{ article.title }}</span>
+                    </div>
+                    <div class="truncate text-xs font-mono text-[var(--text-tertiary)] mt-0.5">/help/{{ article.slug }}</div>
+                  </td>
+                  <td class="px-4 py-3.5">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <span
+                        class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        :style="{ backgroundColor: getCategoryColor(article.category) }"
+                      ></span>
+                      <span class="truncate text-sm font-medium text-[var(--text-secondary)]">{{ getCategoryLabel(article.category) }}</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3.5">
+                    <Badge :variant="article.published ? 'success' : 'default'" size="sm">
+                      {{ article.published ? t('admin.helpManage.published') : t('admin.helpManage.draft') }}
+                    </Badge>
+                  </td>
+                  <td class="truncate px-4 py-3.5 text-xs font-mono tabular-nums text-[var(--text-secondary)]">{{ formatDate(article.updated_at) }}</td>
+                  <td class="px-5 py-3.5 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                      <IconButton :label="t('common.edit')" @click="openEdit(article)"><Pencil class="w-4 h-4" /></IconButton>
+                      <IconButton :label="article.published ? t('admin.helpManage.hide') : t('admin.helpManage.publish')" @click="togglePublished(article)"><EyeOff v-if="article.published" class="w-4 h-4" /><Eye v-else class="w-4 h-4" /></IconButton>
+                      <IconButton :label="t('common.delete')" variant="danger" @click="deleteArticle(article)"><Trash2 class="w-4 h-4" /></IconButton>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Apple Pagination -->
+        <div v-if="total > pageSize" class="pt-2">
+          <Pagination
+            v-model:page="page"
+            v-model:page-size="pageSize"
+            :total="total"
+            @change="loadArticles"
+          />
+        </div>
+      </template>
+    </div>
+
+    <!-- Article Editor Modal -->
     <DrawerModal
       :show="showEditor"
       max-width="max-w-5xl"
       raw
       @close="showEditor = false"
     >
-          <!-- Header -->
-          <div class="modal-header">
-            <h3 class="modal-title truncate">
-              {{ editorMode === 'create' ? t('admin.helpManage.createArticle') : t('admin.helpManage.editArticle') }}
-            </h3>
-            <div class="flex flex-shrink-0 items-center gap-3">
-              <button
-                :class="['btn-ghost btn-sm', previewMode && 'bg-themed-secondary']"
-                @click="previewMode = !previewMode"
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface)]">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">
+            {{ editorMode === 'create' ? t('admin.helpManage.createArticle') : t('admin.helpManage.editArticle') }}
+          </h3>
+          <p class="text-xs text-[var(--text-secondary)] mt-0.5 truncate">
+            {{ editorMode === 'create' ? '支持 Markdown 语法与自定义 Alert 提示框' : ('ID: ' + editingId) }}
+          </p>
+        </div>
+        <div class="flex flex-shrink-0 items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            @click="previewMode = !previewMode"
+          >
+            <template #icon>
+              <Eye v-if="!previewMode" class="w-3.5 h-3.5" />
+              <Pencil v-else class="w-3.5 h-3.5" />
+            </template>
+            {{ previewMode ? t('common.edit') : t('admin.helpManage.preview') }}
+          </Button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all"
+            @click="showEditor = false"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="flex flex-1 overflow-hidden min-h-[500px]">
+        <!-- Form Mode -->
+        <div v-if="!previewMode" class="flex-1 space-y-5 overflow-y-auto p-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Input
+                v-model="form.title"
+                :label="t('admin.helpManage.articleTitle') + ' *'"
+                :placeholder="t('admin.helpManage.titlePlaceholder')"
+                @blur="generateSlug"
+              />
+            </div>
+            <div>
+              <Input
+                v-model="form.slug"
+                :label="t('admin.helpManage.urlSlug') + ' *'"
+                :placeholder="t('admin.helpManage.urlSlugPlaceholder')"
+                class="font-mono"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Select
+                v-model="form.category"
+                :label="t('admin.helpManage.category')"
+                :options="categoryFormOptions"
+              />
+            </div>
+            <div>
+              <Input
+                v-model.number="form.sortOrder"
+                type="number"
+                :label="t('admin.helpManage.sortOrder')"
+                min="0"
+                class="font-mono"
+              />
+            </div>
+            <div class="flex flex-col justify-end pb-1.5">
+              <div class="flex items-center gap-6">
+                <!-- Published Toggle -->
+                <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                  <div class="relative">
+                    <input
+                      v-model="form.published"
+                      type="checkbox"
+                      class="sr-only peer"
+                    />
+                    <div
+                      class="w-10 h-6 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] peer-checked:bg-[var(--accent)] peer-checked:border-[var(--accent)] transition-colors duration-200"
+                    ></div>
+                    <div
+                      class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 peer-checked:translate-x-4"
+                    ></div>
+                  </div>
+                  <span class="text-xs font-medium text-[var(--text-secondary)]">
+                    {{ form.published ? t('admin.helpManage.published') : t('admin.helpManage.draft') }}
+                  </span>
+                </label>
+
+                <!-- Pinned Toggle -->
+                <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                  <div class="relative">
+                    <input
+                      v-model="form.pinned"
+                      type="checkbox"
+                      class="sr-only peer"
+                    />
+                    <div
+                      class="w-10 h-6 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] peer-checked:bg-[var(--accent)] peer-checked:border-[var(--accent)] transition-colors duration-200"
+                    ></div>
+                    <div
+                      class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 peer-checked:translate-x-4"
+                    ></div>
+                  </div>
+                  <span class="text-xs font-medium text-[var(--text-secondary)]">
+                    {{ form.pinned ? t('admin.helpManage.pinned') : t('admin.helpManage.notPinned') }}
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Markdown Content -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none">
+                {{ t('admin.helpManage.contentMarkdown') }} *
+              </label>
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                @click="showMarkdownHelp = !showMarkdownHelp"
               >
-                {{ previewMode ? t('common.edit') : t('admin.helpManage.preview') }}
-              </button>
-              <button class="btn-ghost btn-sm -mr-2 p-1.5" @click="showEditor = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Content -->
-          <div class="flex flex-1 overflow-hidden">
-            <!-- Left: Form -->
-            <div v-if="!previewMode" class="flex-1 space-y-5 overflow-y-auto p-6">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.articleTitle') }} *</label>
-                  <input
-                    v-model="form.title"
-                    type="text"
-                    class="input"
-                    :placeholder="t('admin.helpManage.titlePlaceholder')"
-                    @blur="generateSlug"
-                  />
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.urlSlug') }} *</label>
-                  <input
-                    v-model="form.slug"
-                    type="text"
-                    class="input font-mono"
-                    :placeholder="t('admin.helpManage.urlSlugPlaceholder')"
-                  />
-                </div>
-              </div>
-
-              <div class="grid grid-cols-3 gap-4">
-                <div>
-                  <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.category') }}</label>
-                  <select v-model="form.category" class="input">
-                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.sortOrder') }}</label>
-                  <input v-model.number="form.sortOrder" type="number" class="input font-mono" min="0" />
-                </div>
-                <div class="flex items-end">
-                  <label class="flex cursor-pointer select-none items-center gap-3">
-                    <div class="relative">
-                      <input
-                        v-model="form.published"
-                        type="checkbox"
-                        class="sr-only peer"
-                      />
-                      <div
-                        class="w-10 h-6 rounded-full transition-colors peer-checked:bg-accent"
-                        :class="themeStore.isDark ? 'bg-gray-700' : 'bg-gray-300'"
-                      ></div>
-                      <div
-                        class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"
-                      ></div>
-                    </div>
-                    <span class="text-sm text-themed-secondary">
-                      {{ form.published ? t('admin.helpManage.published') : t('admin.helpManage.draft') }}
-                    </span>
-                  </label>
-
-                  <!-- 置顶开关 -->
-                  <label class="ml-4 flex cursor-pointer select-none items-center gap-3">
-                    <div class="relative">
-                      <input
-                        v-model="form.pinned"
-                        type="checkbox"
-                        class="sr-only peer"
-                      />
-                      <div
-                        class="w-10 h-6 rounded-full transition-colors peer-checked:bg-accent"
-                        :class="themeStore.isDark ? 'bg-gray-700' : 'bg-gray-300'"
-                      ></div>
-                      <div
-                        class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"
-                      ></div>
-                    </div>
-                    <span class="text-sm text-themed-secondary">
-                      {{ form.pinned ? t('admin.helpManage.pinned') : t('admin.helpManage.notPinned') }}
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="flex-1">
-                <div class="mb-1.5 flex items-center justify-between">
-                  <label class="block text-sm text-themed-secondary">{{ t('admin.helpManage.contentMarkdown') }} *</label>
-                  <button
-                    type="button"
-                    class="text-xs text-themed-muted transition-colors hover:text-themed"
-                    @click="showMarkdownHelp = !showMarkdownHelp"
-                  >
-                    {{ showMarkdownHelp ? t('admin.helpManage.hideMarkdownHelp') : t('admin.helpManage.showMarkdownHelp') }}
-                  </button>
-                </div>
-
-                <!-- Markdown 语法帮助 -->
-                <div v-if="showMarkdownHelp" class="mb-3 space-y-2 rounded-lg border border-themed bg-themed-tertiary p-3 text-xs text-themed-secondary">
-                  <div class="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono"># Title</code> {{ t('admin.helpManage.markdownHeading1') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">## Title</code> {{ t('admin.helpManage.markdownHeading2') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">**bold**</code> {{ t('admin.helpManage.markdownBold') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">*italic*</code> {{ t('admin.helpManage.markdownItalic') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">[link](url)</code> {{ t('admin.helpManage.markdownLink') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">![image](url)</code> {{ t('admin.helpManage.markdownImage') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">- item</code> {{ t('admin.helpManage.markdownUnorderedList') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">1. item</code> {{ t('admin.helpManage.markdownOrderedList') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">`code`</code> {{ t('admin.helpManage.markdownInlineCode') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">```code```</code> {{ t('admin.helpManage.markdownCodeBlock') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">> quote</code> {{ t('admin.helpManage.markdownQuote') }}</div>
-                    <div><code class="rounded bg-themed-secondary px-1 font-mono">---</code> {{ t('admin.helpManage.markdownHr') }}</div>
-                  </div>
-                  <div class="border-t border-themed pt-2">
-                    <div class="mb-1 font-medium text-themed">{{ t('admin.helpManage.customAlerts') }}</div>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1">
-                      <div><code class="rounded bg-themed-secondary px-1 font-mono">?{info}[text]</code> {{ t('admin.helpManage.alertInfo') }}</div>
-                      <div><code class="rounded bg-themed-secondary px-1 font-mono">?{success}[text]</code> {{ t('admin.helpManage.alertSuccess') }}</div>
-                      <div><code class="rounded bg-themed-secondary px-1 font-mono">?{warning}[text]</code> {{ t('admin.helpManage.alertWarning') }}</div>
-                      <div><code class="rounded bg-themed-secondary px-1 font-mono">?{danger}[text]</code> {{ t('admin.helpManage.alertDanger') }}</div>
-                      <div><code class="rounded bg-themed-secondary px-1 font-mono">?{note}[text]</code> {{ t('admin.helpManage.alertNote') }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <textarea
-                  v-model="form.content"
-                  class="input w-full font-mono text-sm resize-none"
-                  style="height: calc(100vh - 400px); min-height: 300px;"
-                  placeholder="# 标题&#10;&#10;正文内容...&#10;&#10;```javascript&#10;// 代码示例&#10;console.log('Hello')&#10;```&#10;&#10;?{info}[提示信息]&#10;?{success}[成功信息]&#10;?{warning}[警告信息]&#10;?{danger}[危险信息]"
-                ></textarea>
-              </div>
-
-              <div v-if="formError" class="text-sm text-error">{{ formError }}</div>
+                {{ showMarkdownHelp ? t('admin.helpManage.hideMarkdownHelp') : t('admin.helpManage.showMarkdownHelp') }}
+              </Button>
             </div>
 
-            <!-- Right: Preview -->
-            <div v-else class="flex-1 overflow-y-auto p-6">
-              <div class="prose prose-invert max-w-none">
-                <h1 class="text-themed">{{ form.title || t('admin.helpManage.noTitle') }}</h1>
-                <div class="markdown-body" v-html="previewHtml"></div>
+            <!-- Markdown Syntax Help -->
+            <div
+              v-if="showMarkdownHelp"
+              class="mb-3 space-y-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-xs text-[var(--text-secondary)] transition-all"
+            >
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]"># 标题</code> {{ t('admin.helpManage.markdownHeading1') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">## 标题</code> {{ t('admin.helpManage.markdownHeading2') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">**粗体**</code> {{ t('admin.helpManage.markdownBold') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">*斜体*</code> {{ t('admin.helpManage.markdownItalic') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">[链接](url)</code> {{ t('admin.helpManage.markdownLink') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">![图片](url)</code> {{ t('admin.helpManage.markdownImage') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">- 列表</code> {{ t('admin.helpManage.markdownUnorderedList') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">1. 列表</code> {{ t('admin.helpManage.markdownOrderedList') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">`行内代码`</code> {{ t('admin.helpManage.markdownInlineCode') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">```代码块```</code> {{ t('admin.helpManage.markdownCodeBlock') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">&gt; 引用</code> {{ t('admin.helpManage.markdownQuote') }}</div>
+                <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">---</code> {{ t('admin.helpManage.markdownHr') }}</div>
+              </div>
+              <div class="border-t border-[var(--border-color)] pt-2.5">
+                <div class="mb-1.5 font-semibold text-[var(--text-primary)]">{{ t('admin.helpManage.customAlerts') }}</div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+                  <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">?{info}[text]</code> {{ t('admin.helpManage.alertInfo') }}</div>
+                  <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">?{success}[text]</code> {{ t('admin.helpManage.alertSuccess') }}</div>
+                  <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">?{warning}[text]</code> {{ t('admin.helpManage.alertWarning') }}</div>
+                  <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">?{danger}[text]</code> {{ t('admin.helpManage.alertDanger') }}</div>
+                  <div><code class="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono text-[var(--text-primary)] border border-[var(--border-color)]">?{note}[text]</code> {{ t('admin.helpManage.alertNote') }}</div>
+                </div>
               </div>
             </div>
+
+            <textarea
+              v-model="form.content"
+              class="w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-4 font-mono text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent transition-all duration-200 resize-y"
+              style="min-height: 280px; max-height: calc(100vh - 420px);"
+              placeholder="# 标题&#10;&#10;正文内容...&#10;&#10;```bash&#10;# 运行示例&#10;sudo systemctl status incus&#10;```&#10;&#10;?{info}[提示信息]&#10;?{success}[成功信息]"
+            ></textarea>
           </div>
 
-          <!-- Footer -->
-          <div class="modal-footer">
-            <button class="btn-secondary" @click="showEditor = false">{{ t('common.cancel') }}</button>
-            <button :disabled="formLoading" class="btn-primary" @click="saveArticle">
-              {{ formLoading ? t('common.loading') : t('common.save') }}
-            </button>
+          <div
+            v-if="formError"
+            class="p-3.5 rounded-xl bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--error)_24%,var(--bg-surface))] text-xs text-[var(--error)] font-medium"
+          >
+            {{ formError }}
           </div>
+        </div>
+
+        <!-- Preview Mode -->
+        <div v-else class="flex-1 overflow-y-auto p-6 bg-[var(--bg-surface-soft)]/30">
+          <div class="max-w-3xl mx-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 md:p-8 shadow-sm">
+            <h1 class="text-2xl font-bold tracking-tight text-[var(--text-primary)] mb-4">
+              {{ form.title || t('admin.helpManage.noTitle') }}
+            </h1>
+            <div class="markdown-body" v-html="previewHtml"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-end gap-3 border-t border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface-soft)]/50">
+        <Button variant="secondary" size="sm" type="button" @click="showEditor = false">
+          {{ t('common.cancel') }}
+        </Button>
+        <Button variant="primary" size="sm" :loading="formLoading" type="button" @click="saveArticle">
+          {{ formLoading ? t('common.loading') : t('common.save') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- Category Modal -->
@@ -736,86 +1057,77 @@ function formatDate(dateStr: string | null | undefined): string {
       raw
       @close="showCategoryModal = false"
     >
-          <div class="modal-header">
-            <h3 class="modal-title truncate">
-              {{ categoryMode === 'create' ? t('admin.helpManage.addCategory') : t('common.edit') }}
-            </h3>
-            <button class="btn-ghost btn-sm -mr-2 p-1.5" @click="showCategoryModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface)]">
+        <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">
+          {{ categoryMode === 'create' ? t('admin.helpManage.addCategory') : t('common.edit') }}
+        </h3>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all"
+          @click="showCategoryModal = false"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div>
+          <Input
+            v-model="categoryForm.id"
+            :label="t('admin.helpManage.categoryId') + ' *'"
+            placeholder="getting-started"
+            :disabled="categoryMode === 'edit'"
+            :hint="t('admin.helpManage.categoryIdHint')"
+            class="font-mono"
+          />
+        </div>
+
+        <div>
+          <Input
+            v-model="categoryForm.name"
+            :label="t('admin.helpManage.categoryName') + ' *'"
+            placeholder="Getting Started"
+          />
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none">
+            {{ t('admin.helpManage.categoryColor') }}
+          </label>
+          <div class="flex flex-wrap gap-2.5">
+            <button
+              v-for="color in categoryColors"
+              :key="color"
+              type="button"
+              class="h-9 w-9 rounded-xl border border-black/10 dark:border-white/10 transition-all duration-200 active:scale-90 flex items-center justify-center"
+              :class="categoryForm.color === color ? 'ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--bg-surface)] scale-105 shadow-sm' : 'hover:scale-105'"
+              :style="{ backgroundColor: color }"
+              @click="categoryForm.color = color"
+            >
+              <Check v-if="categoryForm.color === color" class="w-4 h-4 text-white drop-shadow" />
             </button>
           </div>
+        </div>
 
-          <div class="modal-body space-y-4">
-            <div>
-              <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.categoryId') }} *</label>
-              <input
-                v-model="categoryForm.id"
-                type="text"
-                class="input font-mono"
-                placeholder="getting-started"
-                :disabled="categoryMode === 'edit'"
-              />
-              <p class="mt-1 text-xs text-themed-muted">{{ t('admin.helpManage.categoryIdHint') }}</p>
-            </div>
+        <div
+          v-if="categoryError"
+          class="p-3 rounded-xl bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--error)_24%,var(--bg-surface))] text-xs text-[var(--error)] font-medium"
+        >
+          {{ categoryError }}
+        </div>
+      </div>
 
-            <div>
-              <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.categoryName') }} *</label>
-              <input
-                v-model="categoryForm.name"
-                type="text"
-                class="input"
-                placeholder="Getting Started"
-              />
-            </div>
-
-            <div>
-              <label class="mb-1.5 block text-sm text-themed-secondary">{{ t('admin.helpManage.categoryColor') }}</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="color in categoryColors"
-                  :key="color"
-                  class="h-8 w-8 rounded-lg ring-1 ring-inset ring-black/10 transition-all dark:ring-white/10"
-                  :class="categoryForm.color === color ? 'scale-110 shadow-lg ring-2 ring-primary-500' : ''"
-                  :style="{ backgroundColor: color }"
-                  @click="categoryForm.color = color"
-                ></button>
-              </div>
-            </div>
-
-            <div v-if="categoryError" class="text-sm text-error">{{ categoryError }}</div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn-secondary" @click="showCategoryModal = false">{{ t('common.cancel') }}</button>
-            <button class="btn-primary" @click="saveCategory">{{ t('common.save') }}</button>
-          </div>
+      <div class="flex items-center justify-end gap-3 border-t border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface-soft)]/50">
+        <Button variant="secondary" size="sm" type="button" @click="showCategoryModal = false">
+          {{ t('common.cancel') }}
+        </Button>
+        <Button variant="primary" size="sm" type="button" @click="saveCategory">
+          {{ t('common.save') }}
+        </Button>
+      </div>
     </DrawerModal>
   </div>
 </template>
-
-<style scoped>
-.nimbus-lift {
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.nimbus-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px -10px rgb(16 24 40 / 0.16);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-view *,
-  .nimbus-view *::before,
-  .nimbus-view *::after {
-    transition-duration: 0.001ms !important;
-    animation-duration: 0.001ms !important;
-  }
-  .nimbus-lift:hover {
-    transform: none;
-  }
-}
-</style>
 
 <style>
 /* ============ Markdown 基础样式 ============ */
@@ -1101,7 +1413,4 @@ function formatDate(dateStr: string | null | undefined): string {
 .light .md-alert-note > div {
   color: var(--alert-note);
 }
-
-/* ============ 代码高亮主题适配 ============ */
-/* 已抽为全局共享样式 client/src/styles/markdown-theme.css（GitHub 官方配色） */
 </style>
