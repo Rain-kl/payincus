@@ -467,11 +467,21 @@ func TestRedeemCodeQueryEnum(t *testing.T) {
 	}
 }
 
-// TestRedeemCodeRootArrayCoercion pins AJV's root `coerceTypes:'array'` unwrap.
+// TestRedeemCodeRootArrayCoercion pins the MEASURED Fastify behaviour: the root is
+// never unwrapped.
+//
+// `coerceTypes: 'array'` applies to schema properties only. A single-element array
+// at the body root fails the root `type: 'object'` test and Fastify answers 400
+// "must be object" (verified on the live Node server). An earlier version of
+// unwrapAJVRootArray unwrapped it, which accepted bodies Node rejects.
 func TestRedeemCodeRootArrayCoercion(t *testing.T) {
-	if got := unwrapAJVRootArray([]any{map[string]any{"a": 1}}); got == nil {
-		t.Fatal("single-element array must unwrap to its element")
+	array := []any{map[string]any{"a": 1}}
+	got := unwrapAJVRootArray(array)
+	asArray, ok := got.([]any)
+	if !ok || len(asArray) != 1 {
+		t.Fatalf("a root array must pass through unchanged, got %#v", got)
 	}
+
 	object := map[string]any{"a": 1}
 	if got, ok := unwrapAJVRootArray(object).(map[string]any); !ok || len(got) != 1 {
 		t.Fatalf("object must pass through unchanged, got %#v", got)

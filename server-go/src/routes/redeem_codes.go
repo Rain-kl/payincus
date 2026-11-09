@@ -178,14 +178,19 @@ func redeemCodeQueryEnum(query url.Values, key string, allowed []string) (string
 	return coerced, true, ""
 }
 
-// unwrapAJVRootArray mirrors AJV's root-level `coerceTypes:'array'` step: a
-// single-element array is replaced by its element before the root type test, so
-// `[{"a":1}]` validates as the object `{"a":1}` (real Fastify behaviour).
+// unwrapAJVRootArray is a NO-OP that documents a measured Fastify fact.
+//
+// `coerceTypes: 'array'` applies to SCHEMA PROPERTIES, not to the body root: a
+// single-element array at the root fails the root `type: 'object'` test and the
+// request is rejected with 400 "must be object" (verified against fastify@5.6.2 on
+// the live Node server — POST [{"operationType":"delete_snapshot"}] returns
+// "must be object", while a property-level {"operationType":["…"]} coerces
+// happily). An earlier version of this helper unwrapped the root as well, which
+// silently accepted bodies Node rejects; the checkin/resource-pool port caught it.
+//
+// It is kept as a named function so every call site reads as "this is where the
+// root-coercion question was settled", and so the tests can pin the behaviour.
 func unwrapAJVRootArray(decoded any) any {
-	source, unwrapped := ajvUnwrapSingleArray(decoded)
-	if unwrapped {
-		return source
-	}
 	return decoded
 }
 
