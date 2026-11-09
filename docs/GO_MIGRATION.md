@@ -263,7 +263,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 ### Wave C — Caddy 与跨节点迁移
 
-- [ ] `lib/caddy-client.go`（394）— proxy-sites 与 transfers 的共同依赖
+- [x] `lib/caddy-client.go`（394）— proxy-sites 与 transfers 的共同依赖
 - [ ] `proxy-sites`（986）
 - [ ] `transfers`（1152）— 还需 `incus-backups`/`incus-restore`/`incus-pool`
 
