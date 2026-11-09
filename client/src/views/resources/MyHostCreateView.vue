@@ -8,6 +8,21 @@ import { onClickOutside } from '@vueuse/core'
 import { availableFlagCountryCodes, getLocalizedCountryName } from '@/utils/countryDisplay'
 import { buildHostApiUrl, validateIdentifier, validateName, validateHostAddress, validateIpAddress } from '@/utils/validation'
 import FlagIcon from '@/components/FlagIcon.vue'
+import { Badge, Button, Card, Input, PageHeader, Select } from '@/components/ui'
+import {
+  Server,
+  Network,
+  Radio,
+  Globe,
+  Cpu,
+  Info,
+  Check,
+  Copy,
+  AlertCircle,
+  Search,
+  ChevronDown,
+  X
+} from 'lucide-vue-next'
 
 const props = withDefaults(
   defineProps<{
@@ -36,7 +51,6 @@ const hostNamePrefix = computed(() => `PEER${authStore.user?.id}-`)
 const saving = ref(false)
 const showInstallScript = ref(false)
 const installCommand = ref('')
-
 
 const hostId = ref<number>(0)
 const installStatus = ref<'waiting' | 'verifying' | 'success' | 'error'>('waiting')
@@ -210,7 +224,7 @@ async function createHost() {
 
   // 验证 NAT 网卡 IP，支持 IPv4 / IPv6
   if (form.value.natPublicIp) {
-    const natIpValidation = validateIpAddress(form.value.natPublicIp, t('admin.hosts.natPublicIp'))
+    const natIpValidation = validateIpAddress(form.value.natPublicIp, t('admin.hosts.natPublicIpv4'))
     if (!natIpValidation.valid) {
       toast.error(natIpValidation.message || '')
       return
@@ -310,353 +324,628 @@ function closeAndGoBack() {
     raw
     @close="closeAndGoBack"
   >
-      <!-- Header -->
-      <div class="modal-header">
-        <div class="flex items-center gap-2 min-w-0">
-          <h3 class="modal-title truncate">
-            {{ showInstallScript ? t('admin.hosts.installScript') : t('resources.hosts.create') }}
-          </h3>
-        </div>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm -mr-2 p-1.5"
-          aria-label="close"
-          @click="closeAndGoBack"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
+    <!-- Header with Apple PageHeader -->
+    <div class="modal-header border-b border-[var(--border-color)] bg-[var(--bg-surface)] px-6 py-4 shrink-0">
+      <PageHeader
+        :title="showInstallScript ? t('admin.hosts.installScript') : t('resources.hosts.create')"
+        :description="showInstallScript ? t('admin.hosts.runOnHost') : t('resources.hosts.installHintTitle')"
+        :back="true"
+        :back-label="t('common.close')"
+        class="!mb-0 w-full"
+        @back="closeAndGoBack"
+      >
+        <template #actions>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            :aria-label="t('common.close')"
+            @click="closeAndGoBack"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </template>
+      </PageHeader>
+    </div>
 
-      <!-- Body -->
-      <div class="modal-body space-y-6">
-        <!-- If install script returned, show install steps -->
-        <div v-if="showInstallScript" class="space-y-6">
-          <!-- 步骤 1: 执行安装命令 -->
-          <div class="space-y-3">
-            <div class="flex items-center gap-2.5">
-              <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold text-white" :class="installStatus === 'success' ? 'bg-emerald-600' : 'bg-primary-600'">1</span>
-              <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step1RunScript') }}</span>
-            </div>
-            <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.runOnHost') }}</p>
-            <div class="ml-8 rounded-lg border border-themed bg-themed-secondary p-3 overflow-x-auto">
-              <code class="block break-all whitespace-pre-wrap font-mono text-xs text-themed">{{ installCommand }}</code>
-            </div>
-            <div class="ml-8">
-              <button type="button" class="btn-secondary btn-sm gap-1.5" @click="copyCommand">
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+    <!-- Body -->
+    <div class="modal-body p-6 space-y-6 overflow-y-auto flex-1 bg-[var(--bg-primary)]">
+      <!-- If install script returned, show install steps -->
+      <div v-if="showInstallScript" class="space-y-6">
+        <!-- 步骤 1: 执行安装命令 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div class="flex items-center gap-3">
+                <span
+                  class="flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold text-white transition-colors shrink-0"
+                  :class="installStatus === 'success' ? 'bg-[var(--success)]' : 'bg-[var(--accent)]'"
+                >
+                  1
+                </span>
+                <div>
+                  <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] tracking-tight">
+                    {{ t('admin.hosts.step1RunScript') }}
+                  </h3>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.hosts.runOnHost') }}
+                  </p>
+                </div>
+              </div>
+              <Button variant="secondary" size="sm" type="button" @click="copyCommand">
+                <template #icon><Copy class="w-3.5 h-3.5" /></template>
                 {{ t('admin.hosts.copyCommand') }}
-              </button>
+              </Button>
+            </div>
+          </template>
+
+          <div class="space-y-3">
+            <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 overflow-x-auto">
+              <code class="block break-all whitespace-pre-wrap font-mono text-xs text-[var(--text-primary)] leading-relaxed select-all">{{ installCommand }}</code>
             </div>
           </div>
+        </Card>
 
-          <!-- 步骤 2：验证并连接 -->
-          <div class="space-y-3 pt-5 border-t border-themed">
-            <div class="flex items-center gap-2.5">
-              <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold text-white" :class="installStatus === 'success' ? 'bg-emerald-600' : 'bg-themed-secondary text-themed-muted'">2</span>
-              <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step2Verify') }}</span>
+        <!-- 步骤 2：验证并连接 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div class="flex items-center gap-3">
+                <span
+                  class="flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold transition-colors shrink-0"
+                  :class="installStatus === 'success' ? 'bg-[var(--success)] text-white' : 'bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] border border-[var(--border-color)]'"
+                >
+                  2
+                </span>
+                <div>
+                  <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] tracking-tight">
+                    {{ t('admin.hosts.step2Verify') }}
+                  </h3>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.hosts.verifyHint') }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <Badge v-if="installStatus === 'success'" variant="success" size="md" dot>
+                  {{ t('admin.hosts.verifySuccess') }}
+                </Badge>
+              </div>
             </div>
-            <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.verifyHint') }}</p>
+          </template>
 
-            <!-- 状态显示 -->
-            <div class="ml-8 flex flex-wrap items-center gap-3">
-              <button
+          <div class="space-y-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <Button
+                variant="primary"
+                size="md"
                 type="button"
-                class="btn-secondary btn-sm gap-1.5"
                 :disabled="installStatus === 'verifying' || installStatus === 'success'"
+                :loading="installStatus === 'verifying'"
                 @click="verifyHost"
               >
-                <span v-if="installStatus === 'verifying'" class="loading-spinner w-3.5 h-3.5"></span>
                 {{ installStatus === 'verifying' ? t('admin.hosts.verifying') : t('admin.hosts.verifyAndConnect') }}
-              </button>
-
-              <!-- 成功状态 -->
-              <span v-if="installStatus === 'success'" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950 px-2.5 py-0.5 text-xs font-mono text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-300 dark:ring-emerald-800">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                {{ t('admin.hosts.verifySuccess') }}
-              </span>
+              </Button>
             </div>
 
             <!-- 错误提示 -->
-            <div v-if="installStatus === 'error' && verifyError" class="ml-8 rounded-lg border border-rose-600 bg-rose-50 dark:bg-rose-950 p-3 text-sm text-rose-700 dark:text-rose-200">
-              {{ verifyError }}
+            <div
+              v-if="installStatus === 'error' && verifyError"
+              class="flex items-start gap-2.5 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 p-3.5 text-sm text-[var(--error)]"
+            >
+              <AlertCircle class="w-4 h-4 shrink-0 mt-0.5 text-[var(--error)]" />
+              <span class="break-words">{{ verifyError }}</span>
             </div>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Form view -->
+      <template v-else>
+        <!-- 部署说明 Hint banner -->
+        <div class="flex items-start gap-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 sm:p-5">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)] text-[var(--accent)]">
+            <Info class="w-4 h-4 stroke-[2]" />
+          </div>
+          <div class="space-y-1.5 text-sm text-[var(--text-secondary)]">
+            <p class="font-medium text-[var(--text-primary)]">{{ t('resources.hosts.ubuntuOnlyHint') }}</p>
+            <p>{{ t('resources.hosts.installHintTitle') }}</p>
+            <p class="text-xs text-[var(--text-tertiary)]">{{ t('resources.hosts.installHintIpv6') }}</p>
           </div>
         </div>
 
-        <!-- Form view -->
-        <template v-else>
-          <!-- 部署说明 -->
-          <div class="flex items-start gap-3 rounded-xl border border-themed bg-themed-secondary p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div class="space-y-1.5 text-sm text-themed-secondary">
-              <p>{{ t('resources.hosts.ubuntuOnlyHint') }}</p>
-              <p>{{ t('resources.hosts.installHintTitle') }}</p>
-              <p class="text-xs text-themed-muted">{{ t('resources.hosts.installHintIpv6') }}</p>
-            </div>
-          </div>
+        <!-- 表单 Form Content -->
+        <form id="host-create-form" class="space-y-6" @submit.prevent="createHost">
+          <!-- 1. 基本信息 Basic Info -->
+          <Card padding="md">
+            <template #header>
+              <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--accent)]">
+                  <Server class="w-5 h-5 stroke-[2]" />
+                </div>
+                <div>
+                  <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] tracking-tight">
+                    {{ t('admin.hosts.basicInfo') }}
+                  </h3>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.hosts.basicInfoHint') }}
+                  </p>
+                </div>
+              </div>
+            </template>
 
-          <!-- 表单 -->
-          <form id="host-create-form" class="space-y-5" @submit.prevent="createHost">
-          <!-- 基本信息 -->
-          <section class="card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
               <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.hostName') }}</label>
                 <!-- 管理员输入完整节点名称 -->
                 <template v-if="isAdmin">
-                  <input v-model="form.name" type="text" class="input font-mono" placeholder="node-01" required pattern="^[a-zA-Z0-9_-]+$" @input="form.name = form.name.replace(/[^a-zA-Z0-9_-]/g, '')" />
-                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.hostNameHint') }}</p>
+                  <Input
+                    v-model="form.name"
+                    type="text"
+                    :label="t('admin.hosts.hostName')"
+                    placeholder="node-01"
+                    class="font-mono"
+                    :hint="t('admin.hosts.hostNameHint')"
+                    @update:model-value="form.name = String($event).replace(/[^a-zA-Z0-9_-]/g, '')"
+                  />
                 </template>
                 <!-- 普通用户输入节点名称后缀 -->
                 <template v-else>
-                  <div class="flex">
-                    <span class="inline-flex items-center rounded-l-lg border border-r-0 border-themed bg-themed-secondary px-3 font-mono text-sm text-themed-muted">{{ hostNamePrefix }}</span>
-                    <input v-model="form.nameSuffix" type="text" class="input flex-1 rounded-l-none font-mono" placeholder="myhost" required pattern="^[a-zA-Z0-9_-]+$" @input="form.nameSuffix = form.nameSuffix.replace(/[^a-zA-Z0-9_-]/g, '')" />
-                  </div>
-                  <p class="text-xs text-themed-muted">{{ t('resources.hosts.nameHint') }}</p>
+                  <Input
+                    v-model="form.nameSuffix"
+                    type="text"
+                    :label="t('admin.hosts.hostName')"
+                    placeholder="myhost"
+                    class="font-mono"
+                    :hint="t('resources.hosts.nameHint')"
+                    @update:model-value="form.nameSuffix = String($event).replace(/[^a-zA-Z0-9_-]/g, '')"
+                  >
+                    <template #prefix>
+                      <span class="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-color)] select-none mr-1 shrink-0">
+                        {{ hostNamePrefix }}
+                      </span>
+                    </template>
+                  </Input>
                 </template>
-                <p class="text-xs text-amber-500">{{ t('common.noIncudalHint') }}</p>
+                <p class="text-xs text-[var(--warning)] font-medium mt-1">{{ t('common.noIncudalHint') }}</p>
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.hostDesc') }}</label>
-                <input v-model="form.location" type="text" class="input" placeholder="Hong Kong DC1" />
+
+              <div>
+                <Input
+                  v-model="form.location"
+                  type="text"
+                  :label="t('admin.hosts.hostDesc')"
+                  placeholder="Hong Kong DC1"
+                />
               </div>
             </div>
-          </section>
+          </Card>
 
-          <!-- 连接与网络 -->
-          <section class="card relative z-20 !overflow-visible space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6" style="overflow: visible !important;">
-            <!-- 连接方式选择 -->
-            <div class="space-y-1.5">
-              <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.connectionMode') }}</label>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label
-                  class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
-                  :class="form.tunnelEnabled ? 'border-primary bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
-                >
-                  <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
-                  <div>
-                    <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
-                  </div>
-                </label>
-                <label
-                    class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
-                    :class="!form.tunnelEnabled ? 'border-primary bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
-                >
-                  <input type="radio" :value="false" v-model="form.tunnelEnabled" class="radio text-primary" />
-                  <div>
-                    <div class="text-sm">{{ t('admin.hosts.directMode') }}</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <!-- 直连模式输入框 -->
-            <div v-if="!form.tunnelEnabled" class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_140px]">
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.ipAddress') }}</label>
-                <input v-model="form.hostAddress" type="text" class="input font-mono" placeholder="10.0.0.1 / 2001:db8::1 / node.example.com" :required="!form.tunnelEnabled" />
-                <p class="text-xs text-themed-muted">{{ t('admin.hosts.ipAddressHint') }}</p>
-              </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.apiPort') }}</label>
-                <input v-model.number="form.apiPort" type="number" min="1" max="65535" class="input font-mono tabular-nums" placeholder="8443" :required="!form.tunnelEnabled" />
-                <p class="text-xs text-themed-muted">{{ t('admin.hosts.apiPortHint') }}</p>
-              </div>
-            </div>
-
-            <!-- 穿透模式输入框与提示 -->
-            <div v-else class="space-y-4">
-              <div class="rounded-lg border border-themed bg-themed-secondary p-3 text-xs text-themed-secondary">
-                {{ t('admin.hosts.tunnelNotice') }}
-              </div>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-[140px_1fr]">
-                <div class="space-y-1.5">
-                  <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.targetPort') }}</label>
-                  <input v-model.number="form.targetPort" type="number" min="1" max="65535" class="input font-mono tabular-nums" placeholder="8443" required />
-                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.targetPortHint') }}</p>
+          <!-- 2. 连接与网络 Connection & Network -->
+          <Card padding="md" class="relative z-20 !overflow-visible">
+            <template #header>
+              <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--accent)]">
+                  <Network class="w-5 h-5 stroke-[2]" />
                 </div>
-                <div class="space-y-1.5">
-                  <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.targetHost') }}</label>
-                  <input v-model="form.targetHost" type="text" class="input font-mono" placeholder="127.0.0.1" />
-                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.targetHostHint') }}</p>
+                <div>
+                  <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] tracking-tight">
+                    {{ t('admin.hosts.connectionConfig') }}
+                  </h3>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.hosts.connectionConfigHint') }}
+                  </p>
                 </div>
               </div>
-            </div>
+            </template>
 
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <!-- 国家选择 -->
-              <div ref="countryDropdownRef" class="relative z-30 space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.country') }}</label>
-                <button type="button" class="input flex w-full items-center justify-between" @click="toggleCountryDropdown">
-                  <span class="flex items-center gap-2"><FlagIcon :code="form.countryCode" size="sm" />{{ selectedCountry?.name }}</span>
-                  <svg class="h-4 w-4 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                </button>
-                <div v-if="showCountryDropdown" class="dropdown-menu kawaii-menu-panel absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-themed bg-[var(--bg-surface)] shadow-2xl">
-                  <div class="border-b border-themed p-2 bg-[var(--bg-surface)]">
-                    <input
-                      v-model="countrySearch"
-                      type="search"
-                      class="input h-9 text-sm"
-                      :placeholder="t('common.searchPlaceholder')"
-                      autocomplete="off"
-                      autofocus
-                      @keydown.enter.prevent.stop
-                      @keydown.stop
-                    />
+            <div class="space-y-5">
+              <!-- 连接方式选择 Connection Mode -->
+              <div class="space-y-2">
+                <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none">
+                  {{ t('admin.hosts.connectionMode') }}
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    class="group relative rounded-2xl border p-4 transition-all duration-300 cursor-pointer active:scale-[0.98]"
+                    :class="form.tunnelEnabled
+                      ? 'border-[var(--accent)] bg-[var(--bg-surface-soft)] ring-1 ring-[var(--accent)] shadow-sm'
+                      : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]/50'"
+                    @click="form.tunnelEnabled = true"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2.5">
+                        <div
+                          class="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--bg-surface)] transition-colors"
+                          :class="form.tunnelEnabled ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'"
+                        >
+                          <Radio class="w-4 h-4" />
+                        </div>
+                        <span
+                          class="text-sm font-semibold tracking-tight"
+                          :class="form.tunnelEnabled ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'"
+                        >
+                          {{ t('admin.hosts.tunnelMode') }}
+                        </span>
+                      </div>
+                      <Badge v-if="form.tunnelEnabled" variant="info" size="sm">
+                        <Check class="w-3.5 h-3.5 stroke-[2.5]" />
+                      </Badge>
+                    </div>
                   </div>
-                  <div class="max-h-60 overflow-auto py-1 bg-[var(--bg-surface)]">
-                    <button
-                      v-for="c in filteredCountries"
-                      :key="c.code"
-                      type="button"
-                      class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-themed-hover"
-                      :class="form.countryCode === c.code ? 'bg-themed-secondary text-themed font-semibold' : 'text-themed-secondary'"
-                      @click="selectCountry(c.code)"
-                    >
-                      <FlagIcon :code="c.code" size="sm" />{{ c.name }}
-                    </button>
-                    <div v-if="filteredCountries.length === 0" class="px-3 py-6 text-center text-sm text-themed-muted">
-                      {{ t('common.noSearchResults') }}
+
+                  <div
+                    class="group relative rounded-2xl border p-4 transition-all duration-300 cursor-pointer active:scale-[0.98]"
+                    :class="!form.tunnelEnabled
+                      ? 'border-[var(--accent)] bg-[var(--bg-surface-soft)] ring-1 ring-[var(--accent)] shadow-sm'
+                      : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]/50'"
+                    @click="form.tunnelEnabled = false"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2.5">
+                        <div
+                          class="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--bg-surface)] transition-colors"
+                          :class="!form.tunnelEnabled ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'"
+                        >
+                          <Globe class="w-4 h-4" />
+                        </div>
+                        <span
+                          class="text-sm font-semibold tracking-tight"
+                          :class="!form.tunnelEnabled ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'"
+                        >
+                          {{ t('admin.hosts.directMode') }}
+                        </span>
+                      </div>
+                      <Badge v-if="!form.tunnelEnabled" variant="info" size="sm">
+                        <Check class="w-3.5 h-3.5 stroke-[2.5]" />
+                      </Badge>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- 网络模式选择 -->
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.networkModeLabel') }}</label>
-                <select v-model="form.networkMode" class="input">
-                  <option value="nat">{{ t('admin.hosts.networkModeNat') }}</option>
-                  <option value="nat_ipv6">{{ t('admin.hosts.networkModeNatIpv6') }}</option>
-                  <option value="ipv6_only">{{ t('admin.hosts.networkModeIpv6Only') }}</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- IPv6 网段输入框（仅在选择 nat_ipv6 时显示） -->
-            <Transition name="fade">
-              <div v-if="form.networkMode === 'nat_ipv6' || form.networkMode === 'ipv6_only'" class="space-y-4 rounded-lg border border-themed bg-themed-secondary p-4">
-                <div class="space-y-1.5">
-                  <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.ipv6Subnet') }}</label>
-                  <input v-model="form.ipv6Subnet" type="text" class="input font-mono" placeholder="2001:db8::/48" />
-                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.ipv6SubnetHint') }}</p>
+              <!-- 直连模式输入框 Direct Mode Inputs -->
+              <div v-if="!form.tunnelEnabled" class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_140px]">
+                <div>
+                  <Input
+                    v-model="form.hostAddress"
+                    type="text"
+                    :label="t('admin.hosts.ipAddress')"
+                    placeholder="10.0.0.1 / 2001:db8::1 / node.example.com"
+                    class="font-mono"
+                    :hint="t('admin.hosts.ipAddressHint')"
+                    :required="!form.tunnelEnabled"
+                  />
                 </div>
-                <div class="space-y-1.5">
-                  <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.ipv6ParentInterface') }}</label>
-                  <input v-model="form.ipv6ParentInterface" type="text" class="input font-mono" placeholder="eth0" />
-                  <p class="text-xs text-themed-muted">{{ t('admin.hosts.ipv6ParentInterfaceHint') }}</p>
+                <div>
+                  <Input
+                    v-model.number="form.apiPort"
+                    type="number"
+                    :label="t('admin.hosts.apiPort')"
+                    placeholder="8443"
+                    min="1"
+                    max="65535"
+                    class="font-mono tabular-nums"
+                    :hint="t('admin.hosts.apiPortHint')"
+                    :required="!form.tunnelEnabled"
+                  />
                 </div>
-                <p class="text-xs text-amber-500">{{ t('resources.hosts.ipv6OptionalHint') }}</p>
               </div>
-            </Transition>
-          </section>
 
-          <!-- NAT 端口映射配置，仅 IPv4 相关模式显示 -->
-          <section v-if="form.networkMode !== 'ipv6_only'" class="card relative z-10 space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
-            <div class="flex items-center gap-2.5">
-              <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-themed bg-themed-secondary">
-                <svg class="h-4 w-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18" /></svg>
-              </span>
-              <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.natConfig') }}</h2>
+              <!-- 穿透模式输入框与提示 Tunnel Mode Inputs -->
+              <div v-else class="space-y-4">
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 text-xs text-[var(--text-secondary)] leading-relaxed">
+                  {{ t('admin.hosts.tunnelNotice') }}
+                </div>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-[140px_1fr]">
+                  <div>
+                    <Input
+                      v-model.number="form.targetPort"
+                      type="number"
+                      :label="t('admin.hosts.targetPort')"
+                      placeholder="8443"
+                      min="1"
+                      max="65535"
+                      class="font-mono tabular-nums"
+                      :hint="t('admin.hosts.targetPortHint')"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Input
+                      v-model="form.targetHost"
+                      type="text"
+                      :label="t('admin.hosts.targetHost')"
+                      placeholder="127.0.0.1"
+                      class="font-mono"
+                      :hint="t('admin.hosts.targetHostHint')"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 国家与网络模式 Country & Network Mode -->
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <!-- 国家选择 Country Dropdown -->
+                <div ref="countryDropdownRef" class="relative z-30 space-y-1.5">
+                  <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none block">
+                    {{ t('admin.hosts.country') }}
+                  </label>
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-between rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 min-h-[44px] text-sm text-[var(--text-primary)] hover:border-[var(--border-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all active:scale-[0.99]"
+                    @click="toggleCountryDropdown"
+                  >
+                    <span class="flex items-center gap-2.5 font-medium truncate">
+                      <FlagIcon :code="form.countryCode" size="sm" class="shrink-0" />
+                      <span class="truncate">{{ selectedCountry?.name }}</span>
+                    </span>
+                    <ChevronDown
+                      class="w-4 h-4 text-[var(--text-tertiary)] shrink-0 transition-transform duration-200"
+                      :class="showCountryDropdown ? 'rotate-180' : ''"
+                    />
+                  </button>
+
+                  <div
+                    v-if="showCountryDropdown"
+                    class="dropdown-menu absolute z-50 mt-1.5 w-full overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                  >
+                    <div class="p-2 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
+                      <div class="relative flex items-center">
+                        <Search class="absolute left-3 w-4 h-4 text-[var(--text-tertiary)] pointer-events-none" />
+                        <input
+                          v-model="countrySearch"
+                          type="search"
+                          class="w-full pl-9 pr-3 py-2 text-sm rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all"
+                          :placeholder="t('common.searchPlaceholder')"
+                          autocomplete="off"
+                          autofocus
+                          @keydown.enter.prevent.stop
+                          @keydown.stop
+                        />
+                      </div>
+                    </div>
+                    <div class="max-h-60 overflow-y-auto p-1.5 space-y-0.5 bg-[var(--bg-surface)]">
+                      <button
+                        v-for="c in filteredCountries"
+                        :key="c.code"
+                        type="button"
+                        class="flex w-full items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm transition-colors duration-150 active:scale-[0.99]"
+                        :class="form.countryCode === c.code ? 'bg-[var(--bg-surface-soft)] text-[var(--accent)] font-semibold' : 'text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)]'"
+                        @click="selectCountry(c.code)"
+                      >
+                        <FlagIcon :code="c.code" size="sm" class="shrink-0" />
+                        <span class="truncate flex-1">{{ c.name }}</span>
+                        <Check v-if="form.countryCode === c.code" class="w-4 h-4 text-[var(--accent)] shrink-0 stroke-[2.5]" />
+                      </button>
+                      <div v-if="filteredCountries.length === 0" class="px-3 py-6 text-center text-sm text-[var(--text-tertiary)]">
+                        {{ t('common.noSearchResults') }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 网络模式选择 Network Mode -->
+                <div>
+                  <Select
+                    v-model="form.networkMode"
+                    :label="t('admin.hosts.networkModeLabel')"
+                  >
+                    <option value="nat">{{ t('admin.hosts.networkModeNat') }}</option>
+                    <option value="nat_ipv6">{{ t('admin.hosts.networkModeNatIpv6') }}</option>
+                    <option value="ipv6_only">{{ t('admin.hosts.networkModeIpv6Only') }}</option>
+                  </Select>
+                </div>
+              </div>
+
+              <!-- IPv6 网段输入框 (仅 nat_ipv6 / ipv6_only) -->
+              <Transition name="fade">
+                <div
+                  v-if="form.networkMode === 'nat_ipv6' || form.networkMode === 'ipv6_only'"
+                  class="space-y-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 sm:p-5"
+                >
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Input
+                        v-model="form.ipv6Subnet"
+                        type="text"
+                        :label="t('admin.hosts.ipv6Subnet')"
+                        placeholder="2001:db8::/48"
+                        class="font-mono"
+                        :hint="t('admin.hosts.ipv6SubnetHint')"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        v-model="form.ipv6ParentInterface"
+                        type="text"
+                        :label="t('admin.hosts.ipv6ParentInterface')"
+                        placeholder="eth0"
+                        class="font-mono"
+                        :hint="t('admin.hosts.ipv6ParentInterfaceHint')"
+                      />
+                    </div>
+                  </div>
+                  <p class="text-xs text-[var(--warning)] font-medium">
+                    {{ t('resources.hosts.ipv6OptionalHint') }}
+                  </p>
+                </div>
+              </Transition>
             </div>
+          </Card>
+
+          <!-- 3. NAT 端口映射配置 (仅 IPv4 相关模式显示) -->
+          <Card v-if="form.networkMode !== 'ipv6_only'" padding="md" class="relative z-10">
+            <template #header>
+              <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--accent)]">
+                  <Globe class="w-5 h-5 stroke-[2]" />
+                </div>
+                <div>
+                  <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] tracking-tight">
+                    {{ t('admin.hosts.natConfig') }}
+                  </h3>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.hosts.natConfigHint') }}
+                  </p>
+                </div>
+              </div>
+            </template>
+
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.natPublicIpv4') }}</label>
-                <input v-model="form.natPublicIp" type="text" class="input font-mono" :placeholder="t('admin.hosts.natPublicIpv4Placeholder')" />
-                <p class="text-xs text-themed-muted">{{ t('admin.hosts.natPublicIpv4Desc') }}</p>
+              <div>
+                <Input
+                  v-model="form.natPublicIp"
+                  type="text"
+                  :label="t('admin.hosts.natPublicIpv4')"
+                  :placeholder="t('admin.hosts.natPublicIpv4Placeholder')"
+                  :hint="t('admin.hosts.natPublicIpv4Desc')"
+                  class="font-mono"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.natPublicIpv6') }}</label>
-                <input v-model="form.natPublicIpv6" type="text" class="input font-mono" :placeholder="t('admin.hosts.natPublicIpv6Placeholder')" />
-                <p class="text-xs text-themed-muted">{{ t('admin.hosts.natPublicIpv6Desc') }}</p>
+              <div>
+                <Input
+                  v-model="form.natPublicIpv6"
+                  type="text"
+                  :label="t('admin.hosts.natPublicIpv6')"
+                  :placeholder="t('admin.hosts.natPublicIpv6Placeholder')"
+                  :hint="t('admin.hosts.natPublicIpv6Desc')"
+                  class="font-mono"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.natBindIpv4') }}</label>
-                <input v-model="form.natBindIp" type="text" class="input font-mono" :placeholder="t('admin.hosts.natBindIpv4Placeholder')" />
-                <p class="text-xs text-themed-muted">{{ t('admin.hosts.natBindIpv4Desc') }}</p>
+              <div>
+                <Input
+                  v-model="form.natBindIp"
+                  type="text"
+                  :label="t('admin.hosts.natBindIpv4')"
+                  :placeholder="t('admin.hosts.natBindIpv4Placeholder')"
+                  :hint="t('admin.hosts.natBindIpv4Desc')"
+                  class="font-mono"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.natBindIpv6') }}</label>
-                <input v-model="form.natBindIpv6" type="text" class="input font-mono" :placeholder="t('admin.hosts.natBindIpv6Placeholder')" />
-                <p class="text-xs text-themed-muted">{{ t('admin.hosts.natBindIpv6Desc') }}</p>
+              <div>
+                <Input
+                  v-model="form.natBindIpv6"
+                  type="text"
+                  :label="t('admin.hosts.natBindIpv6')"
+                  :placeholder="t('admin.hosts.natBindIpv6Placeholder')"
+                  :hint="t('admin.hosts.natBindIpv6Desc')"
+                  class="font-mono"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.portRangeStart') }}</label>
-                <input v-model.number="form.portRangeStart" type="number" class="input font-mono tabular-nums" placeholder="10000" />
+              <div>
+                <Input
+                  :model-value="form.portRangeStart ?? ''"
+                  type="number"
+                  :label="t('admin.hosts.portRangeStart')"
+                  placeholder="10000"
+                  class="font-mono tabular-nums"
+                  @update:model-value="form.portRangeStart = $event === '' || $event == null ? null : Number($event)"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.portRangeEnd') }}</label>
-                <input v-model.number="form.portRangeEnd" type="number" class="input font-mono tabular-nums" placeholder="65000" />
+              <div>
+                <Input
+                  :model-value="form.portRangeEnd ?? ''"
+                  type="number"
+                  :label="t('admin.hosts.portRangeEnd')"
+                  placeholder="65000"
+                  class="font-mono tabular-nums"
+                  @update:model-value="form.portRangeEnd = $event === '' || $event == null ? null : Number($event)"
+                />
               </div>
             </div>
-          </section>
+          </Card>
 
-          <!-- 资源限制 -->
-          <section class="card space-y-4 rounded-xl border border-themed bg-themed-surface p-5 sm:p-6">
-            <div class="flex items-center gap-2.5">
-              <span class="flex h-8 w-8 items-center justify-center rounded-lg border border-themed bg-themed-secondary">
-                <svg class="h-4 w-4 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 7h10v10H7z" /></svg>
-              </span>
-              <h2 class="text-sm font-semibold text-themed">{{ t('admin.hosts.resourceLimits') }}</h2>
-            </div>
+          <!-- 4. 资源限制 Resource Limits -->
+          <Card padding="md">
+            <template #header>
+              <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--accent)]">
+                  <Cpu class="w-5 h-5 stroke-[2]" />
+                </div>
+                <div>
+                  <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] tracking-tight">
+                    {{ t('admin.hosts.resourceTitle') }}
+                  </h3>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.hosts.resourceTitleHint') }}
+                  </p>
+                </div>
+              </div>
+            </template>
+
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.cpuAllowanceMax') }}</label>
-                <input v-model.number="form.cpuAllowanceMax" type="number" class="input font-mono tabular-nums" placeholder="0" :min="0" step="5" />
+              <div>
+                <Input
+                  v-model.number="form.cpuAllowanceMax"
+                  type="number"
+                  :label="t('admin.hosts.cpuAllowanceMax')"
+                  placeholder="0"
+                  class="font-mono tabular-nums"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.memoryMax') }} (MB)</label>
-                <input v-model.number="form.memoryMax" type="number" class="input font-mono tabular-nums" placeholder="0" :min="0" step="64" />
+              <div>
+                <Input
+                  v-model.number="form.memoryMax"
+                  type="number"
+                  :label="`${t('admin.hosts.memoryMax')} (MB)`"
+                  placeholder="0"
+                  class="font-mono tabular-nums"
+                />
               </div>
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-themed-secondary">{{ t('admin.hosts.instanceTypeLabel') }}</label>
-                <select v-model="form.instanceType" class="input">
+              <div>
+                <Select
+                  v-model="form.instanceType"
+                  :label="t('admin.hosts.instanceTypeLabel')"
+                >
                   <option value="container">{{ t('admin.hosts.typeContainer') }}</option>
                   <option value="vm">{{ t('admin.hosts.typeVm') }}</option>
                   <option value="both">{{ t('admin.hosts.typeBoth') }}</option>
-                </select>
+                </Select>
               </div>
             </div>
-          </section>
+          </Card>
 
-          <!-- 存储池提示 -->
-          <div class="flex items-start gap-2.5 rounded-lg border border-themed bg-themed-secondary px-4 py-3">
-            <svg class="mt-0.5 h-4 w-4 shrink-0 icon-themed-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-            </svg>
-            <p class="text-xs leading-relaxed text-themed-secondary">{{ t('resources.hosts.storagePoolAfterConnectHint') }}</p>
+          <!-- 存储池提示 Storage Pool Note -->
+          <div class="flex items-start gap-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 sm:p-5">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)] text-[var(--accent)]">
+              <Info class="w-4 h-4 stroke-[2]" />
+            </div>
+            <p class="text-xs leading-relaxed text-[var(--text-secondary)] mt-1">
+              {{ t('resources.hosts.storagePoolAfterConnectHint') }}
+            </p>
           </div>
+        </form>
+      </template>
+    </div>
 
-          </form>
-        </template>
-      </div>
-
-      <!-- Footer -->
-      <div class="modal-footer">
-        <template v-if="showInstallScript">
-          <button type="button" class="btn-secondary" @click="closeAndGoBack">{{ t('common.close') }}</button>
-          <button v-if="installStatus === 'success'" type="button" class="btn-primary" @click="closeAndGoBack">{{ t('common.done') }}</button>
-        </template>
-        <template v-else>
-          <button type="button" class="btn-secondary" @click="closeAndGoBack">{{ t('common.cancel') }}</button>
-          <button
-            type="submit"
-            form="host-create-form"
-            class="btn-primary"
-            :disabled="saving || (isAdmin ? !form.name : !form.nameSuffix) || (!form.tunnelEnabled && !form.hostAddress)"
-            @click="createHost"
-          >
-            <span v-if="saving" class="loading-spinner w-4 h-4"></span>
-            <span v-else>{{ t('common.create') }}</span>
-          </button>
-        </template>
-      </div>
-    </DrawerModal>
+    <!-- Footer -->
+    <div class="modal-footer border-t border-[var(--border-color)] bg-[var(--bg-surface)] px-6 py-4 flex items-center justify-end gap-3 shrink-0">
+      <template v-if="showInstallScript">
+        <Button variant="secondary" size="md" type="button" @click="closeAndGoBack">
+          {{ t('common.close') }}
+        </Button>
+        <Button v-if="installStatus === 'success'" variant="primary" size="md" type="button" @click="closeAndGoBack">
+          {{ t('common.done') }}
+        </Button>
+      </template>
+      <template v-else>
+        <Button variant="secondary" size="md" type="button" @click="closeAndGoBack">
+          {{ t('common.cancel') }}
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          type="submit"
+          form="host-create-form"
+          :disabled="saving || (isAdmin ? !form.name : !form.nameSuffix) || (!form.tunnelEnabled && !form.hostAddress)"
+          :loading="saving"
+          @click="createHost"
+        >
+          {{ t('common.create') }}
+        </Button>
+      </template>
+    </div>
+  </DrawerModal>
 </template>
 
 <style scoped>

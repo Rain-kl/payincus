@@ -7,7 +7,6 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import PackageSelector from '@/components/instance/PackageSelector.vue'
 import ResourceSliders from '@/components/instance/ResourceSliders.vue'
 import HostSelector from '@/components/instance/HostSelector.vue'
@@ -15,6 +14,8 @@ import ImageSelector from '@/components/instance/ImageSelector.vue'
 import type { Package, AvailableHost, PackagePlan } from '@/types/api'
 import { validateName as validateInstanceName } from '@/utils/validation'
 import { translateError } from '@/utils/errorHandler'
+import { Button, Card, Input, Badge, PageHeader } from '@/components/ui'
+import { User, Sliders, CreditCard, Tag, Check, X, Loader2, AlertCircle } from 'lucide-vue-next'
 
 interface ImageOption {
   value: string
@@ -24,7 +25,6 @@ interface ImageOption {
 
 const { t } = useI18n()
 const toast = useToast()
-const themeStore = useThemeStore()
 
 // 数据加载状态
 const packages = ref<Package[]>([])
@@ -569,74 +569,62 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <template>
-  <div class="kawaii-page max-w-3xl mx-auto space-y-6 animate-fade-in">
-    <div class="page-header">
-      <div class="flex items-center gap-3">
-        <span class="nimbus-title-icon">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5.25 14.25h13.5m-13.5 0a3 3 0 0 1-3-3m3 3a3 3 0 1 0 0 6h13.5a3 3 0 1 0 0-6m-16.5-3a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3m-19.5 0a4.5 4.5 0 0 1 .9-2.7L5.737 5.1a3.375 3.375 0 0 1 2.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 0 1 .9 2.7m0 0a3 3 0 0 1-3 3m0 3h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Zm-3 6h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Z" />
-          </svg>
-        </span>
-        <div>
-          <h1 class="page-title">{{ $t('admin.instanceCreate.title') }}</h1>
-          <p class="page-description">{{ $t('admin.instanceCreate.description') }}</p>
-        </div>
-      </div>
-    </div>
+  <div class="max-w-4xl mx-auto space-y-6 pb-12 animate-fade-in">
+    <!-- Apple HIG Page Header -->
+    <PageHeader
+      :title="t('admin.instanceCreate.title')"
+      :description="t('admin.instanceCreate.description')"
+    />
 
-    <div v-if="loading" class="card p-8 text-center text-themed-muted">
-      <svg class="w-8 h-8 mx-auto mb-2 animate-spin icon-themed-muted" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      {{ $t('common.loading') }}
-    </div>
+    <!-- Loading State -->
+    <Card v-if="loading" padding="lg" class="text-center py-12">
+      <div class="flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
+        <Loader2 class="w-8 h-8 animate-spin text-[var(--accent)]" />
+        <span class="text-sm font-medium">{{ t('common.loading') }}</span>
+      </div>
+    </Card>
 
     <form v-else class="space-y-6" @submit.prevent="handleSubmit">
       <!-- 目标用户 -->
-      <section class="card p-6">
-        <div class="mb-4 flex items-center gap-2 border-b border-themed pb-4">
-          <svg class="h-4 w-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-          </svg>
-          <h2 class="text-base font-semibold text-themed">{{ $t('admin.instanceCreate.targetUser') }}</h2>
-        </div>
-        <div class="relative">
-          <input
+      <Card padding="md">
+        <template #header>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+              <User class="w-4 h-4" />
+            </div>
+            <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">
+              {{ t('admin.instanceCreate.targetUser') }}
+            </h2>
+          </div>
+        </template>
+
+        <div class="space-y-3">
+          <Input
             v-model="usernameInput"
-            type="text"
-            class="input w-full pr-10"
-            :placeholder="$t('admin.instanceCreate.usernamePlaceholder')"
+            :placeholder="t('admin.instanceCreate.usernamePlaceholder')"
             @blur="checkUsername"
-            @keyup.enter="checkUsername"
-          />
-          <div v-if="usernameChecking" class="absolute right-3 top-1/2 -translate-y-1/2">
-            <svg class="w-5 h-5 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-          </div>
-          <div v-else-if="usernameValid === true" class="absolute right-3 top-1/2 -translate-y-1/2">
-            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <div v-else-if="usernameValid === false" class="absolute right-3 top-1/2 -translate-y-1/2">
-            <svg class="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
+            @enter="checkUsername"
+          >
+            <template #suffix>
+              <Loader2 v-if="usernameChecking" class="w-4 h-4 animate-spin text-[var(--text-tertiary)]" />
+              <Check v-else-if="usernameValid === true" class="w-4 h-4 text-[var(--success)]" />
+              <X v-else-if="usernameValid === false" class="w-4 h-4 text-[var(--error)]" />
+            </template>
+          </Input>
+
+          <p v-if="usernameValid === true && targetUser" class="text-xs text-[var(--success)] font-medium flex items-center gap-1.5">
+            <Check class="w-3.5 h-3.5" />
+            {{ t('admin.instanceCreate.userFound', { id: targetUser.id }) }}
+          </p>
+          <p v-else-if="usernameValid === false" class="text-xs text-[var(--error)] font-medium flex items-center gap-1.5">
+            <AlertCircle class="w-3.5 h-3.5" />
+            {{ t('admin.instanceCreate.userNotFound') }}
+          </p>
+          <p class="text-xs text-[var(--text-tertiary)]">
+            {{ t('admin.instanceCreate.userHint') }}
+          </p>
         </div>
-        <p v-if="usernameValid === true && targetUser" class="text-xs text-green-500 mt-2">
-          {{ $t('admin.instanceCreate.userFound', { id: targetUser.id }) }}
-        </p>
-        <p v-else-if="usernameValid === false" class="text-xs text-rose-600 dark:text-rose-400 mt-2">
-          {{ $t('admin.instanceCreate.userNotFound') }}
-        </p>
-        <p class="text-xs text-themed-muted mt-2">
-          {{ $t('admin.instanceCreate.userHint') }}
-        </p>
-      </section>
+      </Card>
 
       <!-- 套餐选择 -->
       <PackageSelector
@@ -647,114 +635,160 @@ async function handleSubmit(): Promise<void> {
       />
 
       <!-- 实例类型选择 -->
-      <section class="card p-6">
-        <div class="mb-4 flex items-center gap-2 border-b border-themed pb-4">
-          <svg class="h-4 w-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
-          </svg>
-          <h2 class="text-base font-semibold text-themed">{{ $t('admin.instanceCreate.instanceType') }}</h2>
-        </div>
+      <Card padding="md">
+        <template #header>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+              <Sliders class="w-4 h-4" />
+            </div>
+            <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">
+              {{ t('admin.instanceCreate.instanceType') }}
+            </h2>
+          </div>
+        </template>
+
         <div class="grid gap-3 sm:grid-cols-2">
-          <label class="nimbus-radio-card">
-            <input v-model="instanceType" type="radio" value="free" class="w-4 h-4 accent-accent" />
-            <span class="text-themed">{{ $t('admin.instanceCreate.freeInstance') }}</span>
+          <label
+            class="flex items-center gap-3 p-4 rounded-xl border transition-all duration-200 cursor-pointer active:scale-[0.98] select-none"
+            :class="instanceType === 'free'
+              ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))] ring-1 ring-[var(--accent)] text-[var(--text-primary)]'
+              : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]'"
+          >
+            <input
+              v-model="instanceType"
+              type="radio"
+              value="free"
+              class="w-4 h-4 accent-[var(--accent)]"
+            />
+            <span class="text-sm font-medium">{{ t('admin.instanceCreate.freeInstance') }}</span>
           </label>
-          <label class="nimbus-radio-card" :class="{ 'opacity-50': plans.length === 0 }">
-            <input v-model="instanceType" type="radio" value="paid" class="w-4 h-4 accent-accent" :disabled="plans.length === 0" />
-            <span class="text-themed">{{ $t('admin.instanceCreate.paidInstance') }}</span>
+
+          <label
+            class="flex items-center gap-3 p-4 rounded-xl border transition-all duration-200 select-none"
+            :class="[
+              plans.length === 0
+                ? 'opacity-50 cursor-not-allowed border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-tertiary)]'
+                : 'cursor-pointer active:scale-[0.98]',
+              instanceType === 'paid' && plans.length > 0
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))] ring-1 ring-[var(--accent)] text-[var(--text-primary)]'
+                : plans.length > 0
+                  ? 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]'
+                  : ''
+            ]"
+          >
+            <input
+              v-model="instanceType"
+              type="radio"
+              value="paid"
+              class="w-4 h-4 accent-[var(--accent)]"
+              :disabled="plans.length === 0"
+            />
+            <span class="text-sm font-medium">{{ t('admin.instanceCreate.paidInstance') }}</span>
           </label>
         </div>
-        <p v-if="plans.length === 0" class="text-xs text-themed-muted mt-2">
-          {{ $t('admin.instanceCreate.noPlanHint') }}
+
+        <p v-if="plans.length === 0" class="text-xs text-[var(--text-tertiary)] mt-3">
+          {{ t('admin.instanceCreate.noPlanHint') }}
         </p>
-      </section>
+      </Card>
 
       <!-- 付费方案选择（仅付费实例） -->
-      <section v-if="instanceType === 'paid' && plans.length > 0" class="card p-6">
-        <div class="mb-4 flex items-center gap-2 border-b border-themed pb-4">
-          <svg class="h-4 w-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 18.75 4.5H5.25A2.25 2.25 0 0 0 3 6.75v10.5A2.25 2.25 0 0 0 5.25 19.5Z" />
-          </svg>
-          <h2 class="text-base font-semibold text-themed">{{ $t('admin.instanceCreate.selectPlan') }}</h2>
+      <Card v-if="instanceType === 'paid' && plans.length > 0" padding="md">
+        <template #header>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+              <CreditCard class="w-4 h-4" />
+            </div>
+            <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">
+              {{ t('admin.instanceCreate.selectPlan') }}
+            </h2>
+          </div>
+        </template>
+
+        <div v-if="plansLoading" class="text-center py-8 text-[var(--text-secondary)]">
+          <Loader2 class="w-6 h-6 animate-spin mx-auto mb-2 text-[var(--accent)]" />
+          <span class="text-sm font-medium">{{ t('common.loading') }}</span>
         </div>
-        
-        <div v-if="plansLoading" class="text-center py-4 text-themed-muted">
-          {{ $t('common.loading') }}
-        </div>
-        
-        <div v-else class="space-y-3">
+
+        <div v-else class="space-y-4">
           <!-- 方案列表 -->
-          <div
-            v-for="plan in plans"
-            :key="plan.id"
-            class="nimbus-option p-4 rounded-lg border cursor-pointer transition-all"
-            :class="[
-              plan.isSoldOut ? 'cursor-not-allowed opacity-60' : '',
-              selectedPlanId === plan.id && !plan.isSoldOut
-                ? 'border-accent bg-themed-secondary'
-                : plan.isSoldOut
-                  ? (themeStore.isDark ? 'border-gray-700 bg-gray-800/40' : 'border-gray-200 bg-gray-50')
-                  : 'border-themed hover:border-accent'
-            ]"
-            @click="!plan.isSoldOut && (selectedPlanId = plan.id)"
-          >
-            <div class="flex justify-between items-start">
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="font-medium text-themed">{{ plan.name }}</span>
-                  <span
-                    v-if="plan.isSoldOut"
-                    class="text-xs px-2 py-0.5 rounded-full"
-                    :class="themeStore.isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-50 text-rose-700'"
-                  >
-                    {{ $t('instance.selector.planSoldOut') }}
-                  </span>
+          <div class="space-y-2.5">
+            <div
+              v-for="plan in plans"
+              :key="plan.id"
+              class="p-4 rounded-xl border transition-all duration-200 select-none"
+              :class="[
+                plan.isSoldOut
+                  ? 'cursor-not-allowed opacity-60 border-[var(--border-color)] bg-[var(--bg-surface-soft)]'
+                  : 'cursor-pointer active:scale-[0.98]',
+                selectedPlanId === plan.id && !plan.isSoldOut
+                  ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))] ring-1 ring-[var(--accent)]'
+                  : !plan.isSoldOut
+                    ? 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]'
+                    : ''
+              ]"
+              @click="!plan.isSoldOut && (selectedPlanId = plan.id)"
+            >
+              <div class="flex justify-between items-start gap-4">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-sm text-[var(--text-primary)]">{{ plan.name }}</span>
+                    <Badge v-if="plan.isSoldOut" variant="error" size="sm">
+                      {{ t('instance.selector.planSoldOut') }}
+                    </Badge>
+                  </div>
+                  <div class="tabular-nums text-xs text-[var(--text-secondary)] mt-1.5 flex items-center gap-1.5 flex-wrap">
+                    <span>CPU {{ plan.cpu }}%</span>
+                    <span class="text-[var(--border-color)]">|</span>
+                    <span>{{ plan.memory >= 1024 ? `${(plan.memory / 1024).toFixed(1)} GB` : `${plan.memory} MB` }}</span>
+                    <span class="text-[var(--border-color)]">|</span>
+                    <span>{{ plan.disk >= 1024 ? `${(plan.disk / 1024).toFixed(0)} GB` : `${plan.disk} MB` }}</span>
+                  </div>
                 </div>
-                <div class="nimbus-num text-sm text-themed-muted mt-1">
-                  CPU {{ plan.cpu }}% | {{ plan.memory >= 1024 ? `${(plan.memory / 1024).toFixed(1)} GB` : `${plan.memory} MB` }} | {{ plan.disk >= 1024 ? `${(plan.disk / 1024).toFixed(0)} GB` : `${plan.disk} MB` }}
+                <div class="text-right shrink-0">
+                  <div class="tabular-nums font-semibold text-sm text-[var(--text-primary)]">
+                    ¥{{ (plan.price / 100).toFixed(2) }}<span class="text-xs font-normal text-[var(--text-secondary)]">/{{ plan.billingCycle }}月</span>
+                  </div>
                 </div>
-              </div>
-              <div class="text-right">
-                <div class="nimbus-num font-semibold text-themed">¥{{ (plan.price / 100).toFixed(2) }}/{{ plan.billingCycle }}月</div>
               </div>
             </div>
           </div>
-          
+
           <!-- 扣除首月费用选项 -->
-          <div class="mt-4 pt-4 border-t border-themed">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input v-model="chargeFirstMonth" type="checkbox" class="w-4 h-4 accent-accent" />
-              <span class="text-sm text-themed">{{ $t('admin.instanceCreate.chargeFirstMonth') }}</span>
+          <div class="pt-4 border-t border-[var(--border-color)]">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input v-model="chargeFirstMonth" type="checkbox" class="w-4 h-4 rounded accent-[var(--accent)]" />
+              <span class="text-sm font-medium text-[var(--text-primary)]">{{ t('admin.instanceCreate.chargeFirstMonth') }}</span>
             </label>
-            <p class="text-xs text-themed-muted mt-2 ml-6">
-              {{ chargeFirstMonth ? $t('admin.instanceCreate.chargeFirstMonthHint') : $t('admin.instanceCreate.noChargeFirstMonthHint') }}
+            <p class="text-xs text-[var(--text-tertiary)] mt-1.5 ml-6">
+              {{ chargeFirstMonth ? t('admin.instanceCreate.chargeFirstMonthHint') : t('admin.instanceCreate.noChargeFirstMonthHint') }}
             </p>
           </div>
-          
+
           <!-- 费用摘要 -->
-          <div v-if="billingInfo && targetUser" class="mt-4 p-4 rounded-lg" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'">
-            <div class="nimbus-num space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-themed-muted">{{ $t('admin.instanceCreate.planPrice') }}</span>
-                <span class="text-themed">¥{{ billingInfo.price.toFixed(2) }}</span>
+          <div v-if="billingInfo && targetUser" class="p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+            <div class="tabular-nums space-y-2.5 text-sm">
+              <div class="flex justify-between items-center">
+                <span class="text-[var(--text-secondary)]">{{ t('admin.instanceCreate.planPrice') }}</span>
+                <span class="font-medium text-[var(--text-primary)]">¥{{ billingInfo.price.toFixed(2) }}</span>
               </div>
-              <div class="flex justify-between font-medium pt-2 border-t border-themed">
-                <span class="text-themed">{{ chargeFirstMonth ? $t('admin.instanceCreate.totalCharge') : $t('admin.instanceCreate.freeFirstMonth') }}</span>
-                <span :class="chargeFirstMonth ? 'text-themed' : 'text-green-500'">
+              <div class="flex justify-between items-center font-medium pt-2.5 border-t border-[var(--border-color)]">
+                <span class="text-[var(--text-primary)]">{{ chargeFirstMonth ? t('admin.instanceCreate.totalCharge') : t('admin.instanceCreate.freeFirstMonth') }}</span>
+                <span :class="chargeFirstMonth ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--success)] font-semibold'">
                   {{ chargeFirstMonth ? `¥${billingInfo.totalPrice.toFixed(2)}` : '¥0.00' }}
                 </span>
               </div>
-              <div class="flex justify-between text-xs">
-                <span class="text-themed-muted">{{ $t('admin.instanceCreate.userBalance') }}</span>
-                <span :class="isBalanceSufficient ? 'text-green-500' : 'text-rose-600 dark:text-rose-400'">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-[var(--text-secondary)]">{{ t('admin.instanceCreate.userBalance') }}</span>
+                <span class="font-medium" :class="isBalanceSufficient ? 'text-[var(--success)]' : 'text-[var(--error)]'">
                   ¥{{ (targetUser.balance ?? 0).toFixed(2) }}
-                  <span v-if="!isBalanceSufficient">(余额不足)</span>
+                  <span v-if="!isBalanceSufficient" class="ml-1 font-normal">(余额不足)</span>
                 </span>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </Card>
 
       <!-- 资源配置（仅免费实例） -->
       <ResourceSliders
@@ -790,92 +824,45 @@ async function handleSubmit(): Promise<void> {
       />
 
       <!-- 实例名称和提交 -->
-      <section class="card p-6">
-        <div class="mb-4 flex items-center gap-2 border-b border-themed pb-4">
-          <svg class="h-4 w-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 6h.008v.008H6V6Z" />
-          </svg>
-          <h2 class="text-base font-semibold text-themed">{{ $t('instance.createPage.instanceName') }}</h2>
-        </div>
-        <div class="space-y-4">
-          <label class="block space-y-1.5">
-            <span class="nimbus-field-label">{{ $t('instance.createPage.instanceName') }}</span>
-            <input v-model="form.name" type="text" class="input" :placeholder="$t('instance.createPage.instanceNamePlaceholder')" required />
-          </label>
+      <Card padding="md">
+        <template #header>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+              <Tag class="w-4 h-4" />
+            </div>
+            <h2 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">
+              {{ t('instance.createPage.instanceName') }}
+            </h2>
+          </div>
+        </template>
 
-          <div v-if="error" class="p-3 rounded-lg border text-sm" :class="themeStore.isDark ? 'bg-rose-500/15 border-rose-500/30 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'">
-            {{ error }}
+        <div class="space-y-4">
+          <Input
+            v-model="form.name"
+            :label="t('instance.createPage.instanceName')"
+            :placeholder="t('instance.createPage.instanceNamePlaceholder')"
+          />
+
+          <div
+            v-if="error"
+            class="flex items-start gap-2.5 p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] text-[var(--error)] text-sm"
+          >
+            <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
+            <span class="leading-relaxed">{{ error }}</span>
           </div>
 
-          <button type="submit" :disabled="!canSubmit" class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md font-medium text-sm bg-black hover:bg-neutral-900 text-white border border-neutral-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ submitting ? $t('instance.createPage.creating') : $t('admin.instanceCreate.submit') }}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            block
+            :loading="submitting"
+            :disabled="!canSubmit"
+          >
+            {{ submitting ? t('instance.createPage.creating') : t('admin.instanceCreate.submit') }}
+          </Button>
         </div>
-      </section>
+      </Card>
     </form>
   </div>
 </template>
-
-<style scoped>
-/* Nimbus admin kit */
-.nimbus-num {
-  font-variant-numeric: tabular-nums;
-}
-
-.nimbus-title-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  color: var(--kawaii-primary);
-  background: color-mix(in srgb, var(--kawaii-primary) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 28%, transparent);
-}
-
-.nimbus-field-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--kawaii-muted);
-}
-
-.nimbus-radio-card {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.875rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--kawaii-line);
-  background: var(--kawaii-surface);
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-}
-
-.nimbus-radio-card:hover {
-  border-color: color-mix(in srgb, var(--kawaii-primary) 45%, var(--kawaii-line));
-}
-
-.nimbus-radio-card:has(input:checked) {
-  border-color: var(--kawaii-primary);
-  background: color-mix(in srgb, var(--kawaii-primary) 6%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 45%, transparent);
-}
-
-.nimbus-option {
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
-}
-
-.nimbus-option.border-accent {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 45%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-radio-card,
-  .nimbus-option {
-    transition: none;
-  }
-}
-</style>

@@ -5,7 +5,7 @@
  * - RegionSelector: 地区选择
  * - PackageSelector: 套餐选择
  * - ResourceSliders: 资源配置滑块
- * - HostSelector: 宝主机选择
+ * - HostSelector: 宿主机选择
  * - ImageSelector: 镜像选择
  * - SSHKeySelector: SSH密钥选择
  */
@@ -41,6 +41,28 @@ import { normalizePackageSourceQuery, toPackageSourceRequest, type PackageSource
 import { validateName as validateInstanceName } from '@/utils/validation'
 import { translateError } from '@/utils/errorHandler'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
+import { Button, Card, Input, Select, Badge, PageHeader } from '@/components/ui'
+import {
+  Loader2,
+  RotateCw,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ReceiptText,
+  ShieldCheck,
+  Shield,
+  ShoppingBag,
+  Check,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  Tag
+} from 'lucide-vue-next'
+
+// 保留 Select 符号引用以满足架构组件库完整性
+void Select
 
 interface ImageOption {
   value: string
@@ -1209,64 +1231,66 @@ async function handleSubmit(): Promise<void> {
     submitting.value = false
   }
 }
-
 </script>
 
 <template>
   <div class="kawaii-page animate-fade-in lg:h-full lg:flex lg:flex-col">
-    <div v-if="loading" class="card p-8 text-center text-themed-muted">
-      <svg class="w-8 h-8 mx-auto mb-2 animate-spin icon-themed-muted" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      {{ $t('common.loading') }}
-    </div>
+    <!-- Header with Apple PageHeader -->
+    <PageHeader
+      :title="$t('instance.createPage.title')"
+      :description="$t('instance.createPage.description')"
+      :back="true"
+      :back-label="$t('common.back')"
+      class="shrink-0 !mb-4"
+      @back="router.push(instancesPath())"
+    >
+      <template #actions>
+        <!-- 套餐来源切换器（多来源时显示） -->
+        <div v-if="sourceTabs.length > 1" class="inline-flex items-center gap-1 overflow-x-auto rounded-full border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-1 shadow-sm scrollbar-hide">
+          <button
+            v-for="source in sourceTabs"
+            :key="source.key"
+            type="button"
+            :disabled="sourceLoading"
+            class="relative shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98]"
+            :class="[
+              packageSource === source.key
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]',
+              sourceLoading ? 'cursor-not-allowed opacity-50' : ''
+            ]"
+            @click="switchPackageSource(source.key)"
+          >
+            <span class="relative z-10 flex items-center gap-1.5">
+              <Loader2 v-if="sourceLoading && packageSource === source.key" class="w-3.5 h-3.5 animate-spin" />
+              <template v-else>
+                <Shield v-if="source.type === 'official'" class="w-3.5 h-3.5" />
+                <ShoppingBag v-else class="w-3.5 h-3.5" />
+              </template>
+              {{ source.label }}
+            </span>
+          </button>
+        </div>
+      </template>
+    </PageHeader>
 
+    <!-- 加载状态 -->
+    <Card v-if="loading" padding="lg" class="rounded-2xl text-center py-16 my-auto">
+      <div class="flex flex-col items-center justify-center space-y-3">
+        <div class="w-12 h-12 rounded-full bg-[var(--bg-surface-soft)] flex items-center justify-center text-[var(--accent)]">
+          <Loader2 class="w-6 h-6 animate-spin" />
+        </div>
+        <div class="text-sm font-medium text-[var(--text-secondary)]">
+          {{ $t('common.loading') }}
+        </div>
+      </div>
+    </Card>
+
+    <!-- 主表单 -->
     <form v-else class="lg:flex-1 lg:min-h-0 lg:flex lg:flex-col" @submit.prevent="handleSubmit">
       <div class="lg:flex lg:flex-1 lg:min-h-0 lg:gap-6">
         <!-- LEFT: 选择区（独立滚动）-->
-        <div class="nimbus-pane space-y-4 mb-4 lg:mb-0 lg:flex-[3] lg:overflow-y-auto lg:pr-1 lg:pb-4 scrollbar-hide">
-          <!-- 套餐来源切换器（随内容滚动） -->
-          <div v-if="sourceTabs.length > 1" class="flex justify-center">
-            <div
-              class="nimbus-segmented inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-themed bg-themed-surface p-1 shadow-sm scrollbar-hide"
-            >
-              <button
-                v-for="source in sourceTabs"
-                :key="source.key"
-                type="button"
-                :disabled="sourceLoading"
-                class="nimbus-seg-pill relative shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200"
-                :class="[
-                  packageSource === source.key ? 'active' : '',
-                  sourceLoading ? 'cursor-not-allowed opacity-50' : ''
-                ]"
-                @click="switchPackageSource(source.key)"
-              >
-                <span class="relative z-10 flex items-center gap-1.5">
-                  <!-- 加载中 -->
-                  <svg
-                    v-if="sourceLoading && packageSource === source.key"
-                    class="w-4 h-4 animate-spin"
-                    fill="none" viewBox="0 0 24 24"
-                  >
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <!-- 图标 -->
-                  <template v-else>
-                    <svg v-if="source.type === 'official'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </template>
-                  {{ source.label }}
-                </span>
-              </button>
-            </div>
-          </div>
+        <div class="apple-pane space-y-4 mb-4 lg:mb-0 lg:flex-[3] lg:overflow-y-auto lg:pr-1 lg:pb-4 scrollbar-hide">
           <RegionSelector
             v-if="regions.length > 0"
             :regions="regions"
@@ -1285,7 +1309,7 @@ async function handleSubmit(): Promise<void> {
             :sold-out-label="getCreatePageText('planSoldOut')"
             @select="selectPackage"
           />
-            <PlanSelector
+          <PlanSelector
             v-if="isPaidPackage"
             :plans="packagePlans"
             :package-gpu-shared="selectedPackage?.gpu_shared"
@@ -1304,365 +1328,502 @@ async function handleSubmit(): Promise<void> {
             @select="selectPlan"
           />
         </div>
+
         <!-- RIGHT: 配置区（独立滚动）-->
-        <div ref="rightPanelScrollRef" class="lg:flex-[2] lg:overflow-y-auto lg:pb-4 scrollbar-hide">
-          <div class="nimbus-pane space-y-4">
-            <div
-              v-if="!isPaidPackage && prerequisiteMissing"
-              class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300"
-            >
-              {{ prerequisiteMessage }}
-            </div>
-            <ResourceSliders
-              v-if="!isPaidPackage"
-              :selected-package="selectedPackage || null"
-              :user-quota="userQuota"
-              :cpu="form.cpu"
-              :memory="form.memory"
-              :disk="form.disk"
-              :step-number="regions.length > 0 ? 3 : 2"
-              @update:cpu="form.cpu = $event"
-              @update:memory="form.memory = $event"
-              @update:disk="form.disk = $event"
-            />
-            <HostSelector
-              :available-hosts="availableHosts"
-              :selected-host-id="form.hostId"
-              :hosts-loading="hostsLoading"
-              :hosts-insufficient="hostsInsufficient"
-              :unavailable-message="hostLookupMessage"
-              :cpu="form.cpu"
-              :memory="form.memory"
-              :selected-package="selectedPackage || null"
-              :show-deduction="!isPaidPackage || form.planId !== null"
-              :title="getCreatePageText('selectHost')"
-              :auto-selected-label="getCreatePageText('hostAutoSelected')"
-              @update:selected-host-id="form.hostId = $event"
-            />
-            <p v-if="selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared" class="px-1 text-sm text-themed-secondary">{{ t('gpu.imageRequirement') }}</p>
-            <ImageSelector
-              :available-images="availableImages"
-              :selected-image="form.image"
-              :images-loading="imagesLoading"
-              :step-number="regions.length > 0 ? 4 : 3"
-              :title="getCreatePageText('selectSystem')"
-              :empty-message="getCreatePageText('noImages')"
-              @update:selected-image="form.image = $event"
-            />
-            <div v-if="form.image" class="card p-5">
-              <InitCommandSelector v-model="form.customInitCommandIds" :distro="selectedImageDistro" />
-            </div>
-            <!-- 步骤：认证方式 -->
-            <div class="card p-5">
-              <div class="flex items-center justify-between gap-3 mb-4">
-                <div class="flex items-center gap-2">
-                  <span
-                    class="w-6 h-6 rounded-full text-sm font-bold flex items-center justify-center"
-                    :class="themeStore.isDark ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'"
-                  >
-                    {{ regions.length > 0 ? 5 : 4 }}
-                  </span>
-                  <h2
-                    class="text-sm font-medium"
-                    :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'"
-                  >
-                    {{ $t('instance.createPage.authMethod') }}
-                  </h2>
-                </div>
+        <div ref="rightPanelScrollRef" class="apple-pane lg:flex-[2] lg:overflow-y-auto lg:pb-4 scrollbar-hide space-y-4">
+          <!-- 前置套餐缺失提示 -->
+          <div
+            v-if="!isPaidPackage && prerequisiteMissing"
+            class="rounded-2xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] p-4 text-sm text-[var(--warning)] flex items-start gap-3"
+          >
+            <AlertCircle class="w-5 h-5 shrink-0 mt-0.5" />
+            <div class="leading-relaxed font-medium">{{ prerequisiteMessage }}</div>
+          </div>
 
-                <!-- 认证方式切换 -->
-                <div class="flex items-center p-1 rounded-lg bg-themed-secondary border border-themed text-xs">
-                  <button
-                    type="button"
-                    class="px-3 py-1 rounded-md font-medium transition-all"
-                    :class="authType === 'ssh' ? 'bg-themed-surface text-themed shadow-sm font-semibold' : 'text-themed-muted hover:text-themed'"
-                    @click="authType = 'ssh'"
-                  >
-                    {{ $t('instance.createPage.authMethodSsh') }}
-                  </button>
-                  <button
-                    type="button"
-                    class="px-3 py-1 rounded-md font-medium transition-all"
-                    :class="authType === 'password' ? 'bg-themed-surface text-themed shadow-sm font-semibold' : 'text-themed-muted hover:text-themed'"
-                    @click="authType = 'password'"
-                  >
-                    {{ $t('instance.createPage.authMethodPassword') }}
-                  </button>
-                </div>
+          <!-- 免费套餐资源滑块 -->
+          <ResourceSliders
+            v-if="!isPaidPackage"
+            :selected-package="selectedPackage || null"
+            :user-quota="userQuota"
+            :cpu="form.cpu"
+            :memory="form.memory"
+            :disk="form.disk"
+            :step-number="regions.length > 0 ? 3 : 2"
+            @update:cpu="form.cpu = $event"
+            @update:memory="form.memory = $event"
+            @update:disk="form.disk = $event"
+          />
+
+          <!-- 宿主机选择 -->
+          <HostSelector
+            :available-hosts="availableHosts"
+            :selected-host-id="form.hostId"
+            :hosts-loading="hostsLoading"
+            :hosts-insufficient="hostsInsufficient"
+            :unavailable-message="hostLookupMessage"
+            :cpu="form.cpu"
+            :memory="form.memory"
+            :selected-package="selectedPackage || null"
+            :show-deduction="!isPaidPackage || form.planId !== null"
+            :title="getCreatePageText('selectHost')"
+            :auto-selected-label="getCreatePageText('hostAutoSelected')"
+            @update:selected-host-id="form.hostId = $event"
+          />
+
+          <!-- GPU镜像要求提示 -->
+          <p
+            v-if="selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared"
+            class="px-1 text-sm text-[var(--text-secondary)] flex items-center gap-2"
+          >
+            <Info class="w-4 h-4 shrink-0 text-[var(--accent)]" />
+            <span>{{ t('gpu.imageRequirement') }}</span>
+          </p>
+
+          <!-- 系统镜像选择 -->
+          <ImageSelector
+            :available-images="availableImages"
+            :selected-image="form.image"
+            :images-loading="imagesLoading"
+            :step-number="regions.length > 0 ? 4 : 3"
+            :title="getCreatePageText('selectSystem')"
+            :empty-message="getCreatePageText('noImages')"
+            @update:selected-image="form.image = $event"
+          />
+
+          <!-- 自定义初始化脚本 -->
+          <Card v-if="form.image" padding="md" class="rounded-2xl">
+            <InitCommandSelector v-model="form.customInitCommandIds" :distro="selectedImageDistro" />
+          </Card>
+
+          <!-- 步骤：认证方式 -->
+          <Card padding="md" class="rounded-2xl">
+            <div class="flex items-center justify-between gap-3 mb-5">
+              <div class="flex items-center gap-2.5">
+                <Badge variant="default" shape="pill" size="md">
+                  {{ regions.length > 0 ? 5 : 4 }}
+                </Badge>
+                <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                  {{ $t('instance.createPage.authMethod') }}
+                </h2>
               </div>
 
-              <!-- SSH 密钥选择 -->
-              <div v-if="authType === 'ssh'">
-                <div v-if="sshKeys.length === 0" class="text-center py-6 px-4 rounded-xl border border-dashed border-themed bg-themed-tertiary">
-                  <div class="w-10 h-10 mx-auto mb-2.5 rounded-full bg-themed-secondary flex items-center justify-center text-themed-muted">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                    </svg>
-                  </div>
-                  <p class="text-xs text-themed-muted mb-3">{{ $t('instance.createPage.noSshKeyHint') }}</p>
-                  <div class="flex items-center justify-center gap-2.5">
-                    <button
-                      type="button"
-                      class="btn-primary text-xs px-3 py-1.5"
-                      @click="authType = 'password'"
-                    >
-                      {{ $t('instance.createPage.switchToPassword') }}
-                    </button>
-                    <router-link
-                      :to="profilePath()"
-                      class="btn-secondary text-xs px-3 py-1.5 inline-flex items-center"
-                    >
-                      {{ $t('instance.createPage.profileSettings') }}
-                    </router-link>
-                  </div>
-                </div>
-                <div v-else>
-                  <SSHKeySelector
-                    :ssh-keys="sshKeys"
-                    :selected-key-id="form.sshKeyId"
-                    :show-header="false"
-                    @update:selected-key-id="form.sshKeyId = $event"
-                  />
-                </div>
-              </div>
-
-              <!-- 密码认证 -->
-              <div v-else class="space-y-4">
-                <!-- 模式切换：随机生成 vs 自定义 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div
-                    class="p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3"
-                    :class="passwordMode === 'auto' ? (themeStore.isDark ? 'border-white bg-themed-secondary' : 'border-gray-900 bg-gray-50') : 'border-themed hover:border-themed-secondary'"
-                    @click="passwordMode = 'auto'"
-                  >
-                    <div class="w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0" :class="passwordMode === 'auto' ? 'border-primary-500' : 'border-themed-muted'">
-                      <div v-if="passwordMode === 'auto'" class="w-2 h-2 rounded-full bg-primary-500" />
-                    </div>
-                    <div class="min-w-0">
-                      <div class="text-sm font-medium text-themed">{{ $t('instance.createPage.passwordModeAuto') }}</div>
-                      <div class="text-xs text-themed-muted truncate">{{ $t('instance.createPage.passwordModeAutoDesc') }}</div>
-                    </div>
-                  </div>
-
-                  <div
-                    class="p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3"
-                    :class="passwordMode === 'custom' ? (themeStore.isDark ? 'border-white bg-themed-secondary' : 'border-gray-900 bg-gray-50') : 'border-themed hover:border-themed-secondary'"
-                    @click="passwordMode = 'custom'"
-                  >
-                    <div class="w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0" :class="passwordMode === 'custom' ? 'border-primary-500' : 'border-themed-muted'">
-                      <div v-if="passwordMode === 'custom'" class="w-2 h-2 rounded-full bg-primary-500" />
-                    </div>
-                    <div class="min-w-0">
-                      <div class="text-sm font-medium text-themed">{{ $t('instance.createPage.passwordModeCustom') }}</div>
-                      <div class="text-xs text-themed-muted truncate">{{ $t('instance.createPage.passwordModeCustomDesc') }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 自动生成提示 -->
-                <div v-if="passwordMode === 'auto'" class="p-3.5 rounded-xl border border-themed bg-themed-tertiary text-xs text-themed-muted flex items-start gap-2.5">
-                  <svg class="w-4 h-4 text-themed-muted mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>{{ $t('instance.createPage.autoPasswordHint') }}</span>
-                </div>
-
-                <!-- 自定义密码输入 -->
-                <div v-else class="space-y-2">
-                  <div class="flex items-center gap-2">
-                    <div class="relative flex-1">
-                      <input
-                        v-model="customPassword"
-                        :type="showPassword ? 'text' : 'password'"
-                        class="input pr-10 font-mono text-sm w-full"
-                        :placeholder="$t('instance.createPage.passwordPlaceholder')"
-                        autocomplete="new-password"
-                      />
-                      <button
-                        type="button"
-                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-themed-muted hover:text-themed"
-                        @click="showPassword = !showPassword"
-                      >
-                        <svg v-if="showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                        </svg>
-                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      class="btn-secondary text-xs px-3 py-2 shrink-0 flex items-center gap-1.5"
-                      @click="generateRandomCustomPassword"
-                    >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      <span>{{ $t('instance.createPage.generatePassword') }}</span>
-                    </button>
-                  </div>
-
-                  <!-- 弱密码提示 -->
-                  <div v-if="customPassword && !isCustomPasswordValid" class="text-xs text-rose-500 dark:text-rose-400 flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{{ $t('instance.createPage.passwordTooWeak') }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- 订单概览 -->
-            <div v-if="isPaidPackage && form.planId && selectedPlan" class="card p-5">
-              <div class="flex items-center gap-3 mb-5">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-primary-500/10 text-primary-600 dark:text-primary-400">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                </div>
-                <div class="min-w-0">
-                  <h3 class="font-semibold text-themed">{{ configStore.freeSiteMode ? freeSiteCopy.createOrderSummary : $t('instance.createPage.orderSummary') }}</h3>
-                  <p class="text-xs text-themed-muted truncate">{{ selectedPackage?.name }} - {{ selectedPlan.name }}</p>
-                </div>
-              </div>
-              <div class="space-y-4">
-                <div class="p-4 rounded-xl border border-themed bg-themed-tertiary">
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-themed-secondary text-themed-secondary">{{ getBillingCycleLabel(selectedPlan.billingCycle) }}</span>
-                    <span v-if="selectedPlan.slaGuarantee" class="flex items-center gap-1 text-xs text-green-500">
-                      <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                      SLA {{ selectedPlan.slaGuarantee }}%
-                    </span>
-                  </div>
-                  <div class="grid grid-cols-2 gap-3 text-center" :class="(selectedPlan.gpuShared ?? selectedPackage?.gpu_shared) ? 'sm:grid-cols-5' : 'sm:grid-cols-4'">
-                    <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatCpu(selectedPlan.cpu) }}</div><div class="text-xs text-themed-muted">CPU</div></div>
-                    <div>
-                      <div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatMemory(selectedPlan.memory) }}</div>
-                      <div class="text-xs text-themed-muted leading-tight">
-                        <div>{{ $t('instance.memory') }}</div>
-                        <div v-if="selectedPackage?.instance_type !== 'vm' && selectedPlan.swapSize > 0" class="mt-0.5 flex items-center justify-center gap-1 text-green-500">
-                          <span>SWAP</span>
-                          <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 111.4-1.4l3.1 3.1 6.8-6.8a1 1 0 011.4 0z" clip-rule="evenodd" /></svg>
-                        </div>
-                      </div>
-                    </div>
-                    <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatDisk(selectedPlan.disk) }}</div><div class="text-xs text-themed-muted">{{ $t('instance.disk') }}</div></div>
-                    <GpuSpecification v-if="selectedPlan.gpuShared ?? selectedPackage?.gpu_shared" :configurations="selectedPlan.gpuConfigurations" :host-id="form.hostId" />
-                    <div><div class="text-lg font-mono font-semibold tabular-nums text-themed">{{ formatTraffic(selectedPlan.trafficLimit) }}</div><div class="text-xs text-themed-muted">{{ $t('billing.traffic') }} <span class="opacity-60">({{ $t('billing.trafficBidirectional') }})</span></div></div>
-                  </div>
-                  <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-themed text-xs">
-                    <span class="text-themed-muted"><span class="opacity-75">{{ $t('instance.ports') }}:</span> <span class="font-mono tabular-nums text-themed-secondary">{{ selectedPlan.portLimit }}</span></span>
-                    <span class="text-themed-muted"><span class="opacity-75">{{ $t('instance.snapshots') }}:</span> <span class="font-mono tabular-nums text-themed-secondary">{{ selectedPlan.snapshotLimit }}</span></span>
-                  </div>
-                </div>
-                <!-- 优惠码 -->
-                <div class="space-y-3">
-                  <div>
-                    <label class="label text-xs uppercase tracking-wide text-themed-muted mb-2">{{ configStore.freeSiteMode ? freeSiteCopy.createPromoCode : $t('aff.promoCode') }}</label>
-                    <div class="relative">
-                      <input v-model="form.promoCode" type="text" class="input w-full pr-10" :placeholder="configStore.freeSiteMode ? freeSiteCopy.createPromoPlaceholder : $t('aff.promoCodePlaceholder')" :disabled="promoCodeVerifying" @blur="verifyPromoCode" @keyup.enter="verifyPromoCode" />
-                      <div v-if="promoCodeVerifying" class="absolute right-3 top-1/2 -translate-y-1/2"><svg class="w-5 h-5 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>
-                      <div v-else-if="promoCodeValid === true" class="absolute right-3 top-1/2 -translate-y-1/2"><svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg></div>
-                      <div v-else-if="promoCodeValid === false" class="absolute right-3 top-1/2 -translate-y-1/2"><svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></div>
-                    </div>
-                    <p v-if="promoCodeValid === true" class="text-xs text-green-500 mt-1.5 flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>{{ configStore.freeSiteMode ? freeSiteCopy.createPromoValid.replace('{rate}', (promoCodeDiscount * 100).toFixed(0) + '%') : $t('aff.promoCodeValid', { rate: (promoCodeDiscount * 100).toFixed(0) + '%' }) }}</p>
-                    <p v-else-if="promoCodeError" class="text-xs text-red-500 mt-1.5">{{ promoCodeError }}</p>
-                  </div>
-                </div>
-                <!-- 价格明细 -->
-                <div v-if="planPriceInfo" class="space-y-3">
-                  <div v-if="promoCodeValid && planPriceInfo.discountAmount > 0" class="p-4 rounded-xl space-y-2 bg-themed-tertiary">
-                    <div class="flex justify-between text-sm"><span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.createPlanFee : $t('instance.createPage.planFee') }}</span><span class="font-mono tabular-nums font-medium text-themed">¥{{ planPriceInfo.planPrice.toFixed(2) }}</span></div>
-                    <div v-if="promoCodeValid && planPriceInfo.discountAmount > 0" class="flex justify-between text-sm pt-1 border-t border-themed">
-                      <span class="text-green-500 flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clip-rule="evenodd" /></svg>{{ $t('aff.discountAmount') }} (-{{ (planPriceInfo.discountRate * 100).toFixed(0) }}%)</span>
-                      <span class="font-mono tabular-nums font-medium text-green-600 dark:text-green-400">-¥{{ planPriceInfo.discountAmount.toFixed(2) }}</span>
-                    </div>
-                  </div>
-                  <div class="rounded-xl overflow-hidden border border-themed">
-                    <div class="p-5 flex items-center justify-between gap-3 bg-themed-secondary">
-                      <div class="min-w-0">
-                        <div class="text-sm font-medium text-themed-secondary">{{ configStore.freeSiteMode ? freeSiteCopy.finalPrice : $t('aff.finalPrice') }}</div>
-                        <div v-if="selectedPlan.billingCycle > 1" class="text-xs mt-1">
-                          <span class="font-mono tabular-nums text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.createMonthlyEquivalent : `≈ ¥${(planPriceInfo.finalPrice / selectedPlan.billingCycle).toFixed(2)}/${$t('instance.createPage.month')}` }}</span>
-                        </div>
-                      </div>
-                      <div class="text-3xl font-mono font-semibold tabular-nums tracking-tight text-themed"><span class="align-[0.14em] text-[0.62em] font-medium text-themed-muted">¥</span>{{ planPriceInfo.finalPrice.toFixed(2) }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div><!-- end scrollable -->
-
-          <!-- 提交区 -->
-          <div class="card p-4 mt-4 space-y-3">
-            <div>
-              <label class="block text-sm font-medium text-themed-secondary mb-1.5">{{ $t('instance.createPage.instanceName') }}</label>
-              <p v-if="showDestroyTrafficNotice" class="mb-2 text-xs leading-relaxed flex items-start gap-1.5 text-amber-700 dark:text-amber-300">
-                <svg class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z" />
-                </svg>
-                <span>{{ $t('instance.createPage.destroyTrafficNotice') }}</span>
-              </p>
-              <div class="flex gap-2">
-                <input
-                  v-model="form.name"
-                  type="text"
-                  class="input min-w-0 flex-1"
-                  :placeholder="$t('instance.createPage.instanceNamePlaceholder')"
-                  @input="handleInstanceNameInput"
-                />
+              <!-- 认证方式切换 (Apple Segmented Pills) -->
+              <div class="inline-flex items-center p-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs">
                 <button
                   type="button"
-                  class="btn-secondary shrink-0 px-3 text-sm"
+                  class="min-h-[36px] px-4 py-1.5 rounded-full font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98]"
+                  :class="authType === 'ssh' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                  @click="authType = 'ssh'"
+                >
+                  {{ $t('instance.createPage.authMethodSsh') }}
+                </button>
+                <button
+                  type="button"
+                  class="min-h-[36px] px-4 py-1.5 rounded-full font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98]"
+                  :class="authType === 'password' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                  @click="authType = 'password'"
+                >
+                  {{ $t('instance.createPage.authMethodPassword') }}
+                </button>
+              </div>
+            </div>
+
+            <!-- SSH 密钥选择 -->
+            <div v-if="authType === 'ssh'">
+              <div v-if="sshKeys.length === 0" class="text-center py-8 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-secondary)]">
+                  <KeyRound class="w-6 h-6 stroke-[1.8]" />
+                </div>
+                <p class="text-sm font-medium text-[var(--text-primary)] mb-1">{{ $t('instance.createPage.noSshKeyConfigured') || '未检测到 SSH 密钥' }}</p>
+                <p class="text-xs text-[var(--text-secondary)] max-w-md mx-auto mb-4 leading-relaxed">{{ $t('instance.createPage.noSshKeyHint') }}</p>
+                <div class="flex items-center justify-center gap-3">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    @click="authType = 'password'"
+                  >
+                    {{ $t('instance.createPage.switchToPassword') }}
+                  </Button>
+                  <router-link :to="profilePath()">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                    >
+                      {{ $t('instance.createPage.profileSettings') }}
+                    </Button>
+                  </router-link>
+                </div>
+              </div>
+              <div v-else>
+                <SSHKeySelector
+                  :ssh-keys="sshKeys"
+                  :selected-key-id="form.sshKeyId"
+                  :show-header="false"
+                  @update:selected-key-id="form.sshKeyId = $event"
+                />
+              </div>
+            </div>
+
+            <!-- 密码认证 -->
+            <div v-else class="space-y-4">
+              <!-- 模式切换：随机生成 vs 自定义 -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  class="p-4 rounded-xl border cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] flex items-center gap-3"
+                  :class="passwordMode === 'auto'
+                    ? 'border-[var(--accent)] bg-[var(--bg-surface-soft)] ring-1 ring-[var(--accent)] shadow-sm'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)]'"
+                  @click="passwordMode = 'auto'"
+                >
+                  <div class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0" :class="passwordMode === 'auto' ? 'border-[var(--accent)]' : 'border-[var(--border-color)]'">
+                    <div v-if="passwordMode === 'auto'" class="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-[var(--text-primary)]">{{ $t('instance.createPage.passwordModeAuto') }}</div>
+                    <div class="text-xs text-[var(--text-secondary)] truncate mt-0.5">{{ $t('instance.createPage.passwordModeAutoDesc') }}</div>
+                  </div>
+                </div>
+
+                <div
+                  class="p-4 rounded-xl border cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] flex items-center gap-3"
+                  :class="passwordMode === 'custom'
+                    ? 'border-[var(--accent)] bg-[var(--bg-surface-soft)] ring-1 ring-[var(--accent)] shadow-sm'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)]'"
+                  @click="passwordMode = 'custom'"
+                >
+                  <div class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0" :class="passwordMode === 'custom' ? 'border-[var(--accent)]' : 'border-[var(--border-color)]'">
+                    <div v-if="passwordMode === 'custom'" class="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-[var(--text-primary)]">{{ $t('instance.createPage.passwordModeCustom') }}</div>
+                    <div class="text-xs text-[var(--text-secondary)] truncate mt-0.5">{{ $t('instance.createPage.passwordModeCustomDesc') }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 自动生成提示 -->
+              <div v-if="passwordMode === 'auto'" class="p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-xs text-[var(--text-secondary)] flex items-start gap-3">
+                <Info class="w-4 h-4 text-[var(--accent)] mt-0.5 shrink-0" />
+                <span class="leading-relaxed">{{ $t('instance.createPage.autoPasswordHint') }}</span>
+              </div>
+
+              <!-- 自定义密码输入 -->
+              <div v-else class="space-y-2">
+                <div class="flex items-end gap-2.5">
+                  <Input
+                    v-model="customPassword"
+                    :type="showPassword ? 'text' : 'password'"
+                    :label="$t('instance.createPage.passwordLabel') || 'Root 密码'"
+                    :placeholder="$t('instance.createPage.passwordPlaceholder')"
+                    autocomplete="new-password"
+                    class="flex-1 font-mono text-sm"
+                  >
+                    <template #suffix>
+                      <button
+                        type="button"
+                        class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors focus:outline-none"
+                        :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                        @click="showPassword = !showPassword"
+                      >
+                        <EyeOff v-if="showPassword" class="w-4 h-4" />
+                        <Eye v-else class="w-4 h-4" />
+                      </button>
+                    </template>
+                  </Input>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    class="shrink-0 mb-0.5"
+                    @click="generateRandomCustomPassword"
+                  >
+                    <template #icon>
+                      <RotateCw class="w-4 h-4" />
+                    </template>
+                    <span>{{ $t('instance.createPage.generatePassword') }}</span>
+                  </Button>
+                </div>
+
+                <!-- 弱密码提示 -->
+                <div v-if="customPassword && !isCustomPasswordValid" class="text-xs text-[var(--error)] flex items-center gap-1.5 mt-1 font-medium">
+                  <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+                  <span>{{ $t('instance.createPage.passwordTooWeak') }}</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <!-- 订单概览 (付费套餐且已选方案) -->
+          <Card v-if="isPaidPackage && form.planId && selectedPlan" padding="md" class="rounded-2xl">
+            <div class="flex items-center gap-3.5 mb-5">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)]">
+                <ReceiptText class="w-5 h-5 stroke-[1.8]" />
+              </div>
+              <div class="min-w-0">
+                <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                  {{ configStore.freeSiteMode ? freeSiteCopy.createOrderSummary : $t('instance.createPage.orderSummary') }}
+                </h3>
+                <p class="text-xs text-[var(--text-secondary)] truncate mt-0.5">
+                  {{ selectedPackage?.name }} · {{ selectedPlan.name }}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <!-- 方案配置参数网格 -->
+              <div class="p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <div class="flex items-center justify-between mb-4">
+                  <Badge variant="default" size="sm">
+                    {{ getBillingCycleLabel(selectedPlan.billingCycle) }}
+                  </Badge>
+                  <Badge v-if="selectedPlan.slaGuarantee" variant="success" size="sm">
+                    <ShieldCheck class="w-3.5 h-3.5 mr-1 inline" />
+                    SLA {{ selectedPlan.slaGuarantee }}%
+                  </Badge>
+                </div>
+
+                <div
+                  class="grid grid-cols-2 gap-3 text-center"
+                  :class="(selectedPlan.gpuShared ?? selectedPackage?.gpu_shared) ? 'sm:grid-cols-5' : 'sm:grid-cols-4'"
+                >
+                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                      {{ formatCpu(selectedPlan.cpu) }}
+                    </div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">CPU</div>
+                  </div>
+
+                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                      {{ formatMemory(selectedPlan.memory) }}
+                    </div>
+                    <div class="text-xs text-[var(--text-secondary)] leading-tight mt-0.5 font-medium">
+                      <div>{{ $t('instance.memory') }}</div>
+                      <div v-if="selectedPackage?.instance_type !== 'vm' && selectedPlan.swapSize > 0" class="mt-0.5 flex items-center justify-center gap-1 text-[var(--success)] font-mono text-[10px]">
+                        <span>SWAP</span>
+                        <Check class="h-3 w-3" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                      {{ formatDisk(selectedPlan.disk) }}
+                    </div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">{{ $t('instance.disk') }}</div>
+                  </div>
+
+                  <GpuSpecification
+                    v-if="selectedPlan.gpuShared ?? selectedPackage?.gpu_shared"
+                    :configurations="selectedPlan.gpuConfigurations"
+                    :host-id="form.hostId"
+                  />
+
+                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                      {{ formatTraffic(selectedPlan.trafficLimit) }}
+                    </div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                      {{ $t('billing.traffic') }} <span class="opacity-60">({{ $t('billing.trafficBidirectional') }})</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 mt-3 pt-3 border-t border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+                  <span><span class="opacity-75">{{ $t('instance.ports') }}:</span> <strong class="font-mono tabular-nums text-[var(--text-primary)] ml-1">{{ selectedPlan.portLimit }}</strong></span>
+                  <span><span class="opacity-75">{{ $t('instance.snapshots') }}:</span> <strong class="font-mono tabular-nums text-[var(--text-primary)] ml-1">{{ selectedPlan.snapshotLimit }}</strong></span>
+                </div>
+              </div>
+
+              <!-- 优惠码输入 -->
+              <div class="space-y-1.5">
+                <Input
+                  v-model="form.promoCode"
+                  type="text"
+                  :label="configStore.freeSiteMode ? freeSiteCopy.createPromoCode : $t('aff.promoCode')"
+                  :placeholder="configStore.freeSiteMode ? freeSiteCopy.createPromoPlaceholder : $t('aff.promoCodePlaceholder')"
+                  :disabled="promoCodeVerifying"
+                  @blur="verifyPromoCode"
+                  @enter="verifyPromoCode"
+                >
+                  <template #suffix>
+                    <Loader2 v-if="promoCodeVerifying" class="w-4 h-4 animate-spin text-[var(--text-tertiary)]" />
+                    <CheckCircle2 v-else-if="promoCodeValid === true" class="w-4 h-4 text-[var(--success)]" />
+                    <XCircle v-else-if="promoCodeValid === false" class="w-4 h-4 text-[var(--error)]" />
+                  </template>
+                </Input>
+                <p v-if="promoCodeValid === true" class="text-xs text-[var(--success)] mt-1.5 flex items-center gap-1 font-medium">
+                  <CheckCircle2 class="w-3.5 h-3.5" />
+                  {{ configStore.freeSiteMode ? freeSiteCopy.createPromoValid.replace('{rate}', (promoCodeDiscount * 100).toFixed(0) + '%') : $t('aff.promoCodeValid', { rate: (promoCodeDiscount * 100).toFixed(0) + '%' }) }}
+                </p>
+                <p v-else-if="promoCodeError" class="text-xs text-[var(--error)] mt-1.5 font-medium flex items-center gap-1">
+                  <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+                  {{ promoCodeError }}
+                </p>
+              </div>
+
+              <!-- 价格明细 -->
+              <div v-if="planPriceInfo" class="space-y-3 pt-2">
+                <div v-if="promoCodeValid && planPriceInfo.discountAmount > 0" class="p-4 rounded-xl space-y-2 bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-[var(--text-secondary)]">{{ configStore.freeSiteMode ? freeSiteCopy.createPlanFee : $t('instance.createPage.planFee') }}</span>
+                    <span class="font-mono tabular-nums font-medium text-[var(--text-primary)]">¥{{ planPriceInfo.planPrice.toFixed(2) }}</span>
+                  </div>
+                  <div class="flex justify-between text-sm pt-2 border-t border-[var(--border-color)]">
+                    <span class="text-[var(--success)] flex items-center gap-1.5 font-medium">
+                      <Tag class="w-3.5 h-3.5" />
+                      {{ $t('aff.discountAmount') }} (-{{ (planPriceInfo.discountRate * 100).toFixed(0) }}%)
+                    </span>
+                    <span class="font-mono tabular-nums font-semibold text-[var(--success)]">-¥{{ planPriceInfo.discountAmount.toFixed(2) }}</span>
+                  </div>
+                </div>
+
+                <!-- 最终价格 Hero 块 -->
+                <div class="rounded-xl overflow-hidden border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                  <div class="p-5 flex items-center justify-between gap-4">
+                    <div class="min-w-0">
+                      <div class="text-sm font-semibold tracking-tight text-[var(--text-secondary)]">
+                        {{ configStore.freeSiteMode ? freeSiteCopy.finalPrice : $t('aff.finalPrice') }}
+                      </div>
+                      <div v-if="selectedPlan.billingCycle > 1" class="text-xs mt-1 text-[var(--text-tertiary)]">
+                        <span class="font-mono tabular-nums">
+                          {{ configStore.freeSiteMode ? freeSiteCopy.createMonthlyEquivalent : `≈ ¥${(planPriceInfo.finalPrice / selectedPlan.billingCycle).toFixed(2)}/${$t('instance.createPage.month')}` }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="text-3xl md:text-4xl font-mono font-semibold tabular-nums tracking-tight text-[var(--text-primary)] flex items-baseline gap-1">
+                      <span class="text-lg font-medium text-[var(--text-secondary)]">¥</span>
+                      <span>{{ planPriceInfo.finalPrice.toFixed(2) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <!-- 提交区 -->
+          <Card padding="md" class="mt-4 rounded-2xl space-y-4">
+            <!-- 实例名称 -->
+            <div>
+              <div
+                v-if="showDestroyTrafficNotice"
+                class="mb-3 p-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] text-xs text-[var(--warning)] leading-relaxed flex items-start gap-2"
+              >
+                <AlertTriangle class="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{{ $t('instance.createPage.destroyTrafficNotice') }}</span>
+              </div>
+              <div class="flex gap-2.5 items-end">
+                <Input
+                  v-model="form.name"
+                  type="text"
+                  :label="$t('instance.createPage.instanceName')"
+                  :placeholder="$t('instance.createPage.instanceNamePlaceholder')"
+                  class="flex-1 min-w-0"
+                  @update:model-value="handleInstanceNameInput"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  class="shrink-0 mb-0.5"
                   :disabled="!form.hostId"
                   @click="refreshGeneratedInstanceName(true)"
                 >
+                  <template #icon>
+                    <RotateCw class="w-4 h-4" />
+                  </template>
                   {{ $t('instance.createPage.regenerateName') }}
-                </button>
+                </Button>
               </div>
-              <p class="mt-1.5 text-xs text-themed-muted">{{ $t('instance.createPage.autoNameHint') }}</p>
+              <p class="mt-1.5 text-xs text-[var(--text-tertiary)]">{{ $t('instance.createPage.autoNameHint') }}</p>
             </div>
-            <div v-if="authType === 'ssh' && sshKeys.length === 0" class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
-              <p class="text-sm font-medium mb-1 text-amber-700 dark:text-amber-300">{{ $t('instance.createPage.missingSshKey') }}</p>
-              <p class="text-xs text-amber-700/90 dark:text-amber-300/90">{{ $t('instance.createPage.missingSshKeyDesc') }} <router-link :to="profilePath()" class="font-medium underline hover:text-amber-900 dark:hover:text-amber-200">{{ $t('instance.createPage.profileSettings') }}</router-link> {{ $t('instance.createPage.addSshKey') }}</p>
+
+            <!-- Missing SSH Key Alert -->
+            <div
+              v-if="authType === 'ssh' && sshKeys.length === 0"
+              class="p-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] text-xs text-[var(--warning)]"
+            >
+              <p class="text-sm font-semibold mb-1">{{ $t('instance.createPage.missingSshKey') }}</p>
+              <p class="leading-relaxed">
+                {{ $t('instance.createPage.missingSshKeyDesc') }}
+                <router-link :to="profilePath()" class="font-medium underline hover:brightness-110 ml-1">
+                  {{ $t('instance.createPage.profileSettings') }}
+                </router-link>
+                {{ $t('instance.createPage.addSshKey') }}
+              </p>
             </div>
-            <div v-if="!quotaCheck.valid" class="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10">
-              <p class="text-sm font-medium mb-2 text-rose-700 dark:text-rose-400">{{ $t('instance.createPage.quotaInsufficient') }}</p>
-              <ul class="text-xs space-y-1 text-rose-600 dark:text-rose-300"><li v-for="(err, idx) in quotaCheck.errors" :key="idx">• {{ err }}</li></ul>
+
+            <!-- Quota check error -->
+            <div
+              v-if="!quotaCheck.valid"
+              class="p-4 rounded-xl border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] text-xs text-[var(--error)]"
+            >
+              <p class="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <AlertCircle class="w-4 h-4 shrink-0" />
+                {{ $t('instance.createPage.quotaInsufficient') }}
+              </p>
+              <ul class="space-y-1 pl-4 list-disc font-medium">
+                <li v-for="(err, idx) in quotaCheck.errors" :key="idx">{{ err }}</li>
+              </ul>
             </div>
-            <div v-if="!resourceLimitCheck.valid" class="p-3 rounded-xl border border-rose-500/30 bg-rose-500/10">
-              <p class="text-sm font-medium mb-2 text-rose-700 dark:text-rose-400">{{ $t('instance.createPage.resourceLimit.title') }}</p>
-              <ul class="text-xs space-y-1 text-rose-600 dark:text-rose-300"><li v-for="(err, idx) in resourceLimitCheck.errors" :key="idx">• {{ err }}</li></ul>
+
+            <!-- Resource limit check error -->
+            <div
+              v-if="!resourceLimitCheck.valid"
+              class="p-4 rounded-xl border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] text-xs text-[var(--error)]"
+            >
+              <p class="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <AlertCircle class="w-4 h-4 shrink-0" />
+                {{ $t('instance.createPage.resourceLimit.title') }}
+              </p>
+              <ul class="space-y-1 pl-4 list-disc font-medium">
+                <li v-for="(err, idx) in resourceLimitCheck.errors" :key="idx">{{ err }}</li>
+              </ul>
             </div>
-            <div v-if="isOwnPaidPackage" class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
-              <p class="text-sm font-medium text-amber-700 dark:text-amber-400">{{ $t('instance.createPage.ownPaidPackageWarning') }}</p>
+
+            <!-- Own paid package warning -->
+            <div
+              v-if="isOwnPaidPackage"
+              class="p-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] text-xs text-[var(--warning)] flex items-center gap-2"
+            >
+              <AlertTriangle class="w-4 h-4 shrink-0" />
+              <span class="font-medium">{{ $t('instance.createPage.ownPaidPackageWarning') }}</span>
             </div>
-            <div v-if="prerequisiteMissing" class="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
-              <p class="text-sm font-medium text-amber-700 dark:text-amber-400">{{ prerequisiteMessage }}</p>
+
+            <!-- Prerequisite missing -->
+            <div
+              v-if="prerequisiteMissing"
+              class="p-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] text-xs text-[var(--warning)] flex items-center gap-2"
+            >
+              <AlertTriangle class="w-4 h-4 shrink-0" />
+              <span class="font-medium">{{ prerequisiteMessage }}</span>
             </div>
-            <label class="flex items-start gap-3 p-3 rounded-xl border border-themed bg-themed-tertiary cursor-pointer">
+
+            <!-- 自动下发远程端口选项 -->
+            <label class="flex items-start gap-3 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer hover:border-[var(--border-hover)] transition-all duration-200">
               <input
                 v-model="form.autoRemotePort"
                 type="checkbox"
-                class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
+                class="mt-1 h-4 w-4 rounded text-[var(--accent)] border-[var(--border-color)] focus:ring-[var(--accent)] cursor-pointer"
               />
-              <span class="text-sm">
-                <span class="font-medium text-themed">{{ $t('instance.createPage.autoRemotePort') }}</span>
-                <span class="mt-1 block text-xs text-themed-muted">{{ $t('instance.createPage.autoRemotePortDesc') }}</span>
+              <span class="text-sm select-none">
+                <span class="font-medium text-[var(--text-primary)] block">{{ $t('instance.createPage.autoRemotePort') }}</span>
+                <span class="mt-0.5 block text-xs text-[var(--text-secondary)] leading-relaxed">{{ $t('instance.createPage.autoRemotePortDesc') }}</span>
               </span>
             </label>
+
+            <!-- Turnstile 验证组件 (严格保留所有 guard 要求) -->
             <div
               v-if="isCreateTurnstileRequired"
               ref="turnstileSectionRef"
               tabindex="-1"
-              class="space-y-3 p-3 rounded-xl border border-themed bg-themed-tertiary text-sm text-themed-secondary"
+              class="space-y-3 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-sm text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
               <div>
-                <p class="font-medium">{{ $t('instance.createPage.turnstileRequiredTitle') }}</p>
-                <p class="mt-1 text-xs opacity-80">{{ $t('instance.createPage.turnstileRequiredDesc') }}</p>
+                <p class="font-medium text-[var(--text-primary)]">{{ $t('instance.createPage.turnstileRequiredTitle') }}</p>
+                <p class="mt-1 text-xs text-[var(--text-secondary)]">{{ $t('instance.createPage.turnstileRequiredDesc') }}</p>
               </div>
               <TurnstileWidget
                 ref="turnstileRef"
@@ -1675,78 +1836,47 @@ async function handleSubmit(): Promise<void> {
                 @error="onTurnstileError"
               />
             </div>
-            <div v-if="error" class="space-y-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
-              <div>{{ error }}</div>
+
+            <!-- 提交错误提示 -->
+            <div
+              v-if="error"
+              class="space-y-2 rounded-xl border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] p-4 text-sm text-[var(--error)] flex items-start gap-2.5"
+            >
+              <AlertCircle class="w-5 h-5 shrink-0 mt-0.5" />
+              <div class="font-medium leading-relaxed">{{ error }}</div>
             </div>
-            <button
+
+            <!-- 提交按钮 -->
+            <Button
               type="submit"
+              variant="primary"
+              size="lg"
+              block
               :disabled="!canSubmit"
+              :loading="submitting"
               :title="submitDisabledReason"
-              class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md font-medium text-sm bg-black hover:bg-neutral-900 text-white border border-neutral-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ submitting ? $t('instance.createPage.creating') : $t('instance.create') }}
-            </button>
-          </div>
+            </Button>
+          </Card>
         </div><!-- end right col -->
       </div><!-- end grid -->
     </form>
   </div>
-
 </template>
 
 <style scoped>
-/* ============ Nimbus polish — create-instance view ============ */
-
-/* Segmented source switcher */
-.nimbus-segmented {
-  backdrop-filter: blur(8px);
-}
-
-.nimbus-seg-pill:not(.active) {
-  color: var(--kawaii-muted);
-}
-
-.nimbus-seg-pill:not(.active):not(:disabled):hover {
-  color: var(--kawaii-text);
-  background: color-mix(in srgb, var(--kawaii-text) 7%, transparent);
-}
-
-.nimbus-seg-pill.active {
-  @apply bg-primary-600 text-white;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 5px 12px -5px color-mix(in srgb, var(--kawaii-primary) 55%, transparent);
-}
-
-/* Selector step cards: subtle hover-lift + staggered entrance */
-.nimbus-pane :deep(.card) {
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-  animation: nimbus-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
-
-.nimbus-pane :deep(.card):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px -16px rgb(0 0 0 / 0.35);
-}
-
-.nimbus-pane :deep(.card):nth-child(1) { animation-delay: 0.02s; }
-.nimbus-pane :deep(.card):nth-child(2) { animation-delay: 0.06s; }
-.nimbus-pane :deep(.card):nth-child(3) { animation-delay: 0.10s; }
-.nimbus-pane :deep(.card):nth-child(4) { animation-delay: 0.14s; }
-.nimbus-pane :deep(.card):nth-child(n + 5) { animation-delay: 0.18s; }
-
-
-@keyframes nimbus-rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Apple style card entrance & physics */
+.apple-pane :deep(.card),
+.apple-pane :deep([class*="rounded-2xl"]) {
+  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1), border-color 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nimbus-seg-pill,
-  .nimbus-pane :deep(.card) {
+  .apple-pane :deep(.card),
+  .apple-pane :deep([class*="rounded-2xl"]) {
     transition: none !important;
-    animation: none !important;
-  }
-  .nimbus-pane :deep(.card):hover {
-    transform: none;
+    transform: none !important;
   }
 }
 </style>

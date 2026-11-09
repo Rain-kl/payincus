@@ -21,7 +21,24 @@ import {
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 import { instanceCreatePath, loginPath } from '@/utils/app-paths'
 import { useReveal } from '@/composables/useReveal'
-import { PackageOpen, SearchX } from 'lucide-vue-next'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Select,
+  type SelectOption
+} from '@/components/ui'
+import {
+  AlertCircle,
+  Check,
+  Info,
+  PackageOpen,
+  Search,
+  SearchX
+} from 'lucide-vue-next'
 
 defineOptions({
   name: 'MarketView'
@@ -59,6 +76,14 @@ let searchTimer: number | null = null
 function getRegionLabel(code: string): string {
   return getLocalizedCountryName(code, locale.value, (key, fallback) => t(key, fallback))
 }
+
+const regionSelectOptions = computed<SelectOption[]>(() => [
+  { label: t('publicSite.market.allRegions'), value: '' },
+  ...regions.value.map(r => ({
+    label: getRegionLabel(r.code),
+    value: r.code
+  }))
+])
 
 const filteredPackages = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -125,49 +150,6 @@ const selectedPlan = computed(() => {
 
   return selectedPackage.value.plans.find(plan => plan.id === selectedPlanId.value && !plan.isSoldOut) || null
 })
-
-const ui = {
-  body: 'text-themed-muted',
-  title: 'text-themed',
-  badge: 'kawaii-chip',
-  badgeDot: 'kawaii-source-dot official',
-  infoBanner: 'kawaii-market-notice',
-  summaryCard: 'kawaii-stat-tile',
-  summaryLabel: 'text-themed-muted',
-  summaryValue: 'text-themed',
-  filterWrap: 'kawaii-browse-wrap',
-  chipActive: 'kawaii-market-pill active',
-  chipIdle: 'kawaii-market-pill',
-  searchInput: 'border-themed bg-themed text-themed placeholder:text-themed-muted focus:border-accent',
-  searchClear: 'text-themed-muted hover:bg-themed-hover hover:text-themed',
-  errorBanner: 'bg-red-500/10 text-red-500 border border-red-500/20',
-  skeleton: 'kawaii-skeleton',
-  emptyState: 'kawaii-empty-state',
-  emptyStateTitle: 'text-themed',
-  emptyStateButton: 'kawaii-primary-button',
-  packageCard: 'kawaii-package-card text-themed',
-  packageCardSelected: 'kawaii-package-card selected text-themed',
-  packageCardMuted: 'text-themed-muted',
-  chipKvm: 'kawaii-instance-chip vm',
-  chipLxc: 'kawaii-instance-chip lxc',
-  chipInStock: 'kawaii-market-status in-stock',
-  chipSoldOut: 'kawaii-market-status sold-out',
-  chipOfficial: 'kawaii-source-chip official',
-  chipMarket: 'kawaii-source-chip market',
-  statChip: 'border border-themed text-themed-muted',
-  statDivider: 'border-themed',
-  statBlockLabel: 'text-themed-muted',
-  detailCard: 'kawaii-market-detail',
-  detailSummaryCard: 'kawaii-stat-tile text-themed',
-  detailSummaryLabel: 'text-themed-muted',
-  detailSummaryIcon: 'text-accent',
-  planIdle: 'kawaii-market-plan text-themed',
-  planSelected: 'kawaii-market-plan selected text-themed',
-  radioIdle: 'border-themed',
-  radioActive: 'border-accent bg-accent',
-  infoCard: 'kawaii-market-info',
-  ctaButton: 'kawaii-primary-button'
-}
 
 const summaryCards = computed(() => [
   { label: t('publicSite.market.summary.total'), value: String(packages.value.length) },
@@ -443,8 +425,6 @@ function selectRegion(code: string | null): void {
   const currentPackageId = selectedPackageId.value
   selectedRegion.value = code
 
-  // 用户主动切换地区时，优先尊重新地区筛选；
-  // 只有当前套餐仍在筛选结果内时才保留，避免把地区强行改回旧值。
   const preferredPackageId = currentPackageId !== null && filteredPackages.value.some(pkg => pkg.id === currentPackageId)
     ? currentPackageId
     : null
@@ -456,6 +436,10 @@ function selectRegion(code: string | null): void {
   ensureSelectedPackage(preferredPackageId, { syncRegionWithPackage: false })
   ensureSelectedPlan(selectedPlanId.value)
   syncRouteQuery()
+}
+
+function handleRegionSelect(value: string | number | boolean): void {
+  selectRegion(value ? String(value) : null)
 }
 
 function selectPackage(pkg: PublicPackage): void {
@@ -489,6 +473,13 @@ function handleSearchInput(): void {
 
 function clearSearch(): void {
   searchQuery.value = ''
+  ensureSelectedPackage(selectedPackageId.value)
+  syncRouteQuery()
+}
+
+function clearFilters(): void {
+  searchQuery.value = ''
+  selectedRegion.value = null
   ensureSelectedPackage(selectedPackageId.value)
   syncRouteQuery()
 }
@@ -538,479 +529,470 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="revealRoot" class="kawaii-page kawaii-market-page relative">
-    <section class="market-hero relative px-4 pb-8 pt-14 sm:px-6 lg:px-8">
-      <div class="relative mx-auto max-w-7xl">
-        <div class="max-w-3xl" data-reveal>
-          <div
-            class="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium"
-            :class="ui.badge"
-          >
-            <span class="h-1.5 w-1.5 rounded-full" :class="ui.badgeDot"></span>
-            {{ t('publicSite.market.badge') }}
+  <div ref="revealRoot" class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+    <!-- Page Header (StyleKit Apple Style) -->
+    <PageHeader data-reveal>
+      <template #title>
+        <div class="space-y-3">
+          <div>
+            <Badge variant="info" :dot="true" size="md">
+              {{ t('publicSite.market.badge') }}
+            </Badge>
           </div>
-
-          <h1 class="mt-6 text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-[2.9rem] lg:leading-[1.06]" :class="ui.title">
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-[var(--text-primary)]">
             {{ t('publicSite.market.title') }}
           </h1>
-          <p class="mt-4 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8" :class="ui.body">
-            {{ t('publicSite.market.description') }}
-          </p>
+        </div>
+      </template>
+      <template #description>
+        <p class="text-base sm:text-lg text-[var(--text-secondary)] max-w-2xl leading-relaxed mt-2">
+          {{ t('publicSite.market.description') }}
+        </p>
+      </template>
+    </PageHeader>
 
-          <div class="market-stat-strip mt-7 flex flex-wrap items-center" data-reveal>
-            <div v-for="card in summaryCards" :key="card.label" class="market-stat">
-              <span class="market-stat-value" :class="ui.summaryValue">{{ card.value }}</span>
-              <span class="market-stat-label" :class="ui.summaryLabel">{{ card.label }}</span>
-            </div>
-          </div>
+    <!-- Summary Stats Strip -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 my-8" data-reveal>
+      <Card
+        v-for="card in summaryCards"
+        :key="card.label"
+        padding="sm"
+        class="relative transition-all duration-300"
+      >
+        <div class="text-xs font-medium text-[var(--text-secondary)]">
+          {{ card.label }}
+        </div>
+        <div class="mt-1.5 text-2xl font-semibold tracking-tight text-[var(--text-primary)] font-mono tabular-nums">
+          {{ card.value }}
+        </div>
+      </Card>
+    </div>
 
-          <div
-            v-if="!authStore.isAuthenticated && parsePackageIdQuery(route.query.package)"
-            class="mt-7 flex items-start gap-3 rounded-xl px-4 py-3.5 text-sm leading-6"
-            :class="ui.infoBanner"
+    <!-- Guest Purchase Intent Banner -->
+    <div
+      v-if="!authStore.isAuthenticated && parsePackageIdQuery(route.query.package)"
+      class="mb-8 flex items-start gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] px-5 py-4 text-sm leading-6 text-[var(--text-primary)] shadow-sm"
+      data-reveal
+    >
+      <Info class="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" />
+      <span>{{ infoBannerText }}</span>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 mb-8 border-y border-[var(--border-color)]" data-reveal>
+      <!-- Mobile Region Select -->
+      <div v-if="regions.length > 0" class="sm:hidden w-full">
+        <Select
+          :model-value="selectedRegion || ''"
+          :options="regionSelectOptions"
+          size="md"
+          @update:model-value="handleRegionSelect"
+        />
+      </div>
+
+      <!-- Desktop Region Pills -->
+      <div v-if="regions.length > 0" class="hidden sm:flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1 scrollbar-none">
+        <Button
+          :variant="selectedRegion === null ? 'primary' : 'secondary'"
+          size="sm"
+          class="shrink-0"
+          @click="selectRegion(null)"
+        >
+          <Check v-if="selectedRegion === null" class="w-3.5 h-3.5" />
+          {{ t('publicSite.market.allRegions') }}
+        </Button>
+
+        <Button
+          v-for="region in regions"
+          :key="region.code"
+          :variant="selectedRegion === region.code ? 'primary' : 'secondary'"
+          size="sm"
+          class="shrink-0"
+          @click="selectRegion(region.code)"
+        >
+          <Check v-if="selectedRegion === region.code" class="w-3.5 h-3.5" />
+          <FlagIcon :code="region.code" class="h-3 w-4" />
+          <span>{{ getRegionLabel(region.code) }}</span>
+        </Button>
+      </div>
+
+      <!-- Search Input -->
+      <div class="w-full sm:w-72 shrink-0">
+        <Input
+          v-model="searchQuery"
+          :placeholder="t('publicSite.market.searchPlaceholder')"
+          clearable
+          size="md"
+          @update:model-value="handleSearchInput"
+          @clear="clearSearch"
+        >
+          <template #prefix>
+            <Search class="h-4 w-4 text-[var(--text-tertiary)]" />
+          </template>
+        </Input>
+      </div>
+    </div>
+
+    <!-- Load Error State -->
+    <div
+      v-if="loadError"
+      class="my-8 flex items-start gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] p-5 text-sm leading-6 text-[var(--error)] shadow-sm"
+    >
+      <AlertCircle class="mt-0.5 h-5 w-5 shrink-0" />
+      <span>{{ loadError }}</span>
+    </div>
+
+    <!-- Loading Skeleton State -->
+    <div v-else-if="loading" class="grid gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(22rem,0.82fr)]">
+      <div class="grid gap-4 md:grid-cols-2">
+        <Card v-for="index in 6" :key="index" padding="md" :loading="true" class="h-64" />
+      </div>
+      <Card padding="md" :loading="true" class="h-[36rem]" />
+    </div>
+
+    <!-- Empty State: No Packages Total -->
+    <EmptyState
+      v-else-if="packages.length === 0"
+      :title="t('publicSite.market.noPackages')"
+      class="mt-8"
+    >
+      <template #icon>
+        <PackageOpen class="w-7 h-7 stroke-[1.5]" />
+      </template>
+    </EmptyState>
+
+    <!-- Main Catalog Content -->
+    <div v-else class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(22rem,0.82fr)]">
+      <!-- Left: Package Grid or Search Empty State -->
+      <div class="min-w-0">
+        <!-- Filter/Search Empty State -->
+        <EmptyState
+          v-if="filteredPackages.length === 0"
+          :title="t('publicSite.market.noResults')"
+          class="py-16"
+        >
+          <template #icon>
+            <SearchX class="w-7 h-7 stroke-[1.5]" />
+          </template>
+          <template #action>
+            <Button
+              v-if="searchQuery || selectedRegion"
+              variant="secondary"
+              size="md"
+              @click="clearFilters"
+            >
+              {{ t('common.reset') }}
+            </Button>
+          </template>
+        </EmptyState>
+
+        <!-- Package Card Grid -->
+        <div v-else class="grid gap-4 md:grid-cols-2">
+          <Card
+            v-for="pkg in filteredPackages"
+            :key="pkg.id"
+            :hoverable="true"
+            padding="sm"
+            role="button"
+            tabindex="0"
+            class="relative text-left transition-all duration-300"
+            :class="[
+              selectedPackage?.id === pkg.id
+                ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-md'
+                : 'hover:border-[var(--border-hover)]',
+              pkg.soldOut ? 'opacity-70' : ''
+            ]"
+            @click="selectPackage(pkg)"
+            @keydown.enter="selectPackage(pkg)"
+            @keydown.space.prevent="selectPackage(pkg)"
           >
-            <svg class="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{{ infoBannerText }}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="relative px-4 pb-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-7xl">
-        <div class="market-toolbar" data-reveal>
-          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-            <div v-if="regions.length > 0" class="market-chips flex min-w-0 flex-1 gap-2 overflow-x-auto">
-              <button
-                class="inline-flex h-9 shrink-0 items-center rounded-xl px-3.5 text-sm font-semibold transition-colors duration-150"
-                :class="selectedRegion === null ? ui.chipActive : ui.chipIdle"
-                @click="selectRegion(null)"
-              >
-                <svg v-if="selectedRegion === null" class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-                {{ t('publicSite.market.allRegions') }}
-              </button>
-
-              <button
-                v-for="region in regions"
-                :key="region.code"
-                class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-sm font-semibold transition-colors duration-150"
-                :class="selectedRegion === region.code ? ui.chipActive : ui.chipIdle"
-                @click="selectRegion(region.code)"
-              >
-                <svg v-if="selectedRegion === region.code" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-                <FlagIcon :code="region.code" class="h-3 w-4" />
-                <span>{{ getRegionLabel(region.code) }}</span>
-              </button>
-            </div>
-
-            <div class="market-search relative w-full lg:w-72 lg:shrink-0">
-              <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2" :class="ui.searchClear" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 110-16 8 8 0 010 16z" />
-              </svg>
-              <input
-                v-model="searchQuery"
-                type="text"
-                class="h-11 w-full rounded-xl border pl-11 pr-12 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent/30"
-                :class="ui.searchInput"
-                :placeholder="t('publicSite.market.searchPlaceholder')"
-                @input="handleSearchInput"
-              />
-              <button
-                v-if="searchQuery"
-                class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 transition-colors duration-150"
-                :class="ui.searchClear"
-                @click="clearSearch"
-              >
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="loadError" class="mt-6 flex items-start gap-3 rounded-lg px-4 py-4 text-sm leading-6" :class="ui.errorBanner">
-          <svg class="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.73-3l-7.07-12a2 2 0 00-3.46 0L3.2 16a2 2 0 001.73 3z" />
-          </svg>
-          <span>{{ loadError }}</span>
-        </div>
-
-        <div v-else-if="loading" class="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(22rem,0.82fr)]">
-          <div class="grid gap-4 md:grid-cols-2">
-            <div
-              v-for="index in 6"
-              :key="index"
-              class="h-60 animate-pulse rounded-lg"
-              :class="ui.skeleton"
-            ></div>
-          </div>
-          <div class="h-[36rem] animate-pulse rounded-lg" :class="ui.skeleton"></div>
-        </div>
-
-        <div v-else-if="packages.length === 0" class="market-empty mt-8" :class="ui.emptyState">
-          <PackageOpen class="market-empty-ic" :size="44" :stroke-width="1.6" aria-hidden="true" />
-          <div class="market-empty-title" :class="ui.emptyStateTitle">{{ t('publicSite.market.noPackages') }}</div>
-        </div>
-
-        <div v-else class="kawaii-market-catalog-layout mt-7 grid items-start gap-6 lg:grid-cols-[minmax(0,1.18fr)_minmax(22rem,0.82fr)]">
-          <div class="min-w-0">
-            <div v-if="filteredPackages.length === 0" class="market-empty" :class="ui.emptyState">
-              <SearchX class="market-empty-ic" :size="44" :stroke-width="1.6" aria-hidden="true" />
-              <div class="market-empty-title" :class="ui.emptyStateTitle">
-                {{ t('publicSite.market.noResults') }}
+            <!-- Card Top Row: Badges & Price -->
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                <Badge :variant="pkg.sourceType === 'official' ? 'info' : 'default'" size="sm">
+                  {{ t('publicSite.market.official') }}
+                </Badge>
+                <Badge variant="default" size="sm">
+                  {{ pkg.instance_type === 'vm' ? 'KVM' : 'LXC' }}
+                </Badge>
+                <Badge :variant="pkg.soldOut ? 'error' : 'success'" size="sm" :dot="true">
+                  {{ pkg.soldOut ? t('publicSite.market.soldOut') : t('publicSite.market.inStock') }}
+                </Badge>
               </div>
-              <button
-                v-if="searchQuery || selectedRegion"
-                class="mt-4 inline-flex h-10 items-center rounded-full px-6 text-sm font-semibold transition-colors duration-150"
-                :class="ui.emptyStateButton"
-                @click="searchQuery = ''; selectRegion(null)"
+
+              <div class="shrink-0 text-right">
+                <div class="text-sm sm:text-base font-semibold text-[var(--accent)] font-mono tabular-nums">
+                  {{ getPackagePriceLabel(pkg) }}
+                </div>
+                <div class="mt-0.5 text-xs text-[var(--text-tertiary)] font-mono">
+                  {{ formatTraffic(pkg.monthly_traffic_limit) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Package Name -->
+            <div class="mt-3.5 line-clamp-2 text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ pkg.name }}
+            </div>
+
+            <!-- Package Description -->
+            <p class="mt-1.5 line-clamp-2 text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
+              {{ pkg.description || t('publicSite.portal.packageFallback') }}
+            </p>
+
+            <!-- Region Badges -->
+            <div v-if="getPackageRegions(pkg).length > 0" class="mt-3.5 flex flex-wrap gap-1.5">
+              <Badge
+                v-for="region in getPackageRegions(pkg)"
+                :key="region.code"
+                variant="default"
+                size="sm"
               >
-                {{ t('common.reset') }}
-              </button>
+                <FlagIcon :code="region.code" class="h-3 w-4 mr-1" />
+                {{ getRegionLabel(region.code) }}
+              </Badge>
             </div>
 
-            <div v-else class="kawaii-market-package-grid grid gap-4 md:grid-cols-2">
-              <button
-                v-for="pkg in filteredPackages"
-                :key="pkg.id"
-                class="kawaii-package-card rounded-lg p-5 text-left transition-[background-color,box-shadow,transform,border-color] duration-150"
-                :class="[
-                  selectedPackage?.id === pkg.id ? 'selected' : '',
-                  pkg.soldOut ? 'opacity-70' : ''
-                ]"
-                @click="selectPackage(pkg)"
-              >
-                <div class="flex min-w-0 items-start justify-between gap-4">
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="pkg.sourceType === 'official' ? ui.chipOfficial : ui.chipMarket">
-                        {{ t('publicSite.market.official') }}
-                      </span>
-                      <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="pkg.instance_type === 'vm' ? ui.chipKvm : ui.chipLxc">
-                        {{ pkg.instance_type === 'vm' ? 'KVM' : 'LXC' }}
-                      </span>
-                      <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="pkg.soldOut ? ui.chipSoldOut : ui.chipInStock">
-                        {{ pkg.soldOut ? t('publicSite.market.soldOut') : t('publicSite.market.inStock') }}
-                      </span>
-                    </div>
-
-                    <div class="mt-4 line-clamp-2 text-xl font-extrabold tracking-normal">
-                      {{ pkg.name }}
-                    </div>
-                  </div>
-
-                  <div class="shrink-0 text-right">
-                    <div class="text-sm font-extrabold text-accent">
-                      {{ getPackagePriceLabel(pkg) }}
-                    </div>
-                    <div class="mt-1 text-xs" :class="selectedPackage?.id === pkg.id ? '' : ui.packageCardMuted">
-                      {{ formatTraffic(pkg.monthly_traffic_limit) }}
-                    </div>
-                  </div>
+            <!-- Specs Divider & Stats -->
+            <div class="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--border-color)] pt-3 text-xs">
+              <div>
+                <div class="text-[11px] font-medium text-[var(--text-tertiary)]">
+                  {{ t('publicSite.market.labels.plans') }}
                 </div>
-
-                <p class="mt-3 line-clamp-2 text-sm leading-6" :class="selectedPackage?.id === pkg.id ? '' : ui.packageCardMuted">
-                  {{ pkg.description || t('publicSite.portal.packageFallback') }}
-                </p>
-
-                <div v-if="getPackageRegions(pkg).length > 0" class="mt-4 flex flex-wrap gap-2">
-                  <span
-                    v-for="region in getPackageRegions(pkg)"
-                    :key="region.code"
-                    class="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold"
-                    :class="ui.statChip"
-                  >
-                    <FlagIcon :code="region.code" class="h-3 w-4" />
-                    {{ getRegionLabel(region.code) }}
-                  </span>
+                <div class="mt-0.5 font-semibold text-[var(--text-primary)] font-mono">
+                  {{ getPlanLabel(pkg) }}
                 </div>
-
-                <div class="mt-5 grid grid-cols-2 gap-3 border-t pt-4" :class="selectedPackage?.id === pkg.id ? 'border-accent/30' : ui.statDivider">
-                  <div class="kawaii-market-card-stat">
-                    <div class="text-[11px] font-semibold" :class="selectedPackage?.id === pkg.id ? 'opacity-70' : ui.statBlockLabel">{{ t('publicSite.market.labels.plans') }}</div>
-                    <div class="mt-1 text-sm font-extrabold">{{ getPlanLabel(pkg) }}</div>
-                  </div>
-                  <div class="kawaii-market-card-stat">
-                    <div class="text-[11px] font-semibold" :class="selectedPackage?.id === pkg.id ? 'opacity-70' : ui.statBlockLabel">{{ t('publicSite.market.labels.network') }}</div>
-                    <div class="mt-1 text-sm font-extrabold leading-5">{{ getNetworkLabel(pkg) }}</div>
-                  </div>
+              </div>
+              <div>
+                <div class="text-[11px] font-medium text-[var(--text-tertiary)]">
+                  {{ t('publicSite.market.labels.network') }}
                 </div>
-              </button>
+                <div class="mt-0.5 font-semibold text-[var(--text-primary)] truncate">
+                  {{ getNetworkLabel(pkg) }}
+                </div>
+              </div>
             </div>
-          </div>
-
-          <aside class="min-w-0 lg:self-start">
-            <div class="kawaii-market-detail-shell rounded-lg border p-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto sm:p-6" :class="ui.detailCard">
-              <template v-if="selectedPackage">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="selectedPackage.sourceType === 'official' ? ui.chipOfficial : ui.chipMarket">
-                    {{ t('publicSite.market.official') }}
-                  </span>
-                  <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="selectedPackage.instance_type === 'vm' ? ui.chipKvm : ui.chipLxc">
-                    {{ selectedPackage.instance_type === 'vm' ? 'KVM' : 'LXC' }}
-                  </span>
-                  <span class="rounded-lg px-2 py-0.5 text-[11px] font-semibold tracking-normal" :class="selectedPackage.soldOut ? ui.chipSoldOut : ui.chipInStock">
-                    {{ selectedPackage.soldOut ? t('publicSite.market.soldOut') : t('publicSite.market.inStock') }}
-                  </span>
-                </div>
-
-                <h2 class="mt-4 text-2xl font-extrabold tracking-normal" :class="ui.title">
-                  {{ selectedPackage.name }}
-                </h2>
-                <p class="mt-3 text-sm leading-6" :class="ui.body">
-                  {{ selectedPackage.description || t('publicSite.portal.packageFallback') }}
-                </p>
-
-                <div v-if="getPackageRegions(selectedPackage).length > 0" class="mt-4 flex flex-wrap gap-2">
-                  <span
-                    v-for="region in getPackageRegions(selectedPackage)"
-                    :key="region.code"
-                    class="inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold"
-                    :class="ui.statChip"
-                  >
-                    <FlagIcon :code="region.code" class="h-3 w-4" />
-                    {{ getRegionLabel(region.code) }}
-                  </span>
-                </div>
-
-                <div class="mt-6 grid grid-cols-2 gap-3">
-                  <div class="kawaii-market-detail-metric rounded-lg p-4" :class="ui.detailSummaryCard">
-                    <div class="text-xs font-semibold" :class="ui.detailSummaryLabel">
-                      {{ t('publicSite.market.labels.startingPrice') }}
-                    </div>
-                    <div class="mt-2 text-lg font-extrabold">{{ getPackagePriceLabel(selectedPackage) }}</div>
-                  </div>
-                  <div class="kawaii-market-detail-metric rounded-lg p-4" :class="ui.detailSummaryCard">
-                    <div class="text-xs font-semibold" :class="ui.detailSummaryLabel">
-                      {{ t('publicSite.market.labels.traffic') }}
-                    </div>
-                    <div class="mt-2 text-lg font-extrabold">{{ formatTraffic(selectedPackage.monthly_traffic_limit) }}</div>
-                  </div>
-                </div>
-
-                <div class="mt-6">
-                  <div class="flex items-center justify-between gap-4">
-                    <div class="text-sm font-extrabold" :class="ui.title">
-                      {{ t('publicSite.market.plansTitle') }}
-                    </div>
-                    <div class="text-xs" :class="ui.statBlockLabel">
-                      {{ getNetworkLabel(selectedPackage) }}
-                    </div>
-                  </div>
-
-                  <div v-if="selectedPackage.isPaid && selectedPackage.plans.length > 0" class="mt-3 space-y-2">
-                    <button
-                      v-for="plan in selectedPackage.plans"
-                      :key="plan.id"
-                      class="kawaii-market-plan w-full rounded-lg px-3 py-3 text-left transition-[background-color,border-color,transform] duration-150"
-                      :class="[
-                        selectedPlan?.id === plan.id ? 'selected text-themed' : 'text-themed',
-                        plan.isSoldOut ? 'cursor-not-allowed opacity-60 hover:bg-inherit' : ''
-                      ]"
-                      :disabled="plan.isSoldOut"
-                      @click="selectPlan(plan.id)"
-                    >
-                      <div class="flex items-start gap-3">
-                        <div class="mt-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2" :class="selectedPlan?.id === plan.id ? ui.radioActive : ui.radioIdle">
-                          <div v-if="selectedPlan?.id === plan.id" class="h-1.5 w-1.5 rounded-full bg-accent"></div>
-                        </div>
-                        <div class="min-w-0 flex-1">
-                          <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                              <div class="truncate text-sm font-extrabold">
-                                {{ plan.name }}
-                              </div>
-                              <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] opacity-70">
-                                <span>{{ getMarketPlanCycleLabel(plan.billingCycle) }}</span>
-                                <span v-if="plan.isSoldOut" class="rounded-full border px-1.5 py-0.5 opacity-100" :class="ui.chipSoldOut">
-                                  {{ t('publicSite.market.soldOut') }}
-                                </span>
-                              </div>
-                            </div>
-                            <div class="shrink-0 text-right">
-                              <div class="font-mono text-sm font-extrabold tabular-nums">
-                                {{ configStore.freeSiteMode ? freeSiteCopy.moneyJustForShow : `¥${formatPublicPrice(plan.price)}` }}
-                              </div>
-                              <div class="mt-0.5 text-[11px] opacity-70">
-                                {{ getMarketMonthlyPriceLabel(plan.monthlyPrice) }}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="mt-2 flex flex-wrap gap-1.5 font-mono text-[11px] tabular-nums">
-                            <span class="rounded-lg border px-2 py-0.5 font-semibold" :class="selectedPlan?.id === plan.id ? 'border-current' : ui.statChip">CPU {{ plan.cpu }}%</span>
-                            <span class="rounded-lg border px-2 py-0.5 font-semibold" :class="selectedPlan?.id === plan.id ? 'border-current' : ui.statChip">{{ formatMemory(plan.memory) }}</span>
-                            <span class="rounded-lg border px-2 py-0.5 font-semibold" :class="selectedPlan?.id === plan.id ? 'border-current' : ui.statChip">{{ formatDisk(plan.disk) }}</span>
-                            <span class="rounded-lg border px-2 py-0.5 font-semibold" :class="selectedPlan?.id === plan.id ? 'border-current' : ui.statChip">{{ formatTraffic(plan.trafficLimit) }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-
-                  <div v-else class="mt-3 rounded-lg p-4 text-sm leading-6" :class="ui.infoCard">
-                    <div class="font-semibold" :class="ui.title">
-                      {{ t('publicSite.market.customConfigTitle') }}
-                    </div>
-                    <p class="mt-2">
-                      {{ t('publicSite.market.customConfigDescription') }}
-                    </p>
-                  </div>
-                </div>
-
-                <div v-if="selectedPlan" class="mt-5">
-                  <div class="rounded-lg px-4 py-4" :class="ui.detailSummaryCard">
-                    <div class="flex items-start justify-between gap-4">
-                      <div class="min-w-0">
-                        <div class="text-xs font-semibold" :class="ui.statBlockLabel">
-                          {{ t('publicSite.market.selectedPlanTitle') }}
-                        </div>
-                        <div class="mt-1 truncate text-base font-extrabold" :class="ui.title">
-                          {{ selectedPlan.name }}
-                        </div>
-                        <div class="mt-1 text-xs" :class="ui.statBlockLabel">
-                          {{ getMarketPlanCycleLabel(selectedPlan.billingCycle) }} · {{ getNetworkLabel(selectedPackage) }}
-                        </div>
-                      </div>
-                      <div class="shrink-0 text-right">
-                        <div class="font-mono text-xl font-extrabold tabular-nums" :class="ui.title">
-                          {{ configStore.freeSiteMode ? freeSiteCopy.moneyJustForShow : `¥${formatPublicPrice(selectedPlan.price)}` }}
-                        </div>
-                        <div class="mt-0.5 text-[11px]" :class="ui.statBlockLabel">
-                          {{ getMarketMonthlyPriceLabel(selectedPlan.monthlyPrice) }}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="mt-3 flex flex-wrap gap-1.5 font-mono text-[11px] tabular-nums">
-                      <span class="rounded-lg border border-current px-2 py-0.5 font-semibold opacity-90">CPU {{ selectedPlan.cpu }}%</span>
-                      <span class="rounded-lg border border-current px-2 py-0.5 font-semibold opacity-90">{{ formatMemory(selectedPlan.memory) }}</span>
-                      <span class="rounded-lg border border-current px-2 py-0.5 font-semibold opacity-90">{{ formatDisk(selectedPlan.disk) }}</span>
-                      <span class="rounded-lg border border-current px-2 py-0.5 font-semibold opacity-90">{{ formatTraffic(selectedPlan.trafficLimit) }}</span>
-                      <span class="rounded-lg border border-current px-2 py-0.5 font-semibold opacity-90">{{ t('publicSite.market.labels.hosts') }} {{ selectedPackage.host_ids.length }}</span>
-                      <span class="rounded-lg border border-current px-2 py-0.5 font-semibold opacity-90">{{ t('publicSite.market.labels.nesting') }} {{ selectedPackage.nested ? t('common.yes') : t('common.no') }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  class="mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-extrabold tracking-normal transition-[background-color,box-shadow,transform] duration-150 disabled:cursor-not-allowed disabled:opacity-60"
-                  :class="ui.ctaButton"
-                  :disabled="selectedPackage.soldOut || (selectedPackage.isPaid && !selectedPlan)"
-                  @click="createInstance(selectedPackage)"
-                >
-                  {{ getMarketCtaText(selectedPackage) }}
-                </button>
-
-                <p v-if="!authStore.isAuthenticated" class="mt-3 text-center text-xs leading-5" :class="ui.statBlockLabel">
-                  {{ t('publicSite.market.loginHint') }}
-                </p>
-              </template>
-
-              <template v-else>
-                <div class="flex min-h-[20rem] items-center justify-center text-center text-sm" :class="ui.statBlockLabel">
-                  {{ t('publicSite.market.choosePackage') }}
-                </div>
-              </template>
-            </div>
-          </aside>
+          </Card>
         </div>
       </div>
-    </section>
+
+      <!-- Right: Sticky Order & Plan Detail Sidebar -->
+      <aside class="min-w-0 lg:self-start">
+        <Card padding="md" class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+          <template v-if="selectedPackage">
+            <!-- Header Badges -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <Badge :variant="selectedPackage.sourceType === 'official' ? 'info' : 'default'" size="sm">
+                {{ t('publicSite.market.official') }}
+              </Badge>
+              <Badge variant="default" size="sm">
+                {{ selectedPackage.instance_type === 'vm' ? 'KVM' : 'LXC' }}
+              </Badge>
+              <Badge :variant="selectedPackage.soldOut ? 'error' : 'success'" size="sm" :dot="true">
+                {{ selectedPackage.soldOut ? t('publicSite.market.soldOut') : t('publicSite.market.inStock') }}
+              </Badge>
+            </div>
+
+            <!-- Selected Package Title -->
+            <h2 class="mt-4 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ selectedPackage.name }}
+            </h2>
+
+            <!-- Selected Package Description -->
+            <p class="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">
+              {{ selectedPackage.description || t('publicSite.portal.packageFallback') }}
+            </p>
+
+            <!-- Selected Package Regions -->
+            <div v-if="getPackageRegions(selectedPackage).length > 0" class="mt-3.5 flex flex-wrap gap-1.5">
+              <Badge
+                v-for="region in getPackageRegions(selectedPackage)"
+                :key="region.code"
+                variant="default"
+                size="sm"
+              >
+                <FlagIcon :code="region.code" class="h-3 w-4 mr-1" />
+                {{ getRegionLabel(region.code) }}
+              </Badge>
+            </div>
+
+            <!-- Key Metric Tiles -->
+            <div class="mt-6 grid grid-cols-2 gap-3">
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+                <div class="text-xs font-medium text-[var(--text-secondary)]">
+                  {{ t('publicSite.market.labels.startingPrice') }}
+                </div>
+                <div class="mt-1 text-lg font-semibold text-[var(--accent)] font-mono tabular-nums">
+                  {{ getPackagePriceLabel(selectedPackage) }}
+                </div>
+              </div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+                <div class="text-xs font-medium text-[var(--text-secondary)]">
+                  {{ t('publicSite.market.labels.traffic') }}
+                </div>
+                <div class="mt-1 text-lg font-semibold text-[var(--text-primary)] font-mono tabular-nums">
+                  {{ formatTraffic(selectedPackage.monthly_traffic_limit) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Plan Selection Section -->
+            <div class="mt-6">
+              <div class="flex items-center justify-between gap-4">
+                <div class="text-sm font-semibold tracking-tight text-[var(--text-primary)]">
+                  {{ t('publicSite.market.plansTitle') }}
+                </div>
+                <div class="text-xs text-[var(--text-tertiary)]">
+                  {{ getNetworkLabel(selectedPackage) }}
+                </div>
+              </div>
+
+              <!-- Available Plans List -->
+              <div v-if="selectedPackage.isPaid && selectedPackage.plans.length > 0" class="mt-3 space-y-2">
+                <button
+                  v-for="plan in selectedPackage.plans"
+                  :key="plan.id"
+                  type="button"
+                  class="w-full text-left rounded-xl p-3 border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  :class="[
+                    selectedPlan?.id === plan.id
+                      ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))] ring-1 ring-[var(--accent)]'
+                      : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface)]',
+                    plan.isSoldOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-[0.99]'
+                  ]"
+                  :disabled="plan.isSoldOut"
+                  @click="selectPlan(plan.id)"
+                >
+                  <div class="flex items-start gap-3">
+                    <div
+                      class="mt-0.5 h-4 w-4 shrink-0 rounded-full border flex items-center justify-center transition-colors"
+                      :class="selectedPlan?.id === plan.id ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-[var(--border-color)] bg-[var(--bg-surface)]'"
+                    >
+                      <div v-if="selectedPlan?.id === plan.id" class="h-1.5 w-1.5 rounded-full bg-white" />
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <div class="text-sm font-semibold text-[var(--text-primary)] truncate">
+                            {{ plan.name }}
+                          </div>
+                          <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                            <span>{{ getMarketPlanCycleLabel(plan.billingCycle) }}</span>
+                            <Badge v-if="plan.isSoldOut" variant="error" size="sm">
+                              {{ t('publicSite.market.soldOut') }}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div class="shrink-0 text-right">
+                          <div class="font-mono text-sm font-semibold text-[var(--text-primary)] tabular-nums">
+                            {{ configStore.freeSiteMode ? freeSiteCopy.moneyJustForShow : `¥${formatPublicPrice(plan.price)}` }}
+                          </div>
+                          <div class="mt-0.5 text-xs text-[var(--text-secondary)] font-mono">
+                            {{ getMarketMonthlyPriceLabel(plan.monthlyPrice) }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px] font-mono tabular-nums">
+                        <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">
+                          CPU {{ plan.cpu }}%
+                        </span>
+                        <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">
+                          {{ formatMemory(plan.memory) }}
+                        </span>
+                        <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">
+                          {{ formatDisk(plan.disk) }}
+                        </span>
+                        <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">
+                          {{ formatTraffic(plan.trafficLimit) }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <!-- Free or Custom Config Notice -->
+              <div v-else class="mt-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm leading-6">
+                <div class="font-semibold text-[var(--text-primary)]">
+                  {{ t('publicSite.market.customConfigTitle') }}
+                </div>
+                <p class="mt-1 text-xs sm:text-sm text-[var(--text-secondary)]">
+                  {{ t('publicSite.market.customConfigDescription') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Selected Plan Summary Card -->
+            <div v-if="selectedPlan" class="mt-5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="text-xs font-medium text-[var(--text-secondary)]">
+                    {{ t('publicSite.market.selectedPlanTitle') }}
+                  </div>
+                  <div class="mt-1 truncate text-base font-semibold text-[var(--text-primary)]">
+                    {{ selectedPlan.name }}
+                  </div>
+                  <div class="mt-0.5 text-xs text-[var(--text-secondary)]">
+                    {{ getMarketPlanCycleLabel(selectedPlan.billingCycle) }} · {{ getNetworkLabel(selectedPackage) }}
+                  </div>
+                </div>
+                <div class="shrink-0 text-right">
+                  <div class="font-mono text-xl font-semibold text-[var(--accent)] tabular-nums">
+                    {{ configStore.freeSiteMode ? freeSiteCopy.moneyJustForShow : `¥${formatPublicPrice(selectedPlan.price)}` }}
+                  </div>
+                  <div class="mt-0.5 text-xs text-[var(--text-secondary)] font-mono">
+                    {{ getMarketMonthlyPriceLabel(selectedPlan.monthlyPrice) }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 flex flex-wrap gap-1.5 font-mono text-[11px] tabular-nums">
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">CPU {{ selectedPlan.cpu }}%</span>
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ formatMemory(selectedPlan.memory) }}</span>
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ formatDisk(selectedPlan.disk) }}</span>
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ formatTraffic(selectedPlan.trafficLimit) }}</span>
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ t('publicSite.market.labels.hosts') }} {{ selectedPackage.host_ids.length }}</span>
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ t('publicSite.market.labels.nesting') }} {{ selectedPackage.nested ? t('common.yes') : t('common.no') }}</span>
+              </div>
+            </div>
+
+            <!-- CTA Order Button -->
+            <Button
+              variant="primary"
+              size="lg"
+              :block="true"
+              class="mt-6 font-semibold"
+              :disabled="selectedPackage.soldOut || (selectedPackage.isPaid && !selectedPlan)"
+              @click="createInstance(selectedPackage)"
+            >
+              {{ getMarketCtaText(selectedPackage) }}
+            </Button>
+
+            <p v-if="!authStore.isAuthenticated" class="mt-3 text-center text-xs text-[var(--text-tertiary)]">
+              {{ t('publicSite.market.loginHint') }}
+            </p>
+          </template>
+
+          <!-- No Package Selected Placeholder -->
+          <template v-else>
+            <div class="flex min-h-[20rem] items-center justify-center text-center text-sm text-[var(--text-tertiary)]">
+              {{ t('publicSite.market.choosePackage') }}
+            </div>
+          </template>
+        </Card>
+      </aside>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* 去掉全站遗留的背景网格装饰（本页） */
-.kawaii-page::before {
-  content: none !important;
-  background: none !important;
-}
-
-/* Hero 内联指标条 */
-.market-stat-strip {
-  gap: 0;
-}
-.market-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 0 16px;
-}
-.market-stat:first-child {
-  padding-left: 0;
-}
-.market-stat + .market-stat {
-  border-left: 1px solid var(--kawaii-line);
-}
-.market-stat-value {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-.market-stat-label {
-  font-size: 13px;
-}
-
-/* 筛选工具栏：干净一行，无装饰接缝 */
-.market-toolbar {
-  padding: 14px 0;
-  border-top: 1px solid var(--kawaii-line);
-  border-bottom: 1px solid var(--kawaii-line);
-}
-.market-seg {
-  background: var(--kawaii-surface-soft);
-}
-.market-chips {
+.scrollbar-none {
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding-bottom: 2px;
 }
-.market-chips::-webkit-scrollbar {
+.scrollbar-none::-webkit-scrollbar {
   display: none;
-}
-
-/* 克制版空状态 */
-.market-empty {
-  border: 1px dashed var(--kawaii-line-strong) !important;
-  border-radius: 16px;
-  padding: 36px 24px !important;
-  text-align: center;
-}
-.market-empty-ic {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--kawaii-surface-soft);
-  padding: 10px;
-  color: var(--kawaii-muted);
-  margin: 0 auto 12px;
-}
-.market-empty-title {
-  font-size: 15px;
-  font-weight: 700;
-}
-
-/* Nimbus catalog card hover-lift */
-.kawaii-market-package-grid > button {
-  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
-}
-.kawaii-market-package-grid > button:not(.opacity-70):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px rgb(16 24 40 / .18);
-}
-@media (prefers-reduced-motion: reduce) {
-  .kawaii-market-package-grid > button,
-  .kawaii-market-package-grid > button:hover {
-    transition: none;
-    transform: none;
-  }
 }
 </style>

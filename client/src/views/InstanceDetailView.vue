@@ -41,6 +41,56 @@ import { getStatusInfo } from '@/utils/formatters'
 import { translateError } from '@/utils/errorHandler'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel, getFreeSiteBillingCycleShort } from '@/utils/freeSiteFun'
 import type { Instance, InstanceWithDetails, Snapshot, UserQuota, UpdateInstanceRequest, Package, CloudInitState, CloudInitStatusResponse } from '@/types/api'
+import { Button, Card, Input, Badge, PageHeader } from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
+import {
+  ArrowLeft,
+  ChevronDown,
+  AlertCircle,
+  AlertTriangle,
+  AlertOctagon,
+  CheckCircle,
+  Clock,
+  Copy,
+  Edit2,
+  HelpCircle,
+  Info,
+  Loader2,
+  Monitor,
+  RefreshCw,
+  RotateCw,
+  Terminal,
+  Trash2,
+  ArrowRightLeft,
+  GripVertical,
+  X
+} from 'lucide-vue-next'
+
+function getStatusBadgeVariant(status?: string): BadgeVariant {
+  const s = status?.toLowerCase()
+  switch (s) {
+    case 'running':
+      return 'success'
+    case 'stopped':
+      return 'default'
+    case 'suspended':
+      return 'error'
+    case 'error':
+      return 'error'
+    case 'starting':
+    case 'stopping':
+    case 'restarting':
+    case 'creating':
+      return 'warning'
+    default:
+      return 'default'
+  }
+}
+
+function isStatusPulsing(status?: string): boolean {
+  const s = status?.toLowerCase()
+  return s === 'starting' || s === 'stopping' || s === 'restarting' || s === 'creating'
+}
 
 // 格式化镜像名称：优先使用 imageName，否则去掉 images: 前缀
 function formatImageName(image: string, imageName?: string | null): string {
@@ -2389,109 +2439,107 @@ function formatShortDate(dateStr: string | null | undefined): string {
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
+  <div class="kawaii-page space-y-6 animate-fade-in pb-12">
     <div v-if="loading">
       <SkeletonLoader type="detail" />
     </div>
 
     <template v-else-if="instance">
-      <!-- Header -->
-      <div class="space-y-4">
-        <!-- Back Link -->
-        <div>
+      <!-- Apple HIG PageHeader -->
+      <PageHeader>
+        <template #back>
           <RouterLink
             :to="getReturnPath()"
-            class="inline-flex items-center gap-1.5 text-sm text-themed-muted hover:text-themed transition-colors"
+            class="mt-0.5 md:mt-0 inline-flex items-center justify-center w-9 h-9 rounded-full bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] shrink-0"
+            :title="$t('nav.instances')"
+            :aria-label="$t('nav.instances')"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span>{{ $t('nav.instances') }}</span>
+            <ArrowLeft class="w-4 h-4 stroke-[2]" />
           </RouterLink>
-        </div>
+        </template>
 
-        <!-- Title Row: Title & Status on left, Actions on right -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="min-w-0">
-            <div class="flex items-center gap-3 flex-wrap">
-              <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-themed truncate">
-                {{ instance.name }}
-              </h1>
-              <span :class="['badge nimbus-status-pill gap-1.5 font-mono tabular-nums text-xs', getStatusInfo(instance.status, t).class]">
-                <span :class="['nimbus-status-dot', getStatusInfo(instance.status, t).dot]"></span>
-                {{ getStatusInfo(instance.status, t).label }}
-              </span>
-              <button
-                v-if="!isAdminEntry && instance"
-                type="button"
-                class="inline-flex items-center justify-center p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
-                :title="$t('instance.badgeModal.open')"
-                @click="showInstanceBadgeModal = true"
-              >
-                <InstanceDisplayIcon
-                  :badge-id="instance.iconBadgeId"
-                  :fallback-icon="getInstanceIconType(instance)"
-                  :alt="instance.name"
-                  :size="16"
-                />
-              </button>
-            </div>
-            <p class="text-xs sm:text-sm text-themed-muted mt-1 font-mono tabular-nums">
-              {{ formatImageName(instance.image, (instance as any).imageName) }} · <span class="uppercase">{{ (instance as any).host?.name || (instance as any).host || '-' }}</span><span v-if="instance.instanceType"> · {{ $t(`common.instanceType.${instance.instanceType}`) }}</span>
-            </p>
+        <template #title>
+          <div class="flex items-center gap-3 flex-wrap min-w-0">
+            <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-[var(--text-primary)] truncate">
+              {{ instance.name }}
+            </h1>
+            <Badge
+              :variant="getStatusBadgeVariant(instance.status)"
+              :pulse="isStatusPulsing(instance.status)"
+              dot
+              size="md"
+            >
+              {{ getStatusInfo(instance.status, t).label }}
+            </Badge>
+            <button
+              v-if="!isAdminEntry && instance"
+              type="button"
+              class="inline-flex items-center justify-center p-1.5 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+              :title="$t('instance.badgeModal.open')"
+              @click="showInstanceBadgeModal = true"
+            >
+              <InstanceDisplayIcon
+                :badge-id="instance.iconBadgeId"
+                :fallback-icon="getInstanceIconType(instance)"
+                :alt="instance.name"
+                :size="18"
+              />
+            </button>
           </div>
+        </template>
 
-          <!-- Actions -->
+        <template #description>
+          <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-1 font-mono tabular-nums">
+            {{ formatImageName(instance.image, (instance as any).imageName) }} · <span class="uppercase">{{ (instance as any).host?.name || (instance as any).host || '-' }}</span><span v-if="instance.instanceType"> · {{ $t(`common.instanceType.${instance.instanceType}`) }}</span>
+          </p>
+        </template>
+
+        <template #actions>
           <div class="flex items-center gap-2 flex-shrink-0">
             <!-- 操作下拉菜单 -->
             <div class="relative inline-block text-left action-menu-container">
-              <button
-                type="button"
-                class="btn-secondary inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                :class="{ 'border-primary-500': isActionMenuOpen }"
+              <Button
+                variant="secondary"
+                size="md"
+                class="gap-1.5"
+                :class="{ 'ring-2 ring-[var(--accent)]': isActionMenuOpen }"
                 @click.stop="toggleActionMenu"
               >
                 <span>{{ $t('common.actions') }}</span>
-                <svg class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-180': isActionMenuOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                <ChevronDown class="w-3.5 h-3.5 transition-transform duration-200" :class="{ 'rotate-180': isActionMenuOpen }" />
+              </Button>
 
               <Transition
-                enter-active-class="transition ease-out duration-100"
+                enter-active-class="transition ease-out duration-150"
                 enter-from-class="transform opacity-0 scale-95"
                 enter-to-class="transform opacity-100 scale-100"
-                leave-active-class="transition ease-in duration-75"
+                leave-active-class="transition ease-in duration-100"
                 leave-from-class="transform opacity-100 scale-100"
                 leave-to-class="transform opacity-0 scale-95"
               >
                 <div
                   v-if="isActionMenuOpen"
-                  class="kawaii-menu-panel absolute right-0 top-full mt-1.5 z-50 min-w-[10.5rem] rounded py-1 border shadow-lg"
+                  class="kawaii-menu-panel absolute right-0 top-full mt-2 z-50 min-w-[12rem] rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md"
                 >
                   <!-- 终端 (运行中可见) -->
                   <button
                     v-if="isRunning"
                     type="button"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left"
                     :title="$t('terminal.title')"
                     @click="showTerminalModal = true; closeActionMenu()"
                   >
-                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <Terminal class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
                     <span class="truncate">{{ $t('terminal.title') }}</span>
                   </button>
 
                   <button
                     v-if="isRunning && instance.instanceType === 'vm'"
                     type="button"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left"
                     @click="showSpiceConsole = true; closeActionMenu()"
                   >
-                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18v13H3zM8 21h8m-4-4v4" />
-                    </svg>
+                    <Monitor class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
                     <span class="truncate">{{ $t('spice.title') }}</span>
                   </button>
 
@@ -2500,17 +2548,11 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     v-if="isRunning"
                     type="button"
                     :disabled="isOperationDisabled"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('instance.actions.restart')"
                     @click="handleAction('restart'); closeActionMenu()"
                   >
-                    <svg v-if="actionLoading === 'restart'" class="w-3.5 h-3.5 animate-spin text-themed-muted shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <RotateCw class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" :class="{ 'animate-spin': actionLoading === 'restart' }" />
                     <span class="truncate">{{ $t('instance.actions.restart') }}</span>
                   </button>
 
@@ -2518,13 +2560,11 @@ function formatShortDate(dateStr: string | null | undefined): string {
                   <button
                     type="button"
                     :disabled="isOperationDisabled"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('instance.actions.rename')"
                     @click="openRenameModal(); closeActionMenu()"
                   >
-                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
+                    <Edit2 class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
                     <span class="truncate">{{ $t('instance.actions.rename') }}</span>
                   </button>
 
@@ -2533,13 +2573,11 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     v-if="canRebuild"
                     type="button"
                     :disabled="isOperationDisabled"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('instance.detail.rebuild.title')"
                     @click="handleRebuildClick(); closeActionMenu()"
                   >
-                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <RefreshCw class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
                     <span class="truncate">{{ $t('instance.detail.rebuild.title') }}</span>
                   </button>
 
@@ -2548,17 +2586,11 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     v-if="canClone"
                     type="button"
                     :disabled="isOperationDisabled || isRunning"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="isRunning ? $t('instance.detail.actions.stopRequiredHint') : $t('instance.actions.clone')"
                     @click="handleAction('clone'); closeActionMenu()"
                   >
-                    <svg v-if="actionLoading === 'clone'" class="w-3.5 h-3.5 animate-spin text-themed-muted shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
+                    <Copy class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" :class="{ 'animate-spin': actionLoading === 'clone' }" />
                     <span class="truncate">{{ $t('instance.actions.clone') }}</span>
                   </button>
 
@@ -2567,17 +2599,11 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     v-if="canSyncStatus"
                     type="button"
                     :disabled="syncStatusLoading"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('instance.detail.actions.syncStatus')"
                     @click="handleSyncStatus(); closeActionMenu()"
                   >
-                    <svg v-if="syncStatusLoading" class="w-3.5 h-3.5 animate-spin text-themed-muted shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <RefreshCw class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" :class="{ 'animate-spin': syncStatusLoading }" />
                     <span class="truncate">{{ $t('instance.detail.actions.syncStatus') }}</span>
                   </button>
 
@@ -2586,26 +2612,22 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     v-if="!isAdminEntry && canTransfer && !showPaidSubscriptionCard"
                     type="button"
                     :disabled="isOperationDisabled"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('transfer.actions.transfer')"
                     @click="handleTransferBtnClick(); closeActionMenu()"
                   >
-                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
+                    <ArrowRightLeft class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
                     <span class="truncate">{{ $t('transfer.actions.transfer') }}</span>
                   </button>
 
                   <!-- 帮助 -->
                   <RouterLink
                     :to="helpPath()"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left"
                     :title="$t('instance.detail.actions.help')"
                     @click="closeActionMenu"
                   >
-                    <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <HelpCircle class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
                     <span class="truncate">{{ $t('instance.detail.actions.help') }}</span>
                   </RouterLink>
 
@@ -2614,52 +2636,38 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     v-if="canSuspend && !isSuspended"
                     type="button"
                     :disabled="suspendLoading"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-warning transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--warning)] hover:bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('instance.detail.actions.suspend')"
                     @click="handleSuspend(); closeActionMenu()"
                   >
-                    <svg v-if="suspendLoading" class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                    </svg>
+                    <AlertOctagon class="w-3.5 h-3.5 shrink-0" :class="{ 'animate-spin': suspendLoading }" />
                     <span class="truncate">{{ $t('instance.actions.suspend') }}</span>
                   </button>
                   <button
                     v-if="canSuspend && isSuspended"
                     type="button"
                     :disabled="suspendLoading"
-                    class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--success)] hover:bg-[color-mix(in_srgb,var(--success)_10%,transparent)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('instance.detail.actions.unsuspend')"
                     @click="handleUnsuspend(); closeActionMenu()"
                   >
-                    <svg v-if="suspendLoading" class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <CheckCircle class="w-3.5 h-3.5 shrink-0" :class="{ 'animate-spin': suspendLoading }" />
                     <span class="truncate">{{ $t('instance.actions.unsuspend') }}</span>
                   </button>
 
                   <!-- 销毁 / 删除 -->
                   <template v-if="canDeleteInstance || !isHostOwnerOnly">
-                    <div class="my-1 border-t border-themed/40"></div>
+                    <div class="my-1 border-t border-[var(--border-color)]"></div>
                     <!-- 销毁（退款销毁，用户端可见） -->
                     <button
                       v-if="!isHostOwnerOnly"
                       type="button"
                       :disabled="destroyButtonDisabled || isOperationDisabled"
-                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       :title="$t('instance.destroy.button')"
                       @click="showDestroyModal = true; closeActionMenu()"
                     >
-                      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 class="w-3.5 h-3.5 shrink-0" />
                       <span class="truncate">{{ $t('instance.destroy.button') }}</span>
                     </button>
                     <!-- 删除（免费/非付费实例直接删除） -->
@@ -2667,17 +2675,11 @@ function formatShortDate(dateStr: string | null | undefined): string {
                       v-if="canDeleteInstance"
                       type="button"
                       :disabled="isOperationDisabled"
-                      class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       :title="$t('common.delete')"
                       @click="handleAction('delete'); closeActionMenu()"
                     >
-                      <svg v-if="actionLoading === 'delete'" class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
-                      <svg v-else class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 class="w-3.5 h-3.5 shrink-0" :class="{ 'animate-spin': actionLoading === 'delete' }" />
                       <span class="truncate">{{ $t('common.delete') }}</span>
                     </button>
                   </template>
@@ -2686,142 +2688,119 @@ function formatShortDate(dateStr: string | null | undefined): string {
             </div>
 
             <!-- 启动 / 停止主按钮 -->
-            <button
+            <Button
               v-if="isRunning"
+              variant="danger"
+              size="md"
               :disabled="isOperationDisabled"
-              class="btn-primary min-w-[72px]"
+              :loading="actionLoading === 'stop' || actionLoading === 'restart'"
+              class="min-w-[80px]"
               @click="handleAction('stop')"
             >
-              <svg v-if="actionLoading === 'stop' || actionLoading === 'restart'" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
               <span v-if="actionLoading === 'restart'">{{ $t('instance.actions.restart') }}</span>
               <span v-else>{{ $t('instance.actions.stop') }}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               v-else
+              variant="primary"
+              size="md"
               :disabled="isOperationDisabled || !isStopped"
-              class="btn-primary min-w-[72px]"
+              :loading="actionLoading === 'start'"
+              class="min-w-[80px]"
               @click="handleAction('start')"
             >
-              <svg v-if="actionLoading === 'start'" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
               <span>{{ $t('instance.actions.start') }}</span>
-            </button>
+            </Button>
           </div>
+        </template>
+      </PageHeader>
+
+      <!-- Active Task / Alert Status Indicators (if any active) -->
+      <div
+        v-if="activeTask || (!isAdminEntry && hasPendingTransfer) || isSuspended || (isRunning && !cloudInitReady)"
+        class="flex flex-wrap items-center gap-2 pt-1 pb-1"
+      >
+        <!-- Active Task Indicator -->
+        <div
+          v-if="activeTask"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_28%,var(--bg-surface))]"
+        >
+          <Loader2 class="w-3.5 h-3.5 animate-spin shrink-0" />
+          <span>{{ $t(`instance.detail.task.${activeTask.taskType}`) }}</span>
         </div>
 
-        <!-- Active Task / Alert Status Indicators (if any active) -->
+        <!-- Transfer Lock Warning -->
         <div
-          v-if="activeTask || (!isAdminEntry && hasPendingTransfer) || isSuspended || (isRunning && !cloudInitReady)"
-          class="flex flex-wrap items-center gap-2 pt-1 pb-1"
+          v-if="!isAdminEntry && hasPendingTransfer"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))]"
         >
-          <!-- Active Task Indicator -->
-          <div
-            v-if="activeTask"
-            class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium"
-            :class="themeStore.isDark ? 'bg-blue-900/30 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-700 border border-blue-200'"
-          >
-            <svg class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span>{{ $t(`instance.detail.task.${activeTask.taskType}`) }}</span>
-          </div>
+          <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+          <span>{{ $t('transfer.messages.instanceLocked') }}</span>
+        </div>
 
-          <!-- Transfer Lock Warning -->
-          <div
-            v-if="!isAdminEntry && hasPendingTransfer"
-            class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium"
-            :class="themeStore.isDark ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/20' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'"
-          >
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>{{ $t('transfer.messages.instanceLocked') }}</span>
-          </div>
+        <!-- Suspended Warning -->
+        <div
+          v-if="isSuspended"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))]"
+        >
+          <AlertOctagon class="w-3.5 h-3.5 shrink-0" />
+          <span>{{ $t('instance.detail.info.suspended') }}</span>
+        </div>
 
-          <!-- Suspended Warning -->
-          <div
-            v-if="isSuspended"
-            class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium"
-            :class="themeStore.isDark ? 'bg-red-900/30 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-700 border border-red-200'"
+        <!-- Cloud-init Initializing -->
+        <div
+          v-if="isRunning && !cloudInitReady"
+          class="flex items-center gap-2 flex-wrap"
+        >
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-[0.98] border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)]"
+            :class="cloudInitChecking ? 'opacity-70 cursor-wait' : 'hover:opacity-85 cursor-pointer'"
+            :disabled="cloudInitChecking || cloudInitManualCompleting"
+            :title="cloudInitBannerTooltip"
+            @click="checkCloudInitStatus"
           >
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>
-            <span>{{ $t('instance.detail.info.suspended') }}</span>
-          </div>
-
-          <!-- Cloud-init Initializing -->
-          <div
-            v-if="isRunning && !cloudInitReady"
-            class="flex items-center gap-2"
+            <Loader2 v-if="cloudInitChecking" class="w-3.5 h-3.5 animate-spin shrink-0" />
+            <Clock v-else class="w-3.5 h-3.5 shrink-0" />
+            <span class="sm:hidden">{{ cloudInitBannerShort }}</span>
+            <span class="hidden sm:inline">{{ cloudInitBannerTitle }}</span>
+            <span class="text-xs font-semibold">
+              · {{ cloudInitBannerRetryText }}
+            </span>
+          </button>
+          <Button
+            v-if="canManualCompleteCloudInit"
+            variant="secondary"
+            size="sm"
+            :loading="cloudInitManualCompleting"
+            :disabled="cloudInitChecking || cloudInitManualCompleting"
+            :title="$t('instance.detail.cloudInit.manualComplete')"
+            @click="manualCompleteCloudInit"
           >
-            <button
-              class="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all"
-              :class="[
-                themeStore.isDark ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' : 'bg-amber-50 text-amber-600 border border-amber-200',
-                cloudInitChecking ? 'opacity-70 cursor-wait' : 'hover:opacity-80 cursor-pointer'
-              ]"
-              :disabled="cloudInitChecking || cloudInitManualCompleting"
-              :title="cloudInitBannerTooltip"
-              @click="checkCloudInitStatus"
-            >
-              <svg v-if="cloudInitChecking" class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              <svg v-else class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span class="sm:hidden">{{ cloudInitBannerShort }}</span>
-              <span class="hidden sm:inline">{{ cloudInitBannerTitle }}</span>
-              <span
-                class="text-xs font-medium"
-                :class="themeStore.isDark ? 'text-amber-300' : 'text-amber-700'"
-              >
-                · {{ cloudInitBannerRetryText }}
-              </span>
-            </button>
-            <button
-              v-if="canManualCompleteCloudInit"
-              class="btn-secondary px-2.5 py-1.5 text-xs sm:text-sm rounded-lg inline-flex"
-              :disabled="cloudInitChecking || cloudInitManualCompleting"
-              :title="$t('instance.detail.cloudInit.manualComplete')"
-              @click="manualCompleteCloudInit"
-            >
-              <svg v-if="cloudInitManualCompleting" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              <span>{{ $t('instance.detail.cloudInit.manualComplete') }}</span>
-            </button>
-          </div>
+            <span>{{ $t('instance.detail.cloudInit.manualComplete') }}</span>
+          </Button>
         </div>
       </div>
 
-      <!-- Tab Navigation -->
-      <div class="nimbus-tabs -mt-1 overflow-x-auto border-b border-themed">
-        <div class="flex min-w-max gap-1 sm:gap-2">
+      <!-- Apple 风格分段导航 (Segmented Tabs) -->
+      <div class="flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full shadow-[0_2px_8px_rgba(0,0,0,0.02)] -mt-1">
+        <div class="flex items-center gap-1 shrink-0" role="tablist">
           <button
             v-for="tab in visibleTabs"
             :key="tab.key"
-            :class="[
-              'nimbus-tab group relative -mb-px flex items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors',
-              activeTab === tab.key
-                ? 'border-primary-500 text-themed font-semibold'
-                : 'border-transparent text-themed-muted hover:text-themed'
-            ]"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.key"
+            class="whitespace-nowrap rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] flex items-center gap-2"
+            :class="activeTab === tab.key
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
             @click="activeTab = tab.key as TabType"
           >
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" :d="tab.icon" />
             </svg>
-            <span class="hidden sm:inline">{{ $t(tab.labelKey) }}</span>
+            <span class="inline">{{ $t(tab.labelKey) }}</span>
           </button>
         </div>
       </div>
@@ -2829,53 +2808,31 @@ function formatShortDate(dateStr: string | null | undefined): string {
       <!-- Error State Banner -->
       <div
         v-if="instance && isError"
-        class="nimbus-alert rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4"
-        :class="themeStore.isDark
-          ? 'bg-red-500/10 border border-red-500/30'
-          : 'bg-red-50 border border-red-200'"
+        class="nimbus-alert rounded-2xl p-4 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
       >
-        <div class="flex items-start gap-3 flex-1 min-w-0">
-          <svg
-            class="w-5 h-5 flex-shrink-0 mt-0.5"
-            :class="themeStore.isDark ? 'text-red-400' : 'text-red-600'"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
+        <div class="flex items-start gap-3.5 flex-1 min-w-0">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--error)_18%,var(--bg-surface))] text-[var(--error)]">
+            <AlertCircle class="w-5 h-5 stroke-[2]" />
+          </div>
           <div class="min-w-0">
-            <p
-              class="text-sm font-medium"
-              :class="themeStore.isDark ? 'text-red-400' : 'text-red-700'"
-            >
+            <p class="text-base font-semibold text-[var(--error)]">
               {{ $t('instance.errorBanner.title') }}
             </p>
-            <p
-              class="text-xs mt-0.5"
-              :class="themeStore.isDark ? 'text-red-300/70' : 'text-red-600'"
-            >
+            <p class="text-sm text-[var(--text-secondary)] mt-0.5">
               {{ $t('instance.errorBanner.description') }}
             </p>
           </div>
         </div>
-        <button
-          class="flex-shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-colors w-full sm:w-auto text-center"
-          :class="themeStore.isDark
-            ? 'bg-red-600 hover:bg-red-700 text-white'
-            : 'bg-red-600 hover:bg-red-700 text-white'"
+        <Button
+          variant="danger"
+          size="md"
           :disabled="errorDestroyLoading"
+          :loading="errorDestroyLoading"
+          class="shrink-0 w-full sm:w-auto"
           @click="handleErrorDestroy"
         >
-          <span v-if="errorDestroyLoading" class="inline-flex items-center gap-2">
-            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ $t('common.processing') }}
-          </span>
-          <span v-else>{{ $t('instance.errorBanner.destroyNow') }}</span>
-        </button>
+          {{ $t('instance.errorBanner.destroyNow') }}
+        </Button>
       </div>
 
       <!-- Tab Content -->
@@ -2884,210 +2841,155 @@ function formatShortDate(dateStr: string | null | undefined): string {
           <!-- Info Tab -->
           <div v-if="activeTab === 'info' && instance" class="space-y-4">
             <!-- Host Announcement Banner -->
-            <div
+            <Card
               v-if="(instance as any).hostAnnouncement"
-              class="relative overflow-hidden rounded-lg border px-4 py-3.5 sm:px-5 sm:py-4"
-              :class="themeStore.isDark
-                ? 'border-slate-700/80 bg-gray-900'
-                : 'border-slate-200 bg-white shadow-sm'"
+              padding="sm"
             >
-              <div class="relative flex flex-col gap-3">
+              <div class="flex flex-col gap-3">
                 <div class="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
                   <div class="flex items-start gap-3 min-w-0">
                     <div
-                      class="flex h-10 w-10 sm:h-11 sm:w-11 flex-shrink-0 items-center justify-center rounded-lg border shadow-sm"
-                      :class="themeStore.isDark
-                        ? 'border-slate-700 bg-gray-800 text-sky-300'
-                        : 'border-slate-200 bg-white text-sky-600'"
+                      class="flex h-10 w-10 sm:h-11 sm:w-11 flex-shrink-0 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--accent)]"
                     >
-                      <AnnouncementIcon class="h-7 w-7 sm:h-[30px] sm:w-[30px]" />
+                      <AnnouncementIcon class="h-6 w-6 sm:h-7 sm:w-7" />
                     </div>
 
                     <div class="min-w-0">
                       <div class="flex flex-wrap items-center gap-2">
-                        <h3
-                          class="text-sm sm:text-[15px] font-semibold"
-                          :class="themeStore.isDark ? 'text-slate-100' : 'text-slate-900'"
-                        >
+                        <h3 class="text-sm sm:text-base font-semibold tracking-tight text-[var(--text-primary)]">
                           {{ $t('instance.hostAnnouncement') }}
                         </h3>
                       </div>
-                      <p
-                        class="mt-0.5 text-[11px] sm:text-xs uppercase tracking-[0.16em]"
-                        :class="themeStore.isDark ? 'text-slate-400' : 'text-slate-500'"
-                      >
+                      <p class="mt-0.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
                         {{ instanceHostName }}
                       </p>
                     </div>
                   </div>
 
-                  <div
-                    class="hidden sm:flex h-9 items-center rounded-full border px-3 text-[10px] font-medium uppercase tracking-[0.18em]"
-                    :class="themeStore.isDark
-                      ? 'border-slate-700 bg-slate-900/70 text-slate-300'
-                      : 'border-slate-200 bg-white/80 text-slate-600'"
+                  <Badge
+                    variant="default"
+                    size="sm"
+                    class="hidden sm:inline-flex uppercase tracking-wider"
                   >
                     {{ instanceHostName }}
-                  </div>
+                  </Badge>
                 </div>
 
-                <p
-                  class="text-sm leading-6 sm:text-[15px] sm:leading-7 whitespace-pre-wrap break-words"
-                  :class="themeStore.isDark ? 'text-slate-200/92' : 'text-slate-700'"
-                >
+                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words text-[var(--text-secondary)]">
                   {{ (instance as any).hostAnnouncement }}
                 </p>
               </div>
-            </div>
+            </Card>
 
             <!-- Paid Subscription Card (only for paid instances) -->
-            <div
+            <Card
               v-if="showPaidSubscriptionCard"
-              class="card p-4 sm:p-5"
+              padding="md"
             >
-              <div class="flex flex-col gap-4">
+              <div class="flex flex-col gap-5">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span
-                        class="inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
-                        :class="themeStore.isDark ? 'border-gray-800 bg-gray-900 text-gray-300' : 'border-gray-200 bg-gray-50 text-gray-600'"
-                      >
+                      <Badge variant="default" size="sm">
                         {{ $t('instance.subscription.premium') }}
-                      </span>
-                      <span
-                        class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                        :class="
-                          subscriptionRemainingDays <= 0
-                            ? (themeStore.isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600')
-                            : subscriptionRemainingDays <= 7
-                              ? (themeStore.isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700')
-                              : (themeStore.isDark ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-700')
-                        "
+                      </Badge>
+                      <Badge
+                        :variant="subscriptionRemainingDays <= 0 ? 'error' : subscriptionRemainingDays <= 7 ? 'warning' : 'success'"
+                        size="sm"
                       >
                         {{ subscriptionRemainingDisplay.text }}
-                      </span>
-                      <span
-                        class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                        :class="subscriptionAutoRenewEnabled
-                          ? (themeStore.isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-700')
-                          : (themeStore.isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600')"
+                      </Badge>
+                      <Badge
+                        :variant="subscriptionAutoRenewEnabled ? 'success' : 'default'"
+                        size="sm"
                       >
                         {{ subscriptionAutoRenewEnabled ? $t('instance.subscription.autoRenewOn') : $t('instance.subscription.autoRenewOff') }}
-                      </span>
+                      </Badge>
                     </div>
 
                     <div class="mt-4 min-w-0">
-                      <h3
-                        class="text-lg sm:text-xl font-semibold truncate"
-                        :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-                      >
+                      <h3 class="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)] truncate">
                         {{ (instance as any).planName }}
                       </h3>
-                      <p
-                        class="mt-1 text-sm truncate"
-                        :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'"
-                      >
+                      <p class="mt-1 text-sm text-[var(--text-secondary)] truncate">
                         {{ (instance as any).packageName }}
                       </p>
                     </div>
                   </div>
 
-                  <div
-                    class="rounded-xl border px-4 py-3 lg:min-w-[220px]"
-                    :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/80' : 'border-gray-200 bg-gray-50/80'"
-                  >
+                  <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 lg:min-w-[220px]">
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <div class="text-[11px] uppercase tracking-[0.06em]" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                        <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
                           {{ configStore.freeSiteMode ? freeSiteCopy.renewPrice : $t('instance.subscription.renewPrice') }}
                         </div>
                         <div class="mt-1.5 flex items-end gap-1.5">
-                          <span
-                            class="text-3xl font-semibold leading-none tracking-tight tabular-nums"
-                            :class="themeStore.isDark ? 'text-white' : 'text-gray-900'"
-                          >
-                            <span class="align-[0.14em] text-[0.62em] font-medium text-themed-muted">¥</span>{{ getRenewPrice(instance).toFixed(2) }}
+                          <span class="text-3xl font-semibold leading-none tracking-tight tabular-nums text-[var(--text-primary)]">
+                            <span class="align-[0.14em] text-[0.62em] font-medium text-[var(--text-tertiary)]">¥</span>{{ getRenewPrice(instance).toFixed(2) }}
                           </span>
-                          <span
-                            class="pb-0.5 text-xs"
-                            :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'"
-                          >
+                          <span class="pb-0.5 text-xs text-[var(--text-tertiary)]">
                             {{ getBillingCycleShort((instance as any).billingCycle) }}
                           </span>
                         </div>
-                        <div v-if="hasAffDiscount(instance) && getOriginalRenewPrice(instance) > getRenewPrice(instance)" class="mt-1 text-xs text-themed-muted">
+                        <div v-if="hasAffDiscount(instance) && getOriginalRenewPrice(instance) > getRenewPrice(instance)" class="mt-1 text-xs text-[var(--text-tertiary)]">
                           <span class="line-through">¥{{ getOriginalRenewPrice(instance).toFixed(2) }}</span>
                         </div>
                       </div>
 
-                      <span
+                      <Badge
                         v-if="hasAffDiscount(instance)"
-                        class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium bg-themed-tertiary text-success border border-themed"
+                        variant="success"
+                        size="sm"
                       >
                         {{ getAffDiscountText(instance) }}
-                      </span>
-                      <button
+                      </Badge>
+                      <Button
                         v-else-if="canApplyAffCode(instance)"
-                        type="button"
-                        class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors bg-themed-secondary text-themed hover:bg-themed-tertiary border border-themed"
+                        variant="secondary"
+                        size="sm"
                         @click="showApplyAffModal = true"
                       >
                         {{ $t('instance.subscription.applyAffShort') }}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
-                  <div
-                    class="min-h-[84px] rounded-xl border p-3"
-                    :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/60' : 'border-gray-200 bg-gray-50/80'"
-                  >
-                    <div class="text-[11px] uppercase tracking-[0.06em]" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
+                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
                       {{ $t('instance.subscription.expiresAt') }}
                     </div>
-                    <div class="mt-1.5 text-sm font-medium tabular-nums" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
+                    <div class="mt-1.5 text-sm font-semibold tabular-nums text-[var(--text-primary)]">
                       {{ formatShortDate(instance.expires_at) }}
                     </div>
                   </div>
 
-                  <div
-                    class="min-h-[84px] rounded-xl border p-3"
-                    :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/60' : 'border-gray-200 bg-gray-50/80'"
-                  >
-                    <div class="text-[11px] uppercase tracking-[0.06em]" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
+                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
                       {{ $t('instance.subscription.expiresIn') }}
                     </div>
-                    <div class="mt-1.5 text-sm font-medium tabular-nums" :class="subscriptionRemainingDisplay.className">
+                    <div class="mt-1.5 text-sm font-semibold tabular-nums" :class="subscriptionRemainingDisplay.className">
                       {{ subscriptionRemainingDisplay.text }}
                     </div>
                   </div>
 
-                  <div
-                    class="min-h-[84px] rounded-xl border p-3"
-                    :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/60' : 'border-gray-200 bg-gray-50/80'"
-                  >
-                    <div class="text-[11px] uppercase tracking-[0.06em]" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
+                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
                       {{ configStore.freeSiteMode ? freeSiteCopy.billingCycle : $t('instance.subscription.billingCycle') }}
                     </div>
-                    <div class="mt-1.5 text-sm font-medium" :class="themeStore.isDark ? 'text-white' : 'text-gray-900'">
+                    <div class="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
                       {{ getBillingCycleText((instance as any).billingCycle) }}
                     </div>
                   </div>
 
-                  <div
-                    class="min-h-[84px] rounded-xl border p-3"
-                    :class="themeStore.isDark ? 'border-gray-800 bg-gray-950/60' : 'border-gray-200 bg-gray-50/80'"
-                  >
-                    <div class="text-[11px] uppercase tracking-[0.06em]" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
+                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
+                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
                       {{ $t('instance.subscription.autoRenew') }}
                     </div>
                     <div
-                      class="mt-1.5 text-sm font-medium"
-                      :class="subscriptionAutoRenewEnabled
-                        ? (themeStore.isDark ? 'text-emerald-400' : 'text-emerald-700')
-                        : (themeStore.isDark ? 'text-gray-200' : 'text-gray-900')"
+                      class="mt-1.5 text-sm font-semibold"
+                      :class="subscriptionAutoRenewEnabled ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'"
                     >
                       {{ subscriptionAutoRenewEnabled ? $t('instance.subscription.autoRenewEnabled') : $t('instance.subscription.autoRenewDisabled') }}
                     </div>
@@ -3096,52 +2998,56 @@ function formatShortDate(dateStr: string | null | undefined): string {
 
                 <div
                   v-if="!isHostOwnerOnly"
-                  class="border-t pt-4"
-                  :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'"
+                  class="border-t border-[var(--border-color)] pt-4"
                 >
                   <div class="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
                     <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-	                      <button
-	                        class="btn-secondary btn-sm w-full justify-center sm:w-auto sm:min-w-[110px]"
-	                        :disabled="isOperationDisabled"
-	                        :class="isOperationDisabled ? 'opacity-50 cursor-not-allowed' : ''"
-	                        @click="showRenewModal = true"
-	                      >
-	                        {{ $t('instance.subscription.renew') }}
-	                      </button>
-
-	                      <button
-	                        class="btn-secondary btn-sm w-full justify-center sm:w-auto sm:min-w-[110px]"
-	                        :disabled="isOperationDisabled"
-	                        :class="isOperationDisabled ? 'opacity-50 cursor-not-allowed' : ''"
-	                        @click="showAutoRenewModal = true"
-	                      >
-	                        {{ $t('instance.subscription.autoRenew') }}
-	                      </button>
-
-	                      <button
-	                        v-if="instance.package_id && (instance as any).planId"
-	                        class="btn-secondary btn-sm w-full justify-center sm:w-auto sm:min-w-[110px]"
-	                        :disabled="isOperationDisabled"
-	                        :class="isOperationDisabled ? 'opacity-50 cursor-not-allowed' : ''"
-	                        @click="showChangePlanModal = true"
-	                      >
-	                        {{ $t('billing.changePlan') }}
-	                      </button>
-
-                      <button
-                        v-if="!isAdminEntry && canTransfer"
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
                         :disabled="isOperationDisabled"
-                        class="btn-secondary btn-sm w-full justify-center sm:w-auto sm:min-w-[110px]"
+                        @click="showRenewModal = true"
+                      >
+                        {{ $t('instance.subscription.renew') }}
+                      </Button>
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
+                        :disabled="isOperationDisabled"
+                        @click="showAutoRenewModal = true"
+                      >
+                        {{ $t('instance.subscription.autoRenew') }}
+                      </Button>
+
+                      <Button
+                        v-if="instance.package_id && (instance as any).planId"
+                        variant="secondary"
+                        size="sm"
+                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
+                        :disabled="isOperationDisabled"
+                        @click="showChangePlanModal = true"
+                      >
+                        {{ $t('billing.changePlan') }}
+                      </Button>
+
+                      <Button
+                        v-if="!isAdminEntry && canTransfer"
+                        variant="secondary"
+                        size="sm"
+                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
+                        :disabled="isOperationDisabled"
                         @click="handleTransferBtnClick"
                       >
                         {{ $t('transfer.actions.transfer') }}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
 
             <!-- Original Info Tab Content -->
             <InstanceGpuInfo :instance-id="instance.id" />
@@ -3181,19 +3087,19 @@ function formatShortDate(dateStr: string | null | undefined): string {
           />
 
           <!-- Sites Tab -->
-	          <InstanceSitesTab
-	            v-if="activeTab === 'sites' && instance"
-	            :instance-id="instance.id"
-	          />
+          <InstanceSitesTab
+            v-if="activeTab === 'sites' && instance"
+            :instance-id="instance.id"
+          />
 
           <!-- Snapshots Tab -->
           <SnapshotManager
             v-if="activeTab === 'snapshots' && instance"
             :instance-id="instance.id"
-	            :instance-name="instance.name"
-	            :instance-status="instance.status"
-	            :snapshot-limit="(instance as any).snapshot_limit"
-	          />
+            :instance-name="instance.name"
+            :instance-status="instance.status"
+            :snapshot-limit="(instance as any).snapshot_limit"
+          />
 
           <!-- Quota Tab -->
           <InstanceQuotaTab
@@ -3231,25 +3137,19 @@ function formatShortDate(dateStr: string | null | undefined): string {
       </Transition>
     </template>
 
-    <div v-else class="card p-12 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10">
-        <svg
-          class="h-8 w-8"
-          :class="themeStore.isDark ? 'text-red-400' : 'text-red-500'"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-        </svg>
+    <Card v-else padding="lg" class="text-center">
+      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[color-mix(in_srgb,var(--error)_20%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)] text-[var(--error)]">
+        <AlertTriangle class="h-8 w-8 stroke-[1.5]" />
       </div>
-      <h3 class="mb-2 text-lg font-medium text-themed">{{ $t('common.loadFailed') }}</h3>
-      <p class="mb-4 break-words text-themed-muted">{{ loadError || $t('instance.detail.loadFailed') }}</p>
+      <h3 class="mb-2 text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('common.loadFailed') }}</h3>
+      <p class="mb-6 max-w-md mx-auto break-words text-sm text-[var(--text-secondary)]">{{ loadError || $t('instance.detail.loadFailed') }}</p>
       <div class="flex flex-wrap justify-center gap-3">
-        <button class="btn-primary" @click="loadInstance()">{{ $t('common.retry') }}</button>
-        <RouterLink :to="getReturnPath()" class="btn-secondary">{{ $t('common.back') }}</RouterLink>
+        <Button variant="primary" @click="loadInstance()">{{ $t('common.retry') }}</Button>
+        <RouterLink :to="getReturnPath()">
+          <Button variant="secondary">{{ $t('common.back') }}</Button>
+        </RouterLink>
       </div>
-    </div>
+    </Card>
 
     <!-- Modals -->
     <AddPortModal
@@ -3320,46 +3220,39 @@ function formatShortDate(dateStr: string | null | undefined): string {
           <div class="modal-content max-w-md">
             <div class="modal-header">
               <h3 class="modal-title">{{ $t('instance.detail.info.redeemTitle') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showRedeemModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors" @click="showRedeemModal = false">
+                <X class="w-5 h-5 stroke-[2]" />
               </button>
             </div>
             <div class="modal-body space-y-4">
               <div>
-                <label class="block text-sm text-themed-muted mb-1">{{ $t('checkin.enterCode') }}</label>
-                <input
+                <Input
                   v-model="redeemCodeInput"
-                  type="text"
-                  class="input w-full"
+                  :label="$t('checkin.enterCode')"
                   :placeholder="$t('checkin.systemCodePlaceholder')"
-                  @keyup.enter="handleRedeem"
+                  @enter="handleRedeem"
                 />
               </div>
-              <div v-if="instance" class="p-3 rounded-lg" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-100'">
+              <div v-if="instance" class="p-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
                 <div class="flex items-center gap-2">
-                  <span class="text-sm text-themed-muted">{{ $t('checkin.targetInstance') }}:</span>
-                  <span class="text-sm font-medium text-themed">{{ instance.name }}</span>
+                  <span class="text-sm text-[var(--text-secondary)]">{{ $t('checkin.targetInstance') }}:</span>
+                  <span class="text-sm font-semibold text-[var(--text-primary)]">{{ instance.name }}</span>
                 </div>
               </div>
-              <div class="text-xs text-themed-muted p-3 rounded-lg bg-themed-secondary">
+              <div class="text-xs text-[var(--text-secondary)] p-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
                 <p>{{ $t('checkin.systemCodeHint') }}</p>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn" @click="showRedeemModal = false">{{ $t('common.cancel') }}</button>
-              <button
-                class="btn btn-primary"
+              <Button variant="secondary" @click="showRedeemModal = false">{{ $t('common.cancel') }}</Button>
+              <Button
+                variant="primary"
                 :disabled="redeemLoading || !redeemCodeInput.trim()"
+                :loading="redeemLoading"
                 @click="handleRedeem"
               >
-                <svg v-if="redeemLoading" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
                 {{ $t('checkin.redeemButton') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3417,27 +3310,28 @@ function formatShortDate(dateStr: string | null | undefined): string {
           <div class="modal-content max-w-md">
             <div class="modal-header">
               <h3 class="modal-title">{{ $t('instance.renameModal.title') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showRenameModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors" @click="showRenameModal = false">
+                <X class="w-5 h-5 stroke-[2]" />
               </button>
             </div>
             <div class="modal-body">
-              <label class="block text-sm text-themed-secondary mb-1.5">{{ $t('instance.renameModal.name') }}</label>
-              <input
+              <Input
                 v-model="newInstanceName"
-                type="text"
-                class="input"
+                :label="$t('instance.renameModal.name')"
                 :placeholder="$t('instance.renameModal.namePlaceholder')"
-                @keyup.enter="doRename"
+                @enter="doRename"
               />
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showRenameModal = false">{{ $t('instance.renameModal.cancel') }}</button>
-              <button :disabled="renameLoading || !newInstanceName.trim()" class="btn-primary" @click="doRename">
+              <Button variant="secondary" @click="showRenameModal = false">{{ $t('instance.renameModal.cancel') }}</Button>
+              <Button
+                variant="primary"
+                :disabled="renameLoading || !newInstanceName.trim()"
+                :loading="renameLoading"
+                @click="doRename"
+              >
                 {{ renameLoading ? $t('instance.renameModal.renaming') : $t('instance.renameModal.confirm') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3453,45 +3347,41 @@ function formatShortDate(dateStr: string | null | undefined): string {
             <div class="modal-header">
               <h3 class="modal-title">{{ $t('instance.detail.actions.clone') }}</h3>
               <button
-                class="text-themed-muted hover:text-themed"
+                class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
                 :disabled="cloneLoading"
                 @click="showCloneModal = false"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X class="w-5 h-5 stroke-[2]" />
               </button>
             </div>
             <div class="modal-body">
-              <p class="text-themed mb-4">{{ $t('instance.detail.actions.confirmClone', { name: instance?.name || '' }) }}</p>
-              <div class="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 mb-4">
-                <p class="text-sm text-blue-400">
+              <p class="text-[var(--text-primary)] mb-4">{{ $t('instance.detail.actions.confirmClone', { name: instance?.name || '' }) }}</p>
+              <div class="p-3.5 rounded-xl bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] mb-4">
+                <p class="text-sm text-[var(--accent)]">
                   {{ $t('instance.detail.actions.cloneNotice') }}
                 </p>
               </div>
-              <div v-if="cloneLoading" class="flex items-center justify-center py-4">
-                <svg class="w-6 h-6 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <span class="ml-2 text-themed">{{ $t('instance.detail.actions.cloning') }}</span>
+              <div v-if="cloneLoading" class="flex items-center justify-center py-4 text-[var(--accent)]">
+                <Loader2 class="w-6 h-6 animate-spin" />
+                <span class="ml-2 text-sm text-[var(--text-primary)]">{{ $t('instance.detail.actions.cloning') }}</span>
               </div>
             </div>
             <div class="modal-footer">
-              <button
-                class="btn-secondary"
+              <Button
+                variant="secondary"
                 :disabled="cloneLoading"
                 @click="showCloneModal = false"
               >
                 {{ $t('common.cancel') }}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 :disabled="cloneLoading"
-                class="btn-primary"
+                :loading="cloneLoading"
                 @click="doClone"
               >
                 {{ cloneLoading ? $t('instance.detail.actions.cloning') : $t('common.confirm') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3505,56 +3395,50 @@ function formatShortDate(dateStr: string | null | undefined): string {
           <div class="modal-backdrop" @click="showSuspendModal = false"></div>
           <div class="modal-content max-w-md">
             <div class="modal-header">
-              <h3 class="modal-title text-warning">{{ $t('instance.detail.actions.suspend') }}</h3>
+              <h3 class="modal-title text-[var(--warning)]">{{ $t('instance.detail.actions.suspend') }}</h3>
               <button
-                class="text-themed-muted hover:text-themed"
+                class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
                 :disabled="suspendLoading"
                 @click="showSuspendModal = false"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X class="w-5 h-5 stroke-[2]" />
               </button>
             </div>
             <div class="modal-body space-y-4">
-              <p class="text-themed">{{ $t('instance.detail.actions.confirmSuspend', { name: instance?.name || '' }) }}</p>
-              <div class="p-3 rounded-lg" :class="themeStore.isDark ? 'bg-warning/10 border border-warning/20' : 'bg-warning/10 border border-warning/30'">
-                <p class="text-sm" :class="themeStore.isDark ? 'text-warning' : 'text-warning'">
+              <p class="text-[var(--text-primary)]">{{ $t('instance.detail.actions.confirmSuspend', { name: instance?.name || '' }) }}</p>
+              <div class="p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] text-[var(--warning)]">
+                <p class="text-sm">
                   {{ $t('instance.detail.actions.confirmSuspendNotice') }}
                 </p>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-themed-secondary mb-1">{{ $t('instance.detail.actions.suspendReason') }}</label>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none">{{ $t('instance.detail.actions.suspendReason') }}</label>
                 <textarea
                   v-model="suspendReason"
                   rows="3"
                   maxlength="500"
                   :placeholder="$t('instance.detail.actions.suspendReasonPlaceholder')"
-                  class="input w-full resize-none"
+                  class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] p-3 text-sm transition-all duration-200 resize-none"
                 />
-                <p class="mt-1 text-xs text-themed-muted">{{ suspendReason.length }}/500</p>
+                <p class="text-xs text-[var(--text-tertiary)]">{{ suspendReason.length }}/500</p>
               </div>
             </div>
             <div class="modal-footer">
-              <button
-                class="btn-secondary"
+              <Button
+                variant="secondary"
                 :disabled="suspendLoading"
                 @click="showSuspendModal = false"
               >
                 {{ $t('common.cancel') }}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 :disabled="suspendLoading"
-                class="text-white"
-                :class="themeStore.isDark ? 'bg-warning hover:bg-warning/90 px-4 py-2 rounded-lg' : 'bg-warning hover:bg-warning/90 px-4 py-2 rounded-lg'"
+                :loading="suspendLoading"
                 @click="confirmSuspend"
               >
-                <svg v-if="suspendLoading" class="w-4 h-4 mr-1 inline animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
                 {{ suspendLoading ? $t('instance.detail.actions.suspending') : $t('instance.detail.actions.suspend') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3586,34 +3470,24 @@ function formatShortDate(dateStr: string | null | undefined): string {
     <Transition name="slide-up">
       <div
         v-if="terminalSessionActive && !showTerminalModal && isRunning"
-        class="fixed right-4 z-40 flex items-center gap-1 rounded-xl shadow-xl select-none"
-        :class="[
-          themeStore.isDark
-            ? 'bg-neutral-900/95 border border-neutral-700 backdrop-blur-sm'
-            : 'bg-white/95 border border-gray-200 backdrop-blur-sm shadow-lg',
-          isDragging ? 'cursor-grabbing' : ''
-        ]"
+        class="fixed right-4 z-40 flex items-center gap-1 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.12)] select-none border border-[var(--border-color)] bg-[var(--bg-surface)]/95 backdrop-blur-md p-1"
+        :class="isDragging ? 'cursor-grabbing' : ''"
         :style="terminalFabY !== null ? { top: terminalFabY + 'px' } : { bottom: '96px' }"
       >
         <!-- 拖动手柄 -->
         <div
-          class="flex items-center px-2 py-3 cursor-grab active:cursor-grabbing touch-none"
-          :class="themeStore.isDark ? 'text-neutral-500 hover:text-neutral-300' : 'text-gray-400 hover:text-gray-600'"
+          class="flex items-center px-2 py-2 cursor-grab active:cursor-grabbing touch-none text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
           @mousedown="startDrag"
           @touchstart.prevent="startDrag"
         >
-          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 6a2 2 0 11-4 0 2 2 0 014 0zM8 12a2 2 0 11-4 0 2 2 0 014 0zM8 18a2 2 0 11-4 0 2 2 0 014 0zM14 6a2 2 0 11-4 0 2 2 0 014 0zM14 12a2 2 0 11-4 0 2 2 0 014 0zM14 18a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
+          <GripVertical class="w-3.5 h-3.5" />
         </div>
         <!-- 分割线 -->
-        <div class="w-px h-6" :class="themeStore.isDark ? 'bg-neutral-700' : 'bg-gray-200'" />
+        <div class="w-px h-5 bg-[var(--border-color)]" />
         <!-- 恢复按钮 -->
         <button
-          class="flex items-center gap-2.5 px-3 py-2.5 transition-colors"
-          :class="themeStore.isDark
-            ? 'hover:bg-neutral-800 text-white'
-            : 'hover:bg-gray-50 text-gray-900'"
+          type="button"
+          class="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-[var(--bg-surface-soft)] text-[var(--text-primary)] transition-colors active:scale-95"
           :title="$t('terminal.restore')"
           @click="showTerminalModal = true"
         >
@@ -3621,40 +3495,33 @@ function formatShortDate(dateStr: string | null | undefined): string {
           <span class="relative flex h-2 w-2">
             <span
               v-if="terminalConnected"
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75"
             ></span>
             <span
               class="relative inline-flex rounded-full h-2 w-2"
-              :class="terminalConnected ? 'bg-emerald-500' : 'bg-neutral-400'"
+              :class="terminalConnected ? 'bg-[var(--success)]' : 'bg-[var(--text-tertiary)]'"
             ></span>
           </span>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
+          <Terminal class="w-4 h-4 text-[var(--text-secondary)]" />
           <span class="text-sm font-medium">{{ $t('terminal.title') }}</span>
           <!-- 标签数量徽章 -->
           <span
             v-if="terminalTabCount > 1"
-            class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-medium rounded-full"
-            :class="themeStore.isDark ? 'bg-neutral-700 text-neutral-300' : 'bg-gray-200 text-gray-600'"
+            class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-medium rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
           >
             {{ terminalTabCount }}
           </span>
         </button>
         <!-- 分割线 -->
-        <div class="w-px h-6" :class="themeStore.isDark ? 'bg-neutral-700' : 'bg-gray-200'" />
+        <div class="w-px h-5 bg-[var(--border-color)]" />
         <!-- 断开连接按钮 -->
         <button
-          class="p-2.5 rounded-r-xl transition-colors"
-          :class="themeStore.isDark
-            ? 'text-neutral-400 hover:text-red-400 hover:bg-neutral-800'
-            : 'text-gray-400 hover:text-red-500 hover:bg-gray-50'"
+          type="button"
+          class="p-2 rounded-full text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
           :title="$t('terminal.disconnect')"
           @click="terminalForceDisconnect = true; terminalSessionActive = false; terminalTabCount = 0"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X class="w-4 h-4" />
         </button>
       </div>
     </Transition>
@@ -3679,89 +3546,72 @@ function formatShortDate(dateStr: string | null | undefined): string {
                 {{ $t('instance.subscription.autoRenew') }}
               </h3>
               <button
-                class="p-1 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors"
+                class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
                 @click="showAutoRenewModal = false"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X class="w-5 h-5 stroke-[2]" />
               </button>
             </div>
             <!-- 内容 -->
-            <div class="modal-body">
+            <div class="modal-body space-y-4">
               <!-- 当前状态 -->
-              <div class="flex items-center justify-between p-4 rounded border border-themed bg-themed-secondary">
-                <span class="text-themed-secondary">
+              <div class="flex items-center justify-between p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <span class="text-sm text-[var(--text-secondary)]">
                   {{ $t('instance.subscription.currentStatus') }}
                 </span>
-                <span
-                  class="font-medium"
-                  :class="(instance as any).autoRenew ? 'text-success' : 'text-themed-muted'"
+                <Badge
+                  :variant="(instance as any).autoRenew ? 'success' : 'default'"
+                  size="md"
                 >
                   {{ (instance as any).autoRenew
                     ? $t('instance.subscription.autoRenewEnabled')
                     : $t('instance.subscription.autoRenewDisabled') }}
-                </span>
+                </Badge>
               </div>
               <!-- 说明 -->
-              <p class="text-sm text-themed-secondary">
+              <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
                 {{ $t('instance.subscription.autoRenewDesc', {
                   cycle: getBillingCycleText((instance as any).billingCycle),
                   price: getRenewPrice(instance).toFixed(2)
                 }) }}
               </p>
               <!-- 提示 -->
-              <div class="flex items-start gap-2 p-3 rounded border border-accent/20 bg-accent/5 text-sm text-accent">
-                <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div class="flex items-start gap-2.5 p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-surface))] text-sm text-[var(--accent)]">
+                <Info class="w-4 h-4 mt-0.5 shrink-0" />
                 <span>{{ $t('instance.subscription.autoRenewHint') }}</span>
               </div>
             </div>
             <!-- 操作按钮 -->
             <div class="modal-footer">
-              <button
-                class="btn btn-secondary"
+              <Button
+                variant="secondary"
                 @click="showAutoRenewModal = false"
               >
                 {{ $t('common.cancel') }}
-              </button>
-              <button
+              </Button>
+              <Button
                 v-if="(instance as any).autoRenew"
-                class="btn btn-danger disabled:opacity-50"
+                variant="danger"
                 :disabled="autoRenewLoading"
+                :loading="autoRenewLoading"
                 @click="handleSetAutoRenew(false)"
               >
-                <span v-if="autoRenewLoading" class="flex items-center justify-center gap-2">
-                  <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" />
-                    <path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75" />
-                  </svg>
-                  {{ $t('common.processing') }}
-                </span>
-                <span v-else>{{ $t('instance.subscription.disableAutoRenew') }}</span>
-              </button>
-              <button
+                {{ $t('instance.subscription.disableAutoRenew') }}
+              </Button>
+              <Button
                 v-else
-                class="btn btn-primary disabled:opacity-50"
+                variant="primary"
                 :disabled="autoRenewLoading"
+                :loading="autoRenewLoading"
                 @click="handleSetAutoRenew(true)"
               >
-                <span v-if="autoRenewLoading" class="flex items-center justify-center gap-2">
-                  <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" />
-                    <path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75" />
-                  </svg>
-                  {{ $t('common.processing') }}
-                </span>
-                <span v-else>{{ $t('instance.subscription.enableAutoRenew') }}</span>
-              </button>
+                {{ $t('instance.subscription.enableAutoRenew') }}
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
-
 
     <InstanceBadgeModal
       v-if="!isAdminEntry && instance"

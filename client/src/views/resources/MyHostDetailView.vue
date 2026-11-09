@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onActivated, computed, watch } from 'vue'
+import { ref, onMounted, onActivated, computed, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
-import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
@@ -23,6 +22,40 @@ import HostOpsTab from '@/components/host/HostOpsTab.vue'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { hostsPath } from '@/utils/app-paths'
 import { useTabQuery } from '@/composables/useTabQuery'
+import { useReveal } from '@/composables/useReveal'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  type BadgeVariant
+} from '@/components/ui'
+import {
+  Activity,
+  AlertCircle,
+  AlertTriangle,
+  Calendar,
+  Check,
+  Copy,
+  Cpu,
+  ExternalLink,
+  FileText,
+  Gift,
+  Globe,
+  HardDrive,
+  Info,
+  Layers,
+  Plus,
+  Server,
+  Shield,
+  ShieldCheck,
+  Sliders,
+  Terminal,
+  Trash2,
+  X
+} from 'lucide-vue-next'
 
 // 为 KeepAlive exclude 匹配定义组件名称
 defineOptions({
@@ -33,8 +66,10 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
-const themeStore = useThemeStore()
 const authStore = useAuthStore()
+
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
 
 // 是否是管理员
 const isAdmin = computed(() => authStore.user?.role === 'admin')
@@ -64,7 +99,7 @@ interface Host {
   resources?: {
     cpuUsed: number
     memoryUsed: number
-    diskTotal: number  // 实例存储池容量（MB）
+    diskTotal: number // 实例存储池容量（MB）
     diskUsed: number
   }
   natConfig?: {
@@ -104,12 +139,12 @@ const reinstallStatus = ref<'waiting' | 'verifying' | 'success' | 'error'>('wait
 const reinstallError = ref('')
 
 const statusInfo = computed(() => {
-  if (!host.value) return { label: '', class: '', dot: '' }
-  const map: Record<string, { label: string; class: string; dot: string }> = {
-    locked: { label: '已锁定', class: 'badge-error', dot: 'bg-red-500' },
-    online: { label: t('admin.hosts.statusOnline'), class: 'badge-success', dot: 'bg-green-500' },
-    offline: { label: t('admin.hosts.statusOffline'), class: 'badge-default', dot: 'bg-gray-500' },
-    maintenance: { label: t('admin.hosts.statusMaintenance'), class: 'badge-warning', dot: 'bg-yellow-500' }
+  if (!host.value) return { label: '', class: '', dot: '', variant: 'default' as BadgeVariant }
+  const map: Record<string, { label: string; class: string; dot: string; variant: BadgeVariant }> = {
+    locked: { label: '已锁定', class: 'badge-error', dot: 'bg-[var(--error)]', variant: 'error' },
+    online: { label: t('admin.hosts.statusOnline'), class: 'badge-success', dot: 'bg-[var(--success)]', variant: 'success' },
+    offline: { label: t('admin.hosts.statusOffline'), class: 'badge-default', dot: 'bg-[var(--text-tertiary)]', variant: 'default' },
+    maintenance: { label: t('admin.hosts.statusMaintenance'), class: 'badge-warning', dot: 'bg-[var(--warning)]', variant: 'warning' }
   }
   let currentStatus = host.value.status
   if (currentStatus !== 'locked' && currentStatus !== 'maintenance' && host.value.tunnelEnabled && !host.value.tunnelOnline) {
@@ -320,10 +355,6 @@ async function confirmExtendAll() {
   }
 }
 
-function openNodeInstall() {
-  showReinstallModal.value = true
-}
-
 function openIncusUi() {
   if (!host.value || !isAdmin.value) return
   if (!host.value.tunnelOnline) {
@@ -331,6 +362,10 @@ function openIncusUi() {
     return
   }
   window.open(`/incus-ui/${host.value.id}/ui`, '_blank', 'noopener,noreferrer')
+}
+
+function openNodeInstall() {
+  showReinstallModal.value = true
 }
 
 // 用户确认后再生成命令，打开抽屉不会轮换节点凭据。
@@ -379,28 +414,49 @@ function copyReinstallCommand() {
   toast.success(t('common.copied'))
 }
 
-
-
 // 关闭重新安装弹窗
 function closeReinstallModal() {
   showReinstallModal.value = false
   loadHost()
 }
 
-const tabs = computed(() => [
-  { key: 'info', labelKey: 'admin.hosts.tabInfo', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { key: 'ops', labelKey: 'admin.hosts.tabOps', icon: 'M5 13l4 4L19 7M12 6v6l4 2' },
-  { key: 'gpu', labelKey: 'gpu.title', icon: 'M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m14 0h3M2 15h3m14 0h3' },
-  { key: 'config', labelKey: 'admin.hosts.tabConfig', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
-  { key: 'images', labelKey: 'admin.hosts.tabImages', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-  { key: 'storage', labelKey: 'admin.hosts.tabStorage', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4' },
-  { key: 'publicIpv4', labelKey: 'admin.hosts.tabPublicIpv4', icon: 'M12 11c0 1.657-1.79 3-4 3s-4-1.343-4-3 1.79-3 4-3 4 1.343 4 3zm0 0c0-1.657 1.79-3 4-3s4 1.343 4 3-1.79 3-4 3-4-1.343-4-3zm-4 3v4m8-4v4M8 6V3m8 3V3' },
-  { key: 'caddy', labelKey: 'host.caddy.title', icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9' },
-  { key: 'agentLogs', labelKey: 'host.agentLogs.title', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-  { key: 'redeemCodes', labelKey: 'redeemCodes.title', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
-  { key: 'instances', labelKey: 'admin.hosts.tabInstances', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-  { key: 'create', labelKey: 'admin.hosts.tabCreate', icon: 'M12 4v16m8-8H4' }
-].flatMap(tab => tab.key === 'config' && isAdmin.value ? [tab, { key: 'firewall', labelKey: 'egress.firewall', icon: 'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7l8-4z' }] : [tab]))
+interface TabItem {
+  key: TabType
+  labelKey: string
+  icon: string
+  iconComponent: Component
+}
+
+const tabDefinitions: TabItem[] = [
+  { key: 'info', labelKey: 'admin.hosts.tabInfo', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', iconComponent: Info },
+  { key: 'ops', labelKey: 'admin.hosts.tabOps', icon: 'M5 13l4 4L19 7M12 6v6l4 2', iconComponent: Activity },
+  { key: 'gpu', labelKey: 'gpu.title', icon: 'M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m14 0h3M2 15h3m14 0h3', iconComponent: Cpu },
+  { key: 'config', labelKey: 'admin.hosts.tabConfig', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z', iconComponent: Sliders },
+  { key: 'images', labelKey: 'admin.hosts.tabImages', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', iconComponent: Layers },
+  { key: 'storage', labelKey: 'admin.hosts.tabStorage', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4', iconComponent: HardDrive },
+  { key: 'publicIpv4', labelKey: 'admin.hosts.tabPublicIpv4', icon: 'M12 11c0 1.657-1.79 3-4 3s-4-1.343-4-3 1.79-3 4-3 4 1.343 4 3zm0 0c0-1.657 1.79-3 4-3s4 1.343 4 3-1.79 3-4 3-4-1.343-4-3zm-4 3v4m8-4v4M8 6V3m8 3V3', iconComponent: Globe },
+  { key: 'caddy', labelKey: 'host.caddy.title', icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9', iconComponent: Terminal },
+  { key: 'agentLogs', labelKey: 'host.agentLogs.title', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', iconComponent: FileText },
+  { key: 'redeemCodes', labelKey: 'redeemCodes.title', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', iconComponent: Gift },
+  { key: 'instances', labelKey: 'admin.hosts.tabInstances', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', iconComponent: Server },
+  { key: 'create', labelKey: 'admin.hosts.tabCreate', icon: 'M12 4v16m8-8H4', iconComponent: Plus }
+]
+
+const tabs = computed<TabItem[]>(() =>
+  tabDefinitions.flatMap(tab =>
+    tab.key === 'config' && isAdmin.value
+      ? [
+          tab,
+          {
+            key: 'firewall' as TabType,
+            labelKey: 'egress.firewall',
+            icon: 'M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7l8-4z',
+            iconComponent: Shield
+          }
+        ]
+      : [tab]
+  )
+)
 
 // 非管理员没有 firewall tab；URL 直接落到该 tab（如分享链接）时回退到 info，避免空白
 watch(tabs, (list) => {
@@ -411,136 +467,148 @@ watch(tabs, (list) => {
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
+  <div ref="revealRoot" class="kawaii-page space-y-6 animate-fade-in">
     <div v-if="loading">
       <SkeletonLoader type="detail" />
     </div>
 
     <template v-else-if="host">
-      <!-- Header -->
-      <div class="page-header flex-col sm:flex-row gap-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <RouterLink
-            :to="hostsPath()"
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-themed bg-themed-surface text-themed-muted transition-colors hover:bg-themed-hover hover:text-themed"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7" />
-            </svg>
-          </RouterLink>
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <FlagIcon v-if="host.countryCode" :code="host.countryCode" size="md" />
-              <h1 class="page-title uppercase truncate">{{ host.name }}</h1>
-              <span :class="['inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-mono', statusInfo.class]">
-                <span :class="['h-1.5 w-1.5 rounded-full', statusInfo.dot]"></span>
-                {{ statusInfo.label }}
-              </span>
-            </div>
-            <p class="page-description mt-1 truncate font-mono text-themed-muted">{{ host.location || host.url }}</p>
+      <!-- Apple Style PageHeader -->
+      <PageHeader
+        data-reveal
+        :title="host.name"
+        :description="host.location || host.url"
+        back
+        @back="router.replace(hostsPath())"
+      >
+        <template #title>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <FlagIcon v-if="host.countryCode" :code="host.countryCode" size="md" />
+            <h1 class="text-2xl md:text-3xl font-semibold tracking-tight text-[var(--text-primary)] uppercase truncate">
+              {{ host.name }}
+            </h1>
+            <Badge :variant="statusInfo.variant" dot pulse>
+              {{ statusInfo.label }}
+            </Badge>
           </div>
-        </div>
+        </template>
 
-        <div class="flex items-center gap-2 flex-wrap">
+        <template #description>
+          <p class="text-sm font-mono text-[var(--text-secondary)] mt-1 truncate">
+            {{ host.location || host.url }}
+          </p>
+        </template>
+
+        <template #actions>
           <!-- IncusUI 内网穿透控制面板入口（仅管理员可见） -->
-          <button
+          <Button
             v-if="isAdmin"
+            variant="secondary"
+            size="sm"
             :disabled="!!actionLoading || needsVerification || !host.tunnelOnline"
             :title="!host.tunnelOnline ? t('admin.hosts.incusUiTunnelOffline') : t('admin.hosts.incusUi')"
-            class="btn-secondary btn-sm sm:btn"
             @click="openIncusUi"
           >
+            <template #icon>
+              <ExternalLink class="w-4 h-4" />
+            </template>
             <span>{{ t('admin.hosts.incusUi') }}</span>
-          </button>
+          </Button>
+
           <!-- 批量延期按钮（仅管理员可见） -->
-          <button
+          <Button
             v-if="isAdmin"
+            variant="secondary"
+            size="sm"
             :disabled="!!actionLoading"
-            class="btn-primary btn-sm sm:btn"
+            :loading="actionLoading === 'extend'"
             @click="openExtendModal"
           >
-            <svg v-if="actionLoading === 'extend'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ t('admin.hosts.batchExtend') }}</span>
-          </button>
+            <template #icon>
+              <Calendar class="w-4 h-4" />
+            </template>
+            <span>{{ t('admin.hosts.batchExtend') }}</span>
+          </Button>
+
           <!-- 唯一的节点安装 / 配置入口 -->
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             :disabled="!!actionLoading"
-            class="btn-secondary btn-sm sm:btn"
+            :loading="actionLoading === 'reinstall'"
             @click="openNodeInstall"
           >
-            <svg v-if="actionLoading === 'reinstall'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ t('admin.hosts.nodeInstallConfigure') }}</span>
-          </button>
+            <template #icon>
+              <Terminal class="w-4 h-4" />
+            </template>
+            <span>{{ t('admin.hosts.nodeInstallConfigure') }}</span>
+          </Button>
+
           <!-- 未验证的宿主机显示验证按钮 -->
-          <button
+          <Button
             v-if="needsVerification"
+            variant="primary"
+            size="sm"
             :disabled="!!actionLoading"
-            class="btn-primary btn-sm sm:btn"
+            :loading="actionLoading === 'verify'"
             @click="verifyHost"
           >
-            <svg v-if="actionLoading === 'verify'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ t('admin.hosts.verifyAndConnect') }}</span>
-          </button>
+            <template #icon>
+              <ShieldCheck class="w-4 h-4" />
+            </template>
+            <span>{{ t('admin.hosts.verifyAndConnect') }}</span>
+          </Button>
+
           <!-- 已验证的宿主机显示测试连接按钮 -->
-          <button
+          <Button
             v-else
+            variant="secondary"
+            size="sm"
             :disabled="!!actionLoading"
-            class="btn-secondary btn-sm sm:btn"
+            :loading="actionLoading === 'test'"
             @click="testConnection"
           >
-            <svg v-if="actionLoading === 'test'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ t('admin.hosts.test') }}</span>
-          </button>
-          <button
+            <template #icon>
+              <Activity class="w-4 h-4" />
+            </template>
+            <span>{{ t('admin.hosts.test') }}</span>
+          </Button>
+
+          <!-- 删除宿主机 -->
+          <Button
+            variant="danger"
+            size="sm"
             :disabled="!!actionLoading"
-            class="btn-danger btn-sm sm:btn"
+            :loading="actionLoading === 'delete'"
             @click="openDeleteModal"
           >
-            <svg v-if="actionLoading === 'delete'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span v-else>{{ t('common.delete') }}</span>
-          </button>
-        </div>
+            <template #icon>
+              <Trash2 class="w-4 h-4" />
+            </template>
+            <span>{{ t('common.delete') }}</span>
+          </Button>
+        </template>
+      </PageHeader>
+
+      <!-- Apple Segmented Tab 导航 -->
+      <div data-reveal class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full scrollbar-hide">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          type="button"
+          class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] shrink-0 select-none"
+          :class="activeTab === tab.key
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/50'"
+          @click="activeTab = tab.key as TabType"
+        >
+          <component :is="tab.iconComponent" v-if="tab.iconComponent" class="w-4 h-4 shrink-0 stroke-[1.8]" />
+          <span>{{ t(tab.labelKey) }}</span>
+        </button>
       </div>
 
-      <!-- Tab Navigation -->
-      <div class="border-b border-themed">
-        <div class="flex gap-1 overflow-x-auto scrollbar-hide scroll-smooth -mb-px">
-          <button
-            v-for="tab in tabs"
-            :key="tab.key"
-            :class="[
-              'nimbus-tab flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm rounded-t-lg whitespace-nowrap shrink-0 border-b-2',
-              activeTab === tab.key
-                ? 'text-themed font-semibold border-primary-500'
-                : 'text-themed-muted font-medium border-transparent hover:text-themed hover:bg-themed-hover'
-            ]"
-            @click="activeTab = tab.key as TabType"
-          >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="tab.icon" />
-            </svg>
-            <span>{{ t(tab.labelKey) }}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Tab Content -->
-      <div>
+      <!-- Tab 内容区 -->
+      <div class="transition-opacity duration-200">
         <HostGpuTab v-if="activeTab === 'gpu'" :host-id="host.id" />
         <HostInfoTab v-if="activeTab === 'info'" :host="host" @refresh="loadHost" />
         <MyHostConfigTab v-if="activeTab === 'config'" :host="host" @saved="onConfigSaved" />
@@ -563,43 +631,51 @@ watch(tabs, (list) => {
             <div class="modal-backdrop" @click="showExtendModal = false"></div>
             <div class="modal-content max-w-md">
               <div class="modal-header">
-                <h3 class="modal-title">{{ t('admin.hosts.batchExtend') }}</h3>
-                <button class="text-themed-muted hover:text-themed" @click="showExtendModal = false">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <div class="flex items-center gap-3">
+                  <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,var(--bg-surface))]">
+                    <Calendar class="w-5 h-5 stroke-[2]" />
+                  </div>
+                  <div>
+                    <h3 class="modal-title">{{ t('admin.hosts.batchExtend') }}</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ host.name }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-all duration-200 active:scale-95"
+                  @click="showExtendModal = false"
+                >
+                  <X class="w-4 h-4 stroke-[2]" />
                 </button>
               </div>
               <div class="modal-body space-y-4">
-                <div class="flex gap-2.5 rounded-lg border border-themed bg-themed-secondary p-3">
-                  <svg class="mt-0.5 h-4 w-4 shrink-0 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p class="text-sm text-themed-secondary">
+                <div class="flex items-start gap-2.5 rounded-2xl border border-[color-mix(in_srgb,var(--accent)_20%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] p-3.5 text-sm text-[var(--text-secondary)]">
+                  <Info class="w-5 h-5 shrink-0 text-[var(--accent)] stroke-[2] mt-0.5" />
+                  <p class="leading-relaxed">
                     {{ t('admin.hosts.extendHint', { count: paidInstanceCount }) }}
                   </p>
                 </div>
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.extendDaysLabel') }}</label>
-                  <input
-                    v-model.number="extendDays"
+                <div class="space-y-1.5">
+                  <Input
+                    :model-value="extendDays ?? ''"
                     type="number"
                     min="1"
                     max="365"
-                    class="input"
+                    :label="t('admin.hosts.extendDaysLabel')"
                     :placeholder="t('admin.hosts.extendDaysPlaceholder')"
+                    @update:model-value="v => extendDays = v === '' ? undefined : Number(v)"
                   />
                 </div>
               </div>
-              <div class="modal-footer">
-                <button class="btn-secondary" @click="showExtendModal = false">{{ t('common.cancel') }}</button>
-                <button
-                  class="btn-primary"
+              <div class="modal-footer flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)]">
+                <Button variant="secondary" @click="showExtendModal = false">{{ t('common.cancel') }}</Button>
+                <Button
+                  variant="primary"
                   :disabled="!extendDays || extendDays < 1 || extendDays > 365"
                   @click="confirmExtendAll"
                 >
                   {{ t('admin.hosts.confirmExtendBtn') }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -613,40 +689,49 @@ watch(tabs, (list) => {
             <div class="modal-backdrop" @click="showDeleteModal = false"></div>
             <div class="modal-content max-w-md">
               <div class="modal-header">
-                <h3 class="modal-title text-error">{{ t('admin.hosts.deleteHost') }}</h3>
-                <button class="text-themed-muted hover:text-themed" @click="showDeleteModal = false">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <div class="flex items-center gap-3">
+                  <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_25%,var(--bg-surface))]">
+                    <Trash2 class="w-5 h-5 stroke-[2]" />
+                  </div>
+                  <div>
+                    <h3 class="modal-title text-[var(--error)]">{{ t('admin.hosts.deleteHost') }}</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ host.name }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-all duration-200 active:scale-95"
+                  @click="showDeleteModal = false"
+                >
+                  <X class="w-4 h-4 stroke-[2]" />
                 </button>
               </div>
               <div class="modal-body space-y-4">
-                <div class="p-3 rounded-lg" :class="themeStore.isDark ? 'bg-rose-500/10' : 'bg-rose-50'">
-                  <p class="text-sm text-error">{{ t('admin.hosts.deleteWarning') }}</p>
+                <div class="p-3.5 rounded-2xl bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_25%,var(--bg-surface))] flex items-start gap-2.5">
+                  <AlertTriangle class="w-5 h-5 shrink-0 stroke-[2] mt-0.5" />
+                  <p class="text-sm leading-relaxed">{{ t('admin.hosts.deleteWarning') }}</p>
                 </div>
-                <p class="text-sm text-themed-secondary">
+                <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
                   {{ t('admin.hosts.deleteConfirmHint', { name: host.name }) }}
                 </p>
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.enterHostName') }}</label>
-                  <input
+                <div class="space-y-1.5">
+                  <Input
                     v-model="deleteConfirmName"
-                    type="text"
-                    class="input"
+                    :label="t('admin.hosts.enterHostName')"
                     :placeholder="host.name"
                     autocomplete="off"
                   />
                 </div>
               </div>
-              <div class="modal-footer">
-                <button class="btn-secondary" @click="showDeleteModal = false">{{ t('common.cancel') }}</button>
-                <button
-                  class="btn-danger"
+              <div class="modal-footer flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)]">
+                <Button variant="secondary" @click="showDeleteModal = false">{{ t('common.cancel') }}</Button>
+                <Button
+                  variant="danger"
                   :disabled="!canDelete"
                   @click="confirmDeleteHost"
                 >
                   {{ t('admin.hosts.confirmDeleteBtn') }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -660,82 +745,120 @@ watch(tabs, (list) => {
             <div class="modal-backdrop" @click="closeReinstallModal"></div>
             <div class="modal-content">
               <div class="modal-header">
-                <h3 class="modal-title">{{ t('admin.hosts.nodeInstallConfigure') }}</h3>
-                <button class="text-themed-muted hover:text-themed" @click="closeReinstallModal">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <div class="flex items-center gap-3">
+                  <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,var(--bg-surface))]">
+                    <Terminal class="w-5 h-5 stroke-[2]" />
+                  </div>
+                  <div>
+                    <h3 class="modal-title">{{ t('admin.hosts.nodeInstallConfigure') }}</h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ host.name }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-all duration-200 active:scale-95"
+                  @click="closeReinstallModal"
+                >
+                  <X class="w-4 h-4 stroke-[2]" />
                 </button>
               </div>
-              <div class="modal-body space-y-4">
-                <p class="text-sm text-themed-secondary">{{ t('admin.hosts.nodeInstallUnifiedHint') }}</p>
-                <p class="rounded border border-themed bg-themed-tertiary p-3 text-sm text-themed">
+              <div class="modal-body space-y-5">
+                <p class="text-sm text-[var(--text-secondary)] leading-relaxed">{{ t('admin.hosts.nodeInstallUnifiedHint') }}</p>
+                <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm text-[var(--text-primary)] leading-relaxed">
                   {{ t('admin.hosts.agentInstallCommandConfirm') }}
-                </p>
+                </div>
+                
                 <!-- 步骤 1: 执行安装命令 -->
-                <div v-if="reinstallCommand" class="space-y-2">
-                  <div class="flex items-center gap-2">
-                    <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium" :class="reinstallStatus === 'success' ? 'bg-green-500 text-white' : 'bg-accent text-white dark:text-black'">1</span>
-                    <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step1RunScript') }}</span>
+                <div v-if="reinstallCommand" class="space-y-3 pt-2">
+                  <div class="flex items-center gap-2.5">
+                    <span
+                      class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors"
+                      :class="reinstallStatus === 'success' ? 'bg-[var(--success)] text-white' : 'bg-[var(--accent)] text-white'"
+                    >
+                      1
+                    </span>
+                    <span class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.hosts.step1RunScript') }}</span>
                   </div>
-                  <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.runOnHost') }}</p>
-                  <p v-if="installTokenExpiresAt" class="text-xs text-themed-muted ml-8">
+                  <p class="text-xs text-[var(--text-secondary)] ml-8">{{ t('admin.hosts.runOnHost') }}</p>
+                  <p v-if="installTokenExpiresAt" class="text-xs text-[var(--text-secondary)] ml-8">
                     {{ t('admin.hosts.agentInstallTokenExpiresAt', { time: new Date(installTokenExpiresAt).toLocaleString() }) }}
                   </p>
-                  <div class="ml-8 overflow-x-auto rounded-lg border border-gray-800 bg-gray-950 p-4">
-                    <code class="text-green-400 text-sm break-all whitespace-pre-wrap font-mono">{{ reinstallCommand }}</code>
+                  <div class="ml-8 overflow-x-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-4 shadow-inner">
+                    <code class="text-[var(--success)] text-xs sm:text-sm break-all whitespace-pre-wrap font-mono select-all">{{ reinstallCommand }}</code>
                   </div>
-                  <div class="ml-8 mb-4">
-                    <button class="btn-secondary btn-sm" @click="copyReinstallCommand">{{ t('admin.hosts.copyCommand') }}</button>
+                  <div class="ml-8">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      @click="copyReinstallCommand"
+                    >
+                      <template #icon>
+                        <Copy class="w-3.5 h-3.5" />
+                      </template>
+                      {{ t('admin.hosts.copyCommand') }}
+                    </Button>
                   </div>
                 </div>
 
                 <!-- 步骤 2: 验证并连接 -->
-                <div v-if="reinstallCommand" class="space-y-2 pt-4 border-t border-themed">
-                  <div class="flex items-center gap-2">
-                    <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium" :class="reinstallStatus === 'success' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'">2</span>
-                    <span class="text-sm font-medium text-themed">{{ t('admin.hosts.step2Verify') }}</span>
+                <div v-if="reinstallCommand" class="space-y-3 pt-4 border-t border-[var(--border-color)]">
+                  <div class="flex items-center gap-2.5">
+                    <span
+                      class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors"
+                      :class="reinstallStatus === 'success' ? 'bg-[var(--success)] text-white' : 'bg-[var(--text-tertiary)] text-white'"
+                    >
+                      2
+                    </span>
+                    <span class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.hosts.step2Verify') }}</span>
                   </div>
-                  <p class="text-xs text-themed-muted ml-8">{{ t('admin.hosts.verifyHint') }}</p>
+                  <p class="text-xs text-[var(--text-secondary)] ml-8">{{ t('admin.hosts.verifyHint') }}</p>
                 
                   <!-- 状态显示 -->
                   <div class="ml-8 flex items-center gap-3">
-                    <button 
-                      class="btn-secondary btn-sm" 
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       :disabled="reinstallStatus === 'verifying' || reinstallStatus === 'success'"
+                      :loading="reinstallStatus === 'verifying'"
                       @click="verifyAfterReinstall"
                     >
-                      <svg v-if="reinstallStatus === 'verifying'" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
                       {{ reinstallStatus === 'verifying' ? t('admin.hosts.verifying') : t('admin.hosts.verifyAndConnect') }}
-                    </button>
+                    </Button>
                   
                     <!-- 成功状态 -->
-                    <div v-if="reinstallStatus === 'success'" class="flex items-center gap-2 text-green-500">
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span class="text-sm">{{ t('admin.hosts.verifySuccess') }}</span>
+                    <div v-if="reinstallStatus === 'success'" class="flex items-center gap-2 text-[var(--success)]">
+                      <Check class="w-5 h-5 stroke-[2.5]" />
+                      <span class="text-sm font-medium">{{ t('admin.hosts.verifySuccess') }}</span>
                     </div>
                   </div>
                 
                   <!-- 错误提示 -->
-                  <div v-if="reinstallStatus === 'error' && reinstallError" class="ml-8 p-3 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 text-sm">
+                  <div
+                    v-if="reinstallStatus === 'error' && reinstallError"
+                    class="ml-8 p-3.5 rounded-2xl bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_25%,var(--bg-surface))] text-sm leading-relaxed"
+                  >
                     {{ reinstallError }}
                   </div>
                 </div>
               </div>
-              <div class="modal-footer">
-                <button class="btn-secondary" @click="closeReinstallModal">{{ t('common.close') }}</button>
-                <button
+              <div class="modal-footer flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)]">
+                <Button variant="secondary" @click="closeReinstallModal">{{ t('common.close') }}</Button>
+                <Button
                   v-if="reinstallStatus !== 'success'"
-                  class="btn-primary"
+                  variant="primary"
                   :disabled="!!actionLoading || reinstallStatus === 'verifying'"
+                  :loading="actionLoading === 'reinstall'"
                   @click="regenerateInstall"
-                >{{ t('admin.hosts.nodeGenerateCommand') }}</button>
-                <button v-if="reinstallStatus === 'success'" class="btn-primary" @click="closeReinstallModal">{{ t('common.done') }}</button>
+                >
+                  {{ t('admin.hosts.nodeGenerateCommand') }}
+                </Button>
+                <Button
+                  v-if="reinstallStatus === 'success'"
+                  variant="primary"
+                  @click="closeReinstallModal"
+                >
+                  {{ t('common.done') }}
+                </Button>
               </div>
             </div>
           </div>
@@ -743,32 +866,26 @@ watch(tabs, (list) => {
       </Teleport>
     </template>
 
-    <!-- 兜底态：既不在 loading、host 又为空时必须给出明确状态。
-         此前这里没有 v-else，两个分支都不成立就什么都不渲染 —— 表现为整页白屏，
-         用户完全无从判断发生了什么，只能靠刷新。 -->
-    <div v-else class="card flex flex-col items-center justify-center gap-3 p-10 text-center">
-      <p class="text-themed-muted">{{ t('admin.hosts.loadFailed') }}</p>
-      <div class="flex gap-2">
-        <button type="button" class="btn-primary btn-sm" @click="retryLoadHost">
-          {{ t('common.retry') }}
-        </button>
-        <button type="button" class="btn-secondary btn-sm" @click="router.replace(hostsPath())">
-          {{ t('common.back') }}
-        </button>
-      </div>
-    </div>
+    <!-- 兜底态：既不在 loading、host 又为空时给出明确状态与重试操作 -->
+    <Card v-else padding="lg" class="text-center">
+      <EmptyState
+        :title="t('admin.hosts.loadFailed')"
+        :description="t('admin.hosts.invalidId')"
+      >
+        <template #icon>
+          <AlertCircle class="w-7 h-7 text-[var(--error)] stroke-[1.5]" />
+        </template>
+        <template #action>
+          <div class="flex items-center gap-3">
+            <Button variant="primary" size="sm" @click="retryLoadHost">
+              {{ t('common.retry') }}
+            </Button>
+            <Button variant="secondary" size="sm" @click="router.replace(hostsPath())">
+              {{ t('common.back') }}
+            </Button>
+          </div>
+        </template>
+      </EmptyState>
+    </Card>
   </div>
 </template>
-
-<style scoped>
-/* Nimbus in-page tabs: indigo underline, smooth colour/underline transition */
-.nimbus-tab {
-  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-tab {
-    transition: none;
-  }
-}
-</style>
