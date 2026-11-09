@@ -258,13 +258,13 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 ### Wave B — 网络与流量（需 IP/流量基座）
 
-- [ ] `ip-addresses`（886）— 需 `lib/ip-calculator`、`lib/network-payload-builder`、`incus-network`
-- [ ] `traffic`（609）— 需 `db/traffic.go`；route 的 3 个 scheduler 调用留 seam，Phase 7 接线
+- [x] `ip-addresses`（886）— 需 `lib/ip-calculator`、`lib/network-payload-builder`、`incus-network`
+- [x] `traffic`（609）— 需 `db/traffic.go`；route 的 3 个 scheduler 调用留 seam，Phase 7 接线
 
 ### Wave C — Caddy 与跨节点迁移
 
 - [x] `lib/caddy-client.go`（394）— proxy-sites 与 transfers 的共同依赖
-- [ ] `proxy-sites`（986）
+- [x] `proxy-sites`（986）
 - [ ] `transfers`（1152）— 还需 `incus-backups`/`incus-restore`/`incus-pool`
 
 ### Wave D — 高危核心（AGENTS.md §2.3：先读后写；按依赖链排序）
@@ -273,7 +273,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 > 这一批是线上主流程，**先出 spec 再实现**，每完成一个跑该模块对拍 + 真机流程。
 
-1. [ ] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
+1. [x] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
 2. [ ] `mail`（2361）— auth 的重置密码/验证邮件依赖它
 3. [ ] `auth`（1436）— 三套鉴权面 + 2FA + OAuth state
 4. [ ] `system-config`（941）

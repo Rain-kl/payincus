@@ -68,7 +68,7 @@
 
 ### 契约
 - `findUserByUsername` / `findUserByUsernameOrEmail` / `findUserById` / `findUserByEmail` → 未命中返回 `nil, nil`（不是 error）。
-- `createUser` / `createRegisteredUser` → 唯一约束冲突必须映射为可识别的 sentinel，供 routes 返回 409 / `USERNAME_EXISTS`。
+- `createUser` / `createRegisteredUser` → 唯一约束冲突必须映射为可识别的 sentinel，供 routes 返回 **400 / `USER_EXISTS`**（实测：`auth.ts` 用的是 400 `USER_EXISTS`；仓库里不存在 `USERNAME_EXISTS` 这个码，本文件早期版本写错，已改正）。
 - `getUserQuota` / `createUserQuota` / `updateUserQuotaLimits` → 配额字段含 bigint（流量），必须 int64。
 - `updateUserStatus(id, status, banReason)` → 封禁时必须同时失效该用户全部 access token（Node 在 route 层做，Go 要保持同一位置，不要下沉）。
 - `getAllAdminUserIds()` → `role='admin' AND status='active'`，顺序无关但要去重。
