@@ -6,19 +6,39 @@ import api from '@/api'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import PackageQuotaReleaseModal from '@/components/PackageQuotaReleaseModal.vue'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import { translateError } from '@/utils/errorHandler'
 import type { Package, Host } from '@/types/api'
 import { instanceCreatePath, isAdminEntry } from '@/utils/app-paths'
 import PackageFormView from './PackageFormView.vue'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Pagination,
+  Select
+} from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
+import {
+  Check,
+  Copy,
+  Edit2,
+  Layers,
+  Plus,
+  Search,
+  Sliders,
+  Trash2,
+  X
+} from 'lucide-vue-next'
 
 // 为 KeepAlive include 匹配定义组件名称（必须在所有 import 之后）
 defineOptions({ name: 'MyPackagesView' })
 
 const { t } = useI18n()
 const toast = useToast()
-const themeStore = useThemeStore()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 const MAX_PACKAGE_PLAN_PRICE_CENTS = 99999999
@@ -56,34 +76,6 @@ const paginatedPackages = computed(() => {
   const start = (packagesPage.value - 1) * packagesPageSize
   return filteredPackages.value.slice(start, start + packagesPageSize)
 })
-
-// 计算可显示的页码列表
-const packagesPageNumbers = computed(() => {
-  const current = packagesPage.value
-  const total = packagesTotalPages.value
-  const pages: (number | string)[] = []
-  
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) pages.push(i)
-  } else {
-    pages.push(1)
-    if (current <= 3) {
-      pages.push(2, 3, 4, 5, '...', total)
-    } else if (current >= total - 2) {
-      pages.push('...', total - 4, total - 3, total - 2, total - 1, total)
-    } else {
-      pages.push('...', current - 1, current, current + 1, '...', total)
-    }
-  }
-  return pages
-})
-
-// 跳转到指定页码
-function goToPackagesPage(p: number | string) {
-  if (typeof p !== 'number') return
-  if (p < 1 || p > packagesTotalPages.value) return
-  packagesPage.value = p
-}
 
 // 监听总页数变化，防止页码越界
 watch(packagesTotalPages, (newTotal) => {
@@ -426,51 +418,11 @@ function getPlanStatusLabel(plan: PackagePlan): string {
   return t('resources.plans.statusActive')
 }
 
-function getPlanStatusBadgeClass(plan: PackagePlan): string {
+function getPlanBadgeVariant(plan: PackagePlan): BadgeVariant {
   const status = getPlanStatus(plan)
-  if (status === 'soldOut') {
-    return themeStore.isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700'
-  }
-  if (status === 'inactive') {
-    return themeStore.isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
-  }
-  return 'badge-success'
-}
-
-function getPlanStatusSegmentClass(status: PackagePlanStatus): string {
-  const selected = planForm.value.status === status
-
-  if (!selected) {
-    return themeStore.isDark
-      ? 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-      : 'text-gray-500 hover:bg-white hover:text-gray-900'
-  }
-
-  if (status === 'active') {
-    return themeStore.isDark
-      ? 'bg-emerald-500/15 text-emerald-300 shadow-sm ring-1 ring-emerald-500/30'
-      : 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-200'
-  }
-
-  if (status === 'soldOut') {
-    return themeStore.isDark
-      ? 'bg-amber-500/15 text-amber-300 shadow-sm ring-1 ring-amber-500/30'
-      : 'bg-white text-amber-700 shadow-sm ring-1 ring-amber-200'
-  }
-
-  return themeStore.isDark
-    ? 'bg-gray-700 text-gray-200 shadow-sm ring-1 ring-gray-600'
-    : 'bg-white text-gray-700 shadow-sm ring-1 ring-gray-200'
-}
-
-function getPlanStatusDotClass(status: PackagePlanStatus): string {
-  if (status === 'active') {
-    return themeStore.isDark ? 'bg-emerald-300' : 'bg-emerald-500'
-  }
-  if (status === 'soldOut') {
-    return themeStore.isDark ? 'bg-amber-300' : 'bg-amber-500'
-  }
-  return themeStore.isDark ? 'bg-gray-400' : 'bg-gray-500'
+  if (status === 'soldOut') return 'warning'
+  if (status === 'inactive') return 'default'
+  return 'success'
 }
 
 // 计费周期选项（单位：月）- 非管理员只能选择月付
@@ -695,67 +647,72 @@ function getBillingCycleLabel(months: number): string {
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ t('resources.packages.title') }}</h1>
-        <p class="page-description">{{ t('resources.packages.description') }}</p>
-      </div>
-      <button class="btn-primary btn-sm sm:btn" @click="openCreate">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ t('resources.packages.create') }}
-      </button>
-    </div>
+  <div class="space-y-6">
+    <!-- Apple HIG Page Header -->
+    <PageHeader
+      :title="t('resources.packages.title')"
+      :description="t('resources.packages.description')"
+    >
+      <template #actions>
+        <Button variant="primary" @click="openCreate">
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2.5]" />
+          </template>
+          {{ t('resources.packages.create') }}
+        </Button>
+      </template>
+    </PageHeader>
 
-    <!-- 工具栏 -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
-      <!-- 搜索框 -->
-      <div class="relative flex-1 sm:max-w-xs">
-        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
+    <!-- Toolbar / Search Box -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="w-full sm:w-80">
+        <Input
           v-model="searchQuery"
-          type="text"
-          class="input pl-10 pr-8 w-full"
           :placeholder="t('resources.packages.searchPlaceholder')"
+          size="md"
+          clearable
           @input="onSearchChange"
-        />
-        <button
-          v-if="searchQuery"
-          class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-themed-muted transition-colors hover:bg-themed-hover hover:text-themed"
-          @click="clearSearch"
+          @clear="clearSearch"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+          <template #prefix>
+            <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+          </template>
+        </Input>
       </div>
     </div>
 
-    <!-- 套餐列表 -->
+    <!-- Loading Skeleton -->
     <SkeletonLoader v-if="loading" type="list" />
 
-    <div v-else-if="filteredPackages.length === 0" class="card p-12 text-center">
-      <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-themed-secondary">
-        <svg class="h-7 w-7 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      </div>
-      <template v-if="searchQuery">
-        <p class="text-themed-secondary">{{ t('resources.packages.noSearchResults') }}</p>
-        <button class="text-xs text-primary hover:underline mt-2" @click="clearSearch">{{ t('resources.packages.clearSearch') }}</button>
-      </template>
-      <template v-else>
-        <p class="text-themed-secondary">{{ t('resources.packages.noPackages') }}</p>
-        <p class="text-xs text-themed-muted mt-2">{{ t('resources.packages.noPackagesHint') }}</p>
-      </template>
-    </div>
+    <!-- Empty State -->
+    <Card v-else-if="filteredPackages.length === 0" padding="none">
+      <EmptyState
+        :title="searchQuery ? t('resources.packages.noSearchResults') : t('resources.packages.noPackages')"
+        :description="searchQuery ? '' : t('resources.packages.noPackagesHint')"
+      >
+        <template #icon>
+          <Layers class="w-7 h-7 stroke-[1.5]" />
+        </template>
+        <template v-if="searchQuery" #action>
+          <Button variant="ghost" size="sm" @click="clearSearch">
+            {{ t('resources.packages.clearSearch') }}
+          </Button>
+        </template>
+        <template v-else #action>
+          <Button variant="primary" size="sm" @click="openCreate">
+            <template #icon>
+              <Plus class="w-4 h-4" />
+            </template>
+            {{ t('resources.packages.create') }}
+          </Button>
+        </template>
+      </EmptyState>
+    </Card>
 
+    <!-- Packages Card Table -->
     <template v-else>
-      <div class="card overflow-hidden">
+      <Card padding="none" class="overflow-hidden">
+        <!-- Mobile Cards (Guarded Container) -->
         <div class="space-y-3 p-4 lg:hidden">
           <div
             v-for="pkg in paginatedPackages"
@@ -766,242 +723,229 @@ function getBillingCycleLabel(months: number): string {
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="flex min-w-0 items-center gap-2">
-                  <span class="truncate text-sm font-medium" :class="'text-themed'">{{ pkg.name }}</span>
-                  <span
+                  <span class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ pkg.name }}</span>
+                  <Badge
                     v-if="isPackagePublic(pkg)"
-                    class="inline-flex shrink-0 items-center rounded-full border border-themed bg-themed-secondary px-2 py-0.5 text-xs font-medium text-themed-secondary"
+                    variant="info"
+                    size="sm"
                   >
                     {{ t('resources.packages.publicBadge') }}
-                  </span>
+                  </Badge>
                 </div>
-                <p v-if="pkg.description" class="mt-1 line-clamp-2 text-xs text-themed-muted">{{ pkg.description }}</p>
+                <p v-if="pkg.description" class="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">{{ pkg.description }}</p>
               </div>
-              <span v-if="pkg.active === 1" class="badge badge-success shrink-0 text-xs">{{ t('admin.packages.active') }}</span>
-              <span v-else class="badge badge-default shrink-0 text-xs" :title="t('admin.packages.archivedHint')">{{ t('admin.packages.inactive') }}</span>
+              <Badge v-if="pkg.active === 1" variant="success" size="sm">
+                {{ t('admin.packages.active') }}
+              </Badge>
+              <Badge v-else variant="default" size="sm" :title="t('admin.packages.archivedHint')">
+                {{ t('admin.packages.inactive') }}
+              </Badge>
             </div>
 
             <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt class="text-xs text-themed-muted">{{ t('resources.packages.networkModeColumn') }}</dt>
-                <dd class="mt-1 text-themed">{{ getPackageNetworkModeLabel(pkg) }}</dd>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('resources.packages.networkModeColumn') }}</dt>
+                <dd class="mt-1 text-xs font-medium text-[var(--text-primary)]">{{ getPackageNetworkModeLabel(pkg) }}</dd>
               </div>
-              <div>
-                <dt class="text-xs text-themed-muted">{{ t('resources.packages.instanceTypeColumn') }}</dt>
-                <dd class="mt-1 text-themed">{{ getPackageInstanceTypeLabel(pkg) }}</dd>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('resources.packages.instanceTypeColumn') }}</dt>
+                <dd class="mt-1 text-xs font-medium text-[var(--text-primary)]">{{ getPackageInstanceTypeLabel(pkg) }}</dd>
               </div>
-              <div>
-                <dt class="text-xs text-themed-muted">{{ t('resources.packages.trafficMultiplierColumn') }}</dt>
-                <dd class="mt-1 font-mono text-themed" :title="getPackageTrafficMultiplierTitle(pkg)">{{ getPackageTrafficMultiplierLabel(pkg) }}</dd>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('resources.packages.trafficMultiplierColumn') }}</dt>
+                <dd class="mt-1 font-mono text-xs font-medium text-[var(--text-primary)]" :title="getPackageTrafficMultiplierTitle(pkg)">{{ getPackageTrafficMultiplierLabel(pkg) }}</dd>
               </div>
-              <div>
-                <dt class="text-xs text-themed-muted">{{ t('resources.packages.instanceColumn') }}</dt>
-                <dd class="mt-1 font-mono text-themed">{{ pkg.instance_count || 0 }}</dd>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('resources.packages.instanceColumn') }}</dt>
+                <dd class="mt-1 font-mono text-xs font-medium text-[var(--text-primary)]">{{ pkg.instance_count || 0 }}</dd>
               </div>
-              <div class="col-span-2">
-                <dt class="text-xs text-themed-muted">{{ t('resources.packages.hostColumn') }}</dt>
-                <dd class="mt-1 line-clamp-2 text-themed-muted">{{ getHostNames(pkg) }}</dd>
+              <div class="col-span-2 rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('resources.packages.hostColumn') }}</dt>
+                <dd class="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">{{ getHostNames(pkg) }}</dd>
               </div>
             </dl>
 
+            <!-- Action bar (Guarded) -->
             <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-themed pt-3">
               <button
                 v-if="!isAdminEntry"
                 type="button"
-                class="p-1.5 transition-colors rounded"
-                :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
                 :title="t('resources.packages.copyShareLink')"
                 @click="copyShareLink(pkg)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-              </button>
-              <button
-                class="p-1.5 transition-colors rounded"
-                :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
-                :title="t('resources.plans.manage')"
-                @click="openPlansModal(pkg)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-              </button>
-              <button
-                class="p-1.5 transition-colors rounded"
-                :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
-                :title="t('quotaRelease.title')"
-                @click="openQuotaReleaseModal(pkg)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </button>
-              <button
-                class="p-1.5 transition-colors rounded"
-                :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
-                :title="t('common.edit')"
-                @click="openEdit(pkg)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
+                <Copy class="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
-                class="px-2 py-1 text-xs font-medium transition-colors rounded"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                :title="t('resources.plans.manage')"
+                @click="openPlansModal(pkg)"
+              >
+                <Sliders class="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                :title="t('quotaRelease.title')"
+                @click="openQuotaReleaseModal(pkg)"
+              >
+                <Layers class="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                :title="t('common.edit')"
+                @click="openEdit(pkg)"
+              >
+                <Edit2 class="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 active:scale-95 border"
                 :class="isPackageActive(pkg)
-                  ? (themeStore.isDark ? 'text-amber-300 hover:bg-amber-500/10' : 'text-amber-700 hover:bg-amber-50')
-                  : (themeStore.isDark ? 'text-emerald-300 hover:bg-emerald-500/10' : 'text-emerald-700 hover:bg-emerald-50')"
+                  ? 'text-[var(--warning)] border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--warning)_16%,transparent)]'
+                  : 'text-[var(--success)] border-[color-mix(in_srgb,var(--success)_30%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--success)_16%,transparent)]'"
                 :disabled="activeChangingId === pkg.id"
                 :title="isPackageActive(pkg) ? t('admin.packages.deactivate') : t('admin.packages.activate')"
                 @click="togglePackageActive(pkg)"
               >
+                <span v-if="activeChangingId === pkg.id" class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1"></span>
                 {{ activeChangingId === pkg.id ? t('common.loading') : (isPackageActive(pkg) ? t('admin.packages.deactivate') : t('admin.packages.activate')) }}
               </button>
               <button
-                class="p-1.5 transition-colors rounded"
-                :class="'text-themed-muted hover:bg-rose-500/10 hover:text-error'"
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
                 :title="t('common.delete')"
                 @click="deletePackage(pkg)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
+                <Trash2 class="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </div>
 
+        <!-- Desktop Fixed Table (Guarded Container) -->
         <div class="hidden overflow-hidden lg:block">
           <table class="w-full table-fixed text-sm">
             <thead>
-              <tr class="border-b border-themed bg-themed-secondary">
-                <th class="w-[26%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.name') }}</th>
-                <th class="w-[8%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('admin.packages.status') }}</th>
-                <th class="w-[11%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.networkModeColumn') }}</th>
-                <th class="w-[8%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceTypeColumn') }}</th>
-                <th class="w-[6%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.trafficMultiplierColumn') }}</th>
-                <th class="w-[13%] text-left px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.hostColumn') }}</th>
-                <th class="w-[8%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('resources.packages.instanceColumn') }}</th>
-                <th class="w-[20%] text-right px-4 py-3 font-medium text-themed-muted">{{ t('common.actions') }}</th>
+              <tr class="border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <th class="w-[26%] text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('admin.packages.name') }}</th>
+                <th class="w-[8%] text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('admin.packages.status') }}</th>
+                <th class="w-[11%] text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('resources.packages.networkModeColumn') }}</th>
+                <th class="w-[8%] text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('resources.packages.instanceTypeColumn') }}</th>
+                <th class="w-[6%] text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('resources.packages.trafficMultiplierColumn') }}</th>
+                <th class="w-[13%] text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('resources.packages.hostColumn') }}</th>
+                <th class="w-[8%] text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('resources.packages.instanceColumn') }}</th>
+                <th class="w-[20%] text-right px-4 py-3.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="pkg in paginatedPackages"
                 :key="pkg.id"
-                class="border-b border-themed transition-colors hover:bg-themed-hover"
+                class="border-b border-[var(--border-color)] transition-colors duration-150 hover:bg-[var(--bg-surface-soft)]"
                 :class="pkg.active !== 1 ? 'opacity-60' : ''"
               >
                 <!-- 套餐名称 -->
-                <td class="px-4 py-3">
+                <td class="px-4 py-3.5">
                   <div class="flex items-center gap-2 min-w-0">
-                    <span class="font-medium truncate" :class="'text-themed'">{{ pkg.name }}</span>
-                    <span
+                    <span class="font-semibold truncate text-[var(--text-primary)]">{{ pkg.name }}</span>
+                    <Badge
                       v-if="isPackagePublic(pkg)"
-                      class="inline-flex shrink-0 items-center rounded-full border border-themed bg-themed-secondary px-2 py-0.5 text-xs font-medium text-themed-secondary"
+                      variant="info"
+                      size="sm"
                     >
                       {{ t('resources.packages.publicBadge') }}
-                    </span>
+                    </Badge>
                   </div>
-                  <div v-if="pkg.description" class="text-xs text-themed-muted mt-0.5 max-w-48 truncate">{{ pkg.description }}</div>
+                  <div v-if="pkg.description" class="text-xs text-[var(--text-tertiary)] mt-0.5 max-w-xs truncate">{{ pkg.description }}</div>
                 </td>
                 <!-- 状态 -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span v-if="pkg.active === 1" class="badge badge-success text-xs">{{ t('admin.packages.active') }}</span>
-                  <span v-else class="badge badge-default text-xs" :title="t('admin.packages.archivedHint')">{{ t('admin.packages.inactive') }}</span>
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <Badge v-if="pkg.active === 1" variant="success" size="sm">{{ t('admin.packages.active') }}</Badge>
+                  <Badge v-else variant="default" size="sm" :title="t('admin.packages.archivedHint')">{{ t('admin.packages.inactive') }}</Badge>
                 </td>
                 <!-- 网络模式 -->
-                <td class="px-4 py-3" :class="'text-themed-secondary'">
-                  <div class="truncate">{{ getPackageNetworkModeLabel(pkg) }}</div>
+                <td class="px-4 py-3.5 text-[var(--text-secondary)]">
+                  <div class="truncate text-xs font-medium">{{ getPackageNetworkModeLabel(pkg) }}</div>
                 </td>
                 <!-- 实例类型 -->
-                <td class="px-4 py-3" :class="'text-themed-secondary'">
-                  <div class="truncate">{{ getPackageInstanceTypeLabel(pkg) }}</div>
+                <td class="px-4 py-3.5 text-[var(--text-secondary)]">
+                  <div class="truncate text-xs font-medium">{{ getPackageInstanceTypeLabel(pkg) }}</div>
                 </td>
                 <!-- 流量倍率 -->
                 <td
-                  class="px-4 py-3 text-right font-mono whitespace-nowrap"
-                  :class="'text-themed-secondary'"
+                  class="px-4 py-3.5 text-right font-mono text-xs whitespace-nowrap text-[var(--text-secondary)]"
                   :title="getPackageTrafficMultiplierTitle(pkg)"
                 >
                   {{ getPackageTrafficMultiplierLabel(pkg) }}
                 </td>
                 <!-- 绑定宿主机 -->
-                <td class="px-4 py-3">
-                  <span class="block truncate text-xs text-themed-muted">{{ getHostNames(pkg) }}</span>
+                <td class="px-4 py-3.5">
+                  <span class="block truncate text-xs text-[var(--text-tertiary)]" :title="getHostNames(pkg)">{{ getHostNames(pkg) }}</span>
                 </td>
                 <!-- 套餐下实例数 -->
-                <td class="px-4 py-3 text-right font-mono whitespace-nowrap" :class="'text-themed-secondary'">
+                <td class="px-4 py-3.5 text-right font-mono text-xs whitespace-nowrap text-[var(--text-secondary)]">
                   {{ pkg.instance_count || 0 }}
                 </td>
                 <!-- 操作 -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <div class="flex items-center justify-end gap-1">
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <div class="flex items-center justify-end gap-1.5">
                     <!-- 分享链接 -->
                     <button
                       v-if="!isAdminEntry"
                       type="button"
-                      class="p-1.5 transition-colors rounded"
-                      :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-transparent hover:border-[var(--border-color)] transition-all duration-200 active:scale-95"
                       :title="t('resources.packages.copyShareLink')"
                       @click="copyShareLink(pkg)"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                    </button>
-                    <button
-                      class="p-1.5 transition-colors rounded"
-                      :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
-                      :title="t('resources.plans.manage')"
-                      @click="openPlansModal(pkg)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                      </svg>
-                    </button>
-                    <button
-                      class="p-1.5 transition-colors rounded"
-                      :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
-                      :title="t('quotaRelease.title')"
-                      @click="openQuotaReleaseModal(pkg)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </button>
-                    <button
-                      class="p-1.5 transition-colors rounded"
-                      :class="'text-themed-muted hover:bg-themed-hover hover:text-themed'"
-                      :title="t('common.edit')"
-                      @click="openEdit(pkg)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
+                      <Copy class="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
-                      class="px-2 py-1 text-xs font-medium transition-colors rounded"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-transparent hover:border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                      :title="t('resources.plans.manage')"
+                      @click="openPlansModal(pkg)"
+                    >
+                      <Sliders class="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-transparent hover:border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                      :title="t('quotaRelease.title')"
+                      @click="openQuotaReleaseModal(pkg)"
+                    >
+                      <Layers class="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-transparent hover:border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                      :title="t('common.edit')"
+                      @click="openEdit(pkg)"
+                    >
+                      <Edit2 class="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center px-2.5 py-1 text-xs font-medium rounded-full transition-all duration-200 active:scale-95 border"
                       :class="isPackageActive(pkg)
-                        ? (themeStore.isDark ? 'text-amber-300 hover:bg-amber-500/10' : 'text-amber-700 hover:bg-amber-50')
-                        : (themeStore.isDark ? 'text-emerald-300 hover:bg-emerald-500/10' : 'text-emerald-700 hover:bg-emerald-50')"
+                        ? 'text-[var(--warning)] border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--warning)_16%,transparent)]'
+                        : 'text-[var(--success)] border-[color-mix(in_srgb,var(--success)_30%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--success)_16%,transparent)]'"
                       :disabled="activeChangingId === pkg.id"
                       :title="isPackageActive(pkg) ? t('admin.packages.deactivate') : t('admin.packages.activate')"
                       @click="togglePackageActive(pkg)"
                     >
+                      <span v-if="activeChangingId === pkg.id" class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1"></span>
                       {{ activeChangingId === pkg.id ? t('common.loading') : (isPackageActive(pkg) ? t('admin.packages.deactivate') : t('admin.packages.activate')) }}
                     </button>
                     <button
-                      class="p-1.5 transition-colors rounded"
-                      :class="'text-themed-muted hover:bg-rose-500/10 hover:text-error'"
+                      type="button"
+                      class="inline-flex items-center justify-center w-7 h-7 rounded-full text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] border border-transparent hover:border-[var(--border-color)] transition-all duration-200 active:scale-95"
                       :title="t('common.delete')"
                       @click="deletePackage(pkg)"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 class="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </td>
@@ -1011,25 +955,20 @@ function getBillingCycleLabel(months: number): string {
         </div>
 
         <!-- 分页控件 -->
-        <div v-if="packagesTotalPages > 1" class="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-themed px-4 py-3 text-sm text-themed-muted">
-          <span>{{ t('common.total') }} {{ filteredPackages.length }} {{ t('common.items') }}</span>
-          <div class="flex items-center gap-1 flex-wrap justify-center">
-            <button :disabled="packagesPage <= 1" class="btn-ghost btn-sm" :class="packagesPage <= 1 ? 'cursor-not-allowed' : ''" @click="goToPackagesPage(packagesPage - 1)">{{ t('instance.prevPage') }}</button>
-            <template v-for="(p, idx) in packagesPageNumbers" :key="idx">
-              <span v-if="p === '...'" class="px-2 py-1 text-themed-muted">…</span>
-              <button
-                v-else
-                class="min-w-[32px] rounded-md px-2 py-1 text-sm font-mono tabular-nums transition-colors"
-                :class="p === packagesPage ? 'bg-primary-500 text-white' : 'text-themed-secondary hover:bg-themed-hover'"
-                @click="goToPackagesPage(p)"
-              >
-                {{ p }}
-              </button>
+        <div v-if="filteredPackages.length > packagesPageSize" class="border-t border-[var(--border-color)] px-4 py-3">
+          <Pagination
+            v-model:page="packagesPage"
+            :total="filteredPackages.length"
+            :page-size="packagesPageSize"
+          >
+            <template #total>
+              <span class="text-xs text-[var(--text-secondary)]">
+                {{ t('common.total') }} {{ filteredPackages.length }} {{ t('common.items') }}
+              </span>
             </template>
-            <button :disabled="packagesPage >= packagesTotalPages" class="btn-ghost btn-sm" :class="packagesPage >= packagesTotalPages ? 'cursor-not-allowed' : ''" @click="goToPackagesPage(packagesPage + 1)">{{ t('instance.nextPage') }}</button>
-          </div>
+          </Pagination>
         </div>
-      </div>
+      </Card>
     </template>
 
     <!-- 配额释放弹窗 -->
@@ -1041,126 +980,129 @@ function getBillingCycleLabel(months: number): string {
       @success="handleQuotaReleaseSuccess"
     />
 
-
     <!-- 方案管理弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showPlansModal" class="modal-overlay">
           <div class="modal-backdrop" @click="showPlansModal = false"></div>
           <div class="modal-content max-w-3xl">
-            <div class="modal-header">
+            <div class="modal-header flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
               <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/15">
-                  <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,var(--bg-surface))]">
+                  <Sliders class="w-5 h-5 stroke-[2]" />
                 </div>
                 <div>
                   <div class="flex items-center gap-2">
-                    <h3 class="modal-title">{{ t('resources.plans.title') }}</h3>
-                    <span v-if="plans.length > 0" class="rounded-full bg-themed-secondary px-2 py-0.5 text-xs font-mono tabular-nums text-themed-secondary">
+                    <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('resources.plans.title') }}</h3>
+                    <Badge v-if="plans.length > 0" variant="default" size="sm">
                       {{ plans.length }}
-                    </span>
+                    </Badge>
                   </div>
-                  <p v-if="plansPackage" class="text-xs text-themed-muted mt-0.5">
+                  <p v-if="plansPackage" class="text-xs text-[var(--text-secondary)] mt-0.5">
                     {{ plansPackage.name }} · {{ plansPackage.cpu_max }}% CPU · {{ formatMemory(plansPackage.memory_max) }}
                   </p>
                 </div>
               </div>
-              <button class="p-1.5 rounded-lg transition-colors hover:bg-themed-hover" @click="showPlansModal = false">
-                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                @click="showPlansModal = false"
+              >
+                <X class="w-4 h-4 stroke-[2]" />
               </button>
             </div>
 
-            <div class="modal-body">
+            <div class="modal-body flex-1 overflow-y-auto">
               <SkeletonLoader v-if="plansLoading" type="list" />
-              <div v-else-if="plans.length === 0" class="text-center py-12">
-                <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-themed-secondary">
-                  <svg class="w-10 h-10 icon-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                </div>
-                <p class="text-themed-secondary font-medium">{{ t('resources.plans.noPlans') }}</p>
-                <p class="text-xs text-themed-muted mt-1">{{ t('resources.plans.noPlansHint') }}</p>
+              <div v-else-if="plans.length === 0" class="py-12">
+                <EmptyState
+                  :title="t('resources.plans.noPlans')"
+                  :description="t('resources.plans.noPlansHint')"
+                >
+                  <template #icon>
+                    <Sliders class="w-7 h-7 stroke-[1.5]" />
+                  </template>
+                  <template #action>
+                    <Button variant="primary" size="sm" @click="openCreatePlanModal">
+                      <template #icon>
+                        <Plus class="w-4 h-4" />
+                      </template>
+                      {{ t('resources.plans.add') }}
+                    </Button>
+                  </template>
+                </EmptyState>
               </div>
-              <div v-else class="space-y-3 max-h-96 overflow-y-auto">
+              <div v-else class="space-y-3 p-6">
                 <div
                   v-for="plan in plans"
                   :key="plan.id"
-                  class="rounded-xl border p-4 transition-colors"
-                  :class="[
-                    'border-themed bg-themed-tertiary',
-                    getPlanStatus(plan) !== 'active' ? 'opacity-70' : ''
-                  ]"
+                  class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-200 hover:border-[var(--border-hover)]"
+                  :class="getPlanStatus(plan) !== 'active' ? 'opacity-70' : ''"
                 >
                   <div class="flex items-start justify-between gap-4">
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 mb-1">
-                        <span class="font-medium" :class="'text-themed'">{{ plan.name }}</span>
-                        <span class="badge text-xs" :class="getPlanStatusBadgeClass(plan)">{{ getPlanStatusLabel(plan) }}</span>
+                        <span class="font-semibold text-sm text-[var(--text-primary)]">{{ plan.name }}</span>
+                        <Badge :variant="getPlanBadgeVariant(plan)" size="sm">{{ getPlanStatusLabel(plan) }}</Badge>
                       </div>
-                      <p v-if="plan.description" class="text-xs text-themed-muted mb-2">{{ plan.description }}</p>
+                      <p v-if="plan.description" class="text-xs text-[var(--text-secondary)] mb-3">{{ plan.description }}</p>
                       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <div>
-                          <span class="text-themed-muted">{{ t('admin.packages.cpu') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ plan.cpu }}%</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('admin.packages.cpu') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ plan.cpu }}%</span>
                         </div>
-                        <div>
-                          <span class="text-themed-muted">{{ t('admin.packages.memory') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ formatMemory(plan.memory) }}</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('admin.packages.memory') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ formatMemory(plan.memory) }}</span>
                         </div>
-                        <div>
-                          <span class="text-themed-muted">{{ t('admin.packages.disk') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ formatDisk(plan.disk) }}</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('admin.packages.disk') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ formatDisk(plan.disk) }}</span>
                         </div>
-                        <div>
-                          <span class="text-themed-muted">{{ t('resources.plans.price') }}:</span>
-                          <span class="ml-1 font-medium text-green-600 dark:text-green-400">¥{{ formatPrice(plan.price) }}/{{ getBillingCycleLabel(plan.billingCycle) }}</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('resources.plans.price') }}</span>
+                          <span class="font-semibold text-[var(--success)] mt-0.5 block">¥{{ formatPrice(plan.price) }}/{{ getBillingCycleLabel(plan.billingCycle) }}</span>
                         </div>
                       </div>
                       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-2">
-                        <div>
-                          <span class="text-themed-muted">{{ t('resources.plans.portLimit') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ plan.portLimit }}</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('resources.plans.portLimit') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ plan.portLimit }}</span>
                         </div>
-                        <div>
-                          <span class="text-themed-muted">{{ t('resources.plans.snapshotLimit') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ plan.snapshotLimit }}</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('resources.plans.snapshotLimit') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ plan.snapshotLimit }}</span>
                         </div>
-                        <div v-if="plansPackage?.instance_type !== 'vm'">
-                          <span class="text-themed-muted">{{ t('resources.plans.swapSize') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ plan.swapSize > 0 ? `${plan.swapSize} MB` : '-' }}</span>
+                        <div v-if="plansPackage?.instance_type !== 'vm'" class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('resources.plans.swapSize') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ plan.swapSize > 0 ? `${plan.swapSize} MB` : '-' }}</span>
                         </div>
-                        <div>
-                          <span class="text-themed-muted">{{ t('resources.plans.siteLimit') }}:</span>
-                          <span class="ml-1 font-mono tabular-nums text-themed-secondary">{{ plan.siteLimit }}</span>
+                        <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
+                          <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('resources.plans.siteLimit') }}</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ plan.siteLimit }}</span>
                         </div>
                       </div>
                       <div v-if="plan.slaGuarantee !== null" class="mt-2 text-xs">
-                        <span class="text-themed-muted">SLA保证:</span>
-                        <span class="ml-1 font-medium" :class="themeStore.isDark ? 'text-green-400' : 'text-green-600'">{{ plan.slaGuarantee }}%</span>
+                        <span class="text-[var(--text-secondary)]">SLA保证:</span>
+                        <span class="ml-1 font-semibold text-[var(--success)]">{{ plan.slaGuarantee }}%</span>
                       </div>
                     </div>
-                    <div class="flex items-center gap-1 flex-shrink-0">
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
                       <button
-                        class="rounded-lg p-2 text-themed-muted transition-colors hover:bg-themed-hover hover:text-primary-500"
+                        type="button"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
                         :title="t('common.edit')"
                         @click="openEditPlanModal(plan)"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
+                        <Edit2 class="w-3.5 h-3.5" />
                       </button>
                       <button
-                        class="rounded-lg p-2 text-themed-muted transition-colors hover:bg-rose-500/10 hover:text-error"
+                        type="button"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
                         :title="t('common.delete')"
                         @click="deletePlan(plan)"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <Trash2 class="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -1168,14 +1110,14 @@ function getBillingCycleLabel(months: number): string {
               </div>
             </div>
 
-            <div class="modal-footer">
-              <button class="btn-primary" @click="openCreatePlanModal">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
+            <div class="modal-footer flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+              <Button variant="secondary" @click="showPlansModal = false">{{ t('common.close') }}</Button>
+              <Button variant="primary" @click="openCreatePlanModal">
+                <template #icon>
+                  <Plus class="w-4 h-4 stroke-[2.5]" />
+                </template>
                 {{ t('resources.plans.add') }}
-              </button>
-              <button class="btn-secondary" @click="showPlansModal = false">{{ t('common.close') }}</button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1188,152 +1130,262 @@ function getBillingCycleLabel(months: number): string {
         <div v-if="showPlanFormModal" class="modal-overlay">
           <div class="modal-backdrop" @click="showPlanFormModal = false"></div>
           <div class="modal-content max-w-2xl">
-            <div class="modal-header">
+            <div class="modal-header flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
               <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/15">
-                  <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_25%,var(--bg-surface))]">
+                  <Sliders class="w-5 h-5 stroke-[2]" />
                 </div>
                 <div>
-                  <h3 class="modal-title">{{ editingPlan ? t('resources.plans.edit') : t('resources.plans.create') }}</h3>
-                  <p v-if="plansPackage" class="text-xs text-themed-muted mt-0.5">{{ plansPackage.name }}</p>
+                  <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                    {{ editingPlan ? t('resources.plans.edit') : t('resources.plans.create') }}
+                  </h3>
+                  <p v-if="plansPackage" class="text-xs text-[var(--text-secondary)] mt-0.5">{{ plansPackage.name }}</p>
                 </div>
               </div>
-              <button class="p-1.5 rounded-lg transition-colors hover:bg-themed-hover" @click="showPlanFormModal = false">
-                <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+                @click="showPlanFormModal = false"
+              >
+                <X class="w-4 h-4 stroke-[2]" />
               </button>
             </div>
 
-            <div class="modal-body space-y-4 max-h-[70vh] overflow-y-auto">
+            <div class="modal-body space-y-4 max-h-[70vh] overflow-y-auto p-6">
               <!-- 基本信息 -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <GpuSharingFields class="sm:col-span-2" v-if="plansPackage" v-model="planForm.gpuShared" v-model:device-ids="planForm.gpuDeviceIds" :host-ids="plansPackage.host_ids || []" :allowed="plansPackage.instance_type !== 'vm' && !plansPackage.privileged" nullable />
+                <GpuSharingFields
+                  v-if="plansPackage"
+                  v-model="planForm.gpuShared"
+                  v-model:device-ids="planForm.gpuDeviceIds"
+                  class="sm:col-span-2"
+                  :host-ids="plansPackage.host_ids || []"
+                  :allowed="plansPackage.instance_type !== 'vm' && !plansPackage.privileged"
+                  nullable
+                />
                 <div>
-                  <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.name') }} *</label>
-                  <input v-model="planForm.name" type="text" class="input" :placeholder="t('resources.plans.namePlaceholder')" />
+                  <Input
+                    v-model="planForm.name"
+                    :label="t('resources.plans.name') + ' *'"
+                    :placeholder="t('resources.plans.namePlaceholder')"
+                    size="sm"
+                  />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.description') }}</label>
-                  <input v-model="planForm.description" type="text" class="input" :placeholder="t('resources.plans.descriptionPlaceholder')" />
+                  <Input
+                    v-model="planForm.description"
+                    :label="t('resources.plans.description')"
+                    :placeholder="t('resources.plans.descriptionPlaceholder')"
+                    size="sm"
+                  />
                 </div>
               </div>
-              <p class="text-xs text-orange-500 dark:text-orange-400 -mt-2">{{ t('common.noIncudalHint') }}</p>
+              <p class="text-xs text-[var(--warning)] -mt-2">{{ t('common.noIncudalHint') }}</p>
 
               <!-- 资源配置 -->
-              <div class="rounded-xl border border-themed bg-themed-tertiary p-4">
-                <h4 class="text-sm font-medium mb-3 text-themed">{{ t('resources.plans.resourceConfig') }}</h4>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3">{{ t('resources.plans.resourceConfig') }}</h4>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">CPU (%)</label>
-                    <input v-model.number="planForm.cpu" type="number" min="15" max="10000" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">CPU (%)</label>
+                    <input
+                      v-model.number="planForm.cpu"
+                      type="number"
+                      min="15"
+                      max="10000"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('admin.packages.memory') }} (MB)</label>
-                    <input v-model.number="planForm.memory" type="number" min="128" max="62144" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('admin.packages.memory') }} (MB)</label>
+                    <input
+                      v-model.number="planForm.memory"
+                      type="number"
+                      min="128"
+                      max="62144"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('admin.packages.disk') }} (MB)</label>
-                    <input v-model.number="planForm.disk" type="number" min="512" max="104857600" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('admin.packages.disk') }} (MB)</label>
+                    <input
+                      v-model.number="planForm.disk"
+                      type="number"
+                      min="512"
+                      max="104857600"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.portLimit') }}</label>
-                    <input v-model.number="planForm.portLimit" type="number" min="0" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.portLimit') }}</label>
+                    <input
+                      v-model.number="planForm.portLimit"
+                      type="number"
+                      min="0"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.snapshotLimit') }}</label>
-                    <input v-model.number="planForm.snapshotLimit" type="number" min="0" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.snapshotLimit') }}</label>
+                    <input
+                      v-model.number="planForm.snapshotLimit"
+                      type="number"
+                      min="0"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div v-if="plansPackage?.instance_type !== 'vm'">
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.swapSize') }} (MB)</label>
-                    <input v-model.number="planForm.swapSize" type="number" min="0" max="1048576" step="128" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.swapSize') }} (MB)</label>
+                    <input
+                      v-model.number="planForm.swapSize"
+                      type="number"
+                      min="0"
+                      max="1048576"
+                      step="128"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.siteLimit') }}</label>
-                    <input v-model.number="planForm.siteLimit" type="number" min="0" class="input" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.siteLimit') }}</label>
+                    <input
+                      v-model.number="planForm.siteLimit"
+                      type="number"
+                      min="0"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.trafficLimit') }} (GB) *</label>
-                    <input v-model="planForm.trafficLimit" type="number" min="1" max="100000" step="1" class="input" required />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.trafficLimit') }} (GB) *</label>
+                    <input
+                      v-model="planForm.trafficLimit"
+                      type="number"
+                      min="1"
+                      max="100000"
+                      step="1"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                      required
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.trafficSpeed') }} (Mbps) *</label>
-                    <input v-model.number="planForm.trafficLimitSpeed" type="number" min="1" max="10000" step="1" class="input" required />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.trafficSpeed') }} (Mbps) *</label>
+                    <input
+                      v-model.number="planForm.trafficLimitSpeed"
+                      type="number"
+                      min="1"
+                      max="10000"
+                      step="1"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                      required
+                    />
                   </div>
                 </div>
               </div>
 
               <!-- 计费配置 -->
-              <div class="rounded-xl border border-themed bg-themed-tertiary p-4">
-                <h4 class="text-sm font-medium mb-3 text-themed">{{ t('resources.plans.billingConfig') }}</h4>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-3">{{ t('resources.plans.billingConfig') }}</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.price') }} (元)</label>
-                    <input v-model.number="planForm.price" type="number" min="0" :max="MAX_PACKAGE_PLAN_PRICE" step="0.01" class="input" />
-                    <p class="mt-1 text-xs text-themed-muted">{{ t('resources.plans.priceRangeHint', { max: MAX_PACKAGE_PLAN_PRICE.toFixed(2) }) }}</p>
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">{{ t('resources.plans.price') }} (元)</label>
+                    <input
+                      v-model.number="planForm.price"
+                      type="number"
+                      min="0"
+                      :max="MAX_PACKAGE_PLAN_PRICE"
+                      step="0.01"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                    />
+                    <p class="mt-1 text-xs text-[var(--text-tertiary)]">{{ t('resources.plans.priceRangeHint', { max: MAX_PACKAGE_PLAN_PRICE.toFixed(2) }) }}</p>
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">流量重置价格（元）</label>
-                    <input v-model.number="planForm.trafficResetPrice" type="number" min="0" :max="MAX_PACKAGE_PLAN_PRICE" step="0.01" class="input" placeholder="继承套餐默认" />
-                    <p class="mt-1 text-xs text-themed-muted">单位:元(如填 5 表示 5 元)；留空继承套餐默认价，填写后覆盖。</p>
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">流量重置价格（元）</label>
+                    <input
+                      v-model.number="planForm.trafficResetPrice"
+                      type="number"
+                      min="0"
+                      :max="MAX_PACKAGE_PLAN_PRICE"
+                      step="0.01"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                      placeholder="继承套餐默认"
+                    />
+                    <p class="mt-1 text-xs text-[var(--text-tertiary)]">单位:元(如填 5 表示 5 元)；留空继承套餐默认价，填写后覆盖。</p>
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.billingCycle') }}</label>
-                    <select v-model.number="planForm.billingCycle" class="input">
-                      <option v-for="opt in billingCycleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                    </select>
+                    <Select
+                      :model-value="planForm.billingCycle"
+                      :options="billingCycleOptions"
+                      :label="t('resources.plans.billingCycle')"
+                      size="sm"
+                      @update:model-value="planForm.billingCycle = Number($event)"
+                    />
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-themed-muted mb-1.5">SLA保证 (%)</label>
-                    <input v-model.number="planForm.slaGuarantee" type="number" min="1" max="100" step="0.01" class="input" placeholder="如 99.9" />
+                    <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">SLA保证 (%)</label>
+                    <input
+                      v-model.number="planForm.slaGuarantee"
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="0.01"
+                      class="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                      placeholder="如 99.9"
+                    />
                   </div>
                 </div>
               </div>
 
-              <!-- 其他设置 -->
+              <!-- 状态与排序 -->
               <div class="grid gap-4 sm:grid-cols-3 sm:items-start">
                 <div class="min-w-0 sm:col-span-2">
-                  <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.status') }}</label>
-                  <div class="h-10 rounded-lg border border-themed bg-themed-secondary p-0.5">
-                    <div class="grid h-full grid-cols-3 gap-0.5">
-                      <button
-                        v-for="option in planStatusOptions"
-                        :key="option.value"
-                        type="button"
-                        class="flex h-full min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-medium transition-all"
-                        :class="getPlanStatusSegmentClass(option.value)"
-                        :aria-pressed="planForm.status === option.value"
-                        @click="planForm.status = option.value"
-                      >
-                        <span class="h-2 w-2 flex-shrink-0 rounded-full" :class="getPlanStatusDotClass(option.value)"></span>
-                        <span class="truncate">{{ option.label }}</span>
-                      </button>
-                    </div>
+                  <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">{{ t('resources.plans.status') }}</label>
+                  <div class="h-10 rounded-full border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-1 flex items-center gap-1">
+                    <button
+                      v-for="option in planStatusOptions"
+                      :key="option.value"
+                      type="button"
+                      class="flex-1 h-full min-w-0 flex items-center justify-center gap-1.5 rounded-full px-2 text-xs font-medium transition-all duration-200 active:scale-95"
+                      :class="planForm.status === option.value
+                        ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold border border-[var(--border-color)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                      :aria-pressed="planForm.status === option.value"
+                      @click="planForm.status = option.value"
+                    >
+                      <span
+                        class="h-2 w-2 flex-shrink-0 rounded-full"
+                        :class="option.value === 'active' ? 'bg-[var(--success)]' : option.value === 'soldOut' ? 'bg-[var(--warning)]' : 'bg-[var(--text-tertiary)]'"
+                      ></span>
+                      <span class="truncate">{{ option.label }}</span>
+                    </button>
                   </div>
-                  <p class="mt-2 min-h-[2.5rem] text-xs leading-5 text-themed-muted">
+                  <p class="mt-2 min-h-[2rem] text-xs leading-5 text-[var(--text-tertiary)]">
                     {{ selectedPlanStatusOption.description }}
                   </p>
                 </div>
                 <div class="min-w-0">
-                  <label class="block text-xs font-medium text-themed-muted mb-1.5">{{ t('resources.plans.sortOrder') }}</label>
-                  <input v-model.number="planForm.sortOrder" type="number" min="0" class="input h-10 w-full text-center" />
+                  <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">{{ t('resources.plans.sortOrder') }}</label>
+                  <input
+                    v-model.number="planForm.sortOrder"
+                    type="number"
+                    min="0"
+                    class="w-full h-10 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 text-center text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                  />
                 </div>
               </div>
             </div>
 
-            <div class="modal-footer">
-              <button class="btn-secondary" @click="showPlanFormModal = false">{{ t('common.cancel') }}</button>
-              <button :disabled="!planForm.name.trim() || planFormLoading" class="btn-primary" @click="savePlan">
-                <span v-if="planFormLoading" class="loading-spinner w-4 h-4"></span>
-                <template v-else>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  {{ t('common.save') }}
+            <div class="modal-footer flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+              <Button variant="secondary" @click="showPlanFormModal = false">{{ t('common.cancel') }}</Button>
+              <Button
+                variant="primary"
+                :disabled="!planForm.name.trim() || planFormLoading"
+                :loading="planFormLoading"
+                @click="savePlan"
+              >
+                <template #icon>
+                  <Check class="w-4 h-4 stroke-[2.5]" />
                 </template>
-              </button>
+                {{ t('common.save') }}
+              </Button>
             </div>
           </div>
         </div>

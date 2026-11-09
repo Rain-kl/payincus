@@ -5,7 +5,6 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
-import { useThemeStore } from '@/stores/theme'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import { useToast } from '@/stores/toast'
 import { getLocalizedCountryName } from '@/utils/countryDisplay'
@@ -17,6 +16,24 @@ import DistroIcon from '@/components/icons/DistroIcon.vue'
 import InstanceDisplayIcon from '@/components/InstanceDisplayIcon.vue'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 import { instanceCreatePath, instanceDetailPath, isAdminEntry, transfersPath, walletPath } from '@/utils/app-paths'
+import { Button, Card, Badge, PageHeader, EmptyState, Input, Select, Pagination } from '@/components/ui'
+import {
+  Play,
+  Square,
+  RotateCw,
+  MoreHorizontal,
+  Search,
+  RefreshCw,
+  LayoutList,
+  LayoutGrid,
+  Copy,
+  Plus,
+  ChevronDown,
+  AlertCircle,
+  AlertTriangle,
+  X,
+  Loader2
+} from 'lucide-vue-next'
 
 // 为 KeepAlive include 匹配定义组件名称（必须在所有 import 之后）
 defineOptions({ name: 'InstancesView' })
@@ -57,7 +74,6 @@ const router = useRouter()
 const { t, locale } = useI18n()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
-const themeStore = useThemeStore()
 const toast = useToast()
 void configStore.loadPublicConfig()
 
@@ -74,7 +90,7 @@ const pageSize = ref<number>(30)
 const total = ref<number>(0)
 const totalPages = ref<number>(0)
 const pageSizeOptions = [10, 20, 30, 50, 100]
-const countryFilter = ref<string | null>(null)
+const countryFilter = ref<string>('')
 const availableCountries = ref<string[]>([])
 const userSelectedLayout = ref<InstanceLayoutMode | null>(null)
 const isDesktopViewport = ref<boolean>(true)
@@ -216,6 +232,7 @@ watch(search, () => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     page.value = 1
+    clearSelection()
     loadInstances()
   }, 300)
 })
@@ -225,11 +242,9 @@ watch(
   () => route.query.userId,
   async (newUserId, oldUserId) => {
     if (newUserId === oldUserId) return
-    
-    // 更新筛选条件
+
     if (newUserId) {
       filterUserId.value = parseInt(newUserId as string)
-      // 获取用户名
       try {
         const res = await api.users.get(filterUserId.value)
         filterUserName.value = (res as { user?: { username?: string } }).user?.username || ''
@@ -240,8 +255,7 @@ watch(
       filterUserId.value = null
       filterUserName.value = ''
     }
-    
-    // 重置分页并重新加载
+
     page.value = 1
     loading.value = true
     await loadInstances()
@@ -249,7 +263,6 @@ watch(
   { immediate: false }
 )
 
-// 判断是否为管理员
 const isAdmin = computed<boolean>(() => authStore.user?.role === 'admin')
 
 function updateViewportState(): void {
@@ -281,7 +294,7 @@ function prepareCreatedInstanceRefresh(): boolean {
   if (!route.query.created) return false
 
   search.value = ''
-  countryFilter.value = null
+  countryFilter.value = ''
   page.value = 1
   selectedIds.value = new Set()
   loading.value = true
@@ -304,18 +317,15 @@ onMounted(async (): Promise<void> => {
     window.addEventListener('scroll', closeRowMenu, { passive: true })
   }
 
-  // 从 URL 获取 userId 参数（首次加载）
   if (route.query.userId) {
     filterUserId.value = parseInt(route.query.userId as string)
-    // 获取用户名
     try {
       const res = await api.users.get(filterUserId.value)
       filterUserName.value = (res as { user?: { username?: string } }).user?.username || ''
     } catch {
-      // 忽略错误
+      // ignore
     }
   } else {
-    // 确保没有 userId 时清空筛选
     filterUserId.value = null
     filterUserName.value = ''
   }
@@ -323,7 +333,6 @@ onMounted(async (): Promise<void> => {
   const forceReload = prepareCreatedInstanceRefresh()
   await loadInstances(forceReload)
   clearCreatedInstanceRouteHint()
-  // 每 15 秒自动刷新
   refreshInterval = setInterval(loadInstances, 15000)
 })
 
@@ -339,7 +348,6 @@ onUnmounted(() => {
   }
 })
 
-// 当组件被 KeepAlive 停用时，暂停定时器
 onDeactivated(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval)
@@ -351,19 +359,15 @@ onDeactivated(() => {
   }
 })
 
-// 当组件从 KeepAlive 缓存中激活时，重新加载数据
 onActivated(async () => {
   updateViewportState()
-  // 恢复定时刷新
   if (!refreshInterval) {
     refreshInterval = setInterval(loadInstances, 15000)
   }
-  
-  // 检查路由参数是否与当前筛选一致
+
   const currentUserId = route.query.userId ? parseInt(route.query.userId as string) : null
-  
+
   if (currentUserId !== filterUserId.value) {
-    // 路由参数已变化，更新筛选并重新加载
     if (currentUserId) {
       filterUserId.value = currentUserId
       try {
@@ -378,15 +382,13 @@ onActivated(async () => {
     }
     page.value = 1
   }
-  
+
   const forceReload = prepareCreatedInstanceRefresh()
-  // 总是重新加载数据以确保最新
   await loadInstances(forceReload)
   clearCreatedInstanceRouteHint()
 })
 
 async function loadInstances(force = false): Promise<void> {
-  // 如果有操作进行中，跳过刷新
   if (
     !force &&
     loading.value === false &&
@@ -397,7 +399,7 @@ async function loadInstances(force = false): Promise<void> {
       batchDestroySubmitting.value
     )
   ) return
-  
+
   try {
     listError.value = ''
     const params: { page: number; pageSize: number; search: string; userId?: number } = {
@@ -405,7 +407,7 @@ async function loadInstances(force = false): Promise<void> {
       pageSize: pageSize.value,
       search: search.value
     }
-    
+
     if (filterUserId.value) {
       params.userId = filterUserId.value
     }
@@ -413,7 +415,7 @@ async function loadInstances(force = false): Promise<void> {
     if (countryFilter.value) {
       ;(params as typeof params & { countryCode?: string }).countryCode = countryFilter.value
     }
-    
+
     const response = await api.instances.list(params)
     const data = response as { instances?: Instance[]; total?: number; totalPages?: number; availableCountries?: string[] }
     const nextInstances = data.instances || []
@@ -463,15 +465,9 @@ function getCountryLabel(code: string): string {
   return getLocalizedCountryName(code, locale.value, (key, fallback) => t(key, fallback))
 }
 
-function handlePageSizeChange(): void {
-  page.value = 1
-  clearSelection()
-  void loadInstances()
-}
-
-function goToPage(nextPage: number): void {
-  if (nextPage < 1 || nextPage > totalPages.value || nextPage === page.value) return
-  page.value = nextPage
+function handlePaginationChange(payload: { page: number; pageSize: number }): void {
+  page.value = payload.page
+  pageSize.value = payload.pageSize
   clearSelection()
   void loadInstances()
 }
@@ -483,18 +479,6 @@ function formatCurrency(value: number | null | undefined): string {
 
 function getBatchRenewMonthsLabel(months: number): string {
   return configStore.freeSiteMode ? getFreeSiteBillingCycleLabel(months) : t('billing.renewMonths', { months })
-}
-
-function getInstanceLayoutButtonClass(mode: InstanceLayoutMode): string {
-  const active = instanceLayoutMode.value === mode
-  if (active) {
-    return themeStore.isDark
-      ? 'bg-white text-gray-900 shadow-sm'
-      : 'bg-gray-900 text-white shadow-sm'
-  }
-  return themeStore.isDark
-    ? 'text-gray-400 hover:text-gray-100'
-    : 'text-gray-500 hover:text-gray-900'
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -513,7 +497,6 @@ function clearUserFilter(): void {
   void loadInstances()
 }
 
-// 遮蔽 IPv4 地址后两位，例如：1.2.3.4 -> 1.2.*.*
 function maskIpv4(ip: string | null | undefined): string | null {
   if (!ip) return null
   const parts = ip.split('.')
@@ -649,48 +632,22 @@ function closeRowMenu(): void {
   activeRowMenuId.value = null
 }
 
+function getRowMenuInstance(): Instance | null {
+  if (activeRowMenuId.value === null) return null
+  return instances.value.find(i => i.id === activeRowMenuId.value) || null
+}
+
 function formatCpuCores(cpu: number): string {
   const val = cpu / 100
   return Number.isInteger(val) ? String(val) : val.toFixed(1)
 }
 
 function getInstanceConfigSummary(instance: Instance): string {
-  return `${instance.cpu}${t('instance.mobileCard.cpuCore')} ${formatMemory(instance.memory)} ${formatDisk(instance.disk)}`
+  return `${formatCpuCores(instance.cpu)}${t('instance.mobileCard.cpuCore')} ${formatMemory(instance.memory)} ${formatDisk(instance.disk)}`
 }
 
 function getInstanceNetworkMode(instance: Instance): string {
   return String((instance as any).networkMode || instance.network_mode || 'nat')
-}
-
-function getInstanceTypeBadgeClass(instance: Instance): string {
-  if ((instance as any).instanceType === 'vm') {
-    return themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
-  }
-  return themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
-}
-
-function getInstanceNetworkBadgeClass(instance: Instance): string {
-  const neutralChip = themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
-  switch (getInstanceNetworkMode(instance)) {
-    case 'nat_ipv6':
-      return neutralChip
-    case 'nat_ipv6_nat':
-      return neutralChip
-    case 'ipv6_only':
-      return neutralChip
-    case 'ipv6_nat':
-      return neutralChip
-    case 'public_ipv4':
-    case 'public_ipv4_ipv6':
-      return neutralChip
-    case 'nat':
-    default:
-      return neutralChip
-  }
-}
-
-function getInstanceQuotaSummary(instance: Instance): string {
-  return `${(instance as any).portLimit ?? '-'} ${t('instance.mobileCard.ports')} / ${(instance as any).snapshotLimit ?? '-'} ${t('instance.mobileCard.snapshots')} / ${(instance as any).siteLimit ?? '-'} ${t('instance.mobileCard.sites')}`
 }
 
 function formatNetworkRate(value: unknown): string | null {
@@ -781,11 +738,11 @@ function getInstanceTrafficPercent(instance: Instance): number | null {
 function getInstanceTrafficBarColor(instance: Instance): string {
   const percent = getInstanceTrafficPercent(instance)
   if (percent === null) {
-    return themeStore.isDark ? 'bg-primary-400' : 'bg-primary-600'
+    return 'bg-[var(--accent)]'
   }
-  if (percent >= 95) return 'bg-rose-500'
-  if (percent >= 80) return 'bg-amber-500'
-  return themeStore.isDark ? 'bg-primary-400' : 'bg-primary-600'
+  if (percent >= 95) return 'bg-[var(--error)]'
+  if (percent >= 80) return 'bg-[var(--warning)]'
+  return 'bg-[var(--accent)]'
 }
 
 async function copyIp(ip: string): Promise<void> {
@@ -796,7 +753,7 @@ async function copyIp(ip: string): Promise<void> {
       toast.success(t('common.copied'))
     }
   } catch {
-    // ignore clipboard error
+    // ignore
   }
 }
 
@@ -818,26 +775,30 @@ function canDeleteInstance(instance: Instance): boolean {
   return !instance.packagePlanId && (instance as any).allow_instance_deletion !== false
 }
 
-function getInstanceStatusTextClass(instance: Instance): string {
-  switch (instance.status?.toLowerCase()) {
+function getStatusBadgeVariant(status?: string): 'default' | 'success' | 'warning' | 'error' | 'info' {
+  switch (status?.toLowerCase()) {
     case 'running':
-      return 'text-green-600'
+      return 'success'
     case 'stopped':
-      return themeStore.isDark ? 'text-gray-400' : 'text-gray-600'
+      return 'default'
     case 'suspended':
     case 'error':
-      return 'text-red-600'
+      return 'error'
     case 'creating':
     case 'starting':
     case 'stopping':
     case 'restarting':
-      return 'text-yellow-600'
+      return 'warning'
     default:
-      return themeStore.isDark ? 'text-gray-400' : 'text-gray-600'
+      return 'default'
   }
 }
 
-// 从镜像名称提取发行版标识（用于 DistroIcon 组件）
+function isStatusTransient(status?: string): boolean {
+  const s = status?.toLowerCase()
+  return s === 'creating' || s === 'starting' || s === 'stopping' || s === 'restarting'
+}
+
 function getDistroFromName(name: string): string {
   const lowerName = (name || '').toLowerCase()
   const distros = ['almalinux', 'alma', 'alpine', 'arch', 'centos', 'debian', 'fedora', 'gentoo', 'kali', 'mint', 'opensuse', 'suse', 'oracle', 'redhat', 'rhel', 'rockylinux', 'rocky', 'ubuntu', 'void']
@@ -847,17 +808,11 @@ function getDistroFromName(name: string): string {
   return 'linux'
 }
 
-// 获取付费实例的图标类型（根据节点名称判断）
-// 返回 'pro' | 'prime' | null
 function getPaidIconType(instance: Instance): 'pro' | 'prime' | null {
-  // 只有付费实例才显示付费图标
   if (!instance.packagePlanId) return null
-
-  // 根据实例类型判断：虚拟机显示 prime，容器显示 pro
   return instance.instanceType === 'vm' ? 'prime' : 'pro'
 }
 
-// 格式化镜像名称：优先使用 imageName，否则去掉 images: 前缀
 function formatImageName(image: string, imageName?: string | null): string {
   if (imageName) return imageName
   return image?.replace(/^images:/, '') || ''
@@ -883,7 +838,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
     return {
       dateText: null,
       remainingText: t('instance.freeInstanceLabel'),
-      className: 'text-green-500 dark:text-green-400',
+      className: 'text-[var(--success)]',
       title: null
     }
   }
@@ -893,7 +848,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
     return {
       dateText: null,
       remainingText: t('instance.freeInstanceLabel'),
-      className: 'text-green-500 dark:text-green-400',
+      className: 'text-[var(--success)]',
       title: null
     }
   }
@@ -908,7 +863,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
     return {
       dateText,
       remainingText: t('billing.autoRenewing'),
-      className: 'text-green-500 dark:text-green-400',
+      className: 'text-[var(--success)]',
       title: expires.toLocaleString()
     }
   }
@@ -917,7 +872,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
     return {
       dateText,
       remainingText: t('instance.expiredLabel'),
-      className: 'text-red-500 dark:text-red-400',
+      className: 'text-[var(--error)]',
       title: expires.toLocaleString()
     }
   }
@@ -926,7 +881,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
     return {
       dateText,
       remainingText: `${remainingDays} ${t('common.days')}`,
-      className: 'text-red-500 dark:text-red-400',
+      className: 'text-[var(--error)]',
       title: expires.toLocaleString()
     }
   }
@@ -935,7 +890,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
     return {
       dateText,
       remainingText: `${remainingDays} ${t('common.days')}`,
-      className: 'text-yellow-500 dark:text-yellow-400',
+      className: 'text-[var(--warning)]',
       title: expires.toLocaleString()
     }
   }
@@ -943,7 +898,7 @@ function getInstanceExpiryInfo(instance: Instance): InstanceExpiryInfo {
   return {
     dateText,
     remainingText: `${remainingDays} ${t('common.days')}`,
-    className: 'text-green-500 dark:text-green-400',
+    className: 'text-[var(--success)]',
     title: expires.toLocaleString()
   }
 }
@@ -954,12 +909,11 @@ const SIMPLE_BATCH_CONCURRENCY = 5
 
 async function handleAction(instance: Instance, action: InstanceAction): Promise<void> {
   actionLoading.value[instance.id] = action
-  
+
   try {
     if (action === 'start') {
       await api.instances.start(instance.id)
       toast.success(t('instance.startingInstance', { name: instance.name }))
-      // 更新本地状态为启动中
       const idx = instances.value.findIndex(i => i.id === instance.id)
       if (idx !== -1) {
         (instances.value[idx] as any).status = 'starting'
@@ -968,7 +922,6 @@ async function handleAction(instance: Instance, action: InstanceAction): Promise
     else if (action === 'stop') {
       await api.instances.stop(instance.id)
       toast.success(t('instance.stoppedInstance', { name: instance.name }))
-      // 更新本地状态为已停止
       const idx = instances.value.findIndex(i => i.id === instance.id)
       if (idx !== -1) {
         instances.value[idx] = { ...instances.value[idx], status: 'stopped' }
@@ -977,7 +930,6 @@ async function handleAction(instance: Instance, action: InstanceAction): Promise
     else if (action === 'restart') {
       await api.instances.restart(instance.id)
       toast.success(t('instance.restartingInstance', { name: instance.name }))
-      // 更新本地状态为重启中
       const idx = instances.value.findIndex(i => i.id === instance.id)
       if (idx !== -1) {
         (instances.value[idx] as any).status = 'restarting'
@@ -989,19 +941,16 @@ async function handleAction(instance: Instance, action: InstanceAction): Promise
         return
       }
       await api.instances.delete(instance.id)
-      // 立即从本地列表移除，提供即时反馈
       instances.value = instances.value.filter(i => i.id !== instance.id)
       total.value = Math.max(0, total.value - 1)
       toast.success(t('instance.deletedInstance', { name: instance.name }))
     }
   } catch (error: any) {
-    // 检查是否需要二次验证
     if (error?.code === 'VERIFICATION_REQUIRED' || error?.message?.includes('Sensitive operation requires verification')) {
       toast.error(t('instance.verificationRequiredHint'), 6000)
     } else {
       toast.error(`${t('instance.actionFailed')}: ${translateError(error)}`)
     }
-    // 操作失败时重新加载以恢复正确状态
     await loadInstances(true)
   } finally {
     delete actionLoading.value[instance.id]
@@ -1318,159 +1267,233 @@ async function confirmBatchDestroy(): Promise<void> {
     batchDestroySubmitting.value = false
   }
 }
-
 </script>
 
 <template>
-  <div class="kawaii-page kawaii-instances-page space-y-6 animate-fade-in">
-    <!-- 页面头部 (OCI 风格) -->
-    <div class="space-y-1">
-      <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{{ $t('instance.title') }}</h1>
-      <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-        <template v-if="filterUserId && filterUserName">
-          {{ $t('instance.userInstances', { name: filterUserName }) }}
-          <button class="text-blue-600 hover:underline ml-2 text-xs font-medium transition-colors" @click="clearUserFilter">
+  <div class="space-y-6 animate-fade-in pb-12">
+    <!-- Apple HIG PageHeader -->
+    <PageHeader
+      :title="$t('instance.title')"
+      :description="filterUserId && filterUserName ? undefined : $t('instance.manageDesc')"
+    >
+      <template v-if="filterUserId && filterUserName" #description>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-sm text-[var(--text-secondary)]">
+            {{ $t('instance.userInstances', { name: filterUserName }) }}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-6 px-2 text-xs text-[var(--accent)] hover:underline"
+            @click="clearUserFilter"
+          >
             {{ $t('instance.clearFilter') }}
-          </button>
-        </template>
-        <template v-else>
-          {{ $t('instance.manageDesc') }}
-        </template>
-      </p>
-    </div>
+          </Button>
+        </div>
+      </template>
 
-
-    <!-- 操作工具栏 (OCI 风格：创建实例 + 操作下拉 + 视图切换) -->
-    <div class="flex items-center justify-between gap-4">
-      <div class="flex items-center gap-2.5">
-        <RouterLink
-          :to="instanceCreatePath()"
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white transition-colors shadow-sm"
-        >
-          {{ configStore.freeSiteMode ? freeSiteCopy.instanceCreate : $t('instance.create') }}
+      <template #actions>
+        <!-- Create Instance Button -->
+        <RouterLink :to="instanceCreatePath()">
+          <Button variant="primary" size="md">
+            <template #icon>
+              <Plus class="w-4 h-4" />
+            </template>
+            {{ configStore.freeSiteMode ? freeSiteCopy.instanceCreate : $t('instance.create') }}
+          </Button>
         </RouterLink>
 
-        <!-- 操作 ∨ 下拉菜单 -->
-        <div class="relative">
+        <!-- Refresh Button -->
+        <Button
+          variant="secondary"
+          size="md"
+          :loading="loading"
+          @click="loadInstances(true)"
+        >
+          <template #icon>
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': loading }" />
+          </template>
+          {{ $t('common.refresh') }}
+        </Button>
+
+        <!-- Layout Switcher (Desktop) -->
+        <div class="hidden sm:inline-flex items-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-0.5 shadow-sm">
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md font-medium text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            @click="toggleActionsDropdown"
-          >
-            <span>{{ $t('instance.actionsDropdown') }}</span>
-            <span v-if="hasSelectedInstances" class="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-              {{ selectedCount }}
-            </span>
-            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          <div v-if="showActionsDropdown" class="fixed inset-0 z-10" @click="closeActionsDropdown"></div>
-          <div
-            v-if="showActionsDropdown"
-            class="absolute left-0 mt-1 w-48 rounded-md bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20 text-xs"
-          >
-            <button
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="selectedStoppedCount === 0 || !!batchActionLoading"
-              @click="closeActionsDropdown(); handleBatchSimpleAction('start')"
-            >
-              {{ $t('instance.batch.start') }} ({{ selectedStoppedCount }})
-            </button>
-            <button
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="selectedRunningCount === 0 || !!batchActionLoading"
-              @click="closeActionsDropdown(); handleBatchSimpleAction('stop')"
-            >
-              {{ $t('instance.batch.stop') }} ({{ selectedRunningCount }})
-            </button>
-            <button
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="selectedRunningCount === 0 || !!batchActionLoading"
-              @click="closeActionsDropdown(); handleBatchSimpleAction('restart')"
-            >
-              {{ $t('instance.batch.restart') }} ({{ selectedRunningCount }})
-            </button>
-            <button
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="!hasSelectedInstances || !!batchActionLoading"
-              @click="closeActionsDropdown(); handleBatchSimpleAction('sync')"
-            >
-              {{ $t('instance.batch.sync') }}
-            </button>
-            <div class="border-t border-gray-100 dark:border-gray-700 my-1"></div>
-            <button
-              v-if="!isAdminEntry"
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading"
-              @click="closeActionsDropdown(); handleBatchAutoRenew(true)"
-            >
-              {{ $t('instance.batch.autoRenewOn') }}
-            </button>
-            <button
-              v-if="!isAdminEntry"
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading"
-              @click="closeActionsDropdown(); handleBatchAutoRenew(false)"
-            >
-              {{ $t('instance.batch.autoRenewOff') }}
-            </button>
-            <button
-              v-if="!isAdminEntry"
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200"
-              :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading"
-              @click="closeActionsDropdown(); openBatchRenewModal()"
-            >
-              {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewAction : $t('instance.batch.renew') }}
-            </button>
-            <button
-              v-if="!isAdminEntry"
-              type="button"
-              class="w-full text-left px-4 py-2 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-red-600 dark:text-red-400"
-              :disabled="!hasSelectedInstances || isViewingAnotherUsersInstances || !!batchActionLoading"
-              @click="closeActionsDropdown(); openBatchDestroyModal()"
-            >
-              {{ $t('instance.batch.destroy') }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右侧：视图切换与总数 -->
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-gray-500 hidden sm:inline tabular-nums">{{ $t('instance.totalCount', { count: total }) }}</span>
-        <div class="hidden sm:inline-flex items-center rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-0.5">
-          <button
-            type="button"
-            class="p-1.5 rounded transition-colors"
-            :class="getInstanceLayoutButtonClass('list')"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 active:scale-95"
+            :class="instanceLayoutMode === 'list'
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'"
             :title="$t('instance.listLayout')"
             @click="setInstanceLayoutMode('list')"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            <LayoutList class="w-4 h-4" />
           </button>
           <button
             type="button"
-            class="p-1.5 rounded transition-colors"
-            :class="getInstanceLayoutButtonClass('card')"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 active:scale-95"
+            :class="instanceLayoutMode === 'card'
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'"
             :title="$t('instance.cardLayout')"
             @click="setInstanceLayoutMode('card')"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+            <LayoutGrid class="w-4 h-4" />
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
-    <!-- 加载骨架屏 -->
+    <!-- Toolbar: Search & Filters & Batch Dropdown -->
+    <Card padding="sm">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <!-- Search & Country Filters -->
+        <div class="flex flex-1 flex-wrap items-center gap-2.5">
+          <div class="w-full sm:w-64">
+            <Input
+              v-model="search"
+              size="sm"
+              clearable
+              :placeholder="$t('common.search')"
+            >
+              <template #prefix>
+                <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+              </template>
+            </Input>
+          </div>
+
+          <div v-if="availableCountries.length > 0" class="w-36">
+            <Select
+              v-model="countryFilter"
+              size="sm"
+              :options="[
+                { label: $t('common.all'), value: '' },
+                ...availableCountries.map(code => ({
+                  label: getCountryLabel(code),
+                  value: code
+                }))
+              ]"
+              @change="page = 1; clearSelection(); loadInstances()"
+            />
+          </div>
+
+          <div class="text-xs text-[var(--text-tertiary)] tabular-nums hidden lg:inline">
+            {{ $t('instance.totalCount', { count: total }) }}
+          </div>
+        </div>
+
+        <!-- Actions Dropdown -->
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="relative">
+            <Button
+              variant="secondary"
+              size="sm"
+              @click="toggleActionsDropdown"
+            >
+              <span>{{ $t('instance.actionsDropdown') }}</span>
+              <Badge
+                v-if="hasSelectedInstances"
+                variant="info"
+                size="sm"
+                class="ml-1"
+              >
+                {{ selectedCount }}
+              </Badge>
+              <ChevronDown class="w-3.5 h-3.5 ml-1 transition-transform" :class="{ 'rotate-180': showActionsDropdown }" />
+            </Button>
+
+            <div v-if="showActionsDropdown" class="fixed inset-0 z-30" @click="closeActionsDropdown"></div>
+            <div
+              v-if="showActionsDropdown"
+              class="absolute right-0 mt-2 w-52 rounded-2xl bg-[var(--bg-surface)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] border border-[var(--border-color)] p-1.5 z-40 text-xs backdrop-blur-md"
+            >
+              <button
+                type="button"
+                class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                :disabled="selectedStoppedCount === 0 || !!batchActionLoading"
+                @click="closeActionsDropdown(); handleBatchSimpleAction('start')"
+              >
+                <span class="flex items-center gap-2">
+                  <Play class="w-3.5 h-3.5 text-[var(--success)] fill-current" />
+                  <span>{{ $t('instance.batch.start') }}</span>
+                </span>
+                <span class="text-[var(--text-tertiary)] font-mono">({{ selectedStoppedCount }})</span>
+              </button>
+              <button
+                type="button"
+                class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                :disabled="selectedRunningCount === 0 || !!batchActionLoading"
+                @click="closeActionsDropdown(); handleBatchSimpleAction('stop')"
+              >
+                <span class="flex items-center gap-2">
+                  <Square class="w-3.5 h-3.5 text-[var(--warning)] fill-current" />
+                  <span>{{ $t('instance.batch.stop') }}</span>
+                </span>
+                <span class="text-[var(--text-tertiary)] font-mono">({{ selectedRunningCount }})</span>
+              </button>
+              <button
+                type="button"
+                class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                :disabled="selectedRunningCount === 0 || !!batchActionLoading"
+                @click="closeActionsDropdown(); handleBatchSimpleAction('restart')"
+              >
+                <span class="flex items-center gap-2">
+                  <RotateCw class="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>{{ $t('instance.batch.restart') }}</span>
+                </span>
+                <span class="text-[var(--text-tertiary)] font-mono">({{ selectedRunningCount }})</span>
+              </button>
+              <button
+                type="button"
+                class="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                :disabled="!hasSelectedInstances || !!batchActionLoading"
+                @click="closeActionsDropdown(); handleBatchSimpleAction('sync')"
+              >
+                <RefreshCw class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                <span>{{ $t('instance.batch.sync') }}</span>
+              </button>
+              <template v-if="!isAdminEntry">
+                <div class="border-t border-[var(--border-color)] my-1"></div>
+                <button
+                  type="button"
+                  class="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                  :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading"
+                  @click="closeActionsDropdown(); handleBatchAutoRenew(true)"
+                >
+                  {{ $t('instance.batch.autoRenewOn') }}
+                </button>
+                <button
+                  type="button"
+                  class="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                  :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading"
+                  @click="closeActionsDropdown(); handleBatchAutoRenew(false)"
+                >
+                  {{ $t('instance.batch.autoRenewOff') }}
+                </button>
+                <button
+                  type="button"
+                  class="w-full text-left px-3 py-2 rounded-xl hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-primary)]"
+                  :disabled="selectedBillingActionIds.length === 0 || isViewingAnotherUsersInstances || !!batchActionLoading"
+                  @click="closeActionsDropdown(); openBatchRenewModal()"
+                >
+                  {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewAction : $t('instance.batch.renew') }}
+                </button>
+                <button
+                  type="button"
+                  class="w-full text-left px-3 py-2 rounded-xl hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[var(--error)]"
+                  :disabled="!hasSelectedInstances || isViewingAnotherUsersInstances || !!batchActionLoading"
+                  @click="closeActionsDropdown(); openBatchDestroyModal()"
+                >
+                  {{ $t('instance.batch.destroy') }}
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <!-- Loading Skeleton -->
     <SkeletonLoader
       v-if="loading"
       :type="isCardLayout ? 'grid' : 'table'"
@@ -1478,324 +1501,297 @@ async function confirmBatchDestroy(): Promise<void> {
       :cols="isDesktopViewport ? 3 : 1"
     />
 
-    <!-- 加载失败 -->
-    <div v-else-if="listError" class="card p-12 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10">
-        <svg
-          class="h-8 w-8"
-          :class="themeStore.isDark ? 'text-red-400' : 'text-red-500'"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-        </svg>
+    <!-- Load Error -->
+    <Card v-else-if="listError" padding="lg" class="text-center">
+      <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)]">
+        <AlertCircle class="h-7 w-7 stroke-[1.5]" />
       </div>
-      <h3
-        class="text-lg font-medium mb-2"
-        :class="'text-themed'"
-      >
+      <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] mb-1">
         {{ $t('common.loadFailed') }}
       </h3>
-      <p class="text-themed-muted mb-4">{{ listError }}</p>
-      <button class="btn-primary" @click="loadInstances(true)">{{ $t('common.retry') }}</button>
-    </div>
+      <p class="text-sm text-[var(--text-secondary)] mb-6 max-w-sm mx-auto leading-relaxed">
+        {{ listError }}
+      </p>
+      <Button variant="primary" size="md" @click="loadInstances(true)">
+        {{ $t('common.retry') }}
+      </Button>
+    </Card>
 
-    <!-- 空状态 -->
-    <div v-else-if="instances.length === 0" class="card p-12 text-center">
-      <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-themed bg-themed-secondary text-themed-faint">
-        <svg
-          class="h-8 w-8"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-        </svg>
-      </div>
-      <h3 
-        class="text-lg font-medium mb-2"
-        :class="'text-themed'"
+    <!-- Empty State -->
+    <Card v-else-if="instances.length === 0" padding="none">
+      <EmptyState
+        :title="search ? $t('instance.noMatchingInstances') : $t('instance.noInstances')"
+        :description="search ? $t('instance.tryOtherKeywords') : $t('instance.createFirstInstance')"
       >
-        {{ search ? $t('instance.noMatchingInstances') : $t('instance.noInstances') }}
-      </h3>
-      <p class="text-themed-muted mb-4">{{ search ? $t('instance.tryOtherKeywords') : $t('instance.createFirstInstance') }}</p>
-      <RouterLink v-if="!search" :to="instanceCreatePath()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium text-sm bg-gray-900 hover:bg-black text-white transition-colors shadow-sm">{{ configStore.freeSiteMode ? freeSiteCopy.instanceCreateFirst : $t('instance.create') }}</RouterLink>
-    </div>
+        <template v-if="!search" #action>
+          <RouterLink :to="instanceCreatePath()">
+            <Button variant="primary" size="md">
+              <template #icon>
+                <Plus class="w-4 h-4" />
+              </template>
+              {{ configStore.freeSiteMode ? freeSiteCopy.instanceCreateFirst : $t('instance.create') }}
+            </Button>
+          </RouterLink>
+        </template>
+      </EmptyState>
+    </Card>
 
-    <!-- 实例列表 -->
+    <!-- Instances Listing -->
     <template v-else>
-      <!-- 列表布局 (OCI 风格) -->
-      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card" style="background-color: var(--bg-surface); box-shadow: none; border: 1px solid var(--border-color);">
-        <div class="overflow-x-auto oci-table-scroll bg-[var(--bg-surface)]">
-          <table class="w-full table-fixed" style="table-layout: auto;">
-            <thead class="border-b border-[var(--border-color)] dark:border-[var(--border-color)] bg-[var(--bg-surface)]">
-              <tr>
-                <th class="w-12 px-3 py-3 text-center">
-                  <div class="flex items-center justify-center">
-                    <button
-                      type="button"
-                      class="relative flex h-4 w-4 items-center justify-center rounded border border-[var(--border-strong)] bg-[var(--bg-surface)] text-primary-600 transition-colors"
-                      @click="toggleSelectAll"
-                    >
-                      <span v-if="isAllSelected" class="h-2 w-2 rounded-sm bg-current"></span>
-                      <span v-else-if="isPartialSelected" class="h-0.5 w-2 rounded-full bg-current"></span>
-                    </button>
-                  </div>
-                </th>
-                <th class="max-w-64 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider truncate">{{ $t('instance.name') }}</th>
-                <th class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
-                <th class="max-w-40 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
-                <th class="max-w-36 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.privateIp') }}</th>
-                <th class="max-w-48 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.config') }}</th>
-                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.ocpuCount') }}</th>
-                <th class="max-w-28 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.memoryGb') }}</th>
-                <th class="max-w-44 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.createdAt') }}</th>
-                <th v-if="isAdmin" class="max-w-32 px-3.5 py-3 text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider whitespace-nowrap">{{ $t('instance.user') }}</th>
-                <th class="w-full"></th>
-                <th class="sticky right-0 z-10 w-14 px-2 py-3 text-center bg-[var(--bg-surface)] border-l border-[var(--border-color)]">
-                  <span class="sr-only">{{ $t('common.actions') }}</span>
-                </th>
-              </tr>
-            </thead>
-            <TransitionGroup
-              tag="tbody"
-              name="instance-table-order"
-              class="divide-y divide-[var(--border-color)]"
+      <!-- Desktop Table View -->
+      <div v-if="instanceLayoutMode === 'list'" class="hidden overflow-hidden sm:block card">
+        <table class="w-full table-fixed">
+          <thead>
+            <tr class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              <th class="w-[4%] px-3 py-3 text-center">
+                <div class="flex items-center justify-center">
+                  <button
+                    type="button"
+                    class="relative flex h-4 w-4 items-center justify-center rounded border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--accent)] transition-colors active:scale-95"
+                    @click="toggleSelectAll"
+                  >
+                    <span v-if="isAllSelected" class="h-2 w-2 rounded-sm bg-current"></span>
+                    <span v-else-if="isPartialSelected" class="h-0.5 w-2 rounded-full bg-current"></span>
+                  </button>
+                </div>
+              </th>
+              <th class="w-[22%] px-3 py-3">{{ $t('instance.name') }}</th>
+              <th class="w-[11%] px-3 py-3 whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
+              <th class="w-[15%] px-3 py-3 whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
+              <th class="w-[16%] px-3 py-3 whitespace-nowrap">{{ $t('instance.config') }}</th>
+              <th class="w-[14%] px-3 py-3 whitespace-nowrap">{{ $t('instance.trafficLabel') }}</th>
+              <th class="w-[11%] px-3 py-3 whitespace-nowrap">{{ $t('instance.expireAt') }}</th>
+              <th class="w-[7%] px-2 py-3 text-center whitespace-nowrap">
+                <span class="sr-only">{{ $t('common.actions') }}</span>
+              </th>
+            </tr>
+          </thead>
+          <TransitionGroup
+            tag="tbody"
+            name="instance-table-order"
+            class="divide-y divide-[var(--border-color)]"
+          >
+            <tr
+              v-for="instance in instances"
+              :key="instance.id"
+              class="group cursor-pointer transition-colors duration-150 hover:bg-[var(--bg-surface-soft)]"
+              :class="[
+                selectedIds.has(instance.id) ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))]' : 'bg-[var(--bg-surface)]'
+              ]"
+              @click="openInstanceDetail(instance.id)"
             >
-              <tr
-                v-for="instance in instances"
-                :key="instance.id"
-                class="group cursor-pointer transition-colors bg-white hover:bg-[var(--bg-tertiary)] dark:bg-[var(--bg-surface)] dark:hover:bg-[var(--bg-tertiary)]"
-                :class="[
-                  selectedIds.has(instance.id) ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))]' : '',
-                  instance.status?.toLowerCase() === 'creating' ? 'creating-row' : ''
-                ]"
-                @click="openInstanceDetail(instance.id)"
-              >
-                <!-- Checkbox -->
-                <td class="w-12 px-3 py-3.5 text-center" @click.stop>
-                  <div class="flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      class="w-4 h-4 rounded border-gray-300 dark:border-stone-600 accent-primary-600 cursor-pointer"
-                      :checked="selectedIds.has(instance.id)"
-                      @change="toggleSelect(instance.id)"
+              <!-- Checkbox -->
+              <td class="w-[4%] px-3 py-3 text-center" @click.stop>
+                <div class="flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-[var(--border-strong)] accent-[var(--accent)] cursor-pointer"
+                    :checked="selectedIds.has(instance.id)"
+                    @change="toggleSelect(instance.id)"
+                  />
+                </div>
+              </td>
+
+              <!-- Name & OS -->
+              <td class="w-[22%] px-3 py-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 overflow-hidden bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                    <InstanceDisplayIcon
+                      v-if="instance.iconBadgeId || getPaidIconType(instance)"
+                      :badge-id="instance.iconBadgeId"
+                      :fallback-icon="getPaidIconType(instance)"
+                      :alt="instance.name"
+                      :size="28"
+                    />
+                    <DistroIcon
+                      v-else
+                      :distro="getDistroFromName(instance.image)"
+                      :size="24"
                     />
                   </div>
-                </td>
-
-                <!-- Name -->
-                <td class="max-w-64 px-3.5 py-3.5">
-                  <div class="flex flex-col min-w-0 max-w-64">
-                    <div class="flex items-center gap-2 min-w-0">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5 min-w-0">
                       <span
-                        class="font-medium text-sm text-[var(--accent)] hover:underline truncate"
+                        class="font-semibold text-sm text-[var(--text-primary)] hover:text-[var(--accent)] truncate transition-colors"
                         :title="instance.name"
                       >
                         {{ instance.name }}
                       </span>
-                      <span
-                        v-if="!instance.packagePlanId"
-                        class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] dark:bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0"
-                      >
+                      <Badge v-if="!instance.packagePlanId" variant="default" size="sm" class="shrink-0">
                         {{ $t('instance.alwaysFree') }}
-                      </span>
+                      </Badge>
                     </div>
-                    <div class="text-[11px] text-[var(--text-tertiary)] truncate mt-0.5" :title="formatImageName(instance.image, (instance as any).imageName)">
+                    <div class="text-xs text-[var(--text-tertiary)] truncate mt-0.5" :title="formatImageName(instance.image, (instance as any).imageName)">
                       {{ formatImageName(instance.image, (instance as any).imageName) }}
                     </div>
                   </div>
-                </td>
+                </div>
+              </td>
 
-                <!-- Status -->
-                <td class="max-w-32 px-3.5 py-3.5 whitespace-nowrap">
-                  <span
-                    v-if="instance.status?.toLowerCase() === 'running'"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/50"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                    {{ $t('instance.status.running') }}
-                  </span>
-                  <span
-                    v-else-if="instance.status?.toLowerCase() === 'stopped'"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--bg-tertiary)] text-stone-600 border border-[var(--border-color)] dark:bg-[var(--bg-tertiary)] dark:text-[var(--text-secondary)] dark:border-[var(--border-color)]"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full bg-stone-400 shrink-0"></span>
-                    {{ $t('instance.status.stopped') }}
-                  </span>
-                  <span
-                    v-else
-                    :class="['inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border', getStatusInfo(instance.status, t).class]"
-                  >
-                    <span :class="['w-1.5 h-1.5 rounded-full shrink-0', getStatusInfo(instance.status, t).dot]"></span>
-                    {{ getStatusInfo(instance.status, t).label }}
-                  </span>
-                </td>
-
-                <!-- Public IP -->
-                <td class="max-w-40 px-3.5 py-3.5 font-mono text-xs text-themed whitespace-nowrap truncate" :title="getPublicIp(instance)">
-                  {{ getPublicIp(instance) }}
-                </td>
-
-                <!-- Private IP -->
-                <td class="max-w-36 px-3.5 py-3.5 font-mono text-xs text-themed-muted whitespace-nowrap truncate" :title="getPrivateIp(instance)">
-                  {{ getPrivateIp(instance) }}
-                </td>
-
-                <!-- Shape/Config -->
-                <td class="max-w-48 px-3.5 py-3.5 text-xs text-themed whitespace-nowrap truncate" :title="getInstancePlanName(instance)">
-                  {{ getInstancePlanName(instance) }}
-                </td>
-
-                <!-- CPU 核心数 -->
-                <td class="max-w-28 px-3.5 py-3.5 font-mono text-xs text-themed whitespace-nowrap">
-                  {{ formatCpuCores(instance.cpu) }}
-                </td>
-
-                <!-- Memory (GB) -->
-                <td class="max-w-28 px-3.5 py-3.5 font-mono text-xs text-themed whitespace-nowrap">
-                  {{ (instance.memory / 1024) >= 1 ? (instance.memory / 1024).toFixed(0) : formatMemory(instance.memory) }}
-                </td>
-
-                <!-- Created At -->
-                <td class="max-w-44 px-3.5 py-3.5 font-mono text-xs text-themed-muted whitespace-nowrap">
-                  {{ formatDate(instance.created_at ?? instance.createdAt) }}
-                </td>
-
-                <!-- User (Admin only) -->
-                <td v-if="isAdmin" class="max-w-32 px-3.5 py-3.5 text-xs text-themed-muted whitespace-nowrap truncate" :title="(instance as any).username || '-'">
-                  {{ (instance as any).username || '-' }}
-                </td>
-
-                <!-- Spacer Column -->
-                <td class="w-full"></td>
-
-                <!-- Actions: Fixed/Sticky to right -->
-                <td
-                  class="sticky right-0 z-10 w-14 px-2 py-3.5 text-center border-l border-[var(--border-color)] transition-colors"
-                  :class="[
-                    selectedIds.has(instance.id)
-                      ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))]'
-                      : 'bg-white group-hover:bg-[var(--bg-tertiary)] dark:bg-[var(--bg-surface)] dark:group-hover:bg-[var(--bg-tertiary)]'
-                  ]"
-                  @click.stop
+              <!-- Status -->
+              <td class="w-[11%] px-3 py-3 whitespace-nowrap">
+                <Badge
+                  :variant="getStatusBadgeVariant(instance.status)"
+                  size="sm"
+                  dot
+                  :pulse="isStatusTransient(instance.status)"
                 >
-                  <div class="inline-flex items-center justify-center">
+                  {{ getStatusInfo(instance.status, t).label }}
+                </Badge>
+              </td>
+
+              <!-- IP -->
+              <td class="w-[15%] px-3 py-3 font-mono text-xs">
+                <div class="space-y-0.5 min-w-0">
+                  <div class="flex items-center gap-1.5 min-w-0 text-[var(--text-primary)]">
+                    <span class="truncate" :title="getPublicIp(instance)">{{ getPublicIp(instance) }}</span>
                     <button
+                      v-if="getPublicIp(instance) && getPublicIp(instance) !== '-'"
                       type="button"
-                      class="p-1.5 rounded hover:bg-black/[0.06] dark:hover:bg-white/[0.08] text-themed-muted transition-colors cursor-pointer"
-                      :title="$t('instance.actions.more') || $t('instance.details')"
-                      @click.stop="toggleRowMenu(instance.id, $event)"
+                      class="shrink-0 p-0.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] rounded transition-colors"
+                      :title="$t('common.copy')"
+                      @click.stop="copyIp(getPublicIp(instance))"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
+                      <Copy class="w-3 h-3" />
                     </button>
-
-                    <Teleport to="body">
-                      <div
-                        v-if="activeRowMenuId === instance.id"
-                        class="fixed inset-0 z-40"
-                        @click.stop="closeRowMenu"
-                      ></div>
-                      <div
-                        v-if="activeRowMenuId === instance.id"
-                        class="dropdown-menu kawaii-menu-panel fixed z-50 w-44 rounded border border-themed bg-[var(--bg-surface)] shadow-2xl py-1.5 text-left text-xs select-none"
-                        :style="{ top: `${rowMenuPosition.top}px`, right: `${rowMenuPosition.right}px` }"
-                        @click.stop
-                      >
-                        <button
-                          type="button"
-                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-themed transition-colors hover:bg-themed-hover"
-                          @click.stop="closeRowMenu(); openInstanceDetail(instance.id)"
-                        >
-                          {{ $t('instance.details') }}
-                        </button>
-
-                        <div class="border-t border-themed my-1"></div>
-
-                        <button
-                          v-if="canStartInstance(instance)"
-                          type="button"
-                          :disabled="!!actionLoading[instance.id]"
-                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-success transition-colors hover:bg-themed-hover disabled:opacity-50"
-                          @click.stop="closeRowMenu(); handleAction(instance, 'start')"
-                        >
-                          {{ $t('instance.actions.start') }}
-                        </button>
-                        <button
-                          v-if="instance.status?.toLowerCase() === 'running'"
-                          type="button"
-                          :disabled="!!actionLoading[instance.id]"
-                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-warning transition-colors hover:bg-themed-hover disabled:opacity-50"
-                          @click.stop="closeRowMenu(); handleAction(instance, 'stop')"
-                        >
-                          {{ $t('instance.actions.stop') }}
-                        </button>
-                        <button
-                          v-if="instance.status?.toLowerCase() === 'running'"
-                          type="button"
-                          :disabled="!!actionLoading[instance.id]"
-                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-accent transition-colors hover:bg-themed-hover disabled:opacity-50"
-                          @click.stop="closeRowMenu(); handleAction(instance, 'restart')"
-                        >
-                          {{ $t('instance.actions.restart') }}
-                        </button>
-
-                        <button
-                          v-if="canResetInstanceTraffic(instance)"
-                          type="button"
-                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-themed transition-colors hover:bg-themed-hover"
-                          @click.stop="closeRowMenu(); openResetTrafficModal(instance)"
-                        >
-                          {{ $t('admin.hosts.resetTraffic') }}
-                        </button>
-
-
-                        <div v-if="canDeleteInstance(instance)" class="border-t border-themed my-1"></div>
-                        <button
-                          v-if="canDeleteInstance(instance)"
-                          type="button"
-                          class="kawaii-menu-item w-full text-left px-3.5 py-1.5 text-danger transition-colors hover:bg-themed-hover"
-                          @click.stop="closeRowMenu(); handleAction(instance, 'delete')"
-                        >
-                          {{ $t('instance.actions.delete') }}
-                        </button>
-                      </div>
-                    </Teleport>
                   </div>
-                </td>
-              </tr>
-            </TransitionGroup>
-          </table>
-        </div>
+                  <div v-if="getPrivateIp(instance) && getPrivateIp(instance) !== '-'" class="text-[var(--text-tertiary)] text-[11px] truncate" :title="getPrivateIp(instance)">
+                    {{ getPrivateIp(instance) }}
+                  </div>
+                </div>
+              </td>
+
+              <!-- Config -->
+              <td class="w-[16%] px-3 py-3 text-xs">
+                <div class="space-y-0.5 min-w-0">
+                  <div class="font-medium text-[var(--text-primary)] truncate" :title="getInstancePlanName(instance)">
+                    {{ getInstancePlanName(instance) }}
+                  </div>
+                  <div class="text-[var(--text-tertiary)] text-[11px] font-mono truncate">
+                    {{ formatCpuCores(instance.cpu) }}{{ $t('instance.mobileCard.cpuCore') }} · {{ formatMemory(instance.memory) }} · {{ formatDisk(instance.disk) }}
+                  </div>
+                </div>
+              </td>
+
+              <!-- Traffic -->
+              <td class="w-[14%] px-3 py-3 text-xs">
+                <div class="space-y-1 min-w-0">
+                  <div class="flex items-center justify-between text-[11px] font-mono">
+                    <span class="text-[var(--text-secondary)] truncate">{{ getInstanceTrafficUsage(instance) }}</span>
+                    <span v-if="getInstanceTrafficPercent(instance) !== null" class="text-[var(--text-tertiary)] ml-1">
+                      {{ getInstanceTrafficPercent(instance) }}%
+                    </span>
+                  </div>
+                  <div class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                    <div
+                      class="h-full rounded-full transition-all duration-300"
+                      :class="getInstanceTrafficBarColor(instance)"
+                      :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
+                    ></div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Expiry -->
+              <td class="w-[11%] px-3 py-3 text-xs">
+                <div class="space-y-0.5 min-w-0" :title="getInstanceExpiryInfo(instance).title || ''">
+                  <div class="font-medium text-[11px]" :class="getInstanceExpiryInfo(instance).className">
+                    {{ getInstanceExpiryInfo(instance).remainingText }}
+                  </div>
+                  <div v-if="getInstanceExpiryInfo(instance).dateText" class="font-mono text-[10px] text-[var(--text-tertiary)] truncate">
+                    {{ getInstanceExpiryInfo(instance).dateText }}
+                  </div>
+                  <div v-if="isAdmin && (instance as any).username" class="text-[10px] text-[var(--text-tertiary)] truncate" :title="(instance as any).username">
+                    {{ (instance as any).username }}
+                  </div>
+                </div>
+              </td>
+
+              <!-- Actions -->
+              <td class="w-[7%] px-2 py-3 text-center" @click.stop>
+                <div class="inline-flex items-center justify-center gap-1">
+                  <button
+                    v-if="canStartInstance(instance)"
+                    type="button"
+                    :disabled="!!actionLoading[instance.id]"
+                    class="p-1 rounded-full text-[var(--success)] hover:bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] transition-all duration-200 active:scale-95 disabled:opacity-50"
+                    :title="$t('instance.actions.start')"
+                    @click.stop="handleAction(instance, 'start')"
+                  >
+                    <Loader2 v-if="actionLoading[instance.id] === 'start'" class="w-3.5 h-3.5 animate-spin" />
+                    <Play v-else class="w-3.5 h-3.5 fill-current" />
+                  </button>
+                  <button
+                    v-else-if="instance.status?.toLowerCase() === 'running'"
+                    type="button"
+                    :disabled="!!actionLoading[instance.id]"
+                    class="p-1 rounded-full text-[var(--warning)] hover:bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] transition-all duration-200 active:scale-95 disabled:opacity-50"
+                    :title="$t('instance.actions.restart')"
+                    @click.stop="handleAction(instance, 'restart')"
+                  >
+                    <Loader2 v-if="actionLoading[instance.id] === 'restart'" class="w-3.5 h-3.5 animate-spin" />
+                    <RotateCw v-else class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    v-if="instance.status?.toLowerCase() === 'running'"
+                    type="button"
+                    :disabled="!!actionLoading[instance.id]"
+                    class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] transition-all duration-200 active:scale-95 disabled:opacity-50"
+                    :title="$t('instance.actions.stop')"
+                    @click.stop="handleAction(instance, 'stop')"
+                  >
+                    <Loader2 v-if="actionLoading[instance.id] === 'stop'" class="w-3.5 h-3.5 animate-spin" />
+                    <Square v-else class="w-3.5 h-3.5 fill-current" />
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-all duration-200 active:scale-95"
+                    :title="$t('instance.actions.more') || $t('instance.details')"
+                    @click.stop="toggleRowMenu(instance.id, $event)"
+                  >
+                    <MoreHorizontal class="w-4 h-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </TransitionGroup>
+        </table>
       </div>
 
-      <!-- 卡片布局 -->
-      <div v-else>
-        <TransitionGroup name="instance-stack-order" tag="div" class="space-y-3 sm:hidden">
-          <div
-            v-for="instance in instances"
-            :key="instance.id"
-            class="nimbus-card-lift card overflow-hidden transition-all rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)]"
-            :class="[
-              instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
-              selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : ''
-            ]"
-          >
-            <div class="p-4 space-y-3">
-              <!-- Header: Checkbox + Icon + Name & Status -->
-              <div class="flex items-start gap-3">
+      <!-- Desktop Card View -->
+      <TransitionGroup
+        v-else-if="instanceLayoutMode === 'card'"
+        name="instance-card-order"
+        tag="div"
+        class="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+      >
+        <Card
+          v-for="instance in instances"
+          :key="instance.id"
+          padding="none"
+          class="group transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] flex flex-col justify-between"
+          :class="[
+            selectedIds.has(instance.id) ? 'ring-2 ring-[var(--accent)] border-[var(--accent)]' : ''
+          ]"
+        >
+          <div class="p-5 space-y-4">
+            <!-- Card Top: Checkbox, Icon, Name, Badges & Status -->
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-start gap-3 min-w-0 flex-1">
+                <!-- Checkbox -->
                 <div class="pt-0.5 shrink-0" @click.stop>
                   <input
                     type="checkbox"
-                    class="w-4 h-4 rounded border-gray-300 accent-primary-600 cursor-pointer touch-manipulation"
+                    class="w-4 h-4 rounded border-[var(--border-strong)] accent-[var(--accent)] cursor-pointer"
                     :checked="selectedIds.has(instance.id)"
-                    @click.stop
                     @change="toggleSelect(instance.id)"
                   />
                 </div>
+
+                <!-- Icon -->
                 <div
-                  class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] cursor-pointer"
+                  class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden bg-[var(--bg-surface-soft)] border border-[var(--border-color)] cursor-pointer"
                   @click="openInstanceDetail(instance.id)"
                 >
                   <InstanceDisplayIcon
@@ -1803,963 +1799,1006 @@ async function confirmBatchDestroy(): Promise<void> {
                     :badge-id="instance.iconBadgeId"
                     :fallback-icon="getPaidIconType(instance)"
                     :alt="instance.name"
-                    :size="36"
+                    :size="32"
                   />
                   <DistroIcon
                     v-else
                     :distro="getDistroFromName(instance.image)"
-                    :size="32"
+                    :size="28"
                   />
                 </div>
-                <div class="flex-1 min-w-0 cursor-pointer" @click="openInstanceDetail(instance.id)">
-                  <div class="flex items-center justify-between gap-2">
-                    <h3 class="font-semibold text-themed truncate text-sm">
-                      {{ instance.name }}
-                    </h3>
-                    <span :class="['inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 font-mono text-[11px] border', getStatusInfo(instance.status, t).class]">
-                      <span :class="['w-1 h-1 rounded-full', getStatusInfo(instance.status, t).dot]"></span>
-                      <span :class="getInstanceStatusTextClass(instance)">{{ getStatusInfo(instance.status, t).label }}</span>
-                    </span>
-                  </div>
-                  <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span
-                      class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
-                      :class="getInstanceTypeBadgeClass(instance)"
-                    >
-                      {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
-                    </span>
-                    <span
-                      class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
-                      :class="getInstanceNetworkBadgeClass(instance)"
-                      :title="getInstanceNetworkSummary(instance)"
-                    >
-                      {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
-                    </span>
-                    <span class="text-[11px] text-themed-muted truncate max-w-[140px]" :title="getInstancePlanName(instance)">
-                      {{ getInstancePlanName(instance) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              <!-- IP Address Row -->
-              <div
-                class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04] text-xs cursor-pointer"
-                @click="openInstanceDetail(instance.id)"
-              >
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <span class="text-[10px] font-semibold uppercase tracking-wider text-themed-muted shrink-0">IP</span>
-                  <span class="font-mono text-themed truncate font-medium" :title="getPrimaryIp(instance)">
-                    {{ getPrimaryIp(instance) }}
-                  </span>
-                </div>
-                <button
-                  v-if="getPrimaryIp(instance) && getPrimaryIp(instance) !== '-'"
-                  type="button"
-                  class="shrink-0 p-1 text-themed-muted hover:text-themed rounded hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
-                  :title="$t('common.copy')"
-                  @click.stop="copyIp(getPrimaryIp(instance))"
-                >
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </button>
-              </div>
-
-              <!-- Hardware Specs Ribbon -->
-              <div class="grid grid-cols-3 gap-1.5 text-center cursor-pointer" :title="getInstanceConfigSummary(instance)" @click="openInstanceDetail(instance.id)">
-                <div class="p-1.5 rounded-md bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                  <div class="text-[9px] uppercase font-semibold tracking-wider text-themed-muted">CPU</div>
-                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
-                    {{ instance.cpu }} {{ $t('instance.mobileCard.cpuCore') }}
-                  </div>
-                </div>
-                <div class="p-1.5 rounded-md bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                  <div class="text-[9px] uppercase font-semibold tracking-wider text-themed-muted">RAM</div>
-                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
-                    {{ formatMemory(instance.memory) }}
-                  </div>
-                </div>
-                <div class="p-1.5 rounded-md bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                  <div class="text-[9px] uppercase font-semibold tracking-wider text-themed-muted">DISK</div>
-                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
-                    {{ formatDisk(instance.disk) }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Traffic Progress Bar -->
-              <div class="space-y-1 cursor-pointer" @click="openInstanceDetail(instance.id)">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-themed-muted text-[11px]">{{ $t('instance.mobileCard.traffic') }}</span>
-                  <span class="font-mono text-themed tabular-nums text-[11px]">
-                    {{ getInstanceTrafficUsage(instance) }}
-                  </span>
-                </div>
-                <div class="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
-                  <div
-                    class="h-full rounded-full transition-all duration-300"
-                    :class="getInstanceTrafficBarColor(instance)"
-                    :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
-                  ></div>
-                </div>
-              </div>
-
-              <!-- Region, Quota & Expiry Details -->
-              <div class="space-y-1.5 pt-1 text-xs cursor-pointer" @click="openInstanceDetail(instance.id)">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-themed-muted">{{ $t('instance.mobileCard.host') }}</span>
-                  <span class="inline-flex items-center gap-1 text-themed" :title="getInstanceRegionLabel(instance)">
-                    <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" />
-                    <span>{{ getInstanceHostName(instance) }}</span>
-                  </span>
-                </div>
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-themed-muted">{{ $t('instance.mobileCard.quota') }}</span>
-                  <span class="font-mono tabular-nums text-themed">{{ getInstanceQuotaSummary(instance) }}</span>
-                </div>
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-themed-muted">{{ $t('instance.expireAt') }}</span>
-                  <span :class="getInstanceExpiryInfo(instance).className" :title="getInstanceExpiryInfo(instance).title || ''">
-                    <template v-if="getInstanceExpiryInfo(instance).dateText">
-                      <span class="font-mono tabular-nums text-themed-muted mr-1">{{ getInstanceExpiryInfo(instance).dateText }}</span>
-                    </template>
-                    <span class="font-medium">{{ getInstanceExpiryInfo(instance).remainingText }}</span>
-                  </span>
-                </div>
-                <div v-if="isAdmin && (instance as any).username" class="flex items-center justify-between text-[11px]">
-                  <span class="text-themed-muted">{{ $t('instance.mobileCard.user') }}</span>
-                  <span class="text-themed font-medium">{{ (instance as any).username }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Mobile Card Actions Bar -->
-            <div
-              class="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.01] dark:bg-white/[0.01]"
-            >
-              <div class="flex items-center gap-1">
-                <button
-                  v-if="canStartInstance(instance)"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-emerald-600 dark:text-emerald-400"
-                  @click.stop="handleAction(instance, 'start')"
-                >
-                  <svg v-if="actionLoading[instance.id] === 'start'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>{{ actionLoading[instance.id] === 'start' ? '...' : $t('instance.actions.start') }}</span>
-                </button>
-                <button
-                  v-if="instance.status?.toLowerCase() === 'running'"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-themed"
-                  @click.stop="handleAction(instance, 'restart')"
-                >
-                  <svg v-if="actionLoading[instance.id] === 'restart'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>{{ actionLoading[instance.id] === 'restart' ? '...' : $t('instance.actions.restart') }}</span>
-                </button>
-                <button
-                  v-if="instance.status?.toLowerCase() === 'running'"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-themed-muted hover:text-red-500"
-                  @click.stop="handleAction(instance, 'stop')"
-                >
-                  <svg v-if="actionLoading[instance.id] === 'stop'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                  </svg>
-                  <span>{{ actionLoading[instance.id] === 'stop' ? '...' : $t('instance.actions.stop') }}</span>
-                </button>
-              </div>
-
-              <div class="flex items-center gap-1">
-                <button
-                  v-if="canResetInstanceTraffic(instance)"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs"
-                  @click.stop="openResetTrafficModal(instance)"
-                >
-                  <span>{{ actionLoading[instance.id] === 'resetTraffic' ? '...' : $t('admin.hosts.resetTraffic') }}</span>
-                </button>
-                <button
-                  v-if="canDeleteInstance(instance)"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="btn-ghost btn-sm px-2 py-1 h-7 text-xs text-red-500 hover:text-red-400"
-                  @click.stop="handleAction(instance, 'delete')"
-                >
-                  <span>{{ actionLoading[instance.id] === 'delete' ? '...' : $t('instance.actions.delete') }}</span>
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex h-7 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black px-2.5 text-xs font-medium hover:opacity-90 transition-opacity"
-                  @click.stop="openInstanceDetail(instance.id)"
-                >
-                  {{ $t('instance.card.manage') }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </TransitionGroup>
-
-        <TransitionGroup
-          name="instance-card-order"
-          tag="div"
-          class="hidden sm:grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3"
-        >
-          <article
-            v-for="instance in instances"
-            :key="instance.id"
-            class="nimbus-instance-card group relative flex flex-col justify-between rounded-xl border p-4 sm:p-5 transition-all duration-200"
-            :class="[
-              instance.status?.toLowerCase() === 'creating' ? 'creating-card' : '',
-              selectedIds.has(instance.id) ? 'ring-2 ring-primary-500/50 border-primary-500/50' : 'border-[var(--border-color)]',
-              'bg-[var(--bg-surface)] dark:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)]'
-            ]"
-          >
-            <div>
-              <!-- Header: Icon, Name, Type/Network Badges, Status Pill & Select Checkbox -->
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex items-start gap-3 min-w-0 flex-1">
-                  <!-- Distro / Custom Icon -->
-                  <div
-                    class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] cursor-pointer"
+                <!-- Name & Tags -->
+                <div class="min-w-0 flex-1">
+                  <h3
+                    class="font-semibold text-base text-[var(--text-primary)] hover:text-[var(--accent)] truncate transition-colors cursor-pointer"
+                    :title="instance.name"
                     @click="openInstanceDetail(instance.id)"
                   >
-                    <InstanceDisplayIcon
-                      v-if="instance.iconBadgeId || getPaidIconType(instance)"
-                      :badge-id="instance.iconBadgeId"
-                      :fallback-icon="getPaidIconType(instance)"
-                      :alt="instance.name"
-                      :size="36"
-                    />
-                    <DistroIcon
-                      v-else
-                      :distro="getDistroFromName(instance.image)"
-                      :size="32"
-                    />
-                  </div>
-
-                  <!-- Name and Metadata -->
-                  <div class="min-w-0 flex-1">
-                    <h2
-                      class="text-base font-semibold leading-snug text-themed truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer"
-                      :title="instance.name"
-                      @click="openInstanceDetail(instance.id)"
-                    >
-                      {{ instance.name }}
-                    </h2>
-                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span
-                        class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
-                        :class="getInstanceTypeBadgeClass(instance)"
-                      >
-                        {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
-                      </span>
-                      <span
-                        class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium"
-                        :class="getInstanceNetworkBadgeClass(instance)"
-                        :title="getInstanceNetworkSummary(instance)"
-                      >
-                        {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
-                      </span>
-                      <span class="inline-flex items-center gap-1 text-xs text-themed-muted truncate" :title="getInstanceRegionLabel(instance)">
-                        <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" />
-                        <span>{{ getInstanceHostName(instance) }}</span>
-                      </span>
-                      <span class="text-xs text-themed-muted truncate max-w-[140px]" :title="getInstancePlanName(instance)">
-                        · {{ getInstancePlanName(instance) }}
-                      </span>
-                    </div>
+                    {{ instance.name }}
+                  </h3>
+                  <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                    <Badge variant="default" size="sm">
+                      {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
+                    </Badge>
+                    <Badge variant="default" size="sm" :title="getInstanceNetworkSummary(instance)">
+                      {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
+                    </Badge>
+                    <span class="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] truncate" :title="getInstanceRegionLabel(instance)">
+                      <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" />
+                      <span>{{ getInstanceHostName(instance) }}</span>
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                <!-- Status pill & selection toggle -->
-                <div class="flex items-center gap-2 shrink-0">
-                  <span :class="['inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-xs font-medium border', getStatusInfo(instance.status, t).class]">
-                    <span :class="['w-1.5 h-1.5 rounded-full', getStatusInfo(instance.status, t).dot]"></span>
-                    <span :class="getInstanceStatusTextClass(instance)">{{ getStatusInfo(instance.status, t).label }}</span>
-                  </span>
+              <!-- Status Badge -->
+              <Badge
+                :variant="getStatusBadgeVariant(instance.status)"
+                size="sm"
+                dot
+                :pulse="isStatusTransient(instance.status)"
+                class="shrink-0"
+              >
+                {{ getStatusInfo(instance.status, t).label }}
+              </Badge>
+            </div>
 
+            <!-- IP Strip -->
+            <div
+              class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs cursor-pointer"
+              @click="openInstanceDetail(instance.id)"
+            >
+              <div class="flex items-center gap-2 min-w-0 font-mono">
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">IP</span>
+                <span class="text-[var(--text-primary)] truncate font-medium" :title="getPrimaryIp(instance)">
+                  {{ getPrimaryIp(instance) }}
+                </span>
+              </div>
+              <button
+                v-if="getPrimaryIp(instance) && getPrimaryIp(instance) !== '-'"
+                type="button"
+                class="shrink-0 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] rounded transition-colors"
+                :title="$t('common.copy')"
+                @click.stop="copyIp(getPrimaryIp(instance))"
+              >
+                <Copy class="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <!-- Hardware Specs Ribbon -->
+            <div
+              class="grid grid-cols-3 gap-2 text-center cursor-pointer"
+              :title="getInstanceConfigSummary(instance)"
+              @click="openInstanceDetail(instance.id)"
+            >
+              <div class="p-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div class="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">CPU</div>
+                <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatCpuCores(instance.cpu) }} {{ $t('instance.mobileCard.cpuCore') }}
+                </div>
+              </div>
+              <div class="p-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div class="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">RAM</div>
+                <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatMemory(instance.memory) }}
+                </div>
+              </div>
+              <div class="p-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div class="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">DISK</div>
+                <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatDisk(instance.disk) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Traffic Progress Bar -->
+            <div class="space-y-1.5 cursor-pointer" @click="openInstanceDetail(instance.id)">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[var(--text-tertiary)] text-[11px]">{{ $t('instance.trafficLabel') }}</span>
+                <span class="font-mono text-[var(--text-secondary)] tabular-nums text-[11px]">
+                  {{ getInstanceTrafficUsage(instance) }}
+                </span>
+              </div>
+              <div class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div
+                  class="h-full rounded-full transition-all duration-300"
+                  :class="getInstanceTrafficBarColor(instance)"
+                  :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- Billing & Expiry Info -->
+            <div class="flex items-center justify-between pt-2 border-t border-[var(--border-color)] text-xs">
+              <div class="flex items-center gap-1.5 min-w-0" :title="getInstanceExpiryInfo(instance).title || ''">
+                <span class="text-[var(--text-tertiary)] text-[11px]">{{ $t('instance.expireAt') }}:</span>
+                <span class="font-medium text-[11px] truncate" :class="getInstanceExpiryInfo(instance).className">
+                  {{ getInstanceExpiryInfo(instance).remainingText || getInstanceExpiryInfo(instance).dateText || '-' }}
+                </span>
+              </div>
+              <div class="flex items-center gap-2.5 shrink-0">
+                <span class="font-mono font-medium text-xs text-[var(--text-primary)]">{{ getInstanceMonthlyPrice(instance) }}</span>
+                <div v-if="canUseInstanceBillingAction(instance)" class="flex items-center gap-1" :title="$t('instance.card.autoRenew')">
                   <button
                     type="button"
-                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer"
-                    :class="selectedIds.has(instance.id)
-                      ? 'border-primary-600 bg-primary-600 text-white'
-                      : 'border-black/20 dark:border-white/20 bg-transparent text-transparent hover:border-black/40 dark:hover:border-white/40'"
-                    :aria-pressed="selectedIds.has(instance.id)"
-                    @click.stop="toggleSelect(instance.id)"
+                    class="relative inline-flex h-4 w-7 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    :class="(instance as any).autoRenew ? 'bg-[var(--accent)]' : 'bg-[var(--border-strong)]'"
+                    :disabled="!!actionLoading[instance.id]"
+                    :aria-pressed="!!(instance as any).autoRenew"
+                    @click.stop="handleSingleAutoRenew(instance, !(instance as any).autoRenew)"
                   >
-                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                    </svg>
+                    <span
+                      class="inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform"
+                      :class="(instance as any).autoRenew ? 'translate-x-3.5' : 'translate-x-0.5'"
+                    ></span>
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <!-- IP Address Row -->
-              <div class="mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.05]">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="text-[11px] font-semibold uppercase tracking-wider text-themed-muted shrink-0">IP</span>
-                  <span class="font-mono text-xs text-themed truncate font-medium select-all" :title="getPrimaryIp(instance)">
-                    {{ getPrimaryIp(instance) }}
-                  </span>
-                </div>
-                <button
-                  v-if="getPrimaryIp(instance) && getPrimaryIp(instance) !== '-'"
-                  type="button"
-                  class="shrink-0 p-1 text-themed-muted hover:text-themed rounded hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
-                  :title="$t('common.copy')"
-                  @click.stop="copyIp(getPrimaryIp(instance))"
-                >
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </button>
+          <!-- Card Footer Actions Bar -->
+          <div class="px-5 py-3 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-between gap-2">
+            <!-- Power Buttons -->
+            <div class="flex items-center gap-1">
+              <Button
+                v-if="canStartInstance(instance)"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs text-[var(--success)]"
+                :disabled="!!actionLoading[instance.id]"
+                :loading="actionLoading[instance.id] === 'start'"
+                :title="$t('instance.actions.start')"
+                @click.stop="handleAction(instance, 'start')"
+              >
+                <template #icon>
+                  <Play class="w-3.5 h-3.5 fill-current" />
+                </template>
+              </Button>
+              <Button
+                v-if="instance.status?.toLowerCase() === 'running'"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs text-[var(--warning)]"
+                :disabled="!!actionLoading[instance.id]"
+                :loading="actionLoading[instance.id] === 'restart'"
+                :title="$t('instance.actions.restart')"
+                @click.stop="handleAction(instance, 'restart')"
+              >
+                <template #icon>
+                  <RotateCw class="w-3.5 h-3.5" />
+                </template>
+              </Button>
+              <Button
+                v-if="instance.status?.toLowerCase() === 'running'"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--error)]"
+                :disabled="!!actionLoading[instance.id]"
+                :loading="actionLoading[instance.id] === 'stop'"
+                :title="$t('instance.actions.stop')"
+                @click.stop="handleAction(instance, 'stop')"
+              >
+                <template #icon>
+                  <Square class="w-3.5 h-3.5 fill-current" />
+                </template>
+              </Button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 px-2.5 text-xs"
+                @click.stop="openInstanceTransfer(instance)"
+              >
+                {{ $t('instance.card.push') }}
+              </Button>
+              <Button
+                v-if="canUseInstanceBillingAction(instance)"
+                variant="secondary"
+                size="sm"
+                class="h-8 px-2.5 text-xs"
+                :disabled="!!actionLoading[instance.id]"
+                @click.stop="openSingleRenewModal(instance)"
+              >
+                {{ $t('instance.card.renew') }}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                class="h-8 px-3 text-xs"
+                @click.stop="openInstanceDetail(instance.id)"
+              >
+                {{ $t('instance.card.manage') }}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </TransitionGroup>
+
+      <!-- Mobile Stack View -->
+      <TransitionGroup name="instance-stack-order" tag="div" class="space-y-3 sm:hidden">
+        <Card
+          v-for="instance in instances"
+          :key="instance.id"
+          padding="none"
+          class="overflow-hidden"
+          :class="[
+            selectedIds.has(instance.id) ? 'ring-2 ring-[var(--accent)] border-[var(--accent)]' : ''
+          ]"
+        >
+          <div class="p-4 space-y-3">
+            <!-- Header: Checkbox + Icon + Name & Status -->
+            <div class="flex items-start gap-3">
+              <div class="pt-0.5 shrink-0" @click.stop>
+                <input
+                  type="checkbox"
+                  class="w-4 h-4 rounded border-[var(--border-strong)] accent-[var(--accent)] cursor-pointer"
+                  :checked="selectedIds.has(instance.id)"
+                  @change="toggleSelect(instance.id)"
+                />
               </div>
-
-              <!-- Hardware Specs Ribbon -->
-              <div class="mt-3 grid grid-cols-3 gap-2 text-center cursor-pointer" :title="getInstanceConfigSummary(instance)" @click="openInstanceDetail(instance.id)">
-                <div class="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                  <div class="text-[10px] uppercase font-semibold tracking-wider text-themed-muted">CPU</div>
-                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
-                    {{ instance.cpu }} {{ $t('instance.mobileCard.cpuCore') }}
-                  </div>
-                </div>
-                <div class="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                  <div class="text-[10px] uppercase font-semibold tracking-wider text-themed-muted">RAM</div>
-                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
-                    {{ formatMemory(instance.memory) }}
-                  </div>
-                </div>
-                <div class="p-2 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04]">
-                  <div class="text-[10px] uppercase font-semibold tracking-wider text-themed-muted">DISK</div>
-                  <div class="mt-0.5 text-xs font-mono font-semibold text-themed tabular-nums">
-                    {{ formatDisk(instance.disk) }}
-                  </div>
-                </div>
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden bg-[var(--bg-surface-soft)] border border-[var(--border-color)] cursor-pointer"
+                @click="openInstanceDetail(instance.id)"
+              >
+                <InstanceDisplayIcon
+                  v-if="instance.iconBadgeId || getPaidIconType(instance)"
+                  :badge-id="instance.iconBadgeId"
+                  :fallback-icon="getPaidIconType(instance)"
+                  :alt="instance.name"
+                  :size="32"
+                />
+                <DistroIcon
+                  v-else
+                  :distro="getDistroFromName(instance.image)"
+                  :size="28"
+                />
               </div>
-
-              <!-- Traffic Section (Progress Bar) -->
-              <div class="mt-3 space-y-1.5 cursor-pointer" @click="openInstanceDetail(instance.id)">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-themed-muted flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                    </svg>
-                    {{ $t('instance.trafficLabel') }}
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openInstanceDetail(instance.id)">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="font-semibold text-sm text-[var(--text-primary)] truncate">
+                    {{ instance.name }}
+                  </h3>
+                  <Badge
+                    :variant="getStatusBadgeVariant(instance.status)"
+                    size="sm"
+                    dot
+                    :pulse="isStatusTransient(instance.status)"
+                  >
+                    {{ getStatusInfo(instance.status, t).label }}
+                  </Badge>
+                </div>
+                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                  <Badge variant="default" size="sm">
+                    {{ (instance as any).instanceType === 'vm' ? $t('common.instanceType.vm') : $t('common.instanceType.container') }}
+                  </Badge>
+                  <Badge variant="default" size="sm">
+                    {{ $t('common.networkMode.' + getInstanceNetworkMode(instance)) }}
+                  </Badge>
+                  <span class="text-xs text-[var(--text-tertiary)] truncate max-w-[120px]">
+                    {{ getInstancePlanName(instance) }}
                   </span>
-                  <span class="font-mono text-themed tabular-nums text-xs">
-                    {{ getInstanceTrafficUsage(instance) }}
-                  </span>
-                </div>
-                <div class="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
-                  <div
-                    class="h-full rounded-full transition-all duration-300"
-                    :class="getInstanceTrafficBarColor(instance)"
-                    :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
-                  ></div>
-                </div>
-                <div class="flex items-center justify-between pt-0.5 text-[11px] text-themed-muted">
-                  <span>{{ $t('instance.quotaLabel') }}</span>
-                  <span class="font-mono tabular-nums text-themed">{{ getInstanceQuotaSummary(instance) }}</span>
-                </div>
-              </div>
-
-              <!-- Billing & Expiry Strip -->
-              <div class="mt-3 flex items-center justify-between border-t border-black/[0.06] dark:border-white/[0.06] pt-3 text-xs">
-                <div class="flex items-center gap-1.5 min-w-0" :title="getInstanceExpiryInfo(instance).title || ''">
-                  <span class="text-themed-muted">{{ $t('instance.expireAt') }}:</span>
-                  <span class="font-mono font-medium truncate" :class="getInstanceExpiryInfo(instance).className">
-                    {{ getInstanceExpiryInfo(instance).remainingText || getInstanceExpiryInfo(instance).dateText || '-' }}
-                  </span>
-                </div>
-                <div class="flex items-center gap-3 shrink-0">
-                  <span class="font-mono font-semibold text-themed">{{ getInstanceMonthlyPrice(instance) }}</span>
-                  <div class="flex items-center gap-1.5" :title="$t('instance.card.autoRenew')">
-                    <span class="text-[11px] text-themed-muted">{{ $t('instance.card.autoRenew') }}</span>
-                    <button
-                      type="button"
-                      class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                      :class="(instance as any).autoRenew
-                        ? 'bg-primary-600'
-                        : (themeStore.isDark ? 'bg-zinc-700' : 'bg-zinc-300')"
-                      :disabled="!canUseInstanceBillingAction(instance) || !!actionLoading[instance.id]"
-                      :aria-pressed="!!(instance as any).autoRenew"
-                      @click.stop="handleSingleAutoRenew(instance, !(instance as any).autoRenew)"
-                    >
-                      <span
-                        class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
-                        :class="(instance as any).autoRenew ? 'translate-x-4' : 'translate-x-0.5'"
-                      ></span>
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Footer: Power buttons + Order Menu + Action Buttons -->
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-black/[0.06] dark:border-white/[0.06] pt-3">
-              <!-- Left side: Order & Power -->
-              <div class="flex items-center gap-1.5">
-                <button
-                  v-if="canStartInstance(instance)"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-emerald-600 dark:text-emerald-400 transition-colors disabled:opacity-50"
-                  :title="$t('instance.actions.start')"
-                  @click.stop="handleAction(instance, 'start')"
-                >
-                  <svg v-if="actionLoading[instance.id] === 'start'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>{{ actionLoading[instance.id] === 'start' ? '...' : $t('instance.actions.start') }}</span>
-                </button>
+            <!-- IP row -->
+            <div
+              class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs cursor-pointer font-mono"
+              @click="openInstanceDetail(instance.id)"
+            >
+              <span class="text-[var(--text-primary)] truncate font-medium" :title="getPrimaryIp(instance)">
+                {{ getPrimaryIp(instance) }}
+              </span>
+              <button
+                v-if="getPrimaryIp(instance) && getPrimaryIp(instance) !== '-'"
+                type="button"
+                class="shrink-0 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] rounded transition-colors"
+                :title="$t('common.copy')"
+                @click.stop="copyIp(getPrimaryIp(instance))"
+              >
+                <Copy class="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-                <button
-                  v-if="instance.status?.toLowerCase() === 'running'"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-themed transition-colors disabled:opacity-50"
-                  :title="$t('instance.actions.restart')"
-                  @click.stop="handleAction(instance, 'restart')"
-                >
-                  <svg v-if="actionLoading[instance.id] === 'restart'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>{{ actionLoading[instance.id] === 'restart' ? '...' : $t('instance.actions.restart') }}</span>
-                </button>
-
-                <button
-                  v-if="instance.status?.toLowerCase() === 'running'"
-                  type="button"
-                  :disabled="!!actionLoading[instance.id]"
-                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-themed-muted hover:text-red-500 transition-colors disabled:opacity-50"
-                  :title="$t('instance.actions.stop')"
-                  @click.stop="handleAction(instance, 'stop')"
-                >
-                  <svg v-if="actionLoading[instance.id] === 'stop'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                  </svg>
-                  <span>{{ actionLoading[instance.id] === 'stop' ? '...' : $t('instance.actions.stop') }}</span>
-                </button>
+            <!-- Hardware Specs -->
+            <div
+              class="grid grid-cols-3 gap-1.5 text-center cursor-pointer"
+              :title="getInstanceConfigSummary(instance)"
+              @click="openInstanceDetail(instance.id)"
+            >
+              <div class="p-1.5 rounded-lg bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div class="text-[9px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">CPU</div>
+                <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatCpuCores(instance.cpu) }} {{ $t('instance.mobileCard.cpuCore') }}
+                </div>
               </div>
-
-              <!-- Right side: Actions -->
-              <div class="flex items-center gap-1.5">
-                <button
-                  v-if="canResetInstanceTraffic(instance)"
-                  type="button"
-                  class="inline-flex h-7 items-center justify-center rounded-md border border-black/10 dark:border-white/10 px-2.5 text-xs font-medium text-themed hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-                  :disabled="!!actionLoading[instance.id]"
-                  @click.stop="openResetTrafficModal(instance)"
-                >
-                  {{ actionLoading[instance.id] === 'resetTraffic' ? '...' : $t('admin.hosts.resetTraffic') }}
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex h-7 items-center justify-center rounded-md border border-black/10 dark:border-white/10 px-2.5 text-xs font-medium text-themed hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                  @click.stop="openInstanceTransfer(instance)"
-                >
-                  {{ $t('instance.card.push') }}
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex h-7 items-center justify-center rounded-md border border-black/10 dark:border-white/10 px-2.5 text-xs font-medium text-themed hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
-                  :disabled="!canUseInstanceBillingAction(instance) || !!actionLoading[instance.id]"
-                  @click.stop="openSingleRenewModal(instance)"
-                >
-                  {{ $t('instance.card.renew') }}
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex h-7 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black px-3 text-xs font-medium hover:opacity-90 transition-opacity"
-                  @click.stop="openInstanceDetail(instance.id)"
-                >
-                  {{ $t('instance.card.manage') }}
-                </button>
+              <div class="p-1.5 rounded-lg bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div class="text-[9px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">RAM</div>
+                <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatMemory(instance.memory) }}
+                </div>
+              </div>
+              <div class="p-1.5 rounded-lg bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div class="text-[9px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">DISK</div>
+                <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatDisk(instance.disk) }}
+                </div>
               </div>
             </div>
-          </article>
-        </TransitionGroup>
-      </div>
+
+            <!-- Traffic -->
+            <div class="space-y-1 cursor-pointer" @click="openInstanceDetail(instance.id)">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-[var(--text-tertiary)] text-[11px]">{{ $t('instance.mobileCard.traffic') }}</span>
+                <span class="font-mono text-[var(--text-secondary)] tabular-nums text-[11px]">
+                  {{ getInstanceTrafficUsage(instance) }}
+                </span>
+              </div>
+              <div class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <div
+                  class="h-full rounded-full transition-all duration-300"
+                  :class="getInstanceTrafficBarColor(instance)"
+                  :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- Expiry & Host -->
+            <div class="flex items-center justify-between text-xs pt-1 border-t border-[var(--border-color)]">
+              <span class="text-[var(--text-tertiary)] flex items-center gap-1" :title="getInstanceRegionLabel(instance)">
+                <FlagIcon :code="getInstanceRegionCode(instance)" size="xs" />
+                <span>{{ getInstanceHostName(instance) }}</span>
+              </span>
+              <span class="font-medium" :class="getInstanceExpiryInfo(instance).className">
+                {{ getInstanceExpiryInfo(instance).remainingText }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Mobile Card Footer -->
+          <div class="flex items-center justify-between px-3 py-2 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+            <div class="flex items-center gap-1">
+              <Button
+                v-if="canStartInstance(instance)"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs text-[var(--success)]"
+                :disabled="!!actionLoading[instance.id]"
+                :loading="actionLoading[instance.id] === 'start'"
+                @click.stop="handleAction(instance, 'start')"
+              >
+                <template #icon>
+                  <Play class="w-3.5 h-3.5 fill-current" />
+                </template>
+              </Button>
+              <Button
+                v-if="instance.status?.toLowerCase() === 'running'"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs text-[var(--warning)]"
+                :disabled="!!actionLoading[instance.id]"
+                :loading="actionLoading[instance.id] === 'restart'"
+                @click.stop="handleAction(instance, 'restart')"
+              >
+                <template #icon>
+                  <RotateCw class="w-3.5 h-3.5" />
+                </template>
+              </Button>
+              <Button
+                v-if="instance.status?.toLowerCase() === 'running'"
+                variant="ghost"
+                size="sm"
+                class="h-8 px-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--error)]"
+                :disabled="!!actionLoading[instance.id]"
+                :loading="actionLoading[instance.id] === 'stop'"
+                @click.stop="handleAction(instance, 'stop')"
+              >
+                <template #icon>
+                  <Square class="w-3.5 h-3.5 fill-current" />
+                </template>
+              </Button>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                class="h-8 px-2 text-xs"
+                @click.stop="openInstanceTransfer(instance)"
+              >
+                {{ $t('instance.card.push') }}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                class="h-8 px-3 text-xs"
+                @click.stop="openInstanceDetail(instance.id)"
+              >
+                {{ $t('instance.card.manage') }}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </TransitionGroup>
+
+      <!-- Pagination -->
+      <Card padding="sm">
+        <Pagination
+          v-model:page="page"
+          v-model:pageSize="pageSize"
+          :total="total"
+          :show-size-changer="true"
+          :page-size-options="pageSizeOptions"
+          @change="handlePaginationChange"
+        >
+          <template #total="{ total: tCount, page: pNum, totalPages: pTotal }">
+            <span class="font-mono text-xs text-[var(--text-secondary)]">
+              {{ $t('instance.pageInfo', {
+                page: pNum,
+                totalPages: pTotal || 1,
+                start: tCount > 0 ? (pNum - 1) * pageSize + 1 : 0,
+                end: Math.min(pNum * pageSize, tCount),
+                total: tCount
+              }) }}
+            </span>
+          </template>
+        </Pagination>
+      </Card>
     </template>
 
-    <div v-if="!loading && instances.length > 0" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-[var(--text-secondary)] py-3 px-1">
-      <div class="flex items-center gap-2">
-        <button
-          :disabled="page <= 1"
-          type="button"
-          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[var(--border-strong)] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
-          @click="goToPage(page - 1)"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-        </button>
-        <button
-          :disabled="page >= totalPages"
-          type="button"
-          class="inline-flex items-center justify-center w-8 h-8 rounded border border-[var(--border-strong)] bg-transparent disabled:opacity-30 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
-          @click="goToPage(page + 1)"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-        </button>
-        <span class="font-mono ml-2 text-xs">
-          {{ $t('instance.pageInfo', {
-            page: page,
-            totalPages: totalPages || 1,
-            start: total > 0 ? (page - 1) * pageSize + 1 : 0,
-            end: Math.min(page * pageSize, total),
-            total: total
-          }) }}
+    <!-- Floating Capsule Selection Bar -->
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="transform translate-y-6 opacity-0"
+      enter-to-class="transform translate-y-0 opacity-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="transform translate-y-0 opacity-100"
+      leave-to-class="transform translate-y-6 opacity-0"
+    >
+      <div
+        v-if="hasSelectedInstances"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-color)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md select-none text-xs"
+      >
+        <span class="font-medium pr-1">
+          {{ $t('instance.batch.selectedCount', { count: selectedCount }) }}
         </span>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-themed-muted">{{ $t('instance.itemsPerPage') }}</span>
-        <div class="relative">
-          <select
-            v-model.number="pageSize"
-            class="input h-8 appearance-none rounded border border-themed bg-themed-surface py-1 pl-2.5 pr-7 text-xs font-mono"
-            @change="handlePageSizeChange"
+        <div class="h-3.5 w-px bg-[var(--border-color)]"></div>
+        <Button
+          v-if="selectedStoppedCount > 0"
+          variant="ghost"
+          size="sm"
+          :disabled="!!batchActionLoading"
+          class="h-7 px-2.5 text-xs text-[var(--success)]"
+          @click="handleBatchSimpleAction('start')"
+        >
+          <Play class="w-3.5 h-3.5 fill-current" />
+          <span>{{ $t('instance.batch.start') }} ({{ selectedStoppedCount }})</span>
+        </Button>
+        <Button
+          v-if="selectedRunningCount > 0"
+          variant="ghost"
+          size="sm"
+          :disabled="!!batchActionLoading"
+          class="h-7 px-2.5 text-xs text-[var(--warning)]"
+          @click="handleBatchSimpleAction('restart')"
+        >
+          <RotateCw class="w-3.5 h-3.5" />
+          <span>{{ $t('instance.batch.restart') }} ({{ selectedRunningCount }})</span>
+        </Button>
+        <Button
+          v-if="selectedRunningCount > 0"
+          variant="ghost"
+          size="sm"
+          :disabled="!!batchActionLoading"
+          class="h-7 px-2.5 text-xs text-[var(--error)]"
+          @click="handleBatchSimpleAction('stop')"
+        >
+          <Square class="w-3.5 h-3.5 fill-current" />
+          <span>{{ $t('instance.batch.stop') }} ({{ selectedRunningCount }})</span>
+        </Button>
+        <template v-if="!isAdminEntry && selectedBillingActionIds.length > 0">
+          <Button
+            variant="ghost"
+            size="sm"
+            :disabled="!!batchActionLoading"
+            class="h-7 px-2.5 text-xs text-[var(--accent)]"
+            @click="openBatchRenewModal()"
           >
-            <option v-for="size in pageSizeOptions" :key="size" :value="size">
-              {{ size }}
-            </option>
-          </select>
-          <svg class="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+            <span>{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewAction : $t('instance.batch.renew') }}</span>
+          </Button>
+        </template>
+        <div class="h-3.5 w-px bg-[var(--border-color)]"></div>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 px-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+          @click="clearSelection"
+        >
+          {{ $t('instance.batch.clear') }}
+        </Button>
       </div>
-    </div>
+    </Transition>
 
+    <!-- Row Menu Teleport -->
+    <Teleport to="body">
+      <div
+        v-if="activeRowMenuId !== null"
+        class="fixed inset-0 z-40"
+        @click.stop="closeRowMenu"
+      ></div>
+      <div
+        v-if="activeRowMenuId !== null"
+        class="fixed z-50 w-44 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-1.5 text-left text-xs select-none backdrop-blur-md"
+        :style="{ top: `${rowMenuPosition.top}px`, right: `${rowMenuPosition.right}px` }"
+        @click.stop
+      >
+        <button
+          type="button"
+          class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+          @click.stop="const id = activeRowMenuId; closeRowMenu(); if (id) openInstanceDetail(id)"
+        >
+          {{ $t('instance.details') }}
+        </button>
+
+        <template v-if="getRowMenuInstance()">
+          <div class="border-t border-[var(--border-color)] my-1"></div>
+
+          <button
+            v-if="canStartInstance(getRowMenuInstance()!)"
+            type="button"
+            :disabled="!!actionLoading[getRowMenuInstance()!.id]"
+            class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--success)] hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-50"
+            @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); handleAction(inst, 'start')"
+          >
+            {{ $t('instance.actions.start') }}
+          </button>
+
+          <button
+            v-if="getRowMenuInstance()!.status?.toLowerCase() === 'running'"
+            type="button"
+            :disabled="!!actionLoading[getRowMenuInstance()!.id]"
+            class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--warning)] hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-50"
+            @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); handleAction(inst, 'stop')"
+          >
+            {{ $t('instance.actions.stop') }}
+          </button>
+
+          <button
+            v-if="getRowMenuInstance()!.status?.toLowerCase() === 'running'"
+            type="button"
+            :disabled="!!actionLoading[getRowMenuInstance()!.id]"
+            class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--accent)] hover:bg-[var(--bg-surface-soft)] transition-colors disabled:opacity-50"
+            @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); handleAction(inst, 'restart')"
+          >
+            {{ $t('instance.actions.restart') }}
+          </button>
+
+          <button
+            v-if="canUseInstanceBillingAction(getRowMenuInstance()!)"
+            type="button"
+            class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+            @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); openSingleRenewModal(inst)"
+          >
+            {{ $t('instance.card.renew') }}
+          </button>
+
+          <button
+            type="button"
+            class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+            @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); openInstanceTransfer(inst)"
+          >
+            {{ $t('instance.card.push') }}
+          </button>
+
+          <button
+            v-if="canResetInstanceTraffic(getRowMenuInstance()!)"
+            type="button"
+            class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+            @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); openResetTrafficModal(inst)"
+          >
+            {{ $t('admin.hosts.resetTraffic') }}
+          </button>
+
+          <template v-if="canDeleteInstance(getRowMenuInstance()!)">
+            <div class="border-t border-[var(--border-color)] my-1"></div>
+            <button
+              type="button"
+              class="w-full text-left px-3 py-1.5 rounded-xl text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] transition-colors"
+              @click.stop="const inst = getRowMenuInstance()!; closeRowMenu(); handleAction(inst, 'delete')"
+            >
+              {{ $t('instance.actions.delete') }}
+            </button>
+          </template>
+        </template>
+      </div>
+    </Teleport>
+
+    <!-- Reset Traffic Modal -->
     <Teleport to="body">
       <div
         v-if="showResetTrafficModal && resetTrafficTarget"
-        class="modal-overlay"
+        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
         @click.self="closeResetTrafficModal()"
       >
-        <div class="modal-backdrop" @click="closeResetTrafficModal()"></div>
-        <div class="modal-content max-w-md">
-          <div class="modal-header">
+        <div class="bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-2xl border border-[var(--border-color)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] w-full max-w-md overflow-hidden animate-scale-in">
+          <div class="flex items-center justify-between p-5 border-b border-[var(--border-color)]">
             <div>
-              <h3 class="modal-title">
+              <h3 class="font-semibold text-lg text-[var(--text-primary)]">
                 {{ $t('admin.hosts.resetTrafficTitle') }}
               </h3>
-              <p class="mt-1 text-sm text-themed-muted">
+              <p class="text-xs text-[var(--text-secondary)] mt-0.5">
                 {{ $t('admin.hosts.resetTrafficDesc', { instance: resetTrafficTarget.name }) }}
               </p>
             </div>
-            <button class="p-1 rounded hover:bg-gray-500/20" :disabled="resetTrafficSubmitting" @click="closeResetTrafficModal()">
-              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button
+              type="button"
+              class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+              :disabled="resetTrafficSubmitting"
+              @click="closeResetTrafficModal()"
+            >
+              <X class="w-5 h-5" />
             </button>
           </div>
 
-          <div class="modal-body">
-            <div class="space-y-2 rounded-xl border p-4 text-sm border-themed bg-themed-secondary">
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-themed-muted">{{ $t('instance.trafficLabel') }}</span>
-                <span class="text-themed">{{ getInstanceTrafficUsage(resetTrafficTarget) }}</span>
+          <div class="p-5 space-y-4 text-sm">
+            <div class="space-y-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[var(--text-secondary)]">{{ $t('instance.trafficLabel') }}</span>
+                <span class="font-mono font-medium">{{ getInstanceTrafficUsage(resetTrafficTarget) }}</span>
               </div>
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-themed-muted">{{ $t('instance.card.trafficReset') }}</span>
-                <span class="text-themed">{{ getInstanceResetTrafficPrice(resetTrafficTarget) }}</span>
+              <div class="flex items-center justify-between">
+                <span class="text-[var(--text-secondary)]">{{ $t('instance.card.trafficReset') }}</span>
+                <span class="font-mono font-medium">{{ getInstanceResetTrafficPrice(resetTrafficTarget) }}</span>
               </div>
             </div>
 
-            <p class="mt-4 text-sm text-yellow-600 dark:text-yellow-400">
+            <p class="text-xs text-[var(--warning)] leading-relaxed">
               {{ $t('admin.hosts.resetTrafficWarning') }}
             </p>
           </div>
 
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn-ghost btn-sm"
+          <div class="p-5 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-end gap-2.5">
+            <Button
+              variant="secondary"
+              size="sm"
               :disabled="resetTrafficSubmitting"
               @click="closeResetTrafficModal()"
             >
               {{ $t('common.cancel') }}
-            </button>
-            <button
-              type="button"
-              class="btn-primary btn-sm"
-              :disabled="resetTrafficSubmitting"
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              :loading="resetTrafficSubmitting"
               @click="confirmResetTraffic()"
             >
-              {{ resetTrafficSubmitting ? '...' : $t('admin.hosts.resetTraffic') }}
-            </button>
+              {{ $t('admin.hosts.resetTraffic') }}
+            </Button>
           </div>
         </div>
       </div>
+    </Teleport>
 
+    <!-- Batch Renew Modal -->
+    <Teleport to="body">
       <div
         v-if="!isAdminEntry && showBatchRenewModal"
-        class="modal-overlay"
+        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
         @click.self="closeBatchRenewModal()"
       >
-        <div class="modal-backdrop" @click="closeBatchRenewModal()"></div>
-        <div class="modal-content max-w-4xl">
-          <div class="modal-header">
+        <div class="bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-2xl border border-[var(--border-color)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
+          <div class="flex items-center justify-between p-5 border-b border-[var(--border-color)] shrink-0">
             <div>
-              <h3 class="modal-title">
+              <h3 class="font-semibold text-lg text-[var(--text-primary)]">
                 {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewTitle : $t('instance.batch.renewTitle') }}
               </h3>
-              <p class="text-sm text-themed-muted mt-1">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewDescription : $t('instance.batch.renewDescription') }}</p>
+              <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewDescription : $t('instance.batch.renewDescription') }}
+              </p>
             </div>
-            <button class="p-1 rounded hover:bg-gray-500/20" @click="closeBatchRenewModal()">
-              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button
+              type="button"
+              class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+              @click="closeBatchRenewModal()"
+            >
+              <X class="w-5 h-5" />
             </button>
           </div>
 
-          <div class="modal-body">
+          <div class="p-5 space-y-4 overflow-y-auto flex-1">
             <div v-if="batchRenewLoading" class="flex items-center justify-center py-12">
-              <svg class="w-8 h-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
+              <Loader2 class="w-8 h-8 animate-spin text-[var(--accent)]" />
             </div>
 
             <template v-else>
-              <div class="grid gap-3 md:grid-cols-4">
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('instance.batch.selectedCount', { count: selectedCount }) }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums" :class="'text-themed'">{{ selectedCount }}</div>
+              <!-- Summary Cards -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.selectedCount', { count: selectedCount }) }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--text-primary)]">{{ selectedCount }}</div>
                 </div>
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('instance.batch.eligibleCount') }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums text-emerald-500">{{ batchRenewEligibleItems.length }}</div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.eligibleCount') }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--success)]">{{ batchRenewEligibleItems.length }}</div>
                 </div>
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchTotalAmount : $t('instance.batch.totalAmount') }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums" :class="'text-themed'">{{ formatCurrency(batchRenewTotal) }}</div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchTotalAmount : $t('instance.batch.totalAmount') }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--text-primary)]">{{ formatCurrency(batchRenewTotal) }}</div>
                 </div>
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchBalanceAfter : $t('billing.balanceAfterRenew') }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums" :class="batchRenewInsufficientBalance ? 'text-red-500' : 'text-primary-600 dark:text-primary-400'">{{ formatCurrency(batchRenewBalanceAfter) }}</div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchBalanceAfter : $t('billing.balanceAfterRenew') }}</div>
+                  <div
+                    class="mt-1 text-xl font-semibold font-mono tabular-nums"
+                    :class="batchRenewInsufficientBalance ? 'text-[var(--error)]' : 'text-[var(--accent)]'"
+                  >
+                    {{ formatCurrency(batchRenewBalanceAfter) }}
+                  </div>
                 </div>
               </div>
 
-              <div v-if="batchRenewMonthOptions.length > 0" class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                <div class="text-sm font-medium" :class="'text-themed'">{{ $t('instance.batch.selectedMonths') }}</div>
-                <div class="mt-3 flex flex-wrap gap-2">
+              <!-- Duration selector -->
+              <div v-if="batchRenewMonthOptions.length > 0" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+                <div class="text-xs font-medium text-[var(--text-primary)]">{{ $t('instance.batch.selectedMonths') }}</div>
+                <div class="mt-2.5 flex flex-wrap gap-2">
                   <button
                     v-for="months in batchRenewMonthOptions"
                     :key="months"
-                    class="px-3 py-2 rounded-lg border text-sm transition-colors"
+                    type="button"
+                    class="px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 active:scale-95"
                     :class="months === batchRenewMonths
-                      ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-300'
-                      : 'border-themed text-themed-muted hover:border-primary-500/40 hover:text-themed'"
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                      : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
                     @click="batchRenewMonths = months"
                   >
                     {{ getBatchRenewMonthsLabel(months) }}
                   </button>
                 </div>
               </div>
-
               <div
                 v-else
-                class="rounded-xl border p-4 text-sm"
-                :class="themeStore.isDark ? 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300' : 'border-yellow-200 bg-yellow-50 text-yellow-700'"
+                class="rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] p-3 text-xs text-[var(--warning)]"
               >
                 {{ $t('instance.batch.renewEmpty') }}
               </div>
 
+              <!-- Insufficient Balance Warning -->
               <div
                 v-if="batchRenewInsufficientBalance"
-                class="rounded-xl border p-4 text-sm"
-                :class="themeStore.isDark ? 'border-red-500/20 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700'"
+                class="flex items-center gap-2 rounded-xl border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] p-3 text-xs text-[var(--error)]"
               >
-                {{ $t('billing.insufficientBalance') }}
-                <RouterLink :to="walletPath()" class="underline ml-1">{{ $t('billing.goRecharge') }}</RouterLink>
+                <AlertCircle class="w-4 h-4 shrink-0" />
+                <span>
+                  {{ $t('billing.insufficientBalance') }}
+                  <RouterLink :to="walletPath()" class="text-[var(--accent)] hover:underline ml-1 font-medium">{{ $t('billing.goRecharge') }}</RouterLink>
+                </span>
               </div>
 
-              <div class="rounded-xl border p-4" :class="'border-themed bg-themed-surface'">
-                <div class="flex items-center justify-between gap-3 mb-3">
-                  <h4 class="text-sm font-medium" :class="'text-themed'">
+              <!-- Eligible list -->
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <div class="flex items-center justify-between mb-2.5">
+                  <h4 class="text-xs font-medium text-[var(--text-primary)]">
                     {{ $t('instance.batch.eligibleList', { count: batchRenewEligibleItems.length }) }}
                   </h4>
-                  <span class="text-xs text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchCurrentBalance : $t('billing.currentBalance') }}: {{ formatCurrency(batchRenewBalance.balance) }}</span>
+                  <span class="text-[11px] text-[var(--text-tertiary)]">
+                    {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchCurrentBalance : $t('billing.currentBalance') }}: {{ formatCurrency(batchRenewBalance.balance) }}
+                  </span>
                 </div>
-                <div v-if="batchRenewEligibleItems.length > 0" class="space-y-3 max-h-64 overflow-y-auto pr-1">
+                <div v-if="batchRenewEligibleItems.length > 0" class="space-y-2 max-h-48 overflow-y-auto pr-1">
                   <div
                     v-for="item in batchRenewEligibleItems"
                     :key="item.id"
-                    class="rounded-xl border px-3 py-3"
-                    :class="'border-themed bg-themed-secondary'"
+                    class="flex items-center justify-between p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs"
                   >
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <div class="text-sm font-medium truncate" :class="'text-themed'">{{ item.name }}</div>
-                        <div class="mt-1 flex flex-wrap gap-2 text-xs">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5" :class="'bg-themed-secondary text-themed'">
-                            {{ item.autoRenew ? $t('billing.autoRenewEnabled') : $t('billing.autoRenewDisabled') }}
-                          </span>
-                        </div>
+                    <div class="min-w-0 flex-1 pr-3">
+                      <div class="font-medium text-[var(--text-primary)] truncate">{{ item.name }}</div>
+                      <div class="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                        {{ item.autoRenew ? $t('billing.autoRenewEnabled') : $t('billing.autoRenewDisabled') }}
                       </div>
-                      <div class="text-right shrink-0">
-                        <div class="text-sm font-semibold font-mono tabular-nums text-emerald-500">{{ formatCurrency(item.selectedOption?.discountedPrice) }}</div>
-                        <div class="text-xs text-themed-muted">{{ formatDate(item.selectedOption?.expiresAt) }}</div>
-                      </div>
+                    </div>
+                    <div class="text-right shrink-0 font-mono">
+                      <div class="font-semibold text-[var(--success)]">{{ formatCurrency(item.selectedOption?.discountedPrice) }}</div>
+                      <div class="text-[10px] text-[var(--text-tertiary)]">{{ formatDate(item.selectedOption?.expiresAt) }}</div>
                     </div>
                   </div>
                 </div>
-                <div v-else class="text-sm text-themed-muted">{{ $t('instance.batch.renewEmpty') }}</div>
+                <div v-else class="text-xs text-[var(--text-tertiary)] py-3 text-center">
+                  {{ $t('instance.batch.renewEmpty') }}
+                </div>
               </div>
 
-              <div
-                v-if="batchRenewIneligibleItems.length > 0"
-                class="rounded-xl border p-4"
-                :class="'border-themed bg-themed-surface'"
-              >
-                <h4 class="text-sm font-medium mb-3" :class="'text-themed'">
+              <!-- Ineligible items list -->
+              <div v-if="batchRenewIneligibleItems.length > 0" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <h4 class="text-xs font-medium text-[var(--text-primary)] mb-2">
                   {{ $t('instance.batch.skippedList', { count: batchRenewIneligibleItems.length }) }}
                 </h4>
-                <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                   <div
                     v-for="item in batchRenewIneligibleItems"
                     :key="`renew-skip-${item.id}`"
-                    class="rounded-lg border px-3 py-2"
-                    :class="'border-themed bg-themed-secondary'"
+                    class="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-surface-soft)] text-xs"
                   >
-                    <div class="text-sm font-medium" :class="'text-themed'">{{ item.name }}</div>
-                    <div class="mt-1 text-xs" :class="themeStore.isDark ? 'text-red-300' : 'text-red-600'">
+                    <span class="text-[var(--text-primary)] truncate">{{ item.name }}</span>
+                    <span class="text-[var(--error)] text-[11px] shrink-0 ml-2">
                       {{ translateBatchReason(item.reason || (item.canRenew ? '该实例不支持当前续费时长' : undefined)) }}
-                    </div>
+                    </span>
                   </div>
                 </div>
               </div>
             </template>
           </div>
 
-          <div class="modal-footer flex items-center justify-between gap-3">
-            <span class="text-xs text-themed-muted">{{ $t('instance.batch.currentPageOnly') }}</span>
+          <div class="p-5 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-between gap-3 shrink-0">
+            <span class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.currentPageOnly') }}</span>
             <div class="flex items-center gap-2">
-              <button class="btn-ghost btn-sm" :disabled="batchRenewSubmitting" @click="closeBatchRenewModal()">
+              <Button
+                variant="secondary"
+                size="sm"
+                :disabled="batchRenewSubmitting"
+                @click="closeBatchRenewModal()"
+              >
                 {{ $t('common.cancel') }}
-              </button>
-              <button class="btn-primary btn-sm" :disabled="!batchRenewCanSubmit" @click="confirmBatchRenew">
-                <svg v-if="batchRenewSubmitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                :disabled="!batchRenewCanSubmit"
+                :loading="batchRenewSubmitting"
+                @click="confirmBatchRenew"
+              >
                 {{ configStore.freeSiteMode ? freeSiteCopy.instanceBatchRenewAction : $t('instance.batch.renew') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </div>
     </Teleport>
 
+    <!-- Batch Destroy Modal -->
     <Teleport to="body">
       <div
         v-if="!isAdminEntry && showBatchDestroyModal"
-        class="modal-overlay"
+        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
         @click.self="closeBatchDestroyModal()"
       >
-        <div class="modal-backdrop" @click="closeBatchDestroyModal()"></div>
-        <div class="modal-content max-w-4xl">
-          <div class="modal-header">
+        <div class="bg-[var(--bg-surface)] text-[var(--text-primary)] rounded-2xl border border-[var(--border-color)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
+          <div class="flex items-center justify-between p-5 border-b border-[var(--border-color)] shrink-0">
             <div>
-              <h3 class="modal-title">
+              <h3 class="font-semibold text-lg text-[var(--text-primary)]">
                 {{ $t('instance.batch.destroyTitle') }}
               </h3>
-              <p class="text-sm text-themed-muted mt-1">{{ $t('instance.batch.destroyDescription') }}</p>
+              <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                {{ $t('instance.batch.destroyDescription') }}
+              </p>
             </div>
-            <button class="p-1 rounded hover:bg-gray-500/20" @click="closeBatchDestroyModal()">
-              <svg class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button
+              type="button"
+              class="p-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+              @click="closeBatchDestroyModal()"
+            >
+              <X class="w-5 h-5" />
             </button>
           </div>
 
-          <div class="modal-body">
+          <div class="p-5 space-y-4 overflow-y-auto flex-1">
             <div v-if="batchDestroyLoading" class="flex items-center justify-center py-12">
-              <svg class="w-8 h-8 animate-spin text-red-500" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
+              <Loader2 class="w-8 h-8 animate-spin text-[var(--error)]" />
             </div>
 
             <template v-else>
-              <div class="rounded-xl border p-4" :class="themeStore.isDark ? 'border-red-500/20 bg-red-500/10' : 'border-red-200 bg-red-50'">
-                <div class="flex items-start gap-3">
-                  <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <p class="text-sm font-medium" :class="themeStore.isDark ? 'text-red-200' : 'text-red-700'">
-                    {{ $t('instance.destroy.warning') }}
-                  </p>
+              <!-- Warning banner -->
+              <div class="flex items-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] p-3.5 text-xs text-[var(--error)]">
+                <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
+                <p class="font-medium leading-relaxed">
+                  {{ $t('instance.destroy.warning') }}
+                </p>
+              </div>
+
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.selectedCount', { count: selectedCount }) }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--text-primary)]">{{ selectedCount }}</div>
+                </div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.eligibleCount') }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--success)]">{{ batchDestroyEligibleItems.length }}</div>
+                </div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.refundTotal') }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--success)]">{{ formatCurrency(batchDestroyTotalRefund) }}</div>
+                </div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+                  <div class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.feeTotal') }}</div>
+                  <div class="mt-1 text-xl font-semibold font-mono tabular-nums text-[var(--text-primary)]">{{ formatCurrency(batchDestroyTotalFee) }}</div>
                 </div>
               </div>
 
-              <div class="grid gap-3 md:grid-cols-4">
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('instance.batch.selectedCount', { count: selectedCount }) }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums" :class="'text-themed'">{{ selectedCount }}</div>
-                </div>
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('instance.batch.eligibleCount') }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums text-emerald-500">{{ batchDestroyEligibleItems.length }}</div>
-                </div>
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('instance.batch.refundTotal') }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums text-emerald-500">{{ formatCurrency(batchDestroyTotalRefund) }}</div>
-                </div>
-                <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                  <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('instance.batch.feeTotal') }}</div>
-                  <div class="mt-2 text-2xl font-semibold font-mono tabular-nums" :class="'text-themed'">{{ formatCurrency(batchDestroyTotalFee) }}</div>
-                </div>
-              </div>
-
-              <div
-                v-if="batchDestroyEligibleItems.length === 0"
-                class="rounded-xl border p-4 text-sm"
-                :class="themeStore.isDark ? 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300' : 'border-yellow-200 bg-yellow-50 text-yellow-700'"
-              >
-                {{ $t('instance.batch.destroyEmpty') }}
-              </div>
-
-              <div class="rounded-xl border p-4" :class="'border-themed bg-themed-surface'">
-                <h4 class="text-sm font-medium mb-3" :class="'text-themed'">
+              <!-- Eligible list -->
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <h4 class="text-xs font-medium text-[var(--text-primary)] mb-2.5">
                   {{ $t('instance.batch.eligibleList', { count: batchDestroyEligibleItems.length }) }}
                 </h4>
-                <div v-if="batchDestroyEligibleItems.length > 0" class="space-y-3 max-h-64 overflow-y-auto pr-1">
+                <div v-if="batchDestroyEligibleItems.length > 0" class="space-y-2 max-h-48 overflow-y-auto pr-1">
                   <div
                     v-for="item in batchDestroyEligibleItems"
                     :key="item.id"
-                    class="rounded-xl border px-3 py-3"
-                    :class="'border-themed bg-themed-secondary'"
+                    class="flex items-center justify-between p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs"
                   >
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <div class="text-sm font-medium truncate" :class="'text-themed'">{{ item.name }}</div>
-                        <div class="mt-1 text-xs text-themed-muted">
-                          {{ item.instance.hostName }} · {{ item.instance.planName || $t('billing.freeInstance') }}
-                        </div>
-                        <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5" :class="'bg-themed-secondary text-themed'">
-                            {{ item.isFreeInstance ? $t('billing.freeInstance') : $t('billing.paidInstance') }}
-                          </span>
-                          <span
-                            v-if="!item.isFreeInstance && item.isFirstTime"
-                            class="inline-flex items-center rounded-full px-2 py-0.5"
-                            :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'"
-                          >
-                            {{ $t('instance.destroy.firstTimeFree') }}
-                          </span>
-                          <span
-                            v-else-if="!item.isFreeInstance && item.feeWaiverEligible"
-                            class="inline-flex items-center rounded-full px-2 py-0.5"
-                            :class="themeStore.isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'"
-                          >
-                            {{ $t('instance.batch.feeWaived') }}
-                          </span>
-                        </div>
+                    <div class="min-w-0 flex-1 pr-3">
+                      <div class="font-medium text-[var(--text-primary)] truncate">{{ item.name }}</div>
+                      <div class="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                        {{ item.instance.hostName }} · {{ item.instance.planName || $t('billing.freeInstance') }}
                       </div>
-                      <div class="text-right shrink-0">
-                        <div class="text-sm font-semibold font-mono tabular-nums text-emerald-500">{{ formatCurrency(item.refund.refundAmount) }}</div>
-                        <div class="text-xs text-themed-muted">{{ $t('instance.destroy.feeAmount') }} {{ formatCurrency(item.refund.feeAmount) }}</div>
-                      </div>
+                    </div>
+                    <div class="text-right shrink-0 font-mono">
+                      <div class="font-semibold text-[var(--success)]">{{ formatCurrency(item.refund.refundAmount) }}</div>
+                      <div class="text-[10px] text-[var(--text-tertiary)]">{{ $t('instance.destroy.feeAmount') }} {{ formatCurrency(item.refund.feeAmount) }}</div>
                     </div>
                   </div>
                 </div>
-                <div v-else class="text-sm text-themed-muted">{{ $t('instance.batch.destroyEmpty') }}</div>
+                <div v-else class="text-xs text-[var(--text-tertiary)] py-3 text-center">
+                  {{ $t('instance.batch.destroyEmpty') }}
+                </div>
               </div>
 
-              <div
-                v-if="batchDestroyIneligibleItems.length > 0"
-                class="rounded-xl border p-4"
-                :class="'border-themed bg-themed-surface'"
-              >
-                <h4 class="text-sm font-medium mb-3" :class="'text-themed'">
+              <!-- Ineligible items list -->
+              <div v-if="batchDestroyIneligibleItems.length > 0" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <h4 class="text-xs font-medium text-[var(--text-primary)] mb-2">
                   {{ $t('instance.batch.skippedList', { count: batchDestroyIneligibleItems.length }) }}
                 </h4>
-                <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                   <div
                     v-for="item in batchDestroyIneligibleItems"
                     :key="`destroy-skip-${item.id}`"
-                    class="rounded-lg border px-3 py-2"
-                    :class="'border-themed bg-themed-secondary'"
+                    class="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-surface-soft)] text-xs"
                   >
-                    <div class="text-sm font-medium" :class="'text-themed'">{{ item.name }}</div>
-                    <div class="mt-1 text-xs" :class="themeStore.isDark ? 'text-red-300' : 'text-red-600'">
+                    <span class="text-[var(--text-primary)] truncate">{{ item.name }}</span>
+                    <span class="text-[var(--error)] text-[11px] shrink-0 ml-2">
                       {{ item.cannotDestroyReason ? translateBatchReason(item.cannotDestroyReason) : $t('instance.destroy.cannotDestroy') }}
-                    </div>
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div class="rounded-xl border p-4" :class="'border-themed bg-themed-secondary'">
-                <label class="block text-sm font-medium mb-2" :class="'text-themed'">
+              <!-- Confirmation input -->
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 space-y-1.5">
+                <label class="block text-xs font-medium text-[var(--text-primary)]">
                   {{ $t('instance.batch.confirmHint') }}
                 </label>
-                <input
+                <Input
                   v-model="batchDestroyConfirm"
-                  type="text"
-                  class="input w-full"
+                  size="sm"
                   :placeholder="$t('instance.batch.confirmPlaceholder')"
                 />
               </div>
             </template>
           </div>
 
-          <div class="modal-footer flex items-center justify-between gap-3">
-            <span class="text-xs text-themed-muted">{{ $t('instance.batch.currentPageOnly') }}</span>
+          <div class="p-5 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-between gap-3 shrink-0">
+            <span class="text-[11px] text-[var(--text-tertiary)]">{{ $t('instance.batch.currentPageOnly') }}</span>
             <div class="flex items-center gap-2">
-              <button class="btn-ghost btn-sm" :disabled="batchDestroySubmitting" @click="closeBatchDestroyModal()">
+              <Button
+                variant="secondary"
+                size="sm"
+                :disabled="batchDestroySubmitting"
+                @click="closeBatchDestroyModal()"
+              >
                 {{ $t('common.cancel') }}
-              </button>
-              <button
-                class="btn-sm text-white"
-                :class="themeStore.isDark ? 'bg-red-500/80 hover:bg-red-500 disabled:bg-red-500/40' : 'bg-red-500 hover:bg-red-600 disabled:bg-red-300'"
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
                 :disabled="!batchDestroyCanSubmit"
+                :loading="batchDestroySubmitting"
                 @click="confirmBatchDestroy"
               >
-                <svg v-if="batchDestroySubmitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
                 {{ $t('instance.batch.destroy') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2773,12 +2812,9 @@ async function confirmBatchDestroy(): Promise<void> {
 .instance-stack-order-move,
 .instance-card-order-move {
   transition:
-    transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    background-color 520ms ease,
-    border-color 520ms ease;
+    transform 400ms cubic-bezier(0.25, 0.1, 0.25, 1),
+    opacity 400ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
 
 @media (prefers-reduced-motion: reduce) {
   .instance-table-order-move,
@@ -2786,84 +2822,5 @@ async function confirmBatchDestroy(): Promise<void> {
   .instance-card-order-move {
     transition-duration: 1ms;
   }
-}
-
-/* Nimbus: interactive card hover-lift (mobile instance stack) */
-.nimbus-card-lift {
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms ease,
-    border-color 200ms ease;
-  will-change: transform;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .nimbus-card-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 32px rgb(15 23 42 / 0.12);
-  }
-
-  :global(.dark) .nimbus-card-lift:hover {
-    box-shadow: 0 16px 34px rgb(0 0 0 / 0.5);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-card-lift {
-    transition-duration: 1ms;
-  }
-
-  .nimbus-card-lift:hover {
-    transform: none;
-  }
-}
-
-/* Nimbus: desktop instance grid card lift */
-.nimbus-instance-card {
-  transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms ease,
-    border-color 200ms ease;
-  will-change: transform;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .nimbus-instance-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgb(15 23 42 / 0.08);
-  }
-
-  :global(.dark) .nimbus-instance-card:hover {
-    box-shadow: 0 14px 30px rgb(0 0 0 / 0.45);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-instance-card {
-    transition-duration: 1ms;
-  }
-
-  .nimbus-instance-card:hover {
-    transform: none;
-  }
-}
-
-/* OCI Table Scrollbar */
-.oci-table-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
-}
-.oci-table-scroll::-webkit-scrollbar {
-  height: 8px;
-}
-.oci-table-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.oci-table-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.35);
-  border-radius: 4px;
-}
-.oci-table-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.6);
 }
 </style>

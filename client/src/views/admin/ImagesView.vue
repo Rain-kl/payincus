@@ -1,15 +1,36 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import DistroIcon from '@/components/icons/DistroIcon.vue'
+import DrawerModal from '@/components/DrawerModal.vue'
 import type { SystemImage, CreateSystemImageRequest, UpdateSystemImageRequest } from '@/types/api'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Input,
+  Select,
+  Badge,
+  EmptyState,
+  Pagination
+} from '@/components/ui'
+import {
+  Plus,
+  RefreshCw,
+  Search,
+  Layers,
+  Eye,
+  EyeOff,
+  Edit3,
+  Trash2,
+  X,
+  Loader2
+} from 'lucide-vue-next'
 
 const { t } = useI18n()
 const toast = useToast()
-const themeStore = useThemeStore()
 
 // 状态
 const loading = ref(true)
@@ -18,6 +39,15 @@ const images = ref<SystemImage[]>([])
 const showModal = ref(false)
 const editingImage = ref<SystemImage | null>(null)
 const activeArchitecture = ref<'all' | 'x86_64' | 'aarch64'>('all')
+
+// 过滤与搜索
+const searchQuery = ref('')
+const selectedOs = ref('all')
+const selectedInstanceType = ref('all')
+
+// 分页
+const page = ref(1)
+const pageSize = ref(15)
 
 // 表单
 interface ImageForm {
@@ -52,6 +82,13 @@ const iconOptions = [
   'fedora', 'kali', 'opensuse', 'oracle', 'rockylinux', 'ubuntu'
 ]
 
+const iconSelectOptions = computed(() =>
+  iconOptions.map((icon) => ({
+    value: icon,
+    label: icon.charAt(0).toUpperCase() + icon.slice(1)
+  }))
+)
+
 const architectureOptions: Array<{ value: 'x86_64' | 'aarch64'; label: string }> = [
   { value: 'x86_64', label: 'x86_64' },
   { value: 'aarch64', label: 'aarch64' }
@@ -63,17 +100,100 @@ const architectureTabs: Array<{ value: 'all' | 'x86_64' | 'aarch64'; labelKey?: 
   { value: 'aarch64', label: 'aarch64' }
 ]
 
+const instanceTypeOptions = computed(() => [
+  { value: 'both', label: t('admin.images.typeBoth') },
+  { value: 'container', label: t('admin.images.typeContainer') },
+  { value: 'vm', label: t('admin.images.typeVm') }
+])
+
+const availableOsList = computed(() => {
+  const osSet = new Set<string>()
+  for (const img of images.value) {
+    if (img.osType) osSet.add(img.osType)
+    if (img.icon) osSet.add(img.icon)
+  }
+  return Array.from(osSet).sort()
+})
+
+const osFilterOptions = computed(() => [
+  { value: 'all', label: t('common.all') },
+  ...availableOsList.value.map((os) => ({
+    value: os,
+    label: os.charAt(0).toUpperCase() + os.slice(1)
+  }))
+])
+
+const instanceTypeFilterOptions = computed(() => [
+  { value: 'all', label: t('common.all') },
+  { value: 'both', label: t('admin.images.typeBoth') },
+  { value: 'container', label: t('admin.images.typeContainer') },
+  { value: 'vm', label: t('admin.images.typeVm') }
+])
+
 // 计算属性
 const isEditMode = computed(() => editingImage.value !== null)
-const modalTitle = computed(() => isEditMode.value 
-  ? t('admin.images.edit') 
-  : t('admin.images.create')
+const modalTitle = computed(() =>
+  isEditMode.value ? t('admin.images.edit') : t('admin.images.create')
 )
+
+const hasActiveFilters = computed(() => {
+  return (
+    searchQuery.value.trim() !== '' ||
+    selectedOs.value !== 'all' ||
+    selectedInstanceType.value !== 'all' ||
+    activeArchitecture.value !== 'all'
+  )
+})
+
+function resetFilters() {
+  searchQuery.value = ''
+  selectedOs.value = 'all'
+  selectedInstanceType.value = 'all'
+  activeArchitecture.value = 'all'
+}
+
 const filteredImages = computed(() => {
-  if (activeArchitecture.value === 'all') {
-    return images.value
+  return images.value.filter((image) => {
+    // 架构过滤
+    if (activeArchitecture.value !== 'all' && image.architecture !== activeArchitecture.value) {
+      return false
+    }
+    // 实例类型过滤
+    if (selectedInstanceType.value !== 'all' && image.instanceType !== selectedInstanceType.value) {
+      return false
+    }
+    // 系统分类过滤
+    if (selectedOs.value !== 'all') {
+      const target = selectedOs.value.toLowerCase()
+      const matchOs = image.osType?.toLowerCase() === target || image.icon?.toLowerCase() === target
+      if (!matchOs) return false
+    }
+    // 搜索
+    if (searchQuery.value.trim()) {
+      const q = searchQuery.value.trim().toLowerCase()
+      const matchName = image.name.toLowerCase().includes(q)
+      const matchAlias = image.remoteAlias.toLowerCase().includes(q)
+      const matchOs = image.osType?.toLowerCase().includes(q)
+      if (!matchName && !matchAlias && !matchOs) return false
+    }
+    return true
+  })
+})
+
+const paginatedImages = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredImages.value.slice(start, start + pageSize.value)
+})
+
+watch([activeArchitecture, selectedOs, selectedInstanceType, searchQuery], () => {
+  page.value = 1
+})
+
+watch(filteredImages, (newVal) => {
+  const maxPage = Math.max(1, Math.ceil(newVal.length / pageSize.value))
+  if (page.value > maxPage) {
+    page.value = maxPage
   }
-  return images.value.filter(image => image.architecture === activeArchitecture.value)
 })
 
 // 批量操作与选中状态
@@ -82,7 +202,9 @@ const batchOperating = ref(false)
 
 const selectedCount = computed(() => selectedIds.value.size)
 const isAllSelected = computed(
-  () => filteredImages.value.length > 0 && filteredImages.value.every((image) => selectedIds.value.has(image.id))
+  () =>
+    filteredImages.value.length > 0 &&
+    filteredImages.value.every((image) => selectedIds.value.has(image.id))
 )
 const isIndeterminate = computed(() => {
   const count = filteredImages.value.filter((image) => selectedIds.value.has(image.id)).length
@@ -117,29 +239,11 @@ function clearSelection(): void {
   selectedIds.value = new Set()
 }
 
-
 function getArchitectureCount(architecture: 'all' | 'x86_64' | 'aarch64'): number {
   if (architecture === 'all') {
     return images.value.length
   }
-  return images.value.filter(image => image.architecture === architecture).length
-}
-
-function getArchitectureBadgeClass(architecture?: string): string {
-  if (architecture === 'aarch64') {
-    return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
-  }
-  return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
-}
-
-function getInstanceTypeBadgeClass(instanceType?: string): string {
-  if (instanceType === 'container') {
-    return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
-  }
-  if (instanceType === 'vm') {
-    return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
-  }
-  return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700'
+  return images.value.filter((image) => image.architecture === architecture).length
 }
 
 // 加载镜像列表
@@ -148,8 +252,8 @@ async function loadImages(): Promise<void> {
   try {
     const response = await api.images.list()
     images.value = response.images || []
-    const validIds = new Set(images.value.map(image => image.id))
-    selectedIds.value = new Set([...selectedIds.value].filter(id => validIds.has(id)))
+    const validIds = new Set(images.value.map((image) => image.id))
+    selectedIds.value = new Set([...selectedIds.value].filter((id) => validIds.has(id)))
   } catch (err: any) {
     toast.error(err.message || t('admin.images.loadFailed'))
   } finally {
@@ -201,7 +305,7 @@ async function saveImage(): Promise<void> {
         architecture: form.value.architecture,
         instanceType: form.value.instanceType,
         icon: form.value.icon,
-        sortOrder: form.value.sortOrder,
+        sortOrder: Number(form.value.sortOrder) || 0,
         hidden: form.value.hidden
       }
       await api.images.update(editingImage.value.id, data)
@@ -214,7 +318,7 @@ async function saveImage(): Promise<void> {
         architecture: form.value.architecture,
         instanceType: form.value.instanceType,
         icon: form.value.icon,
-        sortOrder: form.value.sortOrder,
+        sortOrder: Number(form.value.sortOrder) || 0,
         hidden: form.value.hidden
       }
       await api.images.create(data)
@@ -243,7 +347,7 @@ async function toggleHidden(image: SystemImage): Promise<void> {
 // 删除镜像
 async function deleteImage(image: SystemImage): Promise<void> {
   if (!confirm(t('admin.images.confirmDelete', { name: image.name }))) return
-  
+
   try {
     await api.images.delete(image.id)
     toast.success(t('admin.images.deleteSuccess'))
@@ -342,334 +446,439 @@ onMounted(() => {
 <template>
   <div class="kawaii-page nimbus-view space-y-6 animate-fade-in">
     <!-- Header -->
-    <header class="flex flex-col gap-4 border-b border-themed pb-5 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-start gap-3">
-        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500 sm:flex">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M18 15.75h.008v.008H18v-.008zM6 6h12a2.25 2.25 0 012.25 2.25v9A2.25 2.25 0 0118 19.5H6a2.25 2.25 0 01-2.25-2.25v-9A2.25 2.25 0 016 6z" />
-          </svg>
-        </span>
-        <div>
-          <h1 class="text-xl font-semibold text-themed sm:text-2xl">{{ t('admin.images.title') }}</h1>
-          <p class="mt-1 text-sm text-themed-muted">{{ t('admin.images.description') }}</p>
-        </div>
-      </div>
-      <button class="btn-primary shrink-0 whitespace-nowrap" @click="openCreateModal">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ t('admin.images.create') }}
-      </button>
-    </header>
+    <PageHeader
+      :title="t('admin.images.title')"
+      :description="t('admin.images.description')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          :loading="loading"
+          @click="loadImages"
+        >
+          <template #icon>
+            <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
+          </template>
+          {{ t('admin.images.refresh') }}
+        </Button>
+        <Button
+          variant="primary"
+          @click="openCreateModal"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2]" />
+          </template>
+          {{ t('admin.images.create') }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <!-- Loading -->
-    <div v-if="loading" class="card p-12 text-center">
-      <div class="loading-spinner w-8 h-8 mx-auto"></div>
-      <p class="text-themed-muted mt-4">{{ t('common.loading') }}</p>
-    </div>
+    <Card v-if="loading" padding="lg" class="text-center">
+      <div class="flex flex-col items-center justify-center py-12">
+        <Loader2 class="w-8 h-8 animate-spin text-[var(--accent)]" />
+        <p class="text-sm text-[var(--text-secondary)] mt-4 font-medium">{{ t('common.loading') }}</p>
+      </div>
+    </Card>
 
     <template v-else>
-      <!-- Architecture Tabs -->
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-for="tab in architectureTabs"
-          :key="tab.value"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors"
-          :class="activeArchitecture === tab.value
-            ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-300'
-            : 'border-themed bg-themed-surface text-themed-muted hover:bg-themed-hover hover:text-themed'"
-          @click="activeArchitecture = tab.value"
-        >
-          <span>{{ tab.labelKey ? t(tab.labelKey) : tab.label }}</span>
-          <span
-            class="rounded-full px-1.5 py-0.5 font-mono text-2xs tabular-nums"
+      <!-- Architecture Tabs & Filter Summary -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <!-- Architecture Segmented Control -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full w-fit">
+          <button
+            v-for="tab in architectureTabs"
+            :key="tab.value"
+            type="button"
+            class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none"
             :class="activeArchitecture === tab.value
-              ? 'bg-primary-500/15 text-primary-600 dark:text-primary-300'
-              : 'bg-themed-secondary text-themed-muted'"
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
+            @click="activeArchitecture = tab.value"
           >
-            {{ getArchitectureCount(tab.value) }}
-          </span>
-        </button>
+            <span>{{ tab.labelKey ? t(tab.labelKey) : tab.label }}</span>
+            <Badge
+              size="sm"
+              :variant="activeArchitecture === tab.value ? 'info' : 'default'"
+            >
+              {{ getArchitectureCount(tab.value) }}
+            </Badge>
+          </button>
+        </div>
+
+        <!-- Filter toggles / summary count -->
+        <div class="text-xs text-[var(--text-secondary)] flex items-center gap-2">
+          <span>共 {{ filteredImages.length }} 个镜像</span>
+          <Button
+            v-if="hasActiveFilters"
+            variant="ghost"
+            size="sm"
+            class="text-[var(--text-secondary)]"
+            @click="resetFilters"
+          >
+            重置筛选
+          </Button>
+        </div>
       </div>
+
+      <!-- Filters and Search Toolbar -->
+      <Card padding="sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+          <!-- Search Input -->
+          <div class="lg:col-span-6">
+            <Input
+              v-model="searchQuery"
+              size="sm"
+              placeholder="搜索镜像名称、远程别名或系统..."
+              clearable
+            >
+              <template #prefix>
+                <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+              </template>
+            </Input>
+          </div>
+
+          <!-- OS Filter -->
+          <div class="lg:col-span-3">
+            <Select
+              v-model="selectedOs"
+              size="sm"
+              :options="osFilterOptions"
+            />
+          </div>
+
+          <!-- Instance Type Filter -->
+          <div class="lg:col-span-3">
+            <Select
+              v-model="selectedInstanceType"
+              size="sm"
+              :options="instanceTypeFilterOptions"
+            />
+          </div>
+        </div>
+      </Card>
 
       <!-- Batch Actions Toolbar -->
       <div
         v-if="selectedCount > 0"
-        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-themed bg-themed-surface px-4 py-3"
+        class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--accent)]/30 bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg-surface))] p-4 shadow-sm transition-all duration-300"
       >
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-themed">
+        <div class="flex items-center gap-3.5">
+          <label class="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-[var(--text-primary)] select-none">
             <input
               type="checkbox"
-              class="h-4 w-4 rounded text-accent cursor-pointer"
+              class="h-4 w-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
               :checked="isAllSelected"
               :indeterminate="isIndeterminate"
               @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
             />
-            <span>{{ t('admin.images.selectedCount', { count: selectedCount }) }}</span>
+            <span class="font-semibold">{{ t('admin.images.selectedCount', { count: selectedCount }) }}</span>
           </label>
-          <button
-            type="button"
-            class="text-xs text-themed-muted hover:text-themed underline"
+          <Button
+            variant="ghost"
+            size="sm"
             @click="clearSelection"
           >
             {{ t('admin.images.clearSelection') }}
-          </button>
+          </Button>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            class="btn-secondary btn-sm"
+          <Button
+            variant="secondary"
+            size="sm"
             :disabled="batchOperating"
             @click="batchEnable"
           >
+            <template #icon>
+              <Eye class="w-3.5 h-3.5" />
+            </template>
             {{ t('admin.images.batchEnable') }}
-          </button>
-          <button
-            type="button"
-            class="btn-secondary btn-sm"
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             :disabled="batchOperating"
             @click="batchDisable"
           >
+            <template #icon>
+              <EyeOff class="w-3.5 h-3.5" />
+            </template>
             {{ t('admin.images.batchDisable') }}
-          </button>
-          <button
-            type="button"
-            class="btn-sm rounded border border-rose-500/20 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 dark:text-rose-400 font-medium px-3 py-1.5 transition-colors disabled:opacity-50"
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
             :disabled="batchOperating"
             @click="batchDelete"
           >
+            <template #icon>
+              <Trash2 class="w-3.5 h-3.5" />
+            </template>
             {{ t('admin.images.batchDelete') }}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <!-- Images List -->
-      <div v-if="filteredImages.length === 0" class="card p-12 text-center text-themed-muted">
-        <span class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-themed-secondary text-themed-faint">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M18 15.75h.008v.008H18v-.008zM6 6h12a2.25 2.25 0 012.25 2.25v9A2.25 2.25 0 0118 19.5H6a2.25 2.25 0 01-2.25-2.25v-9A2.25 2.25 0 016 6z" />
-          </svg>
-        </span>
-        {{ images.length === 0 ? t('admin.images.noImages') : t('admin.images.noImagesForArchitecture') }}
-      </div>
+      <!-- Images List Empty -->
+      <Card v-if="filteredImages.length === 0" padding="none">
+        <EmptyState
+          :title="images.length === 0 ? t('admin.images.noImages') : t('admin.images.noImagesForArchitecture')"
+          :description="hasActiveFilters ? '未找到符合当前筛选条件的镜像，请尝试更改搜索词或重置筛选' : '点击下方按钮开始添加第一个镜像'"
+        >
+          <template #icon>
+            <Layers class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template #action>
+            <Button
+              v-if="hasActiveFilters"
+              variant="secondary"
+              size="sm"
+              @click="resetFilters"
+            >
+              重置筛选
+            </Button>
+            <Button
+              v-else
+              variant="primary"
+              size="sm"
+              @click="openCreateModal"
+            >
+              <template #icon>
+                <Plus class="w-4 h-4 stroke-[2]" />
+              </template>
+              {{ t('admin.images.create') }}
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
       <template v-else>
+        <!-- Mobile Cards -->
         <div class="space-y-3 lg:hidden">
-          <div
-            v-for="image in filteredImages"
+          <Card
+            v-for="image in paginatedImages"
             :key="image.id"
-            class="card p-4"
+            padding="sm"
+            class="transition-all duration-200"
             :class="[
               image.hidden ? 'opacity-70' : '',
-              selectedIds.has(image.id) ? 'ring-1 ring-primary-500/30' : ''
+              selectedIds.has(image.id) ? 'ring-2 ring-[var(--accent)]' : ''
             ]"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3">
                 <input
                   type="checkbox"
-                  class="h-4 w-4 rounded text-accent cursor-pointer shrink-0"
+                  class="h-4 w-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer shrink-0"
                   :checked="selectedIds.has(image.id)"
                   @change="toggleSelect(image.id, ($event.target as HTMLInputElement).checked)"
                 />
-                <DistroIcon :distro="image.icon" :size="32" />
+                <div class="w-10 h-10 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center shrink-0">
+                  <DistroIcon :distro="image.icon" :size="28" />
+                </div>
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-themed">{{ image.name }}</div>
-                  <div class="truncate font-mono text-xs text-themed-muted">{{ image.remoteAlias }}</div>
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ image.name }}</div>
+                  <div class="truncate font-mono text-xs text-[var(--text-secondary)] mt-0.5">{{ image.remoteAlias }}</div>
                 </div>
               </div>
-              <span
-                class="shrink-0 px-2 py-1 text-xs rounded-full"
-                :class="image.hidden
-                  ? (themeStore.isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600')
-                  : (themeStore.isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')"
+              <Badge
+                size="sm"
+                :variant="image.hidden ? 'default' : 'success'"
+                :dot="true"
               >
                 {{ image.hidden ? t('admin.images.statusHidden') : t('admin.images.statusVisible') }}
-              </span>
+              </Badge>
             </div>
 
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.images.fields.architecture') }}</div>
-                <span
-                  class="mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-                  :class="getArchitectureBadgeClass(image.architecture)"
-                >
+            <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.images.fields.architecture') }}</div>
+                <Badge size="sm" variant="default">
                   {{ image.architecture }}
-                </span>
+                </Badge>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.images.fields.instanceType') }}</div>
-                <span
-                  class="mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-                  :class="getInstanceTypeBadgeClass(image.instanceType)"
-                >
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.images.fields.instanceType') }}</div>
+                <Badge size="sm" variant="info">
                   {{ image.instanceType === 'container' ? t('admin.images.typeContainer') : image.instanceType === 'vm' ? t('admin.images.typeVm') : t('admin.images.typeBoth') }}
-                </span>
+                </Badge>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.images.fields.sortOrder') }}</div>
-                <div class="mt-1 text-themed">{{ image.sortOrder }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.images.fields.sortOrder') }}</div>
+                <span class="font-mono tabular-nums text-sm font-medium text-[var(--text-primary)]">{{ image.sortOrder }}</span>
               </div>
             </div>
 
-            <div class="mt-4 flex justify-end gap-2 border-t border-themed pt-3">
-              <button
-                class="p-1.5 rounded transition-colors"
-                :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'"
+            <div class="mt-4 flex items-center justify-end gap-2 border-t border-[var(--border-color)] pt-3">
+              <Button
+                variant="secondary"
+                size="sm"
                 :title="image.hidden ? t('admin.images.show') : t('admin.images.hide')"
                 @click="toggleHidden(image)"
               >
-                <svg v-if="image.hidden" class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                <svg v-else class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-              </button>
-              <button
-                class="p-1.5 rounded transition-colors"
-                :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'"
+                <template #icon>
+                  <Eye v-if="image.hidden" class="w-3.5 h-3.5" />
+                  <EyeOff v-else class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ image.hidden ? t('admin.images.show') : t('admin.images.hide') }}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 :title="t('common.edit')"
                 @click="openEditModal(image)"
               >
-                <svg class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button
-                class="p-1.5 rounded transition-colors"
-                :class="themeStore.isDark ? 'hover:bg-rose-900/50' : 'hover:bg-rose-50'"
+                <template #icon>
+                  <Edit3 class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('common.edit') }}</span>
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
                 :title="t('common.delete')"
                 @click="deleteImage(image)"
               >
-                <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+                <template #icon>
+                  <Trash2 class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('common.delete') }}</span>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
 
+        <!-- Desktop Table -->
         <div class="card hidden overflow-hidden lg:block">
           <table class="w-full table-fixed">
-          <thead>
-            <tr class="border-b border-themed bg-themed-secondary/60 text-left text-2xs font-medium uppercase tracking-wide text-themed-muted">
-              <th class="w-[5%] px-4 py-3">
-                <input
-                  type="checkbox"
-                  class="h-4 w-4 rounded text-accent cursor-pointer"
-                  :checked="isAllSelected"
-                  :indeterminate="isIndeterminate"
-                  :aria-label="t('admin.images.selectAll')"
-                  @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
-                />
-              </th>
-              <th class="w-[6%] px-4 py-3">{{ t('admin.images.fields.icon') }}</th>
-              <th class="w-[16%] px-4 py-3">{{ t('admin.images.fields.name') }}</th>
-              <th class="w-[21%] px-4 py-3">{{ t('admin.images.fields.remoteAlias') }}</th>
-              <th class="w-[12%] px-4 py-3">{{ t('admin.images.fields.architecture') }}</th>
-              <th class="w-[12%] px-4 py-3">{{ t('admin.images.fields.instanceType') }}</th>
-              <th class="w-[8%] px-4 py-3">{{ t('admin.images.fields.sortOrder') }}</th>
-              <th class="w-[8%] px-4 py-3">{{ t('admin.images.fields.status') }}</th>
-              <th class="w-[12%] px-4 py-3 text-right">{{ t('common.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-themed">
-            <tr
-              v-for="image in filteredImages"
-              :key="image.id"
-              class="transition-colors hover:bg-themed-hover"
-              :class="[
-                image.hidden ? 'opacity-60' : '',
-                selectedIds.has(image.id) ? 'bg-primary-500/5' : ''
-              ]"
-            >
-              <td class="px-4 py-3">
-                <input
-                  type="checkbox"
-                  class="h-4 w-4 rounded text-accent cursor-pointer"
-                  :checked="selectedIds.has(image.id)"
-                  @change="toggleSelect(image.id, ($event.target as HTMLInputElement).checked)"
-                />
-              </td>
-              <td class="px-4 py-3">
-                <DistroIcon :distro="image.icon" :size="32" />
-              </td>
-              <td class="px-4 py-3 text-sm text-themed truncate" :title="image.name">{{ image.name }}</td>
-              <td class="px-4 py-3 font-mono text-xs text-themed-muted truncate" :title="image.remoteAlias">{{ image.remoteAlias }}</td>
-              <td class="px-4 py-3">
-                <span
-                  class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-                  :class="getArchitectureBadgeClass(image.architecture)"
-                >
-                  {{ image.architecture }}
-                </span>
-              </td>
-              <td class="px-4 py-3">
-                <span
-                  class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-                  :class="getInstanceTypeBadgeClass(image.instanceType)"
-                >
-                  {{ image.instanceType === 'container' ? t('admin.images.typeContainer') : image.instanceType === 'vm' ? t('admin.images.typeVm') : t('admin.images.typeBoth') }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-sm text-themed-muted">{{ image.sortOrder }}</td>
-              <td class="px-4 py-3">
-                <span
-                  class="px-2 py-1 text-xs rounded-full"
-                  :class="image.hidden
-                    ? (themeStore.isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600')
-                    : (themeStore.isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')"
-                >
-                  {{ image.hidden ? t('admin.images.statusHidden') : t('admin.images.statusVisible') }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-2">
-                  <button
-                    class="p-1.5 rounded transition-colors"
-                    :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'"
-                    :title="image.hidden ? t('admin.images.show') : t('admin.images.hide')"
-                    @click="toggleHidden(image)"
+            <colgroup>
+              <col class="w-[4%]" />
+              <col class="w-[6%]" />
+              <col class="w-[18%]" />
+              <col class="w-[22%]" />
+              <col class="w-[11%]" />
+              <col class="w-[11%]" />
+              <col class="w-[8%]" />
+              <col class="w-[8%]" />
+              <col class="w-[12%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+              <tr class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider select-none">
+                <th class="px-4 py-3.5">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
+                    :checked="isAllSelected"
+                    :indeterminate="isIndeterminate"
+                    :aria-label="t('admin.images.selectAll')"
+                    @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                  />
+                </th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.icon') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.name') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.remoteAlias') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.architecture') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.instanceType') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.sortOrder') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.images.fields.status') }}</th>
+                <th class="px-4 py-3.5 text-right">{{ t('common.actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="image in paginatedImages"
+                :key="image.id"
+                class="transition-colors hover:bg-[var(--bg-surface-soft)]/50"
+                :class="[
+                  image.hidden ? 'opacity-65' : '',
+                  selectedIds.has(image.id) ? 'bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))]' : ''
+                ]"
+              >
+                <td class="px-4 py-3.5">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
+                    :checked="selectedIds.has(image.id)"
+                    @change="toggleSelect(image.id, ($event.target as HTMLInputElement).checked)"
+                  />
+                </td>
+                <td class="px-4 py-3.5">
+                  <div class="w-9 h-9 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center">
+                    <DistroIcon :distro="image.icon" :size="22" />
+                  </div>
+                </td>
+                <td class="px-4 py-3.5 text-sm font-semibold text-[var(--text-primary)] truncate" :title="image.name">
+                  {{ image.name }}
+                </td>
+                <td class="px-4 py-3.5 font-mono text-xs text-[var(--text-secondary)] truncate" :title="image.remoteAlias">
+                  {{ image.remoteAlias }}
+                </td>
+                <td class="px-4 py-3.5">
+                  <Badge size="sm" variant="default">
+                    {{ image.architecture }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5">
+                  <Badge size="sm" variant="info">
+                    {{ image.instanceType === 'container' ? t('admin.images.typeContainer') : image.instanceType === 'vm' ? t('admin.images.typeVm') : t('admin.images.typeBoth') }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5 font-mono tabular-nums text-xs text-[var(--text-secondary)]">
+                  {{ image.sortOrder }}
+                </td>
+                <td class="px-4 py-3.5">
+                  <Badge
+                    size="sm"
+                    :variant="image.hidden ? 'default' : 'success'"
+                    :dot="true"
                   >
-                    <svg v-if="image.hidden" class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <svg v-else class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  </button>
-                  <button
-                    class="p-1.5 rounded transition-colors"
-                    :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'"
-                    :title="t('common.edit')"
-                    @click="openEditModal(image)"
-                  >
-                    <svg class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    class="p-1.5 rounded transition-colors"
-                    :class="themeStore.isDark ? 'hover:bg-rose-900/50' : 'hover:bg-rose-50'"
-                    :title="t('common.delete')"
-                    @click="deleteImage(image)"
-                  >
-                    <svg class="w-4 h-4 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                    {{ image.hidden ? t('admin.images.statusHidden') : t('admin.images.statusVisible') }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5 text-right">
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                      :title="image.hidden ? t('admin.images.show') : t('admin.images.hide')"
+                      @click="toggleHidden(image)"
+                    >
+                      <Eye v-if="image.hidden" class="w-4 h-4" />
+                      <EyeOff v-else class="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-surface-soft)] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                      :title="t('common.edit')"
+                      @click="openEditModal(image)"
+                    >
+                      <Edit3 class="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--error)]"
+                      :title="t('common.delete')"
+                      @click="deleteImage(image)"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+
+        <!-- Pagination -->
+        <Card v-if="filteredImages.length > 0" padding="sm">
+          <Pagination
+            v-model:page="page"
+            v-model:page-size="pageSize"
+            :total="filteredImages.length"
+            :show-size-changer="filteredImages.length > 10"
+            :page-size-options="[10, 15, 20, 50]"
+          />
+        </Card>
       </template>
     </template>
 
@@ -680,79 +889,111 @@ onMounted(() => {
       raw
       @close="showModal = false"
     >
-      <div class="modal-header">
-        <h3 class="modal-title">{{ modalTitle }}</h3>
-        <button type="button" class="btn btn-ghost btn-sm p-1.5 -mr-1" aria-label="close" @click="showModal = false">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface)]">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+            <Layers class="w-4 h-4 stroke-[2]" />
+          </div>
+          <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">{{ modalTitle }}</h3>
+        </div>
+        <button
+          type="button"
+          class="w-8 h-8 inline-flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+          :aria-label="t('common.cancel')"
+          @click="showModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
         </button>
       </div>
 
-      <form class="flex-1 flex flex-col min-h-0" @submit.prevent="saveImage">
-        <div class="modal-body space-y-4">
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.name') }} *</label>
-            <input v-model="form.name" type="text" class="input" :placeholder="t('admin.images.placeholder.name')" />
-          </div>
+      <form class="flex-1 flex flex-col min-h-0 bg-[var(--bg-surface)]" @submit.prevent="saveImage">
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+          <!-- Name -->
+          <Input
+            v-model="form.name"
+            :label="`${t('admin.images.fields.name')} *`"
+            :placeholder="t('admin.images.placeholder.name')"
+          />
 
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.remoteAlias') }} *</label>
-            <input v-model="form.remoteAlias" type="text" class="input font-mono" :placeholder="t('admin.images.placeholder.remoteAlias')" />
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.remoteAlias') }}</p>
-          </div>
+          <!-- Remote Alias -->
+          <Input
+            v-model="form.remoteAlias"
+            :label="`${t('admin.images.fields.remoteAlias')} *`"
+            :placeholder="t('admin.images.placeholder.remoteAlias')"
+            :hint="t('admin.images.hint.remoteAlias')"
+          />
 
+          <!-- OS Type & Architecture (2 cols) -->
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.osType') }}</label>
-              <input v-model="form.osType" type="text" class="input" />
+            <Input
+              v-model="form.osType"
+              :label="t('admin.images.fields.osType')"
+              placeholder="Linux"
+            />
+            <Select
+              v-model="form.architecture"
+              :label="t('admin.images.fields.architecture')"
+              :options="architectureOptions"
+            />
+          </div>
+
+          <!-- Instance Type -->
+          <Select
+            v-model="form.instanceType"
+            :label="t('admin.images.fields.instanceType')"
+            :options="instanceTypeOptions"
+            :hint="t('admin.images.hint.instanceType')"
+          />
+
+          <!-- Distro Icon with preview -->
+          <div>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center justify-between mb-1.5">
+              <span>{{ t('admin.images.fields.icon') }} *</span>
+            </label>
+            <div class="flex items-center gap-3">
+              <div v-if="form.icon" class="w-11 h-11 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] flex items-center justify-center shrink-0">
+                <DistroIcon :distro="form.icon" :size="28" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <Select
+                  v-model="form.icon"
+                  :options="iconSelectOptions"
+                  :placeholder="t('admin.images.placeholder.icon')"
+                />
+              </div>
             </div>
-            <div>
-              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.architecture') }}</label>
-              <select v-model="form.architecture" class="input">
-                <option v-for="option in architectureOptions" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </select>
+          </div>
+
+          <!-- Sort Order -->
+          <Input
+            v-model.number="form.sortOrder"
+            type="number"
+            :label="t('admin.images.fields.sortOrder')"
+            :hint="t('admin.images.hint.sortOrder')"
+          />
+
+          <!-- Hidden Checkbox / Switch -->
+          <label class="flex items-start gap-3 p-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] cursor-pointer hover:bg-[var(--bg-surface)] transition-colors select-none">
+            <input
+              id="hidden"
+              v-model="form.hidden"
+              type="checkbox"
+              class="w-4 h-4 mt-0.5 rounded text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer shrink-0"
+            />
+            <div class="text-sm">
+              <span class="font-medium text-[var(--text-primary)]">{{ t('admin.images.fields.hidden') }}</span>
+              <p class="text-xs text-[var(--text-secondary)] mt-0.5">勾选后用户在新建实例时将无法看到并选择此镜像</p>
             </div>
-          </div>
-
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.instanceType') }}</label>
-            <select v-model="form.instanceType" class="input">
-              <option value="both">{{ t('admin.images.typeBoth') }}</option>
-              <option value="container">{{ t('admin.images.typeContainer') }}</option>
-              <option value="vm">{{ t('admin.images.typeVm') }}</option>
-            </select>
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.instanceType') }}</p>
-          </div>
-
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.icon') }} *</label>
-            <select v-model="form.icon" class="input">
-              <option value="">{{ t('admin.images.placeholder.icon') }}</option>
-              <option v-for="icon in iconOptions" :key="icon" :value="icon">{{ icon }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.images.fields.sortOrder') }}</label>
-            <input v-model.number="form.sortOrder" type="number" class="input" min="0" />
-            <p class="text-xs text-themed-muted mt-1">{{ t('admin.images.hint.sortOrder') }}</p>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <input :id="'hidden'" v-model="form.hidden" type="checkbox" class="w-4 h-4 rounded" />
-            <label :for="'hidden'" class="text-sm text-themed-secondary cursor-pointer">{{ t('admin.images.fields.hidden') }}</label>
-          </div>
+          </label>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn-secondary" @click="showModal = false">{{ t('common.cancel') }}</button>
-          <button type="submit" class="btn-primary" :disabled="saving">
-            <span v-if="saving" class="loading-spinner w-4 h-4 mr-2"></span>
+        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+          <Button type="button" variant="secondary" @click="showModal = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button type="submit" variant="primary" :loading="saving">
             {{ isEditMode ? t('common.save') : t('common.create') }}
-          </button>
+          </Button>
         </div>
       </form>
     </DrawerModal>
