@@ -158,8 +158,11 @@ func TestConnectRequiresCertificatePair(t *testing.T) {
 	}
 }
 
-// TestConnectRejectsPinnedFingerprint pins that the unimplemented pinning path
-// refuses to connect rather than downgrading to an unpinned connection.
+// TestConnectRejectsPinnedFingerprint pins that a pinned client still refuses to
+// connect without usable credentials. Pinning itself is now implemented
+// (lib/node_security_transport.go), so the failure surfaces as the missing
+// certificate rather than an "unimplemented" error — but the security property
+// being asserted is unchanged: no connection is attempted unverified.
 func TestConnectRejectsPinnedFingerprint(t *testing.T) {
 	certPath := "/tmp/does-not-exist.crt"
 	keyPath := "/tmp/does-not-exist.key"
@@ -171,10 +174,28 @@ func TestConnectRejectsPinnedFingerprint(t *testing.T) {
 	})
 	_, err := client.Connect(t.Context())
 	if err == nil {
-		t.Fatal("expected pinning to be rejected")
+		t.Fatal("expected the connect to fail without credentials")
 	}
-	if !strings.Contains(err.Error(), "尚未移植") {
+	if !strings.Contains(err.Error(), "无法连接到 Incus") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestConnectRejectsMalformedPinnedFingerprint pins that a bad pin is refused
+// before any dial, so a typo cannot silently become an unpinned connection.
+func TestConnectRejectsMalformedPinnedFingerprint(t *testing.T) {
+	certPath := "/tmp/does-not-exist.crt"
+	keyPath := "/tmp/does-not-exist.key"
+	for _, bad := range []string{"abc", strings.Repeat("A", 64), strings.Repeat("z", 64)} {
+		client := NewIncusClient(IncusClientOptions{
+			URL:               "https://127.0.0.1:8443",
+			CertPath:          &certPath,
+			KeyPath:           &keyPath,
+			ServerFingerprint: bad,
+		})
+		if _, err := client.Connect(t.Context()); err == nil {
+			t.Fatalf("fingerprint %q must be rejected", bad)
+		}
 	}
 }
 

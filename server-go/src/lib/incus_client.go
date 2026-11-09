@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -261,12 +262,6 @@ func (c *IncusClient) buildTransport() (*http.Transport, error) {
 		return nil, errors.New("Certificate or key path is missing")
 	}
 
-	// A pinned fingerprint is a security control: refuse rather than connect
-	// without verifying it. /lib/node-security/transport.ts owns that path and is
-	// part of the node-security wave.
-	if c.options.ServerFingerprint != "" {
-		return nil, errors.New("节点身份固定校验（serverFingerprint）尚未移植")
-	}
 	// The tunnel branch depends on hostTunnelManager (WebSocket wave).
 	if c.options.TunnelEnabled && c.options.HostID != 0 {
 		return nil, errors.New("宿主机内网穿透通道未移植，请等待节点隧道模块")
@@ -277,21 +272,41 @@ func (c *IncusClient) buildTransport() (*http.Transport, error) {
 		return nil, err
 	}
 
-	// Incus uses a self-signed certificate, so verification is disabled —
-	// matching `rejectUnauthorized: false` in the TypeScript.
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			Certificates:       []tls.Certificate{certificate},
+			Certificates: []tls.Certificate{certificate},
+			// Incus uses a self-signed certificate, so chain verification is off,
+			// matching `rejectUnauthorized: false` in the TypeScript.
 			InsecureSkipVerify: true,
-			// The node's identity is established by the client certificate, not by
-			// validating its self-signed chain. Verification is either a pinned
-			// fingerprint (not ported) or absent, exactly as in Node.
-			MinVersion: tls.VersionTLS12,
+			MinVersion:         tls.VersionTLS12,
 		},
 		DisableKeepAlives:   false,
 		MaxIdleConnsPerHost: 8,
 		IdleConnTimeout:     90 * time.Second,
 	}
+
+	// A configured fingerprint is a security control: every connection must prove
+	// the node's identity before a single header or secret body is sent. It is
+	// wired through DialNodePinned (lib/node_security_transport.go), which validates
+	// the pin before dialling, refuses https-less URLs and compares the leaf
+	// certificate's sha256 in constant time.
+	if fingerprint := strings.TrimSpace(c.options.ServerFingerprint); fingerprint != "" {
+		if !nodePinnedFingerprintPattern.MatchString(fingerprint) {
+			return nil, ErrNodeInvalidIdentity
+		}
+		parsed, err := url.Parse(c.baseURL)
+		if err != nil || parsed.Scheme != "https" {
+			return nil, ErrNodeTLSRequired
+		}
+		expected := fingerprint
+
+		transport.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return DialNodePinned(ctx, c.baseURL, expected, NodePinnedCredentials{Certificate: certificate})
+		}
+		// The pin replaces the PKI, so the dial target is derived from baseURL inside
+		// DialNodePinned rather than from the transport's address argument.
+	}
+
 	return transport, nil
 }
 
