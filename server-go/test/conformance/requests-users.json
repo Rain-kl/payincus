@@ -1,0 +1,506 @@
+[
+  {
+    "name": "users-list-anon",
+    "method": "GET",
+    "path": "/api/users",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-list-anon-trailing-slash",
+    "method": "GET",
+    "path": "/api/users/",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-lookup-anon",
+    "method": "GET",
+    "path": "/api/users/lookup?username=admin",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detail-anon",
+    "method": "GET",
+    "path": "/api/users/1",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detect-anon",
+    "method": "GET",
+    "path": "/api/users/detect-linked-accounts",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-anon",
+    "method": "PATCH",
+    "path": "/api/users/1",
+    "body": {
+      "avatarStyle": "rings"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-anon-invalid-id-and-body",
+    "method": "PATCH",
+    "path": "/api/users/abc",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-role-anon",
+    "method": "PATCH",
+    "path": "/api/users/1/role",
+    "body": {
+      "role": "user"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-status-anon",
+    "method": "PATCH",
+    "path": "/api/users/1/status",
+    "body": {
+      "status": "active"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-delete-anon",
+    "method": "DELETE",
+    "path": "/api/users/1",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-sessions-anon",
+    "method": "GET",
+    "path": "/api/users/1/sessions",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-revoke-sessions-anon",
+    "method": "POST",
+    "path": "/api/users/1/revoke-sessions",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-reset-password-anon",
+    "method": "POST",
+    "path": "/api/users/1/reset-password",
+    "body": {
+      "password": "Abcdef12"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-disable-2fa-anon",
+    "method": "POST",
+    "path": "/api/users/1/disable-2fa",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-oauth-unbind-anon",
+    "method": "DELETE",
+    "path": "/api/users/1/oauth/github",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-login-records-anon",
+    "method": "GET",
+    "path": "/api/users/1/login-records",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-recalculate-anon",
+    "method": "POST",
+    "path": "/api/users/1/quota/recalculate",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-quota-increase-anon",
+    "method": "POST",
+    "path": "/api/users/me/quota/increase",
+    "body": {
+      "hostLimit": 5
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-change-email-anon",
+    "method": "POST",
+    "path": "/api/users/1/change-email/send-code",
+    "body": {
+      "email": "new@example.com"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-list",
+    "method": "GET",
+    "path": "/api/users",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/users/?page=1&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-list-search",
+    "method": "GET",
+    "path": "/api/users?search=admin&searchFields=username&exact=true",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-list-invalid-paging",
+    "method": "GET",
+    "path": "/api/users?page=abc&pageSize=9999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-list-empty-search-fields",
+    "method": "GET",
+    "path": "/api/users?searchFields=&page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-lookup",
+    "method": "GET",
+    "path": "/api/users/lookup?username=admin",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-lookup-missing-username",
+    "method": "GET",
+    "path": "/api/users/lookup",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-lookup-blank-username",
+    "method": "GET",
+    "path": "/api/users/lookup?username=%20",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-lookup-unknown",
+    "method": "GET",
+    "path": "/api/users/lookup?username=conformance-no-such-user",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detail",
+    "method": "GET",
+    "path": "/api/users/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detail-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/users/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detail-non-numeric-id",
+    "method": "GET",
+    "path": "/api/users/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detail-overflow-id",
+    "method": "GET",
+    "path": "/api/users/9999999999999999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detail-not-found",
+    "method": "GET",
+    "path": "/api/users/2147483000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-sessions",
+    "method": "GET",
+    "path": "/api/users/1/sessions",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-sessions-not-found",
+    "method": "GET",
+    "path": "/api/users/2147483000/sessions",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-login-records",
+    "method": "GET",
+    "path": "/api/users/1/login-records?page=1&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-login-records-page-size-clamped",
+    "method": "GET",
+    "path": "/api/users/1/login-records?pageSize=999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-login-records-invalid-id",
+    "method": "GET",
+    "path": "/api/users/abc/login-records",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-login-records-not-found",
+    "method": "GET",
+    "path": "/api/users/2147483000/login-records",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-recalculate-not-found",
+    "method": "POST",
+    "path": "/api/users/2147483000/quota/recalculate",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-invalid-id",
+    "method": "PATCH",
+    "path": "/api/users/0",
+    "body": {
+      "avatarStyle": "rings"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-validation-email",
+    "method": "PATCH",
+    "path": "/api/users/1",
+    "body": {
+      "email": "not-an-email"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-validation-password-too-short",
+    "method": "PATCH",
+    "path": "/api/users/1",
+    "body": {
+      "password": "12345"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-validation-email-code",
+    "method": "PATCH",
+    "path": "/api/users/1",
+    "body": {
+      "emailCode": "1"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-validation-avatar-style",
+    "method": "PATCH",
+    "path": "/api/users/1",
+    "body": {
+      "avatarStyle": "nope"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-non-object-body",
+    "method": "PATCH",
+    "path": "/api/users/1",
+    "body": [],
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-update-not-found",
+    "method": "PATCH",
+    "path": "/api/users/2147483000",
+    "body": {
+      "avatarStyle": "rings"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-role-validation",
+    "method": "PATCH",
+    "path": "/api/users/1/role",
+    "body": {
+      "role": "superuser"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-role-missing-field",
+    "method": "PATCH",
+    "path": "/api/users/1/role",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-role-not-found",
+    "method": "PATCH",
+    "path": "/api/users/2147483000/role",
+    "body": {
+      "role": "admin"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-status-validation",
+    "method": "PATCH",
+    "path": "/api/users/1/status",
+    "body": {
+      "status": "deleted"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-status-reason-too-long",
+    "method": "PATCH",
+    "path": "/api/users/1/status",
+    "body": {
+      "status": "active",
+      "reason": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-status-not-found",
+    "method": "PATCH",
+    "path": "/api/users/2147483000/status",
+    "body": {
+      "status": "active"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-reset-password-schema",
+    "method": "POST",
+    "path": "/api/users/1/reset-password",
+    "body": {
+      "password": "12345"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-reset-password-weak",
+    "method": "POST",
+    "path": "/api/users/1/reset-password",
+    "body": {
+      "password": "abcdef"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-reset-password-not-found",
+    "method": "POST",
+    "path": "/api/users/2147483000/reset-password",
+    "body": {
+      "password": "Abcdef12"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-change-email-missing-field",
+    "method": "POST",
+    "path": "/api/users/1/change-email/send-code",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-change-email-invalid-address",
+    "method": "POST",
+    "path": "/api/users/1/change-email/send-code",
+    "body": {
+      "email": "not-an-email"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-change-email-not-owner",
+    "method": "POST",
+    "path": "/api/users/2147483000/change-email/send-code",
+    "body": {
+      "email": "new@example.com"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-quota-increase-admin-rejected",
+    "method": "POST",
+    "path": "/api/users/me/quota/increase",
+    "body": {
+      "hostLimit": 5
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-oauth-invalid-provider",
+    "method": "DELETE",
+    "path": "/api/users/1/oauth/gitlab",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-oauth-not-found",
+    "method": "DELETE",
+    "path": "/api/users/2147483000/oauth/github",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detect-linked-accounts",
+    "method": "GET",
+    "path": "/api/users/detect-linked-accounts",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "skipBody": true,
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "users-detect-clamped-params",
+    "method": "GET",
+    "path": "/api/users/detect-linked-accounts?days=9999&limit=999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "skipBody": true,
+    "ignoreRateLimit": true
+  }
+]

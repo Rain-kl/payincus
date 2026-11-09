@@ -89,10 +89,18 @@ func trafficRespondInternal(c *gin.Context) {
 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 }
 
-// trafficParseInt32RouteID mirrors parsePositiveId (canonical positive decimal,
+// trafficParseInt32RouteID mirrors parsePositiveId's intent (positive decimal,
 // JavaScript safe integer) and then the Prisma Int range: an id that parses but
 // exceeds int32 cannot address an Int column (P2020), and the Node route does not
 // catch that error, so it surfaces as a 500.
+//
+// It uses lib.ParsePositiveRouteID, per the migration rules, which is stricter than
+// traffic.ts' local helper in exactly one respect: `^[1-9]\d*$` rejects a
+// leading-zero id such as "01", which the TypeScript's `^\d+$` + Number() would
+// accept as 1. Zero, negative, fractional and non-numeric ids behave identically
+// in both implementations. The strict parser is what all other ports use and what
+// the route-id guard tests pin, so the divergence is deliberate; no conformance
+// case exercises a leading-zero id.
 func trafficParseInt32RouteID(value string) (id int32, ok bool, outOfRange bool) {
 	parsed, ok := lib.ParsePositiveRouteID(value)
 	if !ok {

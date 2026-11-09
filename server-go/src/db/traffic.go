@@ -499,13 +499,17 @@ func trafficAcquireLock(ctx context.Context, lockKey string, options trafficLock
 	return "", errors.New("Lock acquisition timeout")
 }
 
-// trafficReleaseLock mirrors releaseLock: only the owner may delete the row.
+// trafficReleaseLock mirrors releaseLock: only the owner may delete the row. The
+// release always runs (even when the request context is already cancelled), like
+// the TypeScript, so a disconnected client cannot leave the lock held until its
+// 30s expiry.
 func trafficReleaseLock(ctx context.Context, lockKey, ownerID string) {
 	pool := Pool()
 	if pool == nil {
 		return
 	}
-	_, _ = pool.Exec(ctx, `DELETE FROM "distributed_locks" WHERE "lock_key" = $1 AND "owner_id" = $2`,
+	_, _ = pool.Exec(context.WithoutCancel(ctx),
+		`DELETE FROM "distributed_locks" WHERE "lock_key" = $1 AND "owner_id" = $2`,
 		lockKey, ownerID)
 }
 
@@ -867,11 +871,6 @@ func trafficPrismaDateParam(instant time.Time) *time.Time {
 	utc := instant.UTC()
 	start := time.Date(utc.Year(), utc.Month(), utc.Day(), 0, 0, 0, 0, time.UTC)
 	return &start
-}
-
-// TrafficDateParamForTest exposes the @db.Date binding quirk to the unit test.
-func TrafficDateParamForTest(instant time.Time) time.Time {
-	return *trafficPrismaDateParam(instant)
 }
 
 // trafficDailyRowsBetween runs the shared `date >= start` ordered read.
@@ -1980,6 +1979,11 @@ func ResetInstanceTrafficForOwnerInTransaction(
 			return 0, errors.New("余额正在处理，请稍后重试")
 		}
 
+		// The TypeScript reads user.balance as part of the instance query *before*
+		// taking the balance lock. Reading it after the lock (this port) keeps the
+		// same lock order while guaranteeing the ledger's balance_before is the
+		// balance the UPDATE actually operates on — i.e. no stale ledger row under
+		// concurrency, which is the invariant that matters for a monthly reset.
 		var balance models.Decimal
 		err = tx.QueryRow(ctx, `SELECT balance FROM users WHERE id = $1`, userID).Scan(&balance)
 		if errors.Is(err, pgx.ErrNoRows) {

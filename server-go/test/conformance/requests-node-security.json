@@ -1,0 +1,261 @@
+[
+  {
+    "name": "node-security-anon-identity",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/identity",
+    "body": { "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+  },
+  {
+    "name": "node-security-anon-overview",
+    "method": "GET",
+    "path": "/api/admin/hosts/1/node-security"
+  },
+  {
+    "name": "node-security-anon-policy",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/policy",
+    "body": { "enabled": true, "revision": 1 }
+  },
+  {
+    "name": "node-security-anon-recover",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/recover",
+    "body": { "revision": 1 }
+  },
+  {
+    "name": "node-security-anon-lock",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/lock",
+    "body": {}
+  },
+  {
+    "name": "node-security-anon-keys",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys",
+    "body": {
+      "dataset": "tank/instances",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "node-security-anon-keys-reveal",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys/reveal",
+    "body": { "dataset": "tank/instances" }
+  },
+  {
+    "name": "node-security-anon-keys-unlock",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys/unlock",
+    "body": { "dataset": "tank/instances" }
+  },
+
+  {
+    "name": "node-security-overview-invalid-id-text",
+    "method": "GET",
+    "path": "/api/admin/hosts/abc/node-security",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "node-security-overview-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/admin/hosts/0/node-security",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "node-security-overview-invalid-id-overflow",
+    "method": "GET",
+    "path": "/api/admin/hosts/2147483648/node-security",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "node-security-identity-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/hosts/abc/node-security/identity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+  },
+
+  {
+    "name": "node-security-identity-missing-fingerprint",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/identity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "node-security-identity-short-fingerprint",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/identity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "fingerprint": "abc" }
+  },
+  {
+    "name": "node-security-identity-uppercase-fingerprint",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/identity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "fingerprint": "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF" }
+  },
+  {
+    "name": "node-security-identity-non-object-body",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/identity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+
+  {
+    "name": "node-security-keys-dataset-too-short",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "dataset": "ab",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "node-security-keys-dataset-bad-pattern",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "dataset": "1abc",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "node-security-keys-dataset-too-long",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "dataset": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "node-security-keys-key-bad-pattern",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "dataset": "tank/instances", "key": "zz" }
+  },
+  {
+    "name": "node-security-keys-missing-key",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "dataset": "tank/instances" }
+  },
+  {
+    "name": "node-security-keys-reveal-invalid-dataset",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys/reveal",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "dataset": "1abc" }
+  },
+  {
+    "name": "node-security-keys-unlock-missing-dataset",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/keys/unlock",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+
+  {
+    "name": "node-security-policy-missing-revision",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": true }
+  },
+  {
+    "name": "node-security-policy-enabled-not-boolean",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": "yes", "revision": 1 }
+  },
+  {
+    "name": "node-security-policy-negative-revision",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": true, "revision": -1 }
+  },
+  {
+    "name": "node-security-policy-revision-over-safe-integer",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": true, "revision": 9007199254740992 }
+  },
+  {
+    "name": "node-security-recover-missing-revision",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/recover",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "node-security-lock-non-object-body",
+    "method": "POST",
+    "path": "/api/admin/hosts/1/node-security/lock",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": "x"
+  },
+
+  {
+    "name": "node-security-identity-host-not-found",
+    "method": "POST",
+    "path": "/api/admin/hosts/2147483647/node-security/identity",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+  },
+  {
+    "name": "node-security-keys-host-not-found",
+    "method": "POST",
+    "path": "/api/admin/hosts/2147483647/node-security/keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "dataset": "tank/instances",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "node-security-keys-reveal-not-enrolled",
+    "method": "POST",
+    "path": "/api/admin/hosts/2147483647/node-security/keys/reveal",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "dataset": "tank/instances" }
+  },
+  {
+    "name": "node-security-overview-host-not-found",
+    "method": "GET",
+    "path": "/api/admin/hosts/2147483647/node-security",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "node-security-policy-host-not-found",
+    "method": "POST",
+    "path": "/api/admin/hosts/2147483647/node-security/policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "enabled": true, "revision": 1 }
+  },
+  {
+    "name": "node-security-lock-host-not-found",
+    "method": "POST",
+    "path": "/api/admin/hosts/2147483647/node-security/lock",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "unknown": "dropped" }
+  },
+  {
+    "name": "node-security-recover-host-not-found",
+    "method": "POST",
+    "path": "/api/admin/hosts/2147483647/node-security/recover",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "revision": 0 }
+  }
+]

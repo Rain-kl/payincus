@@ -103,7 +103,7 @@ func TestTrafficPrismaDateParam(t *testing.T) {
 	// getDailyTrafficByPeriod reproduces.
 	local := time.FixedZone("CST", 8*3600)
 	periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, local) // 2026-02-28T16:00Z
-	got := TrafficPrismaDateParam(periodStart)
+	got := trafficPrismaDateParam(periodStart)
 	if want := time.Date(2026, 2, 28, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Fatalf("date param = %s, want %s", got, want)
 	}
@@ -111,7 +111,7 @@ func TestTrafficPrismaDateParam(t *testing.T) {
 	// A UTC-midnight instant (the stored daily_traffic canonical value) keeps its
 	// own date.
 	canonical := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-	if got := TrafficPrismaDateParam(canonical); !got.Equal(canonical) {
+	if got := trafficPrismaDateParam(canonical); !got.Equal(canonical) {
 		t.Fatalf("canonical date param = %s, want %s", got, canonical)
 	}
 }
