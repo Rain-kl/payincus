@@ -1,0 +1,284 @@
+[
+  { "name": "checkin-status-anon", "method": "GET", "path": "/api/checkin/status" },
+  { "name": "checkin-claim-anon", "method": "POST", "path": "/api/checkin/checkin" },
+  {
+    "name": "checkin-redeem-anon",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "body": { "redeemCode": "h-abcdefghijklmnopqr", "instanceId": 1 }
+  },
+  { "name": "checkin-instances-anon", "method": "GET", "path": "/api/checkin/instances" },
+  { "name": "checkin-records-anon", "method": "GET", "path": "/api/checkin/records" },
+  { "name": "checkin-redeems-anon", "method": "GET", "path": "/api/checkin/redeems" },
+
+  {
+    "name": "checkin-status",
+    "method": "GET",
+    "path": "/api/checkin/status",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-instances",
+    "method": "GET",
+    "path": "/api/checkin/instances",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-records-default",
+    "method": "GET",
+    "path": "/api/checkin/records",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-records-pagination",
+    "method": "GET",
+    "path": "/api/checkin/records?limit=5&offset=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-records-limit-zero",
+    "method": "GET",
+    "path": "/api/checkin/records?limit=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-records-limit-over-max",
+    "method": "GET",
+    "path": "/api/checkin/records?limit=101",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-records-limit-non-integer",
+    "method": "GET",
+    "path": "/api/checkin/records?limit=abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-records-offset-negative",
+    "method": "GET",
+    "path": "/api/checkin/records?offset=-1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-redeems-default",
+    "method": "GET",
+    "path": "/api/checkin/redeems",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-redeems-pagination",
+    "method": "GET",
+    "path": "/api/checkin/redeems?limit=5&offset=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-redeems-offset-beyond-end",
+    "method": "GET",
+    "path": "/api/checkin/redeems?limit=20&offset=1000",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "checkin-redeem-missing-body",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "checkin-redeem-missing-instance-id",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "h-abcdefghijklmnopqr" }
+  },
+  {
+    "name": "checkin-redeem-code-too-short",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "h-1", "instanceId": 1 }
+  },
+  {
+    "name": "checkin-redeem-code-too-long",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "h-12345678901234567890123456789", "instanceId": 1 }
+  },
+  {
+    "name": "checkin-redeem-instance-zero",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "h-abcdefghijklmnopqr", "instanceId": 0 }
+  },
+  {
+    "name": "checkin-redeem-instance-fractional",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "h-abcdefghijklmnopqr", "instanceId": 1.5 }
+  },
+  {
+    "name": "checkin-redeem-non-object-body",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "checkin-redeem-non-system-code",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "abcdefghij", "instanceId": 1 }
+  },
+  {
+    "name": "checkin-redeem-unknown-code",
+    "method": "POST",
+    "path": "/api/checkin/redeem",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "redeemCode": "h-zzzzzzzzzzzzzzzzzz", "instanceId": 1 }
+  },
+
+  { "name": "resource-pool-anon", "method": "GET", "path": "/api/resource-pool" },
+  { "name": "resource-pool-trailing-slash-anon", "method": "GET", "path": "/api/resource-pool/" },
+  { "name": "resource-pool-logs-anon", "method": "GET", "path": "/api/resource-pool/logs" },
+  { "name": "resource-pool-instances-anon", "method": "GET", "path": "/api/resource-pool/instances" },
+  {
+    "name": "resource-pool-apply-anon",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "body": { "instanceId": 1, "resourceType": "c", "amount": 100 }
+  },
+
+  {
+    "name": "resource-pool",
+    "method": "GET",
+    "path": "/api/resource-pool",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-trailing-slash",
+    "method": "GET",
+    "path": "/api/resource-pool/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-default",
+    "method": "GET",
+    "path": "/api/resource-pool/logs",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-filters",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?action=checkin&resourceType=c&limit=10&offset=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-invalid-action",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?action=nope",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-invalid-resource-type",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?resourceType=p",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-limit-zero-falls-back",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?limit=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-limit-over-max-clamps",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?limit=101",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-offset-invalid-falls-back",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?offset=-5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-logs-repeated-limit-falls-back",
+    "method": "GET",
+    "path": "/api/resource-pool/logs?limit=10&limit=20",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-instances",
+    "method": "GET",
+    "path": "/api/resource-pool/instances",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "resource-pool-apply-missing-body",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "resource-pool-apply-missing-type",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 1 }
+  },
+  {
+    "name": "resource-pool-apply-missing-amount",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 1, "resourceType": "c" }
+  },
+  {
+    "name": "resource-pool-apply-invalid-type",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 1, "resourceType": "p", "amount": 1 }
+  },
+  {
+    "name": "resource-pool-apply-amount-zero",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 1, "resourceType": "c", "amount": 0 }
+  },
+  {
+    "name": "resource-pool-apply-amount-over-max",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 1, "resourceType": "c", "amount": 104857601 }
+  },
+  {
+    "name": "resource-pool-apply-amount-fractional",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 1, "resourceType": "c", "amount": 1.5 }
+  },
+  {
+    "name": "resource-pool-apply-instance-zero",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "instanceId": 0, "resourceType": "c", "amount": 1 }
+  },
+  {
+    "name": "resource-pool-apply-non-object-body",
+    "method": "POST",
+    "path": "/api/resource-pool/apply",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": []
+  }
+]
