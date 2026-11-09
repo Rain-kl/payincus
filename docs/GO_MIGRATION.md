@@ -32,6 +32,8 @@
 | **Wave 5 substrate（已完成）** | `src/lib/bigint_input.go`、`src/lib/timezone.go`、`src/lib/gpu.go`、`src/lib/traffic_utils.go`、`src/lib/permission.go` + `src/db/permission_lookups.go`、`src/lib/incus_client.go` + `src/lib/incus_error.go`、`src/lib/operation_task_log.go` | BigInt 三态解析、业务时区、GPU 准入策略、流量计量、AUTH004 权限边界、Incus mTLS 客户端、长任务日志 |
 | **Wave 5 模块（已完成）** | `src/routes/logs.go`、`src/db/custom_init_commands.go` + `src/routes/custom_init_commands.go`、`src/db/user_invites.go` + `src/routes/user_invites.go`、`src/db/oauth_apps.go` + `src/routes/admin_oauth_apps.go`、`src/routes/tickets.go`（16 路由）、`src/routes/telegram.go`（9 路由）、`src/routes/admin_tasks.go`（含 SSE）、`src/services/promo_*.go` + `src/db/promo_*.go` + `src/routes/promo_codes.go`、`src/routes/admin_statistics.go` + `src/db/checkin_settings.go` | 日志/自定义初始化/邀请/OAuth 应用/工单/Telegram/后台任务/优惠码/管理统计 |
 | **Fastify 请求体生命周期（已完成）** | `src/middleware/request_body.go` + `src/app.go` 的 NoRoute | 复刻 Fastify 在鉴权之后、handler 之前的 body 解析（400/413/415），未匹配路由也先解析 JSON |
+| **Wave 5 substrate 追加（已完成）** | `src/lib/billing_calc.go`、`src/lib/cpu_allowance.go`、`src/lib/incus_instances.go`、`src/db/billing_operations.go` | 金额算术（精确复刻 `Number(x.toFixed(n))`）、CPU 额配↔核心数、Incus 实例/快照操作、`calculateCreateBilling` 单片 |
+| **Wave 5 模块追加（已完成）** | `src/routes/tickets.go`（16）、`src/routes/telegram.go`（9）、`src/routes/admin_tasks.go`（3，含 SSE）、`src/services/promo_*.go` + `src/db/promo_*.go` + `src/routes/promo_codes.go`、`src/routes/admin_statistics.go` + `src/db/checkin_settings.go`、`src/db/badges.go` + `src/db/lottery.go` + `src/lib/lottery_notifier.go` + `src/routes/entertainment.go`（16） | 工单/Telegram/后台任务/优惠码/管理统计/娱乐（徽章·抽奖·积分） |
 
 ### 对拍基线（真实双跑，同一 PostgreSQL，2026-10-29）
 
@@ -55,7 +57,7 @@
 | requests-promo-codes | 57/57 |
 | requests-admin-tasks | 27/27 |
 | requests-admin-statistics | 4/4 |
-| requests-entertainment | 33/33 |
+| requests-entertainment | 64/64 |
 
 **全部 625 例零 FAIL**（19 例为已记录的限流分歧 skip）。临时库 `payincus_goparity` 与 Node/Go 进程按需重建，dev 库未被触碰。
 
