@@ -54,7 +54,18 @@ import (
 // `price = Number(plan.price) / 100` with no setup fee and returns
 // {plan, price, billingCycle, setupFee, totalPrice, expiresAt}.
 var PromoCreateBilling = func(plan models.PackagePlan) (float64, error) {
-	return 0, fmt.Errorf("calculateCreateBilling 尚未移植（db/billing-operations.ts 归属实例计费模块）")
+	return 0, fmt.Errorf("calculateCreateBilling 尚未接线")
+}
+
+// The create-quote slice of db/billing-operations.ts IS ported (db/billing_operations.go
+// lands CalculateCreateBilling and registers it as the quote provider), so the seam is
+// wired at package-init time rather than left unsupported. The remaining
+// billing-operations functions (plan changes, refunds, renewals) stay with the billing
+// wave; the seam only ever needed totalPrice.
+func init() {
+	if quote := db.GetCreateBillingQuote(); quote != nil {
+		PromoCreateBilling = quote
+	}
 }
 
 // ==================== constants ====================
