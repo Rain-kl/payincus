@@ -1,0 +1,32 @@
+[
+  { "name": "admin-tasks-list-anon", "method": "GET", "path": "/api/admin/tasks" },
+  { "name": "admin-tasks-list-anon-trailing-slash", "method": "GET", "path": "/api/admin/tasks/" },
+  { "name": "admin-tasks-stop-anon", "method": "POST", "path": "/api/admin/tasks/1/stop" },
+  { "name": "admin-tasks-stream-anon", "method": "GET", "path": "/api/admin/tasks/1/logs/stream" },
+
+  { "name": "admin-tasks-list", "method": "GET", "path": "/api/admin/tasks", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-trailing-slash", "method": "GET", "path": "/api/admin/tasks/", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-page-default", "method": "GET", "path": "/api/admin/tasks?page=1", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-page-zero", "method": "GET", "path": "/api/admin/tasks?page=0", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-page-too-large", "method": "GET", "path": "/api/admin/tasks?page=100001", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-page-text", "method": "GET", "path": "/api/admin/tasks?page=abc", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-status-running", "method": "GET", "path": "/api/admin/tasks?status=running", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-status-success", "method": "GET", "path": "/api/admin/tasks?status=success", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-status-interrupted", "method": "GET", "path": "/api/admin/tasks?status=interrupted", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-status-bogus", "method": "GET", "path": "/api/admin/tasks?status=bogus", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-kind-create", "method": "GET", "path": "/api/admin/tasks?kind=create", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-kind-node-recover", "method": "GET", "path": "/api/admin/tasks?kind=node_recover", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-kind-bogus", "method": "GET", "path": "/api/admin/tasks?kind=bogus", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-search", "method": "GET", "path": "/api/admin/tasks?search=zzz-no-such-task", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-list-search-too-long", "method": "GET", "path": "/api/admin/tasks?search=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+
+  { "name": "admin-tasks-stop-invalid-id-zero", "method": "POST", "path": "/api/admin/tasks/0/stop", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-stop-invalid-id-leading-zero", "method": "POST", "path": "/api/admin/tasks/01/stop", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-stop-invalid-id-text", "method": "POST", "path": "/api/admin/tasks/abc/stop", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-stop-missing", "method": "POST", "path": "/api/admin/tasks/999999/stop", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+
+  { "name": "admin-tasks-stream-invalid-id", "method": "GET", "path": "/api/admin/tasks/0/logs/stream", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-stream-missing", "method": "GET", "path": "/api/admin/tasks/999999/logs/stream", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-stream-bad-after", "method": "GET", "path": "/api/admin/tasks/1/logs/stream?after=abc", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "admin-tasks-stream-negative-after", "method": "GET", "path": "/api/admin/tasks/1/logs/stream?after=-1", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" }
+]
