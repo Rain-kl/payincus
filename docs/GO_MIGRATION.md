@@ -245,16 +245,16 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 ### Wave A — 无新依赖的叶子模块（先清空，减少待办面积）
 
 - [x] `vip-levels`（已完成）
-- [ ] `vip-benefits`（126）— 依赖 `services/vip-benefits` 的完整版（目前只有 resource-pool 用的切片）
-- [ ] `gpus`（50）— `db/gpus` + `lib/gpu.go`（已就绪）
-- [ ] `instance-advanced-config`（98）
-- [ ] `storage-encryption`（92）— 依赖 `lib/storage/*`
-- [ ] `egress-profiles`（89）
-- [ ] `egress`（155）
-- [ ] `node-security`（162）— 含**指纹固定传输层**（`lib/node-security/transport.ts`），补齐 `lib/incus_client.go` 里现在硬失败的那条分支
-- [ ] `oauth-provider`（328）
-- [ ] `admin-promo-codes`（680）
-- [ ] `admin-entertainment`（1568）— lottery 管理端，依赖已移植的 `db/lottery.go`
+- [x] `vip-benefits`（126）— 依赖 `services/vip-benefits` 的完整版（目前只有 resource-pool 用的切片）
+- [x] `gpus`（50）— `db/gpus` + `lib/gpu.go`（已就绪）
+- [x] `instance-advanced-config`（98）
+- [x] `storage-encryption`（92）— 依赖 `lib/storage/*`
+- [x] `egress-profiles`（89）
+- [x] `egress`（155）
+- [x] `node-security`（162）— 含**指纹固定传输层**（`lib/node-security/transport.ts`），补齐 `lib/incus_client.go` 里现在硬失败的那条分支
+- [x] `oauth-provider`（328）
+- [x] `admin-promo-codes`（680）
+- [x] `admin-entertainment`（1568）— lottery 管理端，依赖已移植的 `db/lottery.go`
 
 ### Wave B — 网络与流量（需 IP/流量基座）
 
