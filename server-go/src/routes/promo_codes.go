@@ -76,11 +76,13 @@ const (
 )
 
 // promoCodesInstanceColumns / promoCodesInstanceApplyColumns are the instance
-// projections the two routes read. `include: { packagePlan: true }` and
-// `include: { host: true }` are loaded separately (the host include is unused by
-// the handler and is therefore skipped). Enum columns are cast to text because
-// every hand-written query in this repo does the same (Prisma uses native PG
-// enums; GORM's typed string scan wants text).
+// projections the two routes read. The TypeScript `include`s are handled
+// separately: the package plan is fetched only by /validate and /renew-preview
+// (calculateCreateBilling / the monthly-price fallback need it), and the
+// `include: { host: true }` of /apply is unused by that handler and therefore
+// skipped. Enum columns are cast to text because every hand-written query in this
+// repo does the same (Prisma uses native PG enums; GORM's typed string scan wants
+// text).
 const (
 	promoCodesInstanceColumns      = `id, user_id, package_id, package_plan_id, status::text AS status, billing_price, billing_cycle`
 	promoCodesInstanceApplyColumns = `id, user_id, package_id, package_plan_id, status::text AS status`

@@ -513,7 +513,7 @@ func adminStatisticsTestCaseChild(value map[string]any, path ...string) map[stri
 }
 
 func adminStatisticsTestCaseFirst(value map[string]any, path ...string) map[string]any {
-	parent := child(value, path[:len(path)-1]...)
+	parent := adminStatisticsTestCaseChild(value, path[:len(path)-1]...)
 	if parent == nil {
 		return nil
 	}

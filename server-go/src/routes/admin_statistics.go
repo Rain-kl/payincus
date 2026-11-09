@@ -23,6 +23,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -1179,7 +1180,7 @@ func adminStatisticsOverviewHandler(c *gin.Context) {
 	})
 
 	if err := batch.wait(); err != nil {
-		c.JSON(500, gin.H{"error": "获取统计数据失败"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取统计数据失败"})
 		return
 	}
 
@@ -1288,7 +1289,7 @@ func adminStatisticsOverviewHandler(c *gin.Context) {
 		PendingTickets:  pendingTickets,
 	}
 
-	c.JSON(200, response)
+	c.JSON(http.StatusOK, response)
 }
 
 // adminStatisticsActiveLotteries mirrors lottery.findMany({ ..., take: 5 }).

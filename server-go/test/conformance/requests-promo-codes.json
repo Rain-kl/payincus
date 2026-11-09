@@ -33,7 +33,7 @@
   { "name": "promo-validate-expired-code", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "SEEDED_EXPIRED_CODE", "packagePlanId": 1} },
   { "name": "promo-validate-not-started-code", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "SEEDED_NOT_STARTED_CODE", "packagePlanId": 1} },
   { "name": "promo-validate-quota-exceeded-code", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "SEEDED_EXHAUSTED_CODE", "packagePlanId": 1} },
-  { "name": "promo-validate-scope-mismatch", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "SEEDED_PLAN_SCOPED_CODE", "packagePlanId": 999999} },
+  { "name": "promo-validate-scoped-code-unknown-plan", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "SEEDED_PLAN_SCOPED_CODE", "packagePlanId": 999999} },
   { "name": "promo-validate-lowercase-code", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "seeded_expired_code", "packagePlanId": 1} },
   { "name": "promo-validate-self-referral-code", "method": "POST", "path": "/api/coupon/validate", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN", "body": {"code": "SEEDED_OWN_AFF_CODE", "packagePlanId": 1} },
   { "name": "promo-renew-preview-id-zero", "method": "GET", "path": "/api/coupon/renew-preview/0", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },

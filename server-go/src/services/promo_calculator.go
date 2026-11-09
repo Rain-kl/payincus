@@ -107,8 +107,9 @@ func PromoCalculateRenewalSplit(params PromoRenewalSplitParams) PromoRenewalSpli
 
 	remainingCycles := int(*params.RemainingCycles)
 	discountedMonths := params.Months
-	if cap := max(0, remainingCycles); discountedMonths > cap {
-		discountedMonths = cap
+	// Math.min(months, Math.max(0, remainingCycles))
+	if limit := max(0, remainingCycles); discountedMonths > limit {
+		discountedMonths = limit
 	}
 	regularMonths := params.Months - discountedMonths
 
