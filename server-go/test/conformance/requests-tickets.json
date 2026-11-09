@@ -1,0 +1,273 @@
+[
+  {
+    "name": "tickets-list-anon",
+    "method": "GET",
+    "path": "/api/tickets"
+  },
+  {
+    "name": "tickets-list-anon-trailing-slash",
+    "method": "GET",
+    "path": "/api/tickets/"
+  },
+  {
+    "name": "tickets-create-anon",
+    "method": "POST",
+    "path": "/api/tickets",
+    "body": {}
+  },
+  {
+    "name": "tickets-create-anon-empty-json",
+    "method": "POST",
+    "path": "/api/tickets",
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  {
+    "name": "tickets-pending-count-anon",
+    "method": "GET",
+    "path": "/api/tickets/pending-count"
+  },
+  {
+    "name": "tickets-my-hosts-anon",
+    "method": "GET",
+    "path": "/api/tickets/my-hosts"
+  },
+  {
+    "name": "tickets-detail-anon",
+    "method": "GET",
+    "path": "/api/tickets/1"
+  },
+  {
+    "name": "tickets-messages-anon",
+    "method": "GET",
+    "path": "/api/tickets/1/messages"
+  },
+  {
+    "name": "tickets-attachment-anon",
+    "method": "GET",
+    "path": "/api/tickets/attachments/1/content"
+  },
+  {
+    "name": "tickets-host-scope-anon",
+    "method": "GET",
+    "path": "/api/tickets/hosts/1"
+  },
+  {
+    "name": "tickets-list",
+    "method": "GET",
+    "path": "/api/tickets",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-trailing-slash",
+    "method": "GET",
+    "path": "/api/tickets/",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-invalid-status",
+    "method": "GET",
+    "path": "/api/tickets?status=bogus",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-active",
+    "method": "GET",
+    "path": "/api/tickets?status=active",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-open",
+    "method": "GET",
+    "path": "/api/tickets?status=open",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-closed",
+    "method": "GET",
+    "path": "/api/tickets?status=closed",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-page-zero-falls-back",
+    "method": "GET",
+    "path": "/api/tickets?page=0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-page-size-clamped",
+    "method": "GET",
+    "path": "/api/tickets?pageSize=500",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-list-search",
+    "method": "GET",
+    "path": "/api/tickets?search=zzz-no-such-ticket",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-pending-count",
+    "method": "GET",
+    "path": "/api/tickets/pending-count",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-my-hosts",
+    "method": "GET",
+    "path": "/api/tickets/my-hosts",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-detail-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/tickets/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-detail-invalid-id-leading-zero",
+    "method": "GET",
+    "path": "/api/tickets/01",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-detail-invalid-id-negative",
+    "method": "GET",
+    "path": "/api/tickets/-1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-detail-invalid-id-text",
+    "method": "GET",
+    "path": "/api/tickets/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-detail-missing",
+    "method": "GET",
+    "path": "/api/tickets/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-messages-missing",
+    "method": "GET",
+    "path": "/api/tickets/999999/messages",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-attachment-invalid-id",
+    "method": "GET",
+    "path": "/api/tickets/attachments/0/content",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-attachment-missing",
+    "method": "GET",
+    "path": "/api/tickets/attachments/999999/content",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-host-scope-invalid-id",
+    "method": "GET",
+    "path": "/api/tickets/hosts/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-host-scope-missing",
+    "method": "GET",
+    "path": "/api/tickets/hosts/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-create-multipart-detected",
+    "method": "POST",
+    "path": "/api/tickets",
+    "headers": {
+      "content-type": "multipart/form-data; boundary=----x"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "tickets-status-invalid-value",
+    "method": "PATCH",
+    "path": "/api/tickets/1/status",
+    "body": {
+      "status": "bogus"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-status-missing",
+    "method": "PATCH",
+    "path": "/api/tickets/999999/status",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-status-invalid-id",
+    "method": "PATCH",
+    "path": "/api/tickets/0/status",
+    "body": {
+      "status": "closed"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-close-invalid-id",
+    "method": "POST",
+    "path": "/api/tickets/0/close",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-close-missing",
+    "method": "POST",
+    "path": "/api/tickets/999999/close",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-message-post-missing-ticket",
+    "method": "POST",
+    "path": "/api/tickets/999999/messages",
+    "body": {
+      "content": "hello there"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-message-delete-missing",
+    "method": "DELETE",
+    "path": "/api/tickets/999999/messages/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-internal-notes-missing",
+    "method": "POST",
+    "path": "/api/tickets/999999/internal-notes",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-links-missing",
+    "method": "POST",
+    "path": "/api/tickets/999999/links",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-notify-missing",
+    "method": "POST",
+    "path": "/api/tickets/999999/notify",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "tickets-support-context-missing",
+    "method": "GET",
+    "path": "/api/tickets/999999/support-context",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]

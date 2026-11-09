@@ -1,0 +1,28 @@
+[
+  { "name": "telegram-binding-anon", "method": "GET", "path": "/api/telegram/binding" },
+  { "name": "telegram-bind-token-anon", "method": "POST", "path": "/api/telegram/bind-token" },
+  { "name": "telegram-bind-token-anon-empty-json", "method": "POST", "path": "/api/telegram/bind-token", "headers": { "content-type": "application/json" } },
+  { "name": "telegram-unbind-anon", "method": "DELETE", "path": "/api/telegram/binding" },
+  { "name": "telegram-admin-webhook-info-anon", "method": "GET", "path": "/api/telegram/admin/webhook/info" },
+  { "name": "telegram-admin-webhook-setup-anon", "method": "POST", "path": "/api/telegram/admin/webhook/setup", "body": {} },
+  { "name": "telegram-admin-webhook-delete-anon", "method": "POST", "path": "/api/telegram/admin/webhook/delete" },
+  { "name": "telegram-admin-bindings-anon", "method": "GET", "path": "/api/telegram/admin/bindings" },
+  { "name": "telegram-admin-binding-delete-anon", "method": "DELETE", "path": "/api/telegram/admin/bindings/1" },
+
+  { "name": "telegram-webhook-empty-body", "method": "POST", "path": "/api/telegram/webhook", "headers": { "content-type": "application/json" } },
+  { "name": "telegram-webhook-malformed-json", "method": "POST", "path": "/api/telegram/webhook", "headers": { "content-type": "application/json" }, "body": "not-an-object-but-a-string" },
+  { "name": "telegram-webhook-empty-object", "method": "POST", "path": "/api/telegram/webhook", "body": {} },
+  { "name": "telegram-webhook-no-update", "method": "POST", "path": "/api/telegram/webhook", "body": { "update_id": 1 } },
+  { "name": "telegram-webhook-message-no-text", "method": "POST", "path": "/api/telegram/webhook", "body": { "update_id": 2, "message": { "message_id": 1, "chat": { "id": 100, "type": "private" }, "from": { "id": 200 } } } },
+  { "name": "telegram-webhook-start-command", "method": "POST", "path": "/api/telegram/webhook", "body": { "update_id": 3, "message": { "message_id": 2, "text": "/start", "chat": { "id": 100, "type": "private" }, "from": { "id": 200, "username": "tester" } } } },
+  { "name": "telegram-webhook-wrong-secret-header", "method": "POST", "path": "/api/telegram/webhook", "headers": { "X-Telegram-Bot-Api-Secret-Token": "definitely-wrong" }, "body": { "update_id": 4, "message": { "message_id": 3, "text": "/start", "chat": { "id": 100, "type": "private" }, "from": { "id": 200 } } } },
+
+  { "name": "telegram-binding", "method": "GET", "path": "/api/telegram/binding", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-unbind-not-bound", "method": "DELETE", "path": "/api/telegram/binding", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-admin-webhook-info", "method": "GET", "path": "/api/telegram/admin/webhook/info", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-admin-bindings", "method": "GET", "path": "/api/telegram/admin/bindings", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-admin-bindings-page-size-clamped", "method": "GET", "path": "/api/telegram/admin/bindings?pageSize=500", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-admin-bindings-search", "method": "GET", "path": "/api/telegram/admin/bindings?search=zzz-nobody", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-admin-binding-delete-invalid-id", "method": "DELETE", "path": "/api/telegram/admin/bindings/0", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" },
+  { "name": "telegram-admin-binding-delete-missing", "method": "DELETE", "path": "/api/telegram/admin/bindings/999999", "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN" }
+]
