@@ -1,12 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import {
+  AlertCircle,
+  Check,
+  Globe,
+  Info,
+  KeyRound
+} from 'lucide-vue-next'
 import api from '@/api'
 import type { OAuthProviderConsentResponse, PublicApiScopeMetadata } from '@/types/api'
 import { dashboardPath } from '@/utils/app-paths'
+import { useAuthStore } from '@/stores/auth'
+import { useBrand } from '@/composables/useBrand'
+import { useReveal } from '@/composables/useReveal'
+import { Badge, Button, Card } from '@/components/ui'
+
+defineOptions({ name: 'OAuthAuthorizeView' })
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const brand = useBrand()
+
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -137,233 +155,226 @@ function deny() {
 }
 
 onMounted(() => {
+  if (!authStore.user) {
+    void authStore.fetchCurrentUser().catch(() => {})
+  }
   void loadScopeCatalog()
   void loadConsent()
 })
 </script>
 
 <template>
-  <main class="nimbus-auth kawaii-public-shell kawaii-auth-shell kawaii-user-auth min-h-screen flex items-center justify-center px-4 py-10">
-    <div class="nimbus-aurora" aria-hidden="true"></div>
-    <section class="relative z-10 mx-auto w-full max-w-xl">
-      <div class="card nimbus-card">
-        <div v-if="loading" class="space-y-3">
-          <div class="h-11 w-11 animate-pulse rounded-xl skeleton-bg"></div>
-          <div class="h-5 w-40 animate-pulse rounded skeleton-bg"></div>
-          <div class="h-4 w-full animate-pulse rounded skeleton-bg-soft"></div>
-          <div class="h-4 w-4/5 animate-pulse rounded skeleton-bg-soft"></div>
-        </div>
-
-        <div v-else-if="error" class="space-y-4">
-          <div class="nimbus-consent-icon nimbus-consent-icon--warn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-8.52 14.06A1.875 1.875 0 003.424 20.9h17.152a1.875 1.875 0 001.604-2.9L13.66 3.94a1.875 1.875 0 00-3.32 0z" />
-            </svg>
+  <main
+    ref="revealRoot"
+    class="min-h-screen flex flex-col items-center justify-center px-4 py-12 sm:px-6 md:py-20 bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-200"
+  >
+    <section class="w-full max-w-xl mx-auto" data-reveal>
+      <Card padding="md" class="border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
+        <!-- 1. 加载中骨架屏 -->
+        <div
+          v-if="loading"
+          class="space-y-6 py-2 animate-pulse"
+          role="status"
+          aria-label="正在加载授权信息"
+        >
+          <!-- App Header Skeleton -->
+          <div class="flex flex-col items-center text-center space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-[var(--bg-surface-soft)]"></div>
+            <div class="h-5 w-44 rounded-full bg-[var(--bg-surface-soft)]"></div>
+            <div class="h-3.5 w-60 rounded-full bg-[var(--bg-surface-soft)]"></div>
           </div>
-          <h1 class="text-lg font-semibold text-themed">OAuth 授权失败</h1>
-          <p class="text-sm text-red-600">{{ error }}</p>
-          <p v-if="errorHint" class="nimbus-consent-hint">
-            {{ errorHint }}
-          </p>
-          <button class="btn-secondary w-full" @click="router.push(dashboardPath())">返回控制台</button>
+          <!-- Scopes Skeleton -->
+          <div class="space-y-2.5 pt-2">
+            <div class="h-3 w-28 rounded-full bg-[var(--bg-surface-soft)]"></div>
+            <div class="space-y-2">
+              <div class="h-16 rounded-xl bg-[var(--bg-surface-soft)]"></div>
+              <div class="h-16 rounded-xl bg-[var(--bg-surface-soft)]"></div>
+            </div>
+          </div>
+          <!-- Actions Skeleton -->
+          <div class="flex gap-3 pt-3">
+            <div class="h-11 flex-1 rounded-full bg-[var(--bg-surface-soft)]"></div>
+            <div class="h-11 flex-1 rounded-full bg-[var(--bg-surface-soft)]"></div>
+          </div>
         </div>
 
-        <div v-else-if="consent" class="space-y-6">
-          <div class="text-center">
-            <div class="nimbus-consent-icon nimbus-consent-icon--app">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-              </svg>
-            </div>
-            <h1 class="text-lg font-semibold text-themed">授权 {{ consent.app.name }}</h1>
-            <p class="mt-2 break-all text-xs font-mono text-themed-muted">{{ consent.request.redirectUri }}</p>
+        <!-- 2. 错误反馈状态 -->
+        <div v-else-if="error" class="space-y-6 text-center py-2">
+          <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_24%,var(--bg-surface))] shadow-sm">
+            <AlertCircle class="w-7 h-7" />
           </div>
 
           <div class="space-y-2">
-            <p class="nimbus-consent-section-label">{{ consent.app.name }}</p>
-            <div
-              v-for="scope in requestedScopes"
-              :key="scope"
-              class="nimbus-scope"
-            >
-              <div class="nimbus-scope-tick">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium text-themed">
-                  {{ scopeMetadataByScope.get(scope)?.title || scope }}
-                </div>
-                <div class="text-xs text-themed-muted">{{ scopeMetadataByScope.get(scope)?.description || '访问授权范围内的公共 API' }}</div>
-                <div v-if="scopeMetadataByScope.get(scope)?.resources.length" class="mt-1 font-mono text-[11px] text-themed-faint">
-                  {{ scopeMetadataByScope.get(scope)?.resources.join(', ') }}
-                </div>
-              </div>
-              <span
-                v-if="consent.existingScopes.includes(scope)"
-                class="nimbus-scope-badge"
-              >
-                已授权
-              </span>
+            <h1 class="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+              OAuth 授权失败
+            </h1>
+            <p class="text-sm font-medium text-[var(--error)] leading-relaxed">
+              {{ error }}
+            </p>
+          </div>
+
+          <div
+            v-if="errorHint"
+            class="rounded-xl p-4 text-xs leading-relaxed text-left border bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] text-[var(--text-secondary)] shadow-sm"
+          >
+            <div class="flex items-start gap-2.5">
+              <Info class="w-4 h-4 shrink-0 text-[var(--warning)] mt-0.5" />
+              <span class="flex-1">{{ errorHint }}</span>
             </div>
           </div>
 
-          <div class="flex gap-3">
-            <button class="btn-secondary flex-1" :disabled="submitting" @click="deny">拒绝</button>
-            <button class="btn-primary flex-1" :disabled="submitting" @click="approve">
-              {{ submitting ? '处理中...' : '允许授权' }}
-            </button>
+          <div class="pt-2">
+            <Button
+              variant="secondary"
+              block
+              @click="router.push(dashboardPath())"
+            >
+              返回控制台
+            </Button>
           </div>
         </div>
+
+        <!-- 3. OAuth 确认授权表单 -->
+        <div v-else-if="consent" class="space-y-6 py-1">
+          <!-- 头部：应用信息与来源识别 -->
+          <div class="text-center">
+            <div class="w-16 h-16 mx-auto mb-3.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center text-[var(--accent)] shadow-sm transition-transform duration-300 hover:scale-105">
+              <KeyRound class="w-8 h-8" />
+            </div>
+
+            <h1 class="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+              授权 {{ consent.app.name }}
+            </h1>
+            <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-1.5">
+              申请访问您的 {{ brand.brandName }} 账号
+            </p>
+
+            <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <span
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] border border-[var(--border-color)] max-w-full"
+                :title="consent.request.redirectUri"
+              >
+                <Globe class="w-3.5 h-3.5 shrink-0 text-[var(--text-tertiary)]" />
+                <span class="truncate max-w-[240px] sm:max-w-xs">{{ consent.request.redirectUri }}</span>
+              </span>
+            </div>
+
+            <div class="text-[11px] font-mono text-[var(--text-tertiary)] mt-1.5">
+              Client ID: {{ consent.app.clientId }}
+            </div>
+          </div>
+
+          <!-- 权限清单 -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+                {{ consent.app.name }} 申请获取的权限
+              </span>
+              <Badge variant="default" size="sm">
+                {{ requestedScopes.length }} 项权限
+              </Badge>
+            </div>
+
+            <div class="space-y-2.5">
+              <div
+                v-for="scope in requestedScopes"
+                :key="scope"
+                class="group rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 sm:p-4 flex items-start gap-3.5 transition-all duration-200 hover:border-[var(--border-hover)]"
+              >
+                <div
+                  class="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-colors mt-0.5"
+                  :class="consent.existingScopes.includes(scope)
+                    ? 'bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-surface))] text-[var(--success)]'
+                    : 'bg-[color-mix(in_srgb,var(--accent)_14%,var(--bg-surface))] text-[var(--accent)]'"
+                >
+                  <Check class="w-4 h-4 stroke-[2.5]" />
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-medium text-[var(--text-primary)]">
+                      {{ scopeMetadataByScope.get(scope)?.title || scope }}
+                    </span>
+                    <Badge
+                      v-if="consent.existingScopes.includes(scope)"
+                      variant="success"
+                      size="sm"
+                      dot
+                    >
+                      已授权
+                    </Badge>
+                    <Badge
+                      v-else-if="scopeMetadataByScope.get(scope)?.risk === 'high'"
+                      variant="error"
+                      size="sm"
+                    >
+                      高风险
+                    </Badge>
+                    <Badge
+                      v-else-if="scopeMetadataByScope.get(scope)?.risk === 'medium'"
+                      variant="warning"
+                      size="sm"
+                    >
+                      敏感
+                    </Badge>
+                  </div>
+
+                  <p class="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                    {{ scopeMetadataByScope.get(scope)?.description || '访问授权范围内的公共 API' }}
+                  </p>
+
+                  <div
+                    v-if="scopeMetadataByScope.get(scope)?.resources.length"
+                    class="mt-2 flex flex-wrap gap-1.5"
+                  >
+                    <span
+                      v-for="res in scopeMetadataByScope.get(scope)?.resources"
+                      :key="res"
+                      class="px-2 py-0.5 rounded-md font-mono text-[10px] bg-[var(--bg-surface)] text-[var(--text-tertiary)] border border-[var(--border-color)]"
+                    >
+                      {{ res }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 用户身份与隐私提示 -->
+          <div v-if="authStore.user" class="text-center text-xs text-[var(--text-secondary)]">
+            以 <span class="font-medium text-[var(--text-primary)]">{{ authStore.user.username }}</span> 的身份授权
+          </div>
+
+          <p class="text-[11px] leading-relaxed text-center text-[var(--text-tertiary)] px-2">
+            点击“允许授权”即表示您同意向该应用授予上述权限。您可以随时在控制台中撤回此授权。
+          </p>
+
+          <!-- 交互操作按钮 -->
+          <div class="flex flex-col-reverse sm:flex-row items-center gap-3 pt-2">
+            <Button
+              variant="secondary"
+              class="w-full sm:flex-1"
+              :disabled="submitting"
+              @click="deny"
+            >
+              拒绝
+            </Button>
+            <Button
+              variant="primary"
+              class="w-full sm:flex-1"
+              :loading="submitting"
+              @click="approve"
+            >
+              {{ submitting ? '处理中...' : '允许授权' }}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <!-- 底部版权/品牌说明 -->
+      <div class="mt-8 text-center text-xs text-[var(--text-tertiary)]">
+        {{ brand.brandCopyright }}
       </div>
     </section>
   </main>
 </template>
-
-<style scoped>
-.nimbus-auth {
-  position: relative;
-  overflow: hidden;
-}
-
-.nimbus-aurora {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.nimbus-aurora::before {
-  content: '';
-  position: absolute;
-  top: -22%;
-  left: 50%;
-  width: min(760px, 128vw);
-  height: min(760px, 128vw);
-  transform: translateX(-50%);
-  background: radial-gradient(circle, color-mix(in srgb, var(--kawaii-primary) 22%, transparent), transparent 62%);
-  opacity: 0.5;
-}
-
-.nimbus-aurora::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(color-mix(in srgb, var(--kawaii-text) 9%, transparent) 1px, transparent 1px);
-  background-size: 26px 26px;
-  -webkit-mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, black 0%, transparent 70%);
-  mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, black 0%, transparent 70%);
-  opacity: 0.45;
-}
-
-.nimbus-card {
-  border-radius: 16px;
-  padding: 1.75rem;
-}
-
-@media (min-width: 640px) {
-  .nimbus-card {
-    padding: 2rem;
-  }
-}
-
-.nimbus-consent-icon {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  margin: 0 auto;
-}
-
-.nimbus-consent-icon svg {
-  width: 26px;
-  height: 26px;
-}
-
-.nimbus-consent-icon--app {
-  color: var(--kawaii-primary);
-  background: color-mix(in srgb, var(--kawaii-primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--kawaii-primary) 22%, transparent);
-  margin-bottom: 0.85rem;
-}
-
-.nimbus-consent-icon--warn {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-}
-
-.nimbus-consent-hint {
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
-  color: color-mix(in srgb, var(--warning) 82%, var(--kawaii-text));
-  padding: 0.6rem 0.75rem;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-}
-
-.nimbus-consent-section-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--kawaii-faint);
-}
-
-.nimbus-scope {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  border-radius: 12px;
-  border: 1px solid var(--kawaii-line);
-  background: var(--kawaii-surface-soft);
-  padding: 0.75rem 0.85rem;
-}
-
-.nimbus-scope-tick {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
-  color: var(--kawaii-primary);
-  background: color-mix(in srgb, var(--kawaii-primary) 14%, transparent);
-}
-
-.nimbus-scope-tick svg {
-  width: 13px;
-  height: 13px;
-}
-
-.nimbus-scope-badge {
-  flex-shrink: 0;
-  align-self: center;
-  border-radius: 9999px;
-  padding: 0.15rem 0.55rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .nimbus-consent-icon--app {
-    animation: nimbus-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-}
-
-@keyframes nimbus-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-</style>

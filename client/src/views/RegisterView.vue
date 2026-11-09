@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
@@ -13,6 +13,24 @@ import api from '@/api'
 import { useBrand } from '@/composables/useBrand'
 import { dashboardPath, loginPath } from '@/utils/app-paths'
 import { useReveal } from '@/composables/useReveal'
+import { Badge, Button, Card, Input, Select } from '@/components/ui'
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+  Monitor,
+  Moon,
+  ShieldCheck,
+  Sun,
+  User,
+  X
+} from 'lucide-vue-next'
 
 const isAdminEntry = import.meta.env.VITE_APP_ENTRY === 'admin'
 
@@ -44,6 +62,8 @@ const form = ref<RegisterForm>({
   emailCode: ''
 })
 
+const showPassword = ref<boolean>(false)
+const showConfirmPassword = ref<boolean>(false)
 const loading = ref<boolean>(false)
 const error = ref<string>('')
 const success = ref<boolean>(false)
@@ -336,148 +356,265 @@ async function handleRegister(): Promise<void> {
 </script>
 
 <template>
-  <div ref="revealRoot" class="nimbus-auth kawaii-public-shell kawaii-auth-shell kawaii-user-auth min-h-screen flex items-center justify-center p-4 sm:p-6">
+  <div ref="revealRoot" class="nimbus-auth kawaii-public-shell kawaii-auth-shell kawaii-user-auth min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8">
     <div class="nimbus-aurora" aria-hidden="true"></div>
     <div class="relative z-10 w-full max-w-lg">
 
       <!-- Logo lockup -->
-      <div class="nimbus-lockup" data-reveal>
-        <div class="nimbus-logo-tile">
-          <img :src="brand.brandLogoUrl" :alt="brand.brandName" />
+      <div class="text-center mb-7" data-reveal>
+        <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <img :src="brand.brandLogoUrl" :alt="brand.brandName" class="h-8 w-8 rounded-xl object-contain" />
         </div>
-        <h1 class="nimbus-title">{{ brand.brandName }}</h1>
-        <p class="nimbus-subtitle">{{ $t('auth.createAccount') }}</p>
-      </div>
-
-      <!-- 注册成功 -->
-      <div v-if="success" class="card nimbus-card nimbus-state" data-reveal>
-        <div class="nimbus-state-icon nimbus-state-icon--ok">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <p class="text-themed font-medium">{{ $t('auth.registerSuccess') }}</p>
-      </div>
-
-      <div v-else-if="configLoading" class="card nimbus-card nimbus-state" data-reveal>
-        <div class="nimbus-spinner"></div>
-        <p class="text-themed-muted">{{ $t('common.loading') }}...</p>
-      </div>
-
-      <div v-else-if="!registrationEnabled" class="card nimbus-card nimbus-state" data-reveal>
-        <div class="nimbus-state-icon nimbus-state-icon--warn">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M12 9v3.75m0 3.75h.007v.008H12v-.008z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M10.34 3.94 1.82 18a1.875 1.875 0 0 0 1.604 2.812h17.152A1.875 1.875 0 0 0 22.18 18L13.66 3.94a1.875 1.875 0 0 0-3.32 0Z" />
-          </svg>
-        </div>
-        <h3 class="text-base font-semibold text-themed">
-          {{ $t('auth.registrationClosedTitle') }}
-        </h3>
-        <p class="text-sm leading-6 text-themed-muted">
-          {{ $t('auth.registrationClosedMessage') }}
+        <h1 class="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+          {{ brand.brandName }}
+        </h1>
+        <p class="mt-1 text-sm text-[var(--text-secondary)]">
+          {{ $t('auth.createAccount') }}
         </p>
-        <button type="button" class="btn-primary w-full" @click="router.push(loginPath())">
-          {{ $t('auth.backToLogin') }}
-        </button>
       </div>
+
+      <!-- 注册成功状态 -->
+      <Card v-if="success" padding="lg" class="text-center shadow-sm" data-reveal>
+        <div class="flex flex-col items-center justify-center py-6 gap-3">
+          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--success)_14%,var(--bg-surface))] text-[var(--success)] shadow-sm">
+            <CheckCircle2 class="h-8 w-8" />
+          </div>
+          <h3 class="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+            {{ $t('auth.registerSuccess') }}
+          </h3>
+        </div>
+      </Card>
+
+      <!-- 配置加载中状态 -->
+      <Card v-else-if="configLoading" padding="lg" class="text-center shadow-sm" data-reveal>
+        <div class="flex flex-col items-center justify-center py-8 gap-3">
+          <Loader2 class="h-8 w-8 animate-spin text-[var(--accent)]" />
+          <p class="text-sm text-[var(--text-secondary)]">{{ $t('common.loading') }}...</p>
+        </div>
+      </Card>
+
+      <!-- 注册已关闭状态 -->
+      <Card v-else-if="!registrationEnabled" padding="lg" class="text-center shadow-sm" data-reveal>
+        <div class="flex flex-col items-center justify-center py-4 gap-4">
+          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--warning)_14%,var(--bg-surface))] text-[var(--warning)] shadow-sm">
+            <AlertTriangle class="h-8 w-8" />
+          </div>
+          <div class="space-y-1.5">
+            <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ $t('auth.registrationClosedTitle') }}
+            </h3>
+            <p class="text-sm leading-relaxed text-[var(--text-secondary)] max-w-sm">
+              {{ $t('auth.registrationClosedMessage') }}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            block
+            class="mt-2"
+            @click="router.push(loginPath())"
+          >
+            {{ $t('auth.backToLogin') }}
+          </Button>
+        </div>
+      </Card>
 
       <!-- 注册表单 -->
-      <div v-else class="card nimbus-card" data-reveal>
+      <Card v-else padding="md" class="shadow-sm" data-reveal>
         <form class="space-y-4" @submit.prevent="handleRegister">
-          <div v-if="requireInviteCode" class="nimbus-field">
-            <label class="nimbus-label">
-              {{ $t('auth.inviteCode') }} <span class="nimbus-req">*</span>
-            </label>
-            <input v-model="form.inviteCode" type="text" class="input font-mono" :placeholder="$t('auth.inviteCodePlaceholder')" />
+          <!-- 邀请码 -->
+          <div v-if="requireInviteCode">
+            <Input
+              v-model="form.inviteCode"
+              type="text"
+              class="font-mono"
+              :placeholder="$t('auth.inviteCodePlaceholder')"
+              autocomplete="off"
+            >
+              <template #label>
+                <span class="flex items-center gap-1.5">
+                  {{ $t('auth.inviteCode') }}
+                  <span class="text-[var(--error)]">*</span>
+                </span>
+              </template>
+              <template #prefix>
+                <KeyRound class="w-4 h-4 text-[var(--text-tertiary)]" />
+              </template>
+            </Input>
           </div>
 
-          <div class="nimbus-field">
-            <label class="nimbus-label">
-              {{ $t('auth.username') }} <span class="nimbus-req">*</span>
-            </label>
-            <input v-model="form.username" type="text" class="input" :placeholder="$t('auth.usernameHint')" />
-          </div>
+          <!-- 用户名 -->
+          <Input
+            v-model="form.username"
+            type="text"
+            :placeholder="$t('auth.usernameHint')"
+            autocomplete="username"
+          >
+            <template #label>
+              <span class="flex items-center gap-1.5">
+                {{ $t('auth.username') }}
+                <span class="text-[var(--error)]">*</span>
+              </span>
+            </template>
+            <template #prefix>
+              <User class="w-4 h-4 text-[var(--text-tertiary)]" />
+            </template>
+          </Input>
 
-          <div class="nimbus-field">
-            <label class="nimbus-label">
-              {{ $t('auth.email') }} <span class="nimbus-req">*</span>
+          <!-- 邮箱 -->
+          <div v-if="emailDomainWhitelistEnabled && allowedEmailDomains.length > 0" class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center gap-1.5">
+              {{ $t('auth.email') }}
+              <span class="text-[var(--error)]">*</span>
             </label>
-            <!-- 邮箱白名单模式：左边输入用户名，右边选择域名 -->
-            <div v-if="emailDomainWhitelistEnabled && allowedEmailDomains.length > 0" class="flex items-center gap-2">
-              <input
+            <div class="flex items-center gap-2">
+              <Input
                 v-model="emailUsername"
                 type="text"
-                class="input min-w-0 flex-1"
+                class="min-w-0 flex-1"
                 :placeholder="$t('auth.emailUsernamePlaceholder')"
+                autocomplete="username"
+              >
+                <template #prefix>
+                  <Mail class="w-4 h-4 text-[var(--text-tertiary)]" />
+                </template>
+              </Input>
+              <span class="shrink-0 text-sm font-semibold text-[var(--text-tertiary)]">@</span>
+              <Select
+                v-model="selectedEmailDomain"
+                :options="allowedEmailDomains"
+                :block="false"
+                class="w-36 sm:w-48 shrink-0"
               />
-              <div class="shrink-0 text-themed-muted">@</div>
-              <select v-model="selectedEmailDomain" class="input w-32 max-w-[45%] shrink-0 sm:w-auto sm:min-w-[140px]">
-                <option v-for="domain in allowedEmailDomains" :key="domain" :value="domain">
-                  {{ domain }}
-                </option>
-              </select>
             </div>
-            <!-- 普通模式：完整邮箱输入 -->
-            <input v-else v-model="form.email" type="email" class="input" placeholder="your@email.com" />
           </div>
+          <Input
+            v-else
+            v-model="form.email"
+            type="email"
+            placeholder="your@email.com"
+            autocomplete="email"
+          >
+            <template #label>
+              <span class="flex items-center gap-1.5">
+                {{ $t('auth.email') }}
+                <span class="text-[var(--error)]">*</span>
+              </span>
+            </template>
+            <template #prefix>
+              <Mail class="w-4 h-4 text-[var(--text-tertiary)]" />
+            </template>
+          </Input>
 
-          <!-- Email Verification Code -->
-          <div v-if="emailVerificationEnabled" class="nimbus-field">
-            <label class="nimbus-label">
-              {{ $t('auth.emailCode') }} <span class="nimbus-req">*</span>
-            </label>
-            <div class="flex flex-col gap-2 sm:flex-row">
-              <input
+          <!-- 邮箱验证码 -->
+          <div v-if="emailVerificationEnabled" class="flex flex-col gap-1.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none flex items-center gap-1.5">
+                {{ $t('auth.emailCode') }}
+                <span class="text-[var(--error)]">*</span>
+              </label>
+              <Badge v-if="codeSent" variant="success" size="sm" dot>
+                {{ $t('auth.codeSentHint') }}
+              </Badge>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <Input
                 v-model="form.emailCode"
                 type="text"
-                class="input min-w-0 flex-1 font-mono tracking-[0.3em]"
-                maxlength="6"
+                class="min-w-0 flex-1 font-mono tracking-[0.25em]"
+                :maxlength="6"
                 :placeholder="$t('auth.emailCodePlaceholder')"
-              />
-              <button
+                autocomplete="one-time-code"
+              >
+                <template #prefix>
+                  <ShieldCheck class="w-4 h-4 text-[var(--text-tertiary)]" />
+                </template>
+              </Input>
+              <Button
                 type="button"
-                class="btn-secondary w-full whitespace-nowrap px-4 sm:w-auto"
+                variant="secondary"
                 :disabled="sendingCode || codeCountdown > 0 || !form.email"
+                :loading="sendingCode"
+                class="whitespace-nowrap sm:w-auto shrink-0"
                 :title="!form.email ? $t('auth.enterEmailFirst') : ''"
                 @click="handleSendCodeClick"
               >
-                <template v-if="sendingCode">
-                  {{ $t('auth.sendingCode') }}
-                </template>
-                <template v-else-if="codeCountdown > 0">
+                <template v-if="codeCountdown > 0">
                   {{ codeCountdown }}s
                 </template>
                 <template v-else>
                   {{ $t('auth.sendCode') }}
                 </template>
-              </button>
+              </Button>
             </div>
-            <p v-if="codeSent" class="nimbus-hint nimbus-hint--ok">
-              {{ $t('auth.codeSentHint') }}
-            </p>
           </div>
 
-          <div class="nimbus-field">
-            <label class="nimbus-label">
-              {{ $t('auth.password') }} <span class="nimbus-req">*</span>
-            </label>
-            <input v-model="form.password" type="password" class="input" :placeholder="$t('auth.passwordHint')" />
-          </div>
+          <!-- 密码 -->
+          <Input
+            v-model="form.password"
+            :type="showPassword ? 'text' : 'password'"
+            :placeholder="$t('auth.passwordHint')"
+            autocomplete="new-password"
+          >
+            <template #label>
+              <span class="flex items-center gap-1.5">
+                {{ $t('auth.password') }}
+                <span class="text-[var(--error)]">*</span>
+              </span>
+            </template>
+            <template #prefix>
+              <Lock class="w-4 h-4 text-[var(--text-tertiary)]" />
+            </template>
+            <template #suffix>
+              <button
+                type="button"
+                tabindex="-1"
+                class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors focus:outline-none"
+                :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                @click="showPassword = !showPassword"
+              >
+                <EyeOff v-if="showPassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </template>
+          </Input>
 
-          <div class="nimbus-field">
-            <label class="nimbus-label">
-              {{ $t('auth.confirmPassword') }} <span class="nimbus-req">*</span>
-            </label>
-            <input v-model="form.confirmPassword" type="password" class="input" :placeholder="$t('auth.confirmPasswordPlaceholder')" />
-          </div>
+          <!-- 确认密码 -->
+          <Input
+            v-model="form.confirmPassword"
+            :type="showConfirmPassword ? 'text' : 'password'"
+            :placeholder="$t('auth.confirmPasswordPlaceholder')"
+            autocomplete="new-password"
+          >
+            <template #label>
+              <span class="flex items-center gap-1.5">
+                {{ $t('auth.confirmPassword') }}
+                <span class="text-[var(--error)]">*</span>
+              </span>
+            </template>
+            <template #prefix>
+              <Lock class="w-4 h-4 text-[var(--text-tertiary)]" />
+            </template>
+            <template #suffix>
+              <button
+                type="button"
+                tabindex="-1"
+                class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors focus:outline-none"
+                :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
+                @click="showConfirmPassword = !showConfirmPassword"
+              >
+                <EyeOff v-if="showConfirmPassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </template>
+          </Input>
 
           <!-- Turnstile 验证 -->
           <div
             v-if="isTurnstileChallengeAvailable"
             ref="turnstileSectionRef"
             tabindex="-1"
-            class="nimbus-turnstile"
+            class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             <TurnstileWidget
               ref="turnstileRef"
@@ -489,18 +626,18 @@ async function handleRegister(): Promise<void> {
           </div>
 
           <!-- 服务条款 -->
-          <div class="flex items-start gap-2.5">
+          <div class="flex items-start gap-2.5 pt-0.5">
             <input
               id="agree-terms"
               v-model="agreedToTerms"
               type="checkbox"
-              class="nimbus-checkbox mt-0.5"
+              class="mt-1 h-4 w-4 rounded-md border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--accent)] accent-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] focus:outline-none cursor-pointer transition-colors"
             />
-            <label for="agree-terms" class="text-sm text-themed-muted leading-relaxed">
+            <label for="agree-terms" class="text-xs text-[var(--text-secondary)] leading-relaxed select-none cursor-pointer">
               {{ $t('auth.tos.agreePrefix') }}
               <button
                 type="button"
-                class="nimbus-textlink nimbus-textlink--accent"
+                class="font-medium text-[var(--accent)] hover:underline focus:outline-none transition-colors ml-0.5"
                 @click="showTermsModal = true"
               >
                 {{ $t('auth.tos.termsLink') }}
@@ -508,22 +645,30 @@ async function handleRegister(): Promise<void> {
             </label>
           </div>
 
-          <div v-if="error" class="nimbus-alert" role="alert">
-            <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-8.52 14.06A1.875 1.875 0 003.424 20.9h17.152a1.875 1.875 0 001.604-2.9L13.66 3.94a1.875 1.875 0 00-3.32 0z" />
-            </svg>
-            <span>{{ error }}</span>
+          <!-- 错误提示 -->
+          <div
+            v-if="error"
+            class="flex items-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--error)_28%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)] p-3 text-xs leading-relaxed text-[var(--error)]"
+            role="alert"
+          >
+            <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
+            <span class="flex-1">{{ error }}</span>
           </div>
 
-          <button
+          <!-- 提交按钮 -->
+          <Button
             type="submit"
+            variant="primary"
+            size="lg"
+            block
+            :loading="loading"
             :disabled="loading || (emailVerificationEnabled && !form.emailCode) || !agreedToTerms"
-            class="btn-primary w-full nimbus-submit"
+            class="mt-2"
           >
             {{ loading ? $t('auth.creatingAccount') : $t('auth.createAccount') }}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
       <!-- 服务条款弹窗 -->
       <TermsOfServiceModal
@@ -534,72 +679,87 @@ async function handleRegister(): Promise<void> {
       <!-- 邮箱确认弹窗 -->
       <Teleport to="body">
         <Transition name="modal">
-          <div v-if="showEmailConfirmModal" class="modal-overlay">
-            <div class="modal-backdrop" @click="showEmailConfirmModal = false" />
-            <div class="modal-content max-w-sm">
-              <div class="modal-header">
-                <h3 class="modal-title">{{ $t('auth.confirmEmail') }}</h3>
+          <div
+            v-if="showEmailConfirmModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            <!-- 背景遮罩 -->
+            <div
+              class="fixed inset-0 bg-[color-mix(in_srgb,var(--text-primary)_35%,transparent)] backdrop-blur-sm"
+              @click="showEmailConfirmModal = false"
+            />
+
+            <!-- 弹窗卡片 -->
+            <div
+              class="modal-card relative z-10 w-full max-w-sm rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl transition-all"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div class="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                  {{ $t('auth.confirmEmail') }}
+                </h3>
                 <button
                   type="button"
-                  class="p-1 rounded transition-colors hover:bg-themed-hover"
+                  class="rounded-full p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors focus:outline-none"
                   @click="showEmailConfirmModal = false"
                 >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X class="w-4 h-4" />
                 </button>
               </div>
-              <div class="modal-body text-center">
-                <p class="text-sm mb-4" :class="'text-themed-muted'">
+
+              <div class="py-5 text-center space-y-3">
+                <p class="text-xs text-[var(--text-secondary)]">
                   {{ $t('auth.confirmEmailMessage') }}
                 </p>
-                <p class="text-lg font-medium break-all">
-                  <span class="text-themed">{{ emailUsername || form.email.split('@')[0] }}</span>
-                  <span class="text-red-500 font-bold">@{{ selectedEmailDomain || form.email.split('@')[1] }}</span>
-                </p>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-4 py-3 text-sm font-mono break-all">
+                  <span class="text-[var(--text-primary)] font-medium">{{ emailUsername || form.email.split('@')[0] }}</span>
+                  <span class="text-[var(--error)] font-bold">@{{ selectedEmailDomain || form.email.split('@')[1] }}</span>
+                </div>
               </div>
-              <div class="modal-footer">
-                <button
+
+              <div class="flex items-center justify-end gap-2.5 pt-2">
+                <Button
                   type="button"
-                  class="btn-secondary"
+                  variant="secondary"
+                  size="sm"
                   @click="showEmailConfirmModal = false"
                 >
                   {{ $t('common.cancel') }}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  class="btn-primary"
+                  variant="primary"
+                  size="sm"
                   @click="confirmSendCode"
                 >
                   {{ $t('auth.confirmAndSend') }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         </Transition>
       </Teleport>
 
-      <p class="mt-6 text-center text-sm text-themed-muted">
+      <!-- 底部登录链接 -->
+      <p class="mt-6 text-center text-sm text-[var(--text-secondary)]" data-reveal>
         {{ $t('auth.hasAccount') }}
-        <RouterLink :to="loginPath()" class="nimbus-textlink nimbus-textlink--accent">
+        <RouterLink :to="loginPath()" class="font-medium text-[var(--accent)] hover:underline ml-1 transition-colors focus:outline-none">
           {{ $t('auth.login') }}
         </RouterLink>
       </p>
 
-      <!-- 主题切换 -->
+      <!-- 右下角主题切换悬浮按钮 -->
       <button
-        class="kawaii-header-icon fixed bottom-4 right-4 p-2 rounded-lg transition-colors"
+        type="button"
+        class="fixed bottom-4 right-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] shadow-sm hover:text-[var(--text-primary)] hover:border-[var(--border-hover)] active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        :title="themeStore.mode === 'dark' ? $t('theme.dark') : themeStore.mode === 'light' ? $t('theme.light') : $t('theme.system')"
+        :aria-label="themeStore.mode === 'dark' ? $t('theme.dark') : themeStore.mode === 'light' ? $t('theme.light') : $t('theme.system')"
         @click="themeStore.toggleTheme"
       >
-        <svg v-if="themeStore.mode === 'dark'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-        </svg>
-        <svg v-else-if="themeStore.mode === 'light'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-        <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
+        <Moon v-if="themeStore.mode === 'dark'" class="w-4 h-4" />
+        <Sun v-else-if="themeStore.mode === 'light'" class="w-4 h-4" />
+        <Monitor v-else class="w-4 h-4" />
       </button>
     </div>
   </div>
@@ -628,7 +788,7 @@ async function handleRegister(): Promise<void> {
   width: min(760px, 128vw);
   height: min(760px, 128vw);
   transform: translateX(-50%);
-  background: radial-gradient(circle, color-mix(in srgb, var(--kawaii-primary) 24%, transparent), transparent 62%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent), transparent 62%);
   opacity: 0.55;
 }
 
@@ -636,215 +796,31 @@ async function handleRegister(): Promise<void> {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(color-mix(in srgb, var(--kawaii-text) 9%, transparent) 1px, transparent 1px);
+  background-image: radial-gradient(color-mix(in srgb, var(--text-primary) 8%, transparent) 1px, transparent 1px);
   background-size: 26px 26px;
   -webkit-mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, black 0%, transparent 70%);
   mask-image: radial-gradient(ellipse 78% 52% at 50% 0%, black 0%, transparent 70%);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
-/* ============ Logo lockup ============ */
-.nimbus-lockup {
-  text-align: center;
-  margin-bottom: 1.75rem;
+/* ============ 模态弹窗动画 ============ */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.22s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-.nimbus-logo-tile {
-  width: 58px;
-  height: 58px;
-  margin: 0 auto 0.9rem;
-  display: grid;
-  place-items: center;
-  border-radius: 16px;
-  background: var(--kawaii-surface);
-  border: 1px solid var(--kawaii-line);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 10px 26px rgb(79 70 229 / 0.12);
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 
-.nimbus-logo-tile img {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+.modal-enter-active .modal-card,
+.modal-leave-active .modal-card {
+  transition: transform 0.22s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
-.nimbus-title {
-  font-size: 1.4rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  color: var(--kawaii-text);
-  line-height: 1.2;
-}
-
-.nimbus-subtitle {
-  margin-top: 0.35rem;
-  font-size: 0.875rem;
-  color: var(--kawaii-muted);
-}
-
-/* ============ Card ============ */
-.nimbus-card {
-  border-radius: 16px;
-  padding: 1.75rem;
-}
-
-@media (min-width: 640px) {
-  .nimbus-card {
-    padding: 2rem;
-  }
-}
-
-/* ============ State cards ============ */
-.nimbus-state {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.nimbus-state-icon {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  margin-bottom: 0.25rem;
-}
-
-.nimbus-state-icon svg {
-  width: 26px;
-  height: 26px;
-}
-
-.nimbus-state-icon--ok {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-}
-
-.nimbus-state-icon--warn {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-}
-
-.nimbus-spinner {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 3px solid var(--kawaii-line);
-  border-top-color: var(--kawaii-primary);
-  animation: nimbus-spin 0.8s linear infinite;
-}
-
-@keyframes nimbus-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ============ Fields ============ */
-.nimbus-label {
-  display: block;
-  margin-bottom: 0.4rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--kawaii-muted);
-}
-
-.nimbus-req {
-  color: var(--error);
-}
-
-.nimbus-hint {
-  margin-top: 0.4rem;
-  font-size: 0.75rem;
-  color: var(--kawaii-faint);
-}
-
-.nimbus-hint--ok {
-  color: var(--success);
-}
-
-.nimbus-textlink {
-  font-size: 0.8125rem;
-  color: var(--kawaii-muted);
-  transition: color 0.15s ease;
-}
-
-.nimbus-textlink:hover {
-  color: var(--kawaii-text);
-}
-
-.nimbus-textlink--accent {
-  color: var(--kawaii-primary);
-  font-weight: 500;
-}
-
-.nimbus-textlink--accent:hover {
-  color: var(--kawaii-primary-strong);
-}
-
-/* ============ Checkbox ============ */
-.nimbus-checkbox {
-  height: 1rem;
-  width: 1rem;
-  border-radius: 5px;
-  border: 1px solid var(--kawaii-line-strong);
-  background: var(--kawaii-surface);
-  accent-color: var(--kawaii-primary);
-  cursor: pointer;
-}
-
-.nimbus-checkbox:focus-visible {
-  outline: 2px solid var(--kawaii-primary);
-  outline-offset: 2px;
-}
-
-/* ============ Turnstile shell ============ */
-.nimbus-turnstile {
-  border-radius: 12px;
-  border: 1px solid var(--kawaii-line);
-  background: var(--kawaii-surface-soft);
-  padding: 0.75rem;
-}
-
-.nimbus-turnstile:focus-visible {
-  outline: 2px solid var(--kawaii-primary);
-  outline-offset: 2px;
-}
-
-/* ============ Alert ============ */
-.nimbus-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: var(--error);
-  background: color-mix(in srgb, var(--error) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--error) 26%, transparent);
-  border-radius: 10px;
-  padding: 0.6rem 0.75rem;
-}
-
-.nimbus-submit {
-  margin-top: 0.25rem;
-}
-
-/* ============ Entrance motion ============ */
-@media (prefers-reduced-motion: no-preference) {
-  .nimbus-logo-tile {
-    animation: nimbus-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-}
-
-@keyframes nimbus-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+.modal-enter-from .modal-card,
+.modal-leave-to .modal-card {
+  transform: scale(0.96);
 }
 </style>
