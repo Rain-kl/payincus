@@ -1,0 +1,26 @@
+[
+  {
+    "name": "admin-statistics-overview-anon",
+    "method": "GET",
+    "path": "/api/admin/statistics/overview"
+  },
+  {
+    "name": "admin-statistics-overview",
+    "method": "GET",
+    "path": "/api/admin/statistics/overview",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "admin-statistics-overview-wrong-method",
+    "method": "POST",
+    "path": "/api/admin/statistics/overview",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-statistics-overview-wrong-path",
+    "method": "GET",
+    "path": "/api/admin/statistics/overview/extra",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]

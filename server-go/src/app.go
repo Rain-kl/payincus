@@ -63,6 +63,19 @@ func NewRouter() *gin.Engine {
 	//   {"message":"Route GET:/api/nope not found","error":"Not Found","statusCode":404}
 	// The static-client branch is ported with the static module.
 	router.NoRoute(func(c *gin.Context) {
+		// Fastify parses the body BEFORE deciding there is no route, so an
+		// unmatched POST carrying Content-Type: application/json with an empty or
+		// malformed body answers 400, not 404 (measured against Node):
+		//   POST /api/nope  json empty  -> 400 "Body cannot be empty…"
+		//   POST /api/nope  application/xml -> 404 (no parser runs for it)
+		// Gin middleware never runs when no route matches, so the check has to be
+		// repeated here. Unauthenticated body errors also cannot be produced by an
+		// auth middleware here, since no route means no auth hooks at all.
+		if status, message := middleware.ValidateFastifyBody(c); status != 0 {
+			middleware.AbortFastifyBody(c, status, message)
+			return
+		}
+
 		c.JSON(http.StatusNotFound, gin.H{
 			"message":    "Route " + c.Request.Method + ":" + c.Request.URL.Path + " not found",
 			"error":      "Not Found",
