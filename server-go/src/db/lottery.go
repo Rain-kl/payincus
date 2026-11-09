@@ -249,7 +249,7 @@ func lotteryScanRow(row pgx.Row) (models.Lottery, error) {
 const lotteryColumns = `id, name, description, cost_points, is_active, start_at, end_at,
 	total_draws, created_at, updated_at, created_by`
 
-const lotteryPrizeColumns = `id, lottery_id, name, type, value, probability, total_quantity,
+const lotteryPrizeColumns = `id, lottery_id, name, type::text, value, probability, total_quantity,
 	remain_quantity, display_order, created_at, instance_desc`
 
 func lotteryScanPrizes(rows pgx.Rows) ([]models.LotteryPrize, error) {
@@ -448,8 +448,8 @@ func LotteryGetUserLotteryRecords(ctx context.Context, userID int32, options Lot
 	}
 
 	listArgs := append(append([]any{}, args...), pageSize, skip)
-	rows, err := Pool().Query(ctx, `SELECT r.id, r.lottery_id, r.prize_id, r.user_id, r.prize_type,
-			r.prize_value, r.prize_name, r.status, r.points_spent, r.delivered_at, r.delivered_by,
+	rows, err := Pool().Query(ctx, `SELECT r.id, r.lottery_id, r.prize_id, r.user_id, r.prize_type::text,
+			r.prize_value, r.prize_name, r.status::text, r.points_spent, r.delivered_at, r.delivered_by,
 			r.ticket_id, r.notification_sent, r.created_at,
 			l.name, p.instance_desc
 		FROM lottery_records r

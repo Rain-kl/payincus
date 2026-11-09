@@ -13,6 +13,13 @@
 // Timestamps on the wire use formatISOTime (Date.prototype.toISOString parity,
 // millisecond precision). Decimal columns stay decimal/exact; JS `Number(...)`
 // conversions are float64/int32 exactly where the TypeScript converts.
+//
+// Update inputs (BadgesSeriesUpdate / BadgesUpdateInput) mirror
+// `withoutUndefined(data)`: a nil pointer means "absent" and is skipped. An
+// explicit JSON null (which the TypeScript keeps and Prisma turns into SQL NULL)
+// cannot be expressed with *string; admin callers that need to clear a nullable
+// column must use a presence-aware wrapper (see docs/GO_MIGRATION.md §3 on
+// tri-state fields).
 package db
 
 import (
@@ -594,7 +601,7 @@ type badgesOwnershipRecord struct {
 	AppliedInstanceName *string
 }
 
-const badgesOwnershipSelect = `SELECT o.id, o.badge_id, o.source, o.application_target,
+const badgesOwnershipSelect = `SELECT o.id, o.badge_id, o.source::text AS source, o.application_target::text AS application_target,
 		o.applied_instance_id, o.applied_at, o.created_at, i.name
 	FROM user_badge_ownerships o
 	LEFT JOIN instances i ON i.id = o.applied_instance_id`
@@ -960,8 +967,8 @@ func badgesListOwnerships(ctx context.Context, q BadgesQuerier, userID int32) ([
 }
 
 func badgesListInstances(ctx context.Context, q BadgesQuerier, userID int32) ([]BadgesInstanceView, error) {
-	rows, err := q.Query(ctx, `SELECT i.id, i.name, i.status, i.icon_badge_id, i.package_plan_id,
-			p.instance_type, h.id, h.name, h.location, h.country_code
+	rows, err := q.Query(ctx, `SELECT i.id, i.name, i.status::text, i.icon_badge_id, i.package_plan_id,
+			p.instance_type::text, h.id, h.name, h.location, h.country_code
 		FROM instances i
 		JOIN hosts h ON h.id = i.host_id
 		LEFT JOIN packages p ON p.id = i.package_id
@@ -1723,12 +1730,12 @@ func BadgesDelete(ctx context.Context, id string) (models.Badge, error) {
 // BadgesSeedDefault mirrors seedDefaultBadges with the generated catalogue passed
 // in: the TypeScript imports DEFAULT_BADGE_CATALOG from config/badges.generated.ts,
 // whose 1.4k-line data file is not part of this module's file ownership. The
-// seeding logic (guarded by system_config badge_catalog_seeded, no-op when any
+// seeding logic (guarded by the system_configs badge_catalog_seeded, no-op when any
 // badge/series already exists) is otherwise identical.
 func BadgesSeedDefault(ctx context.Context, catalog []BadgesCatalogItem) error {
 	var seeded string
 	err := Pool().QueryRow(ctx,
-		`SELECT value FROM system_config WHERE key = 'badge_catalog_seeded'`).Scan(&seeded)
+		`SELECT value FROM system_configs WHERE key = 'badge_catalog_seeded'`).Scan(&seeded)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
@@ -1745,8 +1752,8 @@ func BadgesSeedDefault(ctx context.Context, catalog []BadgesCatalogItem) error {
 		return err
 	}
 	if seriesCount > 0 || badgeCount > 0 {
-		_, err := Pool().Exec(ctx, `INSERT INTO system_config (key, value, type, label, description, updated_at)
-			VALUES ('badge_catalog_seeded', 'true', 'boolean', '徽章目录已初始化', '用于避免启动时重复导入默认徽章目录', NOW())
+		_, err := Pool().Exec(ctx, `INSERT INTO system_configs (key, value, type, label, description, created_at, updated_at)
+			VALUES ('badge_catalog_seeded', 'true', 'boolean', '徽章目录已初始化', '用于避免启动时重复导入默认徽章目录', NOW(), NOW())
 			ON CONFLICT (key) DO UPDATE SET value = 'true', updated_at = NOW()`)
 		return err
 	}
@@ -1815,8 +1822,8 @@ func BadgesSeedDefault(ctx context.Context, catalog []BadgesCatalogItem) error {
 		}
 	}
 
-	if _, err := tx.Exec(ctx, `INSERT INTO system_config (key, value, type, label, description, updated_at)
-		VALUES ('badge_catalog_seeded', 'true', 'boolean', '徽章目录已初始化', '用于避免启动时重复导入默认徽章目录', NOW())
+	if _, err := tx.Exec(ctx, `INSERT INTO system_configs (key, value, type, label, description, created_at, updated_at)
+		VALUES ('badge_catalog_seeded', 'true', 'boolean', '徽章目录已初始化', '用于避免启动时重复导入默认徽章目录', NOW(), NOW())
 		ON CONFLICT (key) DO UPDATE SET value = 'true', updated_at = NOW()`); err != nil {
 		return err
 	}
