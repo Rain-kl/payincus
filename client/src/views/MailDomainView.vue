@@ -6,6 +6,73 @@ import api from '@/api'
 import { useToast } from '@/stores/toast'
 import { translateError } from '@/utils/errorHandler'
 import { helpPath, mailPath } from '@/utils/app-paths'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  Table,
+  EmptyState,
+  Input
+} from '@/components/ui'
+import type { TableColumn, BadgeVariant } from '@/components/ui'
+import DrawerModal from '@/components/DrawerModal.vue'
+import {
+  ExternalLink,
+  FileText,
+  RefreshCw,
+  Plus,
+  Edit3,
+  Trash2,
+  Key,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  AlertTriangle
+} from 'lucide-vue-next'
+
+interface MailAccountItem {
+  id: number
+  email: string
+  username: string
+  displayName: string | null
+  diskLimitMb: number
+  diskUsedMb: number
+  isAdmin: boolean
+  createdAt: string
+}
+
+interface MailDomainDetail {
+  id: number
+  domain: string
+  status: string
+  diskLimitMb?: number
+  diskUsedMb?: number
+  verifiedAt: string | null
+  createdAt: string
+  adminUsername: string | null
+  adminPasswordConfigured: boolean
+  sourceCode: string
+  accounts?: MailAccountItem[]
+}
+
+interface DnsRecordItem {
+  type: string
+  record: string
+  value: string
+  prio?: number
+}
+
+interface DnsConfigData {
+  verified: boolean
+  txtRecord?: string
+  dnsRecords?: DnsRecordItem[]
+  mxRecords?: string[]
+  spfRecord?: string
+  dkimRecord?: string
+  cnameRecords?: Array<{ record: string; value: string }>
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -20,17 +87,31 @@ const loading = ref(true)
 const actionLoading = ref('')
 
 // 域名数据
-const domain = ref<any>(null)
-const dnsConfig = ref<any>(null)
+const domain = ref<MailDomainDetail | null>(null)
+const dnsConfig = ref<DnsConfigData | null>(null)
 const adminPassword = ref<string | null>(null)
 
 const domainId = computed(() => parseInt(route.params.id as string))
 
+// 域名下的邮箱账户列表
+const domainAccounts = computed<MailAccountItem[]>(() => {
+  return domain.value?.accounts || []
+})
+
+// 表格列定义
+const accountColumns = computed<TableColumn<MailAccountItem>[]>(() => [
+  { key: 'email', title: t('mail.emailAddress'), width: '30%' },
+  { key: 'displayName', title: t('mail.displayName'), width: '22%' },
+  { key: 'diskLimitMb', title: t('mail.diskLimit'), width: '16%' },
+  { key: 'isAdmin', title: t('profile.account.role'), width: '14%' },
+  { key: 'actions', title: t('common.actions'), width: '18%', align: 'right' }
+])
+
 // 过滤后的 DNS 记录（排除验证记录，因为它单独显示）
-const filteredDnsRecords = computed(() => {
+const filteredDnsRecords = computed<DnsRecordItem[]>(() => {
   if (!dnsConfig.value?.dnsRecords) return []
   return dnsConfig.value.dnsRecords.filter(
-    (r: { record: string }) => r.record !== 'workspace-verification'
+    (r) => r.record !== 'workspace-verification'
   )
 })
 
@@ -82,7 +163,7 @@ async function verifyDomain() {
 // 删除域名
 async function deleteDomain() {
   if (!confirm(t('mail.deleteDomainConfirm', { domain: domain.value?.domain }))) return
-  
+
   actionLoading.value = 'delete-domain'
   try {
     await api.mail.deleteDomain(domainId.value)
@@ -150,14 +231,11 @@ async function copyAdminPassword() {
 
 // DNS 记录格式化函数
 function formatHostRecord(record: string): string {
-  // 如果是 @，直接返回
   if (record === '@') return '@'
-  // 移除末尾的点
   return record.replace(/\.$/, '')
 }
 
 function formatRecordValue(record: { type: string; value: string; prio?: number }): string {
-  // MX 记录显示优先级
   if (record.type === 'MX' && record.prio !== undefined) {
     return `${record.prio} ${record.value}`
   }
@@ -177,352 +255,893 @@ function getDnsRecordDescription(record: { type: string; value: string; record?:
   }
 }
 
-function getStatusBadge(status: string) {
+function getStatusBadgeVariant(status?: string): BadgeVariant {
   switch (status) {
-    case 'verified': return 'badge-success'
-    case 'pending': return 'badge-warning'
-    case 'suspended': return 'badge-error'
-    default: return 'badge-ghost'
+    case 'verified': return 'success'
+    case 'pending': return 'warning'
+    case 'suspended': return 'error'
+    default: return 'default'
   }
 }
 
-function formatDate(dateStr: string) {
+function getDnsBadgeVariant(type?: string): BadgeVariant {
+  switch (type?.toUpperCase()) {
+    case 'MX': return 'info'
+    case 'TXT': return 'success'
+    case 'CNAME': return 'warning'
+    default: return 'default'
+  }
+}
+
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString()
+}
+
+function formatDiskMb(mb?: number | null): string {
+  if (!mb || mb === 0) return '—'
+  if (mb >= 1024) {
+    const gb = mb / 1024
+    return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`
+  }
+  return `${mb} MB`
 }
 
 // 切换到 DNS 配置 TAB 时加载配置
 function switchTab(tab: 'accounts' | 'dns' | 'settings') {
   activeTab.value = tab
   if (tab === 'dns' && !dnsConfig.value) {
-    loadDnsConfig()
+    void loadDnsConfig()
+  }
+}
+
+// ==================== 账户管理弹窗逻辑 ====================
+
+// 创建账户
+const showCreateAccountModal = ref(false)
+const createAccountForm = ref({
+  username: '',
+  password: '',
+  displayName: '',
+  diskLimitMb: 1024,
+  isAdmin: false
+})
+
+function openCreateAccountModal() {
+  createAccountForm.value = {
+    username: '',
+    password: '',
+    displayName: '',
+    diskLimitMb: 1024,
+    isAdmin: false
+  }
+  showCreateAccountModal.value = true
+}
+
+async function handleCreateAccount() {
+  const username = createAccountForm.value.username.trim()
+  const password = createAccountForm.value.password.trim()
+  if (!username || !password) {
+    toast.error(t('mail.accountFieldsRequired'))
+    return
+  }
+  if (password.length < 8) {
+    toast.error(t('mail.passwordMinLength'))
+    return
+  }
+
+  actionLoading.value = 'create-account'
+  try {
+    await api.mail.createAccount(domainId.value, {
+      username,
+      password,
+      displayName: createAccountForm.value.displayName.trim() || undefined,
+      diskLimitMb: createAccountForm.value.diskLimitMb ? Number(createAccountForm.value.diskLimitMb) : undefined,
+      isAdmin: createAccountForm.value.isAdmin
+    })
+    toast.success(t('mail.accountCreated'))
+    showCreateAccountModal.value = false
+    await loadDomain()
+  } catch (err: any) {
+    toast.error(translateError(err))
+  } finally {
+    actionLoading.value = ''
+  }
+}
+
+// 编辑账户
+const showEditAccountModal = ref(false)
+const editingAccount = ref<MailAccountItem | null>(null)
+const editAccountForm = ref({
+  displayName: '',
+  diskLimitMb: 1024
+})
+
+function openEditAccountModal(account: MailAccountItem) {
+  editingAccount.value = account
+  editAccountForm.value = {
+    displayName: account.displayName || '',
+    diskLimitMb: account.diskLimitMb || 1024
+  }
+  showEditAccountModal.value = true
+}
+
+async function handleUpdateAccount() {
+  if (!editingAccount.value) return
+
+  actionLoading.value = 'update-account'
+  try {
+    await api.mail.updateAccount(domainId.value, editingAccount.value.id, {
+      displayName: editAccountForm.value.displayName.trim() || undefined,
+      diskLimitMb: editAccountForm.value.diskLimitMb ? Number(editAccountForm.value.diskLimitMb) : undefined
+    })
+    toast.success(t('mail.accountUpdated'))
+    showEditAccountModal.value = false
+    await loadDomain()
+  } catch (err: any) {
+    toast.error(translateError(err))
+  } finally {
+    actionLoading.value = ''
+  }
+}
+
+// 重置密码
+const showResetPasswordModal = ref(false)
+const resettingAccount = ref<MailAccountItem | null>(null)
+const resetPasswordForm = ref({
+  password: ''
+})
+
+function openResetPasswordModal(account: MailAccountItem) {
+  resettingAccount.value = account
+  resetPasswordForm.value = {
+    password: ''
+  }
+  showResetPasswordModal.value = true
+}
+
+async function handleResetPassword() {
+  if (!resettingAccount.value) return
+  const password = resetPasswordForm.value.password.trim()
+  if (!password) {
+    toast.error(t('mail.accountFieldsRequired'))
+    return
+  }
+  if (password.length < 8) {
+    toast.error(t('mail.passwordMinLength'))
+    return
+  }
+
+  actionLoading.value = 'reset-password'
+  try {
+    await api.mail.resetAccountPassword(domainId.value, resettingAccount.value.id, password)
+    toast.success(t('mail.passwordReset'))
+    showResetPasswordModal.value = false
+  } catch (err: any) {
+    toast.error(translateError(err))
+  } finally {
+    actionLoading.value = ''
+  }
+}
+
+// 删除账户
+async function deleteAccount(account: MailAccountItem) {
+  if (!confirm(t('mail.deleteAccountConfirm', { email: account.email }))) return
+
+  actionLoading.value = `delete-account-${account.id}`
+  try {
+    await api.mail.deleteAccount(domainId.value, account.id)
+    toast.success(t('mail.accountDeleted'))
+    await loadDomain()
+  } catch (err: any) {
+    toast.error(translateError(err))
+  } finally {
+    actionLoading.value = ''
   }
 }
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
-    <!-- 返回按钮和标题 -->
-    <div class="page-header">
-      <div class="flex min-w-0 items-center gap-3">
-        <button class="btn btn-secondary btn-sm gap-1 flex-none" @click="router.push(mailPath())">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-          </svg>
-          {{ t('common.back') }}
-        </button>
-
-        <div v-if="loading" class="h-8 bg-themed-secondary rounded animate-pulse w-48"></div>
-        <div v-else-if="domain" class="min-w-0">
-          <div class="flex flex-wrap items-center gap-3">
-            <h1 class="page-title truncate text-lg sm:text-xl">{{ domain.domain }}</h1>
-            <span class="nimbus-pill font-mono" :class="getStatusBadge(domain.status)">
-              <span class="nimbus-dot"></span>{{ t('mail.domainStatus.' + domain.status) }}
-            </span>
-          </div>
-          <p class="page-description">{{ t('mail.description') }}</p>
+  <div class="space-y-6">
+    <!-- 页面顶栏 -->
+    <PageHeader
+      back
+      :back-label="t('common.back')"
+      @back="router.push(mailPath())"
+    >
+      <template #title>
+        <div v-if="loading" class="h-8 bg-[var(--bg-surface-soft)] rounded-xl animate-pulse w-56"></div>
+        <div v-else-if="domain" class="flex flex-wrap items-center gap-3">
+          <h1 class="text-2xl md:text-3xl font-semibold tracking-tight text-[var(--text-primary)] truncate">
+            {{ domain.domain }}
+          </h1>
+          <Badge
+            :variant="getStatusBadgeVariant(domain.status)"
+            size="md"
+            dot
+            :pulse="domain.status === 'pending'"
+          >
+            {{ t('mail.domainStatus.' + domain.status) }}
+          </Badge>
         </div>
-      </div>
-    </div>
+      </template>
 
-    <!-- 加载状态 -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <span class="nimbus-spinner nimbus-spinner--lg text-themed-muted"></span>
+      <template #description>
+        <p class="text-sm text-[var(--text-secondary)] mt-1 max-w-2xl leading-relaxed">
+          {{ t('mail.description') }}
+        </p>
+      </template>
+
+      <!-- 选项卡切换 -->
+      <template #bottom>
+        <div class="inline-flex p-1 bg-[var(--bg-surface-soft)] rounded-full border border-[var(--border-color)]">
+          <button
+            type="button"
+            class="px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            :class="activeTab === 'accounts' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+            @click="switchTab('accounts')"
+          >
+            {{ t('mail.tabs.accounts') }}
+          </button>
+          <button
+            type="button"
+            class="px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            :class="activeTab === 'dns' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+            @click="switchTab('dns')"
+          >
+            {{ t('mail.tabs.dns') }}
+          </button>
+          <button
+            type="button"
+            class="px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            :class="activeTab === 'settings' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+            @click="switchTab('settings')"
+          >
+            {{ t('mail.tabs.settings') }}
+          </button>
+        </div>
+      </template>
+    </PageHeader>
+
+    <!-- 加载骨架屏 -->
+    <div v-if="loading" class="space-y-6">
+      <Card loading />
+      <Card loading />
     </div>
 
     <template v-else-if="domain">
-      <!-- TAB 切换 -->
-      <div class="flex items-center gap-6 border-b border-themed mb-6 overflow-x-auto">
-        <button
-          class="relative -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-2.5 text-sm font-medium transition-colors"
-          :class="activeTab === 'accounts' ? 'border-primary-500 text-themed' : 'border-transparent text-themed-muted hover:text-themed'"
-          @click="switchTab('accounts')"
-        >
-          {{ t('mail.tabs.accounts') }}
-        </button>
-        <button
-          class="relative -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-2.5 text-sm font-medium transition-colors"
-          :class="activeTab === 'dns' ? 'border-primary-500 text-themed' : 'border-transparent text-themed-muted hover:text-themed'"
-          @click="switchTab('dns')"
-        >
-          {{ t('mail.tabs.dns') }}
-        </button>
-        <button
-          class="relative -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-2.5 text-sm font-medium transition-colors"
-          :class="activeTab === 'settings' ? 'border-primary-500 text-themed' : 'border-transparent text-themed-muted hover:text-themed'"
-          @click="switchTab('settings')"
-        >
-          {{ t('mail.tabs.settings') }}
-        </button>
-      </div>
-
       <!-- 邮箱账户 TAB -->
       <div v-show="activeTab === 'accounts'" class="space-y-6">
-        <!-- DNS 未完成提示 -->
-        <div v-if="domain.status !== 'verified'" class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg p-4">
-          <div class="flex items-center gap-3">
-            <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-            <span class="text-sm text-amber-700 dark:text-amber-400 flex-1">{{ t('mail.completeDnsFirst') }}</span>
-            <button class="text-sm text-amber-700 dark:text-amber-400 hover:underline" @click="activeTab = 'dns'">{{ t('mail.goDnsConfig') }}</button>
+        <!-- DNS 未完成提示横幅 -->
+        <div
+          v-if="domain.status !== 'verified'"
+          class="rounded-2xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--border-color))] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all"
+        >
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-[color-mix(in_srgb,var(--warning)_18%,var(--bg-surface))] flex items-center justify-center shrink-0">
+              <AlertTriangle class="w-5 h-5 text-[var(--warning)]" />
+            </div>
+            <p class="text-sm font-medium text-[var(--text-primary)] leading-relaxed">
+              {{ t('mail.completeDnsFirst') }}
+            </p>
           </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            class="shrink-0"
+            @click="switchTab('dns')"
+          >
+            {{ t('mail.goDnsConfig') }}
+          </Button>
         </div>
 
         <!-- 管理员账号卡片 -->
-        <div v-if="domain.adminUsername" class="card overflow-hidden">
-          <div class="p-4 border-b border-themed">
-            <h4 class="text-sm font-medium text-themed">{{ t('mail.adminAccount') }}</h4>
-            <p class="text-xs text-themed-muted mt-1">{{ t('mail.adminAccountDesc') }}</p>
-          </div>
-          <div class="p-4 space-y-4">
+        <Card
+          v-if="domain.adminUsername"
+          :title="t('mail.adminAccount')"
+          :subtitle="t('mail.adminAccountDesc')"
+          padding="md"
+        >
+          <template #extra v-if="webmailUrl">
+            <a
+              :href="webmailUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-all border border-[var(--border-color)] active:scale-95"
+            >
+              <span>Webmail</span>
+              <ExternalLink class="w-3.5 h-3.5" />
+            </a>
+          </template>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             <!-- 邮箱地址 -->
-            <div>
-              <div class="text-xs text-themed-muted mb-1.5">{{ t('mail.emailAddress') }}</div>
-              <div class="flex items-center gap-2">
-                <code class="text-sm text-themed font-mono">{{ domain.adminUsername }}</code>
-                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" :title="t('common.copy')" @click="copyValue(domain.adminUsername, 'admin-email')">
-                  <svg v-if="copiedKey !== 'admin-email'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  <svg v-else class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            <div class="space-y-1.5">
+              <div class="text-xs font-medium text-[var(--text-secondary)]">{{ t('mail.emailAddress') }}</div>
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                <code class="text-xs sm:text-sm font-mono text-[var(--text-primary)] truncate">{{ domain.adminUsername }}</code>
+                <button
+                  type="button"
+                  class="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                  :title="t('common.copy')"
+                  @click="copyValue(domain.adminUsername, 'admin-email')"
+                >
+                  <Check v-if="copiedKey === 'admin-email'" class="w-4 h-4 text-[var(--success)]" />
+                  <Copy v-else class="w-4 h-4" />
                 </button>
               </div>
             </div>
+
             <!-- 密码 -->
-            <div>
-              <div class="text-xs text-themed-muted mb-1.5">{{ t('mail.password') }}</div>
-              <div class="flex items-center gap-2">
-                <code class="text-sm text-themed font-mono">{{ domain.adminPasswordConfigured ? (showPassword ? adminPassword : '••••••••') : '—' }}</code>
-                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50" :disabled="passwordLoading || !domain.adminPasswordConfigured" :title="showPassword ? t('common.hide') : t('common.show')" @click="toggleAdminPassword">
-                  <svg v-if="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                </button>
-                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50" :disabled="passwordLoading || !domain.adminPasswordConfigured" :title="t('common.copy')" @click="copyAdminPassword">
-                  <svg v-if="copiedKey !== 'admin-password'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  <svg v-else class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                </button>
+            <div class="space-y-1.5">
+              <div class="text-xs font-medium text-[var(--text-secondary)]">{{ t('mail.password') }}</div>
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                <code class="text-xs sm:text-sm font-mono text-[var(--text-primary)] truncate">
+                  {{ domain.adminPasswordConfigured ? (showPassword ? adminPassword : '••••••••') : '—' }}
+                </code>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    class="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40 active:scale-95"
+                    :disabled="passwordLoading || !domain.adminPasswordConfigured"
+                    :title="showPassword ? t('common.hide') : t('common.show')"
+                    @click="toggleAdminPassword"
+                  >
+                    <EyeOff v-if="showPassword" class="w-4 h-4" />
+                    <Eye v-else class="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40 active:scale-95"
+                    :disabled="passwordLoading || !domain.adminPasswordConfigured"
+                    :title="t('common.copy')"
+                    @click="copyAdminPassword"
+                  >
+                    <Check v-if="copiedKey === 'admin-password'" class="w-4 h-4 text-[var(--success)]" />
+                    <Copy v-else class="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
+
             <!-- 登录地址 -->
-            <div>
-              <div class="text-xs text-themed-muted mb-1.5">{{ t('mail.webmailUrl') }}</div>
-              <div class="flex items-center gap-2">
-                <a :href="webmailUrl" target="_blank" class="text-sm text-primary-500 hover:underline font-mono break-all">{{ webmailUrl }}</a>
-                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" :title="t('common.copy')" @click="copyValue(webmailUrl, 'webmail-url')">
-                  <svg v-if="copiedKey !== 'webmail-url'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  <svg v-else class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            <div class="space-y-1.5">
+              <div class="text-xs font-medium text-[var(--text-secondary)]">{{ t('mail.webmailUrl') }}</div>
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                <a
+                  :href="webmailUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs sm:text-sm font-mono text-[var(--accent)] hover:underline truncate"
+                >
+                  {{ webmailUrl }}
+                </a>
+                <button
+                  type="button"
+                  class="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                  :title="t('common.copy')"
+                  @click="copyValue(webmailUrl, 'webmail-url')"
+                >
+                  <Check v-if="copiedKey === 'webmail-url'" class="w-4 h-4 text-[var(--success)]" />
+                  <Copy v-else class="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <!-- 帮助文档 -->
-            <div>
-              <router-link :to="`${helpPath()}/mail`" class="text-sm text-primary-500 hover:underline inline-flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+
+          <!-- 帮助文档链接 -->
+          <template #footer>
+            <div class="flex items-center justify-between">
+              <router-link
+                :to="`${helpPath()}/mail`"
+                class="text-xs sm:text-sm text-[var(--accent)] hover:underline inline-flex items-center gap-1.5 font-medium transition-colors"
+              >
+                <FileText class="w-4 h-4 shrink-0" />
                 {{ t('mail.helpDoc') }}
               </router-link>
             </div>
-          </div>
-        </div>
+          </template>
+        </Card>
 
         <!-- 无管理员账号提示 -->
-        <div v-else class="border border-themed border-dashed rounded-lg p-8 text-center">
-          <svg class="w-10 h-10 mx-auto mb-3 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-          </svg>
-          <p class="text-sm text-themed-muted">{{ t('mail.noAdminAccount') }}</p>
-        </div>
+        <Card v-else padding="md">
+          <EmptyState
+            :title="t('mail.noAdminAccount')"
+            :description="t('mail.description')"
+          />
+        </Card>
+
+        <!-- 用户账户列表卡片 -->
+        <Card padding="none">
+          <template #header>
+            <div class="flex items-center justify-between gap-4 w-full">
+              <div class="min-w-0">
+                <h3 class="font-semibold tracking-tight text-lg text-[var(--text-primary)] truncate">
+                  {{ t('mail.tabs.accounts') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('mail.accountsDescription') }}
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                :disabled="domain.status !== 'verified'"
+                @click="openCreateAccountModal"
+              >
+                <template #icon>
+                  <Plus class="w-4 h-4" />
+                </template>
+                {{ t('mail.createAccount') }}
+              </Button>
+            </div>
+          </template>
+
+          <Table
+            :columns="accountColumns"
+            :data="domainAccounts"
+            row-key="id"
+            :empty-text="t('mail.noAccounts')"
+            :empty-description="domain.status !== 'verified' ? t('mail.verifyFirst') : ''"
+          >
+            <!-- 邮箱地址单元格 -->
+            <template #cell-email="{ row }">
+              <div class="flex items-center gap-1.5">
+                <code class="font-mono text-xs sm:text-sm text-[var(--text-primary)]">{{ row.email }}</code>
+                <button
+                  type="button"
+                  class="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                  :title="t('common.copy')"
+                  @click="copyValue(row.email, `account-${row.id}-email`)"
+                >
+                  <Check v-if="copiedKey === `account-${row.id}-email`" class="w-3.5 h-3.5 text-[var(--success)]" />
+                  <Copy v-else class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </template>
+
+            <!-- 显示名称单元格 -->
+            <template #cell-displayName="{ row }">
+              <span class="text-sm text-[var(--text-primary)]">{{ row.displayName || '—' }}</span>
+            </template>
+
+            <!-- 空间配额单元格 -->
+            <template #cell-diskLimitMb="{ row }">
+              <span class="text-sm text-[var(--text-secondary)]">{{ formatDiskMb(row.diskLimitMb) }}</span>
+            </template>
+
+            <!-- 角色单元格 -->
+            <template #cell-isAdmin="{ row }">
+              <Badge :variant="row.isAdmin ? 'info' : 'default'" size="sm">
+                {{ row.isAdmin ? t('mail.admin') : t('common.user') }}
+              </Badge>
+            </template>
+
+            <!-- 操作列单元格 -->
+            <template #cell-actions="{ row }">
+              <div class="flex items-center justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-8 px-2 text-xs"
+                  :title="t('mail.editAccount')"
+                  @click="openEditAccountModal(row)"
+                >
+                  <Edit3 class="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-8 px-2 text-xs"
+                  :title="t('mail.resetPassword')"
+                  @click="openResetPasswordModal(row)"
+                >
+                  <Key class="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-8 px-2 text-xs text-[var(--error)] hover:text-[var(--error)]"
+                  :title="t('common.delete')"
+                  :loading="actionLoading === `delete-account-${row.id}`"
+                  @click="deleteAccount(row)"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </template>
+
+            <!-- 移动端卡片视图 -->
+            <template #mobile="{ row }">
+              <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-3">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="font-mono text-sm font-semibold text-[var(--text-primary)] truncate">{{ row.email }}</div>
+                    <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ row.displayName || '—' }}</div>
+                  </div>
+                  <Badge :variant="row.isAdmin ? 'info' : 'default'" size="sm">
+                    {{ row.isAdmin ? t('mail.admin') : t('common.user') }}
+                  </Badge>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-[var(--text-secondary)] pt-2 border-t border-[var(--border-color)]">
+                  <div>{{ t('mail.diskLimit') }}: {{ formatDiskMb(row.diskLimitMb) }}</div>
+                  <div>{{ formatDate(row.createdAt) }}</div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-color)]">
+                  <Button variant="secondary" size="sm" class="text-xs" @click="openEditAccountModal(row)">
+                    {{ t('common.edit') }}
+                  </Button>
+                  <Button variant="secondary" size="sm" class="text-xs" @click="openResetPasswordModal(row)">
+                    {{ t('mail.resetPassword') }}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    class="text-xs"
+                    :loading="actionLoading === `delete-account-${row.id}`"
+                    @click="deleteAccount(row)"
+                  >
+                    {{ t('common.delete') }}
+                  </Button>
+                </div>
+              </div>
+            </template>
+
+            <!-- 空状态插槽 -->
+            <template #empty>
+              <EmptyState
+                :title="t('mail.noAccounts')"
+                :description="domain.status !== 'verified' ? t('mail.verifyFirst') : t('mail.accountsDescription')"
+              >
+                <template #action v-if="domain.status === 'verified'">
+                  <Button variant="primary" size="sm" @click="openCreateAccountModal">
+                    <template #icon>
+                      <Plus class="w-4 h-4" />
+                    </template>
+                    {{ t('mail.createAccount') }}
+                  </Button>
+                </template>
+              </EmptyState>
+            </template>
+          </Table>
+        </Card>
       </div>
 
       <!-- DNS 配置 TAB -->
       <div v-show="activeTab === 'dns'" class="space-y-6">
-        <div class="flex justify-between items-center gap-3">
-          <p class="text-sm text-themed-muted">{{ t('mail.dnsDescription') }}</p>
-          <button class="btn btn-sm btn-secondary flex-none" :disabled="actionLoading === 'verify'" @click="verifyDomain">
-            <span v-if="actionLoading === 'verify'" class="nimbus-spinner nimbus-spinner--sm mr-1"></span>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
+            {{ t('mail.dnsDescription') }}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            class="shrink-0"
+            :loading="actionLoading === 'verify'"
+            @click="verifyDomain"
+          >
+            <template #icon>
+              <RefreshCw class="w-4 h-4" />
+            </template>
             {{ t('mail.refreshStatus') }}
-          </button>
+          </Button>
         </div>
 
-        <div v-if="!dnsConfig" class="flex justify-center py-8">
-          <span class="nimbus-spinner text-themed-muted"></span>
+        <div v-if="!dnsConfig" class="space-y-4">
+          <Card loading />
+          <Card loading />
         </div>
 
         <!-- DNS 记录列表 -->
-        <div v-else class="space-y-3">
+        <div v-else class="space-y-4">
           <!-- TXT 验证记录 -->
-          <div v-if="dnsConfig.txtRecord" class="card p-4">
-            <div class="mb-3">
-              <span class="text-xs font-medium text-themed-muted uppercase tracking-wide">TXT</span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 text-sm">
-              <div>
-                <div class="text-themed-muted text-xs mb-1">{{ t('mail.hostRecord') }}</div>
-                <div class="flex items-center gap-1.5">
-                  <code class="text-themed font-mono">workspace-verification</code>
-                  <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" :title="t('common.copy')" @click="copyValue('workspace-verification', 'txt-host')">
-                    <svg v-if="copiedKey !== 'txt-host'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                  </button>
-                </div>
+          <Card v-if="dnsConfig.txtRecord" padding="md">
+            <template #header>
+              <div class="flex items-center gap-2">
+                <Badge variant="info" size="sm">TXT</Badge>
+                <span class="text-xs font-medium text-[var(--text-secondary)]">{{ t('mail.txtVerification') }}</span>
               </div>
-              <div>
-                <div class="text-themed-muted text-xs mb-1">{{ t('mail.recordValue') }}</div>
-                <div class="flex items-start gap-1.5">
-                  <code class="text-themed break-all font-mono">{{ dnsConfig.txtRecord }}</code>
-                  <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0 mt-0.5" :title="t('common.copy')" @click="copyValue(dnsConfig.txtRecord, 'txt-value')">
-                    <svg v-if="copiedKey !== 'txt-value'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <p class="text-xs text-themed-muted mt-3">{{ t('mail.dnsHint.txt') }}</p>
-          </div>
+            </template>
 
-          <!-- 其他 DNS 记录（来自 API 返回的原始数据，跳过验证记录） -->
-          <div v-for="(record, idx) in filteredDnsRecords" :key="idx" class="card p-4">
-            <div class="mb-3">
-              <span class="text-xs font-medium text-themed-muted uppercase tracking-wide">{{ record.type }}</span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-4 text-sm">
+            <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 text-sm">
               <div>
-                <div class="text-themed-muted text-xs mb-1">{{ t('mail.hostRecord') }}</div>
-                <div class="flex items-center gap-1.5">
-                  <code class="text-themed truncate font-mono">{{ formatHostRecord(record.record) }}</code>
-                  <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0" :title="t('common.copy')" @click="copyValue(formatHostRecord(record.record), `dns-${idx}-host`)">
-                    <svg v-if="copiedKey !== `dns-${idx}-host`" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <div class="text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ t('mail.hostRecord') }}</div>
+                <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                  <code class="text-xs sm:text-sm font-mono text-[var(--text-primary)] truncate">workspace-verification</code>
+                  <button
+                    type="button"
+                    class="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                    :title="t('common.copy')"
+                    @click="copyValue('workspace-verification', 'txt-host')"
+                  >
+                    <Check v-if="copiedKey === 'txt-host'" class="w-3.5 h-3.5 text-[var(--success)]" />
+                    <Copy v-else class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
+
               <div>
-                <div class="text-themed-muted text-xs mb-1">{{ t('mail.recordValue') }}</div>
-                <div class="flex items-start gap-1.5">
-                  <code class="text-themed break-all font-mono">{{ formatRecordValue(record) }}</code>
-                  <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0 mt-0.5" :title="t('common.copy')" @click="copyValue(formatRecordValue(record), `dns-${idx}-value`)">
-                    <svg v-if="copiedKey !== `dns-${idx}-value`" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                    <svg v-else class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <div class="text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ t('mail.recordValue') }}</div>
+                <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                  <code class="text-xs sm:text-sm font-mono text-[var(--text-primary)] break-all">{{ dnsConfig.txtRecord }}</code>
+                  <button
+                    type="button"
+                    class="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                    :title="t('common.copy')"
+                    @click="copyValue(dnsConfig.txtRecord, 'txt-value')"
+                  >
+                    <Check v-if="copiedKey === 'txt-value'" class="w-3.5 h-3.5 text-[var(--success)]" />
+                    <Copy v-else class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             </div>
-            <p class="text-xs text-themed-muted mt-3">{{ getDnsRecordDescription(record) }}</p>
-          </div>
+
+            <p class="text-xs text-[var(--text-tertiary)] mt-3 leading-relaxed">
+              {{ t('mail.dnsHint.txt') }}
+            </p>
+          </Card>
+
+          <!-- 其他 DNS 记录（MX、CNAME、SPF、DKIM、DMARC 等） -->
+          <Card
+            v-for="(record, idx) in filteredDnsRecords"
+            :key="idx"
+            padding="md"
+          >
+            <template #header>
+              <div class="flex items-center gap-2">
+                <Badge :variant="getDnsBadgeVariant(record.type)" size="sm">{{ record.type }}</Badge>
+              </div>
+            </template>
+
+            <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 text-sm">
+              <div>
+                <div class="text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ t('mail.hostRecord') }}</div>
+                <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                  <code class="text-xs sm:text-sm font-mono text-[var(--text-primary)] truncate">{{ formatHostRecord(record.record) }}</code>
+                  <button
+                    type="button"
+                    class="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                    :title="t('common.copy')"
+                    @click="copyValue(formatHostRecord(record.record), `dns-${idx}-host`)"
+                  >
+                    <Check v-if="copiedKey === `dns-${idx}-host`" class="w-3.5 h-3.5 text-[var(--success)]" />
+                    <Copy v-else class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div class="text-xs font-medium text-[var(--text-secondary)] mb-1.5">{{ t('mail.recordValue') }}</div>
+                <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] min-h-[44px]">
+                  <code class="text-xs sm:text-sm font-mono text-[var(--text-primary)] break-all">{{ formatRecordValue(record) }}</code>
+                  <button
+                    type="button"
+                    class="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0 active:scale-95"
+                    :title="t('common.copy')"
+                    @click="copyValue(formatRecordValue(record), `dns-${idx}-value`)"
+                  >
+                    <Check v-if="copiedKey === `dns-${idx}-value`" class="w-3.5 h-3.5 text-[var(--success)]" />
+                    <Copy v-else class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p class="text-xs text-[var(--text-tertiary)] mt-3 leading-relaxed">
+              {{ getDnsRecordDescription(record) }}
+            </p>
+          </Card>
         </div>
       </div>
 
       <!-- 设置 TAB -->
-      <div v-show="activeTab === 'settings'" class="space-y-4">
-        <div class="card p-4">
-          <h4 class="font-medium text-themed mb-3">{{ t('mail.domainInfo') }}</h4>
-          <div class="space-y-2 text-sm">
-            <div class="flex justify-between">
-              <span class="text-themed-muted">{{ t('mail.domainName') }}</span>
-              <span class="text-themed">{{ domain.domain }}</span>
+      <div v-show="activeTab === 'settings'" class="space-y-6">
+        <!-- 域名信息卡片 -->
+        <Card :title="t('mail.domainInfo')" padding="md">
+          <div class="divide-y divide-[var(--border-color)] text-sm">
+            <div class="py-3 flex items-center justify-between">
+              <span class="text-[var(--text-secondary)]">{{ t('mail.domainName') }}</span>
+              <span class="font-mono font-medium text-[var(--text-primary)]">{{ domain.domain }}</span>
             </div>
-            <div class="flex justify-between">
-              <span class="text-themed-muted">{{ t('common.status') }}</span>
-              <span class="nimbus-pill font-mono" :class="getStatusBadge(domain.status)">
-                <span class="nimbus-dot"></span>{{ t('mail.domainStatus.' + domain.status) }}
-              </span>
+            <div class="py-3 flex items-center justify-between">
+              <span class="text-[var(--text-secondary)]">{{ t('common.status') }}</span>
+              <Badge :variant="getStatusBadgeVariant(domain.status)" size="sm" dot>
+                {{ t('mail.domainStatus.' + domain.status) }}
+              </Badge>
             </div>
-            <div class="flex justify-between">
-              <span class="text-themed-muted">{{ t('mail.createdAt') }}</span>
-              <span class="text-themed">{{ formatDate(domain.createdAt) }}</span>
+            <div class="py-3 flex items-center justify-between">
+              <span class="text-[var(--text-secondary)]">{{ t('mail.createdAt') }}</span>
+              <span class="text-[var(--text-primary)]">{{ formatDate(domain.createdAt) }}</span>
             </div>
-            <div v-if="domain.verifiedAt" class="flex justify-between">
-              <span class="text-themed-muted">{{ t('mail.verifiedAt') }}</span>
-              <span class="text-themed">{{ formatDate(domain.verifiedAt) }}</span>
+            <div v-if="domain.verifiedAt" class="py-3 flex items-center justify-between">
+              <span class="text-[var(--text-secondary)]">{{ t('mail.verifiedAt') }}</span>
+              <span class="text-[var(--text-primary)]">{{ formatDate(domain.verifiedAt) }}</span>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div class="card border border-red-200 dark:border-red-900/50 overflow-hidden">
-          <div class="px-4 py-3 bg-red-50 dark:bg-red-950/30 border-b border-red-200 dark:border-red-900/50">
-            <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <h4 class="text-sm font-medium text-red-600 dark:text-red-400">{{ t('mail.dangerZone') }}</h4>
-            </div>
+        <!-- 危险操作区域 -->
+        <div class="rounded-2xl border border-[color-mix(in_srgb,var(--error)_30%,var(--border-color))] bg-[var(--bg-surface)] overflow-hidden">
+          <div class="px-6 py-4 bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))] border-b border-[color-mix(in_srgb,var(--error)_20%,var(--border-color))] flex items-center gap-2">
+            <AlertTriangle class="w-4 h-4 text-[var(--error)] shrink-0" />
+            <h4 class="text-sm font-semibold text-[var(--error)]">{{ t('mail.dangerZone') }}</h4>
           </div>
-          <div class="p-4 flex items-center justify-between">
-            <p class="text-sm text-themed-muted">{{ t('mail.deleteDomainWarning') }}</p>
-            <button
-              class="btn btn-danger btn-sm flex-shrink-0 ml-4"
-              :disabled="actionLoading === 'delete-domain'"
+          <div class="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
+              {{ t('mail.deleteDomainWarning') }}
+            </p>
+            <Button
+              variant="danger"
+              size="md"
+              class="shrink-0"
+              :loading="actionLoading === 'delete-domain'"
               @click="deleteDomain"
             >
-              <span v-if="actionLoading === 'delete-domain'" class="nimbus-spinner nimbus-spinner--sm mr-1"></span>
               {{ t('mail.deleteDomain') }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
     </template>
+
+    <!-- 创建账户抽屉弹窗 -->
+    <DrawerModal
+      v-model="showCreateAccountModal"
+      :title="t('mail.createAccount')"
+      max-width="max-w-lg"
+    >
+      <div class="space-y-4 py-2">
+        <!-- 用户名 -->
+        <Input
+          v-model="createAccountForm.username"
+          :label="`${t('mail.username')} *`"
+          :placeholder="t('mail.usernamePlaceholder')"
+          autocomplete="off"
+        >
+          <template #suffix v-if="domain">
+            <span class="text-xs font-mono text-[var(--text-secondary)] select-none">@{{ domain.domain }}</span>
+          </template>
+        </Input>
+
+        <!-- 密码 -->
+        <Input
+          v-model="createAccountForm.password"
+          type="password"
+          :label="`${t('mail.password')} *`"
+          :placeholder="t('mail.passwordPlaceholder')"
+          :hint="t('mail.passwordHint')"
+          autocomplete="new-password"
+        />
+
+        <!-- 显示名称 -->
+        <Input
+          v-model="createAccountForm.displayName"
+          :label="t('mail.displayName')"
+          :placeholder="t('mail.displayNamePlaceholder')"
+        />
+
+        <!-- 空间配额 -->
+        <Input
+          v-model="createAccountForm.diskLimitMb"
+          type="number"
+          :label="`${t('mail.diskLimit')} (MB)`"
+          placeholder="1024"
+        />
+
+        <!-- 管理员选项 -->
+        <div class="pt-2">
+          <label class="inline-flex items-center gap-2 cursor-pointer text-sm text-[var(--text-primary)]">
+            <input
+              v-model="createAccountForm.isAdmin"
+              type="checkbox"
+              class="w-4 h-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
+            />
+            <span>{{ t('mail.setAsAdmin') }}</span>
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <Button variant="ghost" @click="showCreateAccountModal = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            variant="primary"
+            :loading="actionLoading === 'create-account'"
+            :disabled="!createAccountForm.username.trim() || !createAccountForm.password.trim()"
+            @click="handleCreateAccount"
+          >
+            {{ t('common.confirm') }}
+          </Button>
+        </div>
+      </template>
+    </DrawerModal>
+
+    <!-- 编辑账户抽屉弹窗 -->
+    <DrawerModal
+      v-model="showEditAccountModal"
+      :title="t('mail.editAccount')"
+      max-width="max-w-lg"
+    >
+      <div v-if="editingAccount" class="space-y-4 py-2">
+        <Input
+          :model-value="editingAccount.email"
+          :label="t('mail.emailAddress')"
+          readonly
+          disabled
+        />
+
+        <Input
+          v-model="editAccountForm.displayName"
+          :label="t('mail.displayName')"
+          :placeholder="t('mail.displayNamePlaceholder')"
+        />
+
+        <Input
+          v-model="editAccountForm.diskLimitMb"
+          type="number"
+          :label="`${t('mail.diskLimit')} (MB)`"
+          placeholder="1024"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <Button variant="ghost" @click="showEditAccountModal = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            variant="primary"
+            :loading="actionLoading === 'update-account'"
+            @click="handleUpdateAccount"
+          >
+            {{ t('common.save') }}
+          </Button>
+        </div>
+      </template>
+    </DrawerModal>
+
+    <!-- 重置密码抽屉弹窗 -->
+    <DrawerModal
+      v-model="showResetPasswordModal"
+      :title="t('mail.resetPassword')"
+      max-width="max-w-md"
+    >
+      <div v-if="resettingAccount" class="space-y-4 py-2">
+        <div class="p-3 bg-[var(--bg-surface-soft)] rounded-xl border border-[var(--border-color)]">
+          <div class="text-xs text-[var(--text-secondary)] mb-0.5">{{ t('mail.emailAddress') }}</div>
+          <div class="font-mono text-sm text-[var(--text-primary)] font-medium">{{ resettingAccount.email }}</div>
+        </div>
+
+        <Input
+          v-model="resetPasswordForm.password"
+          type="password"
+          :label="`${t('mail.newPassword')} *`"
+          :placeholder="t('mail.newPasswordPlaceholder')"
+          :hint="t('mail.passwordHint')"
+          autocomplete="new-password"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <Button variant="ghost" @click="showResetPasswordModal = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            variant="primary"
+            :loading="actionLoading === 'reset-password'"
+            :disabled="!resetPasswordForm.password.trim() || resetPasswordForm.password.length < 8"
+            @click="handleResetPassword"
+          >
+            {{ t('common.confirm') }}
+          </Button>
+        </div>
+      </template>
+    </DrawerModal>
   </div>
 </template>
-
-<style scoped>
-/* Nimbus kit — shared with MailView */
-.nimbus-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  line-height: 1.1rem;
-  letter-spacing: 0.01em;
-}
-.nimbus-dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 9999px;
-  background: currentColor;
-  opacity: 0.7;
-  flex: none;
-}
-.nimbus-step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 9999px;
-  background: var(--kawaii-primary);
-  color: var(--topbar-text);
-  font-size: 0.75rem;
-  font-weight: 600;
-  flex: none;
-}
-.nimbus-spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 9999px;
-  animation: nimbus-spin 0.6s linear infinite;
-  vertical-align: -0.125em;
-}
-.nimbus-spinner--sm {
-  width: 0.75rem;
-  height: 0.75rem;
-}
-.nimbus-spinner--lg {
-  width: 2rem;
-  height: 2rem;
-  border-width: 3px;
-}
-@keyframes nimbus-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-</style>

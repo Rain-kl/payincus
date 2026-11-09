@@ -9,12 +9,48 @@ import { translateError } from '@/utils/errorHandler'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { freeSiteCopy } from '@/utils/freeSiteFun'
 import { mailDomainPath } from '@/utils/app-paths'
+import { useReveal } from '@/composables/useReveal'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Input,
+  Select,
+  Badge,
+  Table,
+  EmptyState
+} from '@/components/ui'
+import type { TableColumn, SelectOption, BadgeVariant } from '@/components/ui'
+import {
+  Mail,
+  ShoppingCart,
+  Clock,
+  Globe,
+  HardDrive,
+  Users,
+  Zap,
+  Sparkles,
+  Shield,
+  Plus,
+  RefreshCw,
+  Check,
+  CheckCircle2,
+  AlertCircle,
+  ChevronRight,
+  Info,
+  HelpCircle,
+  X,
+  Loader2
+} from 'lucide-vue-next'
 
 const { t } = useI18n()
 const router = useRouter()
 const toast = useToast()
 const configStore = useConfigStore()
 void configStore.loadPublicConfig()
+
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
 
 // TAB 状态
 const activeTab = ref<'my' | 'buy'>('my')
@@ -66,6 +102,13 @@ const hasSubscriptionInSelectedRegion = computed(() => {
   return subscription.value.source.id === selectedSourceId.value
 })
 
+// 域名列表表格配置
+const domainColumns = computed<TableColumn[]>(() => [
+  { key: 'domain', title: t('mail.domainName'), width: '50%' },
+  { key: 'status', title: t('common.status'), width: '28%' },
+  { key: 'actions', title: t('common.actions'), width: '22%', align: 'right' }
+])
+
 // 域名添加弹窗
 const showAddDomainModal = ref(false)
 const addDomainLoading = ref(false)
@@ -76,6 +119,13 @@ const showRenewModal = ref(false)
 const renewLoading = ref(false)
 const renewMonths = ref(1)
 const autoRenewLoading = ref(false)
+
+const renewOptions = computed<SelectOption[]>(() => [
+  { label: `1 ${t('mail.month')}`, value: 1 },
+  { label: `3 ${t('mail.months')}`, value: 3 },
+  { label: `6 ${t('mail.months')}`, value: 6 },
+  { label: `12 ${t('mail.months')}`, value: 12 }
+])
 
 onMounted(async () => {
   await loadData()
@@ -90,7 +140,7 @@ async function loadData() {
     ])
     subscription.value = subRes.subscription
     sources.value = srcRes.sources
-    
+
     // 默认选择第一个源和方案
     if (sources.value.length > 0 && !selectedSourceId.value) {
       selectedSourceId.value = sources.value[0].id
@@ -98,7 +148,7 @@ async function loadData() {
         selectedPlanId.value = sources.value[0].plans[0].id
       }
     }
-    
+
     // 如果没有订阅，自动切换到购买 TAB
     if (!subscription.value) {
       activeTab.value = 'buy'
@@ -139,10 +189,10 @@ async function verifyAffCode() {
     resetAffCode()
     return
   }
-  
+
   affCodeVerifying.value = true
   affCodeError.value = ''
-  
+
   try {
     const res = await api.mail.validateAffCode(affCode.value.trim())
     if (res.valid) {
@@ -166,7 +216,7 @@ async function purchaseSubscription() {
     toast.error(t('mail.selectPlanFirst'))
     return
   }
-  
+
   buyLoading.value = true
   try {
     await api.mail.purchaseSubscription(
@@ -195,7 +245,7 @@ async function addDomain() {
     toast.error(t('mail.domainRequired'))
     return
   }
-  
+
   addDomainLoading.value = true
   try {
     await api.mail.addDomain(newDomain.value.trim())
@@ -227,13 +277,13 @@ function openRenewModal() {
 const renewMonthlyPrice = computed(() => {
   if (!subscription.value?.plan) return 0
   const plan = subscription.value.plan
-  return plan.billingCycle === 'monthly' 
-    ? Number(plan.price) 
+  return plan.billingCycle === 'monthly'
+    ? Number(plan.price)
     : Number(plan.price) / 12
 })
 
 const renewOriginalPrice = computed(() => {
-  return Math.round(renewMonthlyPrice.value * renewMonths.value * 100) / 100
+  return Math.round(renewMonthlyPrice.value * Number(renewMonths.value) * 100) / 100
 })
 
 const renewDiscountRate = computed(() => {
@@ -251,7 +301,7 @@ const renewFinalPrice = computed(() => {
 async function renewSubscription() {
   renewLoading.value = true
   try {
-    await api.mail.renewSubscription(renewMonths.value)
+    await api.mail.renewSubscription(Number(renewMonths.value))
     toast.success(t('mail.renewSuccess'))
     showRenewModal.value = false
     await loadData()
@@ -278,12 +328,19 @@ async function toggleAutoRenew() {
   }
 }
 
-function getStatusBadge(status: string) {
+function getStatusBadgeVariant(status: string): BadgeVariant {
   switch (status) {
-    case 'verified': return 'badge-success'
-    case 'pending': return 'badge-warning'
-    case 'suspended': return 'badge-error'
-    default: return 'badge-ghost'
+    case 'verified':
+    case 'active':
+      return 'success'
+    case 'pending':
+      return 'warning'
+    case 'suspended':
+    case 'expired':
+    case 'cancelled':
+      return 'error'
+    default:
+      return 'default'
   }
 }
 
@@ -309,92 +366,131 @@ function getBillingCycleSuffix(cycle: string | null | undefined) {
 </script>
 
 <template>
-  <div class="kawaii-page animate-fade-in">
+  <div ref="revealRoot" class="kawaii-page animate-fade-in space-y-6">
     <!-- 页面标题 -->
-    <div class="page-header">
-      <div class="min-w-0">
-        <h1 class="page-title">{{ t('mail.title') }}</h1>
-        <p class="page-description">{{ t('mail.description') }}</p>
+    <PageHeader
+      :title="t('mail.title')"
+      :description="t('mail.description')"
+    />
+
+    <!-- Apple 风格分段导航 (Segmented Tabs) -->
+    <div
+      data-reveal
+      class="flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+    >
+      <div class="flex items-center gap-1 shrink-0" role="tablist" :aria-label="t('mail.title')">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'my'"
+          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          :class="activeTab === 'my'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
+          @click="activeTab = 'my'"
+        >
+          {{ t('mail.tabs.my') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === 'buy'"
+          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          :class="activeTab === 'buy'
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
+          @click="activeTab = 'buy'"
+        >
+          {{ t('mail.tabs.buy') }}
+        </button>
       </div>
     </div>
 
-    <!-- TAB 切换 -->
-    <div class="flex items-center gap-6 border-b border-themed mb-6 overflow-x-auto">
-      <button
-        class="relative -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'my'
-          ? 'border-primary-500 text-themed'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="activeTab = 'my'"
-      >
-        {{ t('mail.tabs.my') }}
-      </button>
-      <button
-        class="relative -mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'buy'
-          ? 'border-primary-500 text-themed'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="activeTab = 'buy'"
-      >
-        {{ t('mail.tabs.buy') }}
-      </button>
-    </div>
-
     <!-- 加载状态 -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <span class="nimbus-spinner nimbus-spinner--lg text-themed-muted"></span>
-    </div>
+    <Card v-if="loading" padding="lg" class="text-center">
+      <div class="flex flex-col items-center justify-center py-12">
+        <Loader2 class="w-8 h-8 animate-spin text-[var(--accent)]" />
+        <p class="text-sm text-[var(--text-secondary)] mt-4 font-medium">{{ t('common.loading') }}</p>
+      </div>
+    </Card>
 
     <!-- 我的域名邮箱 TAB -->
     <div v-else-if="activeTab === 'my'" class="space-y-6">
       <!-- 无订阅状态 -->
-      <div v-if="!subscription" class="card p-12 text-center">
-        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-themed-secondary flex items-center justify-center">
-          <svg class="w-8 h-8 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-          </svg>
-        </div>
-        <h3 class="text-lg font-medium text-themed mb-2">{{ t('mail.noSubscription') }}</h3>
-        <p class="text-sm text-themed-muted mb-6">{{ t('mail.buyNowHint') }}</p>
-        <button class="btn btn-primary" @click="activeTab = 'buy'">
-          {{ t('mail.buyNow') }}
-        </button>
-      </div>
+      <Card v-if="!subscription" padding="none">
+        <EmptyState
+          :title="t('mail.noSubscription')"
+          :description="t('mail.buyNowHint')"
+        >
+          <template #icon>
+            <Mail class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template #action>
+            <Button variant="primary" @click="activeTab = 'buy'">
+              <template #icon>
+                <ShoppingCart class="w-4 h-4 stroke-[2]" />
+              </template>
+              <span>{{ t('mail.buyNow') }}</span>
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
       <!-- 有订阅状态 -->
       <template v-else>
         <!-- 订阅概览卡片 -->
-        <div class="card p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-base font-medium text-themed">{{ t('mail.subscriptionOverview') }}</h3>
-            <span class="nimbus-pill font-mono" :class="getStatusBadge(subscription.status)">
-              <span class="nimbus-dot"></span>{{ t('mail.status.' + subscription.status) }}
-            </span>
-          </div>
-          
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div class="bg-themed-secondary rounded-lg p-3">
-              <div class="text-xs text-themed-muted mb-1">{{ t('mail.expiresAt') }}</div>
-              <div class="text-sm font-medium text-themed">{{ formatDate(subscription.expiresAt) }}</div>
+        <Card data-reveal>
+          <template #header>
+            <div class="flex items-center justify-between w-full">
+              <h3 class="text-base md:text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ t('mail.subscriptionOverview') }}
+              </h3>
+              <Badge :variant="getStatusBadgeVariant(subscription.status)" dot>
+                {{ t('mail.status.' + subscription.status) }}
+              </Badge>
             </div>
-            <div class="bg-themed-secondary rounded-lg p-3">
-              <div class="text-xs text-themed-muted mb-1">{{ t('mail.domainsUsed') }}</div>
-              <div class="text-sm font-medium text-themed">{{ subscription.usage.domainCount }}/{{ subscription.plan.domainLimit }}</div>
-            </div>
-            <div class="bg-themed-secondary rounded-lg p-3">
-              <div class="text-xs text-themed-muted mb-1">{{ t('mail.totalSpace') }}</div>
-              <div class="text-sm font-medium text-themed">{{ subscription.plan.diskLimitGb }} GB</div>
-            </div>
-          </div>
-          
-          <div class="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <div class="text-themed-muted truncate">
-                {{ t('mail.plan') }}：{{ subscription.plan.name }} ({{ subscription.source.name }}) ·
-                {{ subscription.plan.domainLimit }} {{ t('mail.domains') }} / {{ subscription.plan.diskLimitGb }}GB ·
-                {{ formatPrice(subscription.plan.price) }}{{ getBillingCycleSuffix(subscription.plan.billingCycle) }}
+          </template>
+
+          <!-- 指标卡片网格 -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+              <div class="text-xs text-[var(--text-secondary)] mb-1 flex items-center gap-1.5">
+                <Clock class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+                <span>{{ t('mail.expiresAt') }}</span>
               </div>
-              <div class="mt-1 text-xs text-themed-muted">{{ t('mail.autoRenewHint') }}</div>
+              <div class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ formatDate(subscription.expiresAt) }}
+              </div>
+            </div>
+            <div class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+              <div class="text-xs text-[var(--text-secondary)] mb-1 flex items-center gap-1.5">
+                <Globe class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+                <span>{{ t('mail.domainsUsed') }}</span>
+              </div>
+              <div class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ subscription.usage.domainCount }} / {{ subscription.plan.domainLimit }}
+              </div>
+            </div>
+            <div class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+              <div class="text-xs text-[var(--text-secondary)] mb-1 flex items-center gap-1.5">
+                <HardDrive class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+                <span>{{ t('mail.totalSpace') }}</span>
+              </div>
+              <div class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ subscription.plan.diskLimitGb }} GB
+              </div>
+            </div>
+          </div>
+
+          <!-- 方案信息与自动续费行 -->
+          <div class="pt-4 border-t border-[var(--border-color)] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <div class="text-sm text-[var(--text-secondary)] truncate">
+                <span class="font-medium text-[var(--text-primary)]">{{ t('mail.plan') }}</span>：{{ subscription.plan.name }} ({{ subscription.source.name }}) ·
+                {{ subscription.plan.domainLimit }} {{ t('mail.domains') }} / {{ subscription.plan.diskLimitGb }}GB ·
+                <span class="font-semibold text-[var(--text-primary)]">{{ formatPrice(subscription.plan.price) }}{{ getBillingCycleSuffix(subscription.plan.billingCycle) }}</span>
+              </div>
+              <div class="mt-1 text-xs text-[var(--text-tertiary)]">{{ t('mail.autoRenewHint') }}</div>
             </div>
             <div class="flex shrink-0 items-center gap-3">
               <button
@@ -404,67 +500,123 @@ function getBillingCycleSuffix(cycle: string | null | undefined) {
                 :aria-label="t('mail.autoRenew')"
                 :disabled="autoRenewLoading"
                 :class="[
-                  'relative h-6 w-11 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60',
-                  subscription.autoRenew ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-700'
+                  'relative h-6 w-11 rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60',
+                  subscription.autoRenew ? 'bg-[var(--success)]' : 'bg-[var(--bg-tertiary)] border border-[var(--border-color)]'
                 ]"
                 @click="toggleAutoRenew"
               >
                 <span
                   :class="[
-                    'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                    'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200',
                     subscription.autoRenew ? 'translate-x-5' : 'translate-x-0.5'
                   ]"
-                ></span>
+                />
               </button>
-              <span class="text-xs font-medium text-themed">
+              <span class="text-xs font-medium text-[var(--text-secondary)]">
                 {{ t(subscription.autoRenew ? 'mail.autoRenewOn' : 'mail.autoRenewOff') }}
               </span>
-              <button class="btn btn-sm btn-secondary" @click="openRenewModal">
-                {{ t('mail.renew') }}
-              </button>
+              <Button variant="secondary" size="sm" @click="openRenewModal">
+                <template #icon>
+                  <RefreshCw class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('mail.renew') }}</span>
+              </Button>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <!-- 我的域名 -->
-        <div class="space-y-3">
+        <!-- 我的域名列表 -->
+        <div data-reveal class="space-y-3 pt-2">
           <div class="flex items-center justify-between">
-            <h3 class="text-base font-medium text-themed">{{ t('mail.myDomains') }}</h3>
-            <button
-              class="btn btn-sm btn-primary"
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ t('mail.myDomains') }}</h3>
+              <Badge v-if="subscription.domains.length > 0" size="sm" variant="default" shape="pill">
+                {{ subscription.domains.length }}
+              </Badge>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
               :disabled="subscription.usage.domainCount >= subscription.plan.domainLimit"
               @click="openAddDomainModal"
             >
-              + {{ t('mail.addDomain') }}
-            </button>
+              <template #icon>
+                <Plus class="w-3.5 h-3.5" />
+              </template>
+              <span>{{ t('mail.addDomain') }}</span>
+            </Button>
           </div>
 
-          <div v-if="subscription.domains.length === 0" class="card p-8 text-center text-themed-muted">
-            {{ t('mail.noDomains') }}
-          </div>
-
-          <div v-else class="space-y-2">
-            <div
-              v-for="domain in subscription.domains"
-              :key="domain.id"
-              class="card-interactive p-4"
-              @click="goToDomain(domain.id)"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-medium text-themed truncate">{{ domain.domain }}</span>
-                    <span class="nimbus-pill font-mono" :class="getStatusBadge(domain.status)">
-                      <span class="nimbus-dot"></span>{{ t('mail.domainStatus.' + domain.status) }}
-                    </span>
+          <Table
+            :columns="domainColumns"
+            :data="subscription.domains"
+            row-key="id"
+            :empty-text="t('mail.noDomains')"
+            empty-description=""
+          >
+            <template #empty>
+              <EmptyState :title="t('mail.noDomains')" description="">
+                <template #icon>
+                  <Globe class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+                </template>
+                <template #action>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    :disabled="subscription.usage.domainCount >= subscription.plan.domainLimit"
+                    @click="openAddDomainModal"
+                  >
+                    <template #icon>
+                      <Plus class="w-3.5 h-3.5" />
+                    </template>
+                    <span>{{ t('mail.addDomain') }}</span>
+                  </Button>
+                </template>
+              </EmptyState>
+            </template>
+            <template #cell-domain="{ row }">
+              <div class="flex items-center gap-2.5 font-medium text-[var(--text-primary)]">
+                <div class="w-8 h-8 rounded-lg bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center shrink-0 text-[var(--text-secondary)]">
+                  <Globe class="w-4 h-4 stroke-[1.5]" />
+                </div>
+                <span class="truncate font-semibold">{{ row.domain }}</span>
+              </div>
+            </template>
+            <template #cell-status="{ row }">
+              <Badge :variant="getStatusBadgeVariant(row.status)" size="sm" dot>
+                {{ t('mail.domainStatus.' + row.status) }}
+              </Badge>
+            </template>
+            <template #cell-actions="{ row }">
+              <Button variant="ghost" size="sm" @click="goToDomain(row.id)">
+                <span>{{ t('common.detail') }}</span>
+                <template #suffix>
+                  <ChevronRight class="w-3.5 h-3.5" />
+                </template>
+              </Button>
+            </template>
+            <template #mobile="{ row }">
+              <div
+                class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:border-[var(--border-hover)] transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer active:scale-[0.99] flex items-center justify-between gap-3"
+                @click="goToDomain(row.id)"
+              >
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-9 h-9 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center shrink-0 text-[var(--text-secondary)]">
+                    <Globe class="w-4 h-4 stroke-[1.5]" />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-semibold text-sm text-[var(--text-primary)] truncate">{{ row.domain }}</div>
+                    <div class="mt-1">
+                      <Badge :variant="getStatusBadgeVariant(row.status)" size="sm" dot>
+                        {{ t('mail.domainStatus.' + row.status) }}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-                <svg class="w-5 h-5 text-themed-muted flex-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
+                <ChevronRight class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
               </div>
-            </div>
-          </div>
+            </template>
+          </Table>
         </div>
       </template>
     </div>
@@ -474,510 +626,520 @@ function getBillingCycleSuffix(cycle: string | null | undefined) {
       <!-- 左侧主内容区域 -->
       <div class="flex-1 min-w-0 space-y-6">
         <!-- Step 1: 选择服务地区 -->
-        <div class="card p-5">
-          <div class="flex items-center gap-2.5 mb-4">
-            <span class="nimbus-step">1</span>
-            <h3 class="text-sm font-semibold text-themed">{{ t('mail.selectRegion') }}</h3>
-          </div>
+        <Card data-reveal>
+          <template #header>
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-full bg-[var(--accent)] text-white text-xs font-semibold flex items-center justify-center shrink-0">1</span>
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ t('mail.selectRegion') }}</h3>
+            </div>
+          </template>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div
               v-for="source in sources"
               :key="source.id"
               :class="[
-                'nimbus-select relative p-4 rounded-xl border cursor-pointer group',
+                'group relative p-4 rounded-2xl border transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer active:scale-[0.98]',
                 selectedSourceId === source.id
-                  ? 'border-primary-500 ring-1 ring-primary-500/30 bg-themed-secondary'
-                  : 'border-themed hover:border-themed-secondary'
+                  ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 bg-[var(--bg-surface)] shadow-[0_4px_16px_rgba(0,0,0,0.06)]'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)]'
               ]"
               @click="selectSource(source.id)"
             >
               <div class="flex items-center gap-3">
                 <!-- 国旗 -->
-                <div class="w-10 h-10 rounded-lg bg-themed-secondary flex items-center justify-center overflow-hidden">
+                <div class="w-10 h-10 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center overflow-hidden shrink-0">
                   <FlagIcon :code="source.code" size="lg" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="font-medium text-themed">{{ source.name }}</div>
-                  <div class="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">{{ t('mail.nodeStatus.limited') }}</div>
+                  <div class="font-semibold text-sm md:text-base text-[var(--text-primary)] truncate">{{ source.name }}</div>
+                  <div class="text-xs text-[var(--warning)] font-medium mt-0.5 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[var(--warning)] shrink-0" />
+                    <span>{{ t('mail.nodeStatus.limited') }}</span>
+                  </div>
                 </div>
                 <!-- 选中指示器 -->
                 <div
                   :class="[
-                    'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+                    'w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-200 shrink-0',
                     selectedSourceId === source.id
-                      ? 'border-primary-500 bg-primary-500'
-                      : 'border-gray-300 dark:border-gray-600 group-hover:border-gray-400 dark:group-hover:border-gray-500'
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                      : 'border-[var(--border-color)] group-hover:border-[var(--border-hover)] bg-[var(--bg-surface-soft)]'
                   ]"
                 >
-                  <svg v-if="selectedSourceId === source.id" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                  </svg>
+                  <Check v-if="selectedSourceId === source.id" class="w-3 h-3 stroke-[3]" />
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         <!-- 已购买该地区提示 -->
-        <div v-if="hasSubscriptionInSelectedRegion" class="card p-5 border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20">
+        <Card
+          v-if="hasSubscriptionInSelectedRegion"
+          data-reveal
+          class="border-[var(--warning)] bg-[color-mix(in_srgb,var(--warning)_8%,var(--bg-surface))]"
+          padding="sm"
+        >
           <div class="flex items-start gap-3">
-            <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-            </svg>
-            <div>
-              <h4 class="font-medium text-amber-800 dark:text-amber-200">{{ t('mail.alreadyPurchased') }}</h4>
-              <p class="text-sm text-amber-600 dark:text-amber-300/80 mt-1">{{ t('mail.alreadyPurchasedDesc') }}</p>
-              <button 
-                class="btn btn-sm btn-ghost mt-3 text-amber-700 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+            <AlertCircle class="w-5 h-5 text-[var(--warning)] shrink-0 mt-0.5" />
+            <div class="min-w-0 flex-1">
+              <h4 class="font-semibold text-sm text-[var(--text-primary)]">{{ t('mail.alreadyPurchased') }}</h4>
+              <p class="text-xs md:text-sm text-[var(--text-secondary)] mt-1 leading-relaxed">{{ t('mail.alreadyPurchasedDesc') }}</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                class="mt-3"
                 @click="activeTab = 'my'"
               >
                 {{ t('mail.viewMySubscription') }}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Card>
 
         <!-- Step 2: 方案配置详情 -->
-        <div v-if="selectedSource && !hasSubscriptionInSelectedRegion" class="card p-5">
-          <div class="flex items-center gap-2.5 mb-4">
-            <span class="nimbus-step">2</span>
-            <h3 class="text-sm font-semibold text-themed">{{ t('mail.planDetails') }}</h3>
-          </div>
+        <Card v-if="selectedSource && !hasSubscriptionInSelectedRegion" data-reveal>
+          <template #header>
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-full bg-[var(--accent)] text-white text-xs font-semibold flex items-center justify-center shrink-0">2</span>
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ t('mail.planDetails') }}</h3>
+            </div>
+          </template>
 
-          <div v-for="plan in selectedSource.plans" :key="plan.id" class="mb-4 last:mb-0">
+          <div class="space-y-4">
             <div
+              v-for="plan in selectedSource.plans"
+              :key="plan.id"
               :class="[
-                'nimbus-select relative p-5 rounded-xl border cursor-pointer',
+                'relative p-5 rounded-2xl border transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer active:scale-[0.99]',
                 selectedPlanId === plan.id
-                  ? 'border-primary-500 ring-1 ring-primary-500/30 bg-themed-secondary'
-                  : 'border-themed hover:border-themed-secondary'
+                  ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 bg-[var(--bg-surface)] shadow-[0_4px_16px_rgba(0,0,0,0.06)]'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)]'
               ]"
               @click="selectPlan(plan.id)"
             >
               <!-- 方案标题和价格 -->
-              <div class="flex items-start justify-between mb-4">
+              <div class="flex items-start justify-between gap-4 mb-4">
                 <div class="flex-1 min-w-0">
-                  <h4 class="text-lg font-semibold text-themed">{{ plan.name }}</h4>
+                  <div class="flex items-center gap-2">
+                    <h4 class="text-base md:text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">{{ plan.name }}</h4>
+                    <Badge v-if="selectedPlanId === plan.id" variant="info" size="sm">已选</Badge>
+                  </div>
                   <!-- 方案描述（从后端获取）-->
-                  <p v-if="plan.description" class="text-sm text-themed-muted mt-1">{{ plan.description }}</p>
+                  <p v-if="plan.description" class="text-xs md:text-sm text-[var(--text-secondary)] mt-1 leading-relaxed">{{ plan.description }}</p>
                 </div>
-                <div class="text-right flex-shrink-0 ml-4">
-                  <div class="text-2xl font-bold text-themed">{{ formatPrice(plan.price) }}<span class="text-sm font-normal text-themed-muted">{{ getBillingCycleSuffix(plan.billingCycle) }}</span></div>
+                <div class="text-right shrink-0">
+                  <div class="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+                    {{ formatPrice(plan.price) }}
+                    <span class="text-xs font-normal text-[var(--text-secondary)]">{{ getBillingCycleSuffix(plan.billingCycle) }}</span>
+                  </div>
                 </div>
               </div>
-              
+
               <!-- 配额信息 + 功能特性 -->
-              <div class="grid grid-cols-2 gap-3 pt-4 border-t border-themed">
-                <div class="flex items-center gap-2.5 text-sm text-themed-muted">
-                  <svg class="w-4 h-4 text-themed-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                  </svg>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-[var(--border-color)] text-xs md:text-sm">
+                <div class="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <HardDrive class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <span>{{ t('mail.feature.domainStorage', { count: plan.domainLimit, storage: plan.diskLimitGb }) }}</span>
                 </div>
-                <div class="flex items-center gap-2.5 text-sm text-themed-muted">
-                  <svg class="w-4 h-4 text-themed-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
+                <div class="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Mail class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <span>{{ t('mail.feature.unlimitedAliases') }}</span>
                 </div>
-                <div class="flex items-center gap-2.5 text-sm text-themed-muted">
-                  <svg class="w-4 h-4 text-themed-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
+                <div class="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Users class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <span>{{ t('mail.feature.unlimitedMailboxes') }}</span>
                 </div>
-                <div class="flex items-center gap-2.5 text-sm text-themed-muted">
-                  <svg class="w-4 h-4 text-themed-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
+                <div class="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Zap class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <span>{{ t('mail.feature.emailLimit') }}</span>
                 </div>
-                <div class="flex items-center gap-2.5 text-sm text-themed-muted">
-                  <svg class="w-4 h-4 text-themed-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                  </svg>
+                <div class="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Sparkles class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <span>{{ t('mail.feature.emClientPro') }}</span>
                 </div>
-                <div class="flex items-center gap-2.5 text-sm text-themed-muted">
-                  <svg class="w-4 h-4 text-themed-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
+                <div class="flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Shield class="w-4 h-4 text-[var(--text-tertiary)] shrink-0" />
                   <span>{{ t('mail.feature.catchAll') }}</span>
                 </div>
               </div>
-              
+
               <!-- 选中指示器 -->
               <div
                 v-if="selectedPlanId === plan.id"
-                class="absolute bottom-4 right-4 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center"
+                class="absolute bottom-4 right-4 w-6 h-6 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shadow-sm"
               >
-                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                </svg>
+                <Check class="w-3.5 h-3.5 stroke-[3]" />
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         <!-- Step 3: 其他选项 (优惠码) -->
-        <div v-if="selectedPlan && !hasSubscriptionInSelectedRegion" class="card p-5">
-          <div class="flex items-center gap-2.5 mb-4">
-            <span class="nimbus-step">3</span>
-            <h3 class="text-sm font-semibold text-themed">{{ t('mail.otherOptions') }}</h3>
-          </div>
+        <Card v-if="selectedPlan && !hasSubscriptionInSelectedRegion" data-reveal>
+          <template #header>
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-full bg-[var(--accent)] text-white text-xs font-semibold flex items-center justify-center shrink-0">3</span>
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ t('mail.otherOptions') }}</h3>
+            </div>
+          </template>
 
           <div>
-            <label class="text-xs font-medium text-themed-muted mb-2 block">{{ t('aff.promoCodeOptional') }}</label>
+            <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5 block">
+              {{ t('aff.promoCodeOptional') }}
+            </label>
             <div class="flex gap-2">
-              <input
-                v-model="affCode"
-                type="text"
-                class="input flex-1"
-                :placeholder="t('aff.promoCodeInputPlaceholder')"
-                :disabled="affCodeVerifying"
-                @keyup.enter="verifyAffCode"
-              />
-              <button
-                class="btn btn-secondary px-4"
+              <div class="flex-1 min-w-0">
+                <Input
+                  v-model="affCode"
+                  :placeholder="t('aff.promoCodeInputPlaceholder')"
+                  :disabled="affCodeVerifying"
+                  @enter="verifyAffCode"
+                />
+              </div>
+              <Button
+                variant="secondary"
                 :disabled="affCodeVerifying || !affCode.trim()"
+                :loading="affCodeVerifying"
                 @click="verifyAffCode"
               >
-                <span v-if="affCodeVerifying" class="nimbus-spinner nimbus-spinner--sm"></span>
-                <span v-else>{{ t('mail.verify') }}</span>
-              </button>
+                <span>{{ t('mail.verify') }}</span>
+              </Button>
             </div>
-            <p v-if="affCodeValid === true" class="text-xs text-green-500 mt-2 flex items-center gap-1">
-              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-              </svg>
-              {{ t('aff.promoCodeValid', { rate: (affCodeDiscount * 100).toFixed(0) + '%' }) }}
-            </p>
-            <p v-else-if="affCodeValid === false" class="text-xs text-red-500 mt-2">
-              {{ affCodeError }}
-            </p>
+            <div v-if="affCodeValid === true" class="text-xs text-[var(--success)] font-medium mt-2 flex items-center gap-1.5">
+              <CheckCircle2 class="w-3.5 h-3.5 shrink-0" />
+              <span>{{ t('aff.promoCodeValid', { rate: (affCodeDiscount * 100).toFixed(0) + '%' }) }}</span>
+            </div>
+            <div v-else-if="affCodeValid === false" class="text-xs text-[var(--error)] font-medium mt-2 flex items-center gap-1.5">
+              <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+              <span>{{ affCodeError }}</span>
+            </div>
           </div>
-        </div>
-        
+        </Card>
+
         <!-- 移动端结算汇总（仅在小屏幕显示） -->
-        <div v-if="selectedPlan && !hasSubscriptionInSelectedRegion" class="lg:hidden card p-5">
-          <div class="flex items-center gap-2 mb-4">
-            <svg class="w-5 h-5 text-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <h3 class="text-sm font-semibold text-themed">{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutTitle : t('mail.checkout.title') }}</h3>
-          </div>
-          
+        <Card v-if="selectedPlan && !hasSubscriptionInSelectedRegion" class="lg:hidden">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <ShoppingCart class="w-5 h-5 text-[var(--text-primary)]" />
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutTitle : t('mail.checkout.title') }}
+              </h3>
+            </div>
+          </template>
+
           <div class="space-y-3 text-sm">
-            <div class="flex justify-between">
-              <span class="text-themed-muted">{{ t('mail.checkout.region') }}</span>
-              <span class="text-themed font-medium">{{ selectedSource?.name }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-[var(--text-secondary)]">{{ t('mail.checkout.region') }}</span>
+              <span class="text-[var(--text-primary)] font-medium">{{ selectedSource?.name }}</span>
             </div>
-            <div class="flex justify-between">
-              <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.mailBillingCycle : t('mail.billingCycle') }}</span>
-              <span class="text-themed font-medium">{{ getBillingCycleLabel(selectedPlan.billingCycle) }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-[var(--text-secondary)]">{{ configStore.freeSiteMode ? freeSiteCopy.mailBillingCycle : t('mail.billingCycle') }}</span>
+              <span class="text-[var(--text-primary)] font-medium">{{ getBillingCycleLabel(selectedPlan.billingCycle) }}</span>
             </div>
-            <div class="flex justify-between">
-              <span class="text-themed-muted">{{ t('mail.checkout.serviceStatus') }}</span>
-              <span class="text-green-500 font-medium">{{ t('mail.checkout.instant') }}</span>
+            <div class="flex justify-between items-center">
+              <span class="text-[var(--text-secondary)]">{{ t('mail.checkout.serviceStatus') }}</span>
+              <Badge variant="success" size="sm" dot>{{ t('mail.checkout.instant') }}</Badge>
             </div>
-            
-            <div class="border-t border-themed pt-3 mt-3">
-              <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-themed-muted mb-2">
+
+            <div class="border-t border-[var(--border-color)] pt-3 mt-3 space-y-2">
+              <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-[var(--text-secondary)]">
                 <span>{{ t('aff.originalPrice') }}</span>
                 <span>¥{{ checkoutPriceInfo.originalPrice.toFixed(2) }}</span>
               </div>
-              <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-green-500 mb-2">
+              <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-[var(--success)] font-medium">
                 <span>{{ t('aff.discountAmount') }}</span>
                 <span>-¥{{ checkoutPriceInfo.discountAmount.toFixed(2) }}</span>
               </div>
-              <div class="flex justify-between items-baseline">
-                <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutAmount : t('mail.checkout.amount') }}</span>
-                <span class="text-2xl font-bold text-themed">{{ formatPrice(checkoutPriceInfo?.finalPrice ?? selectedPlan.price) }}</span>
+              <div class="flex justify-between items-baseline pt-1">
+                <span class="text-[var(--text-secondary)] font-medium">{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutAmount : t('mail.checkout.amount') }}</span>
+                <span class="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{{ formatPrice(checkoutPriceInfo?.finalPrice ?? selectedPlan.price) }}</span>
               </div>
             </div>
           </div>
-          
-          <button 
-            class="btn btn-primary w-full mt-5" 
+
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            class="mt-5"
+            :loading="buyLoading"
             :disabled="buyLoading"
             @click="purchaseSubscription"
           >
-            <span v-if="buyLoading" class="nimbus-spinner nimbus-spinner--sm mr-2"></span>
-            {{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutConfirm : t('mail.checkout.confirm') }}
-          </button>
-          
-          <p class="text-xs text-themed-muted text-center mt-3 flex items-center justify-center gap-1">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {{ configStore.freeSiteMode ? freeSiteCopy.mailBalanceRequired : t('mail.checkout.balanceRequired') }}
+            <span>{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutConfirm : t('mail.checkout.confirm') }}</span>
+            <template #suffix>
+              <ChevronRight class="w-4 h-4" />
+            </template>
+          </Button>
+
+          <p class="text-xs text-[var(--text-tertiary)] text-center mt-3 flex items-center justify-center gap-1.5">
+            <Info class="w-3.5 h-3.5 shrink-0" />
+            <span>{{ configStore.freeSiteMode ? freeSiteCopy.mailBalanceRequired : t('mail.checkout.balanceRequired') }}</span>
           </p>
-        </div>
+        </Card>
       </div>
-      
+
       <!-- 右侧结算汇总卡片（大屏幕显示） -->
-      <div v-if="selectedPlan && !hasSubscriptionInSelectedRegion" class="hidden lg:block w-80 flex-shrink-0">
-        <div class="sticky top-6">
-          <div class="card p-5">
-            <div class="flex items-center gap-2 mb-5 pb-4 border-b border-themed">
-              <svg class="w-5 h-5 text-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <h3 class="text-sm font-semibold text-themed">{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutTitle : t('mail.checkout.title') }}</h3>
-            </div>
-            
+      <div v-if="selectedPlan && !hasSubscriptionInSelectedRegion" class="hidden lg:block w-80 shrink-0">
+        <div class="sticky top-6 space-y-4">
+          <Card data-reveal>
+            <template #header>
+              <div class="flex items-center gap-2">
+                <ShoppingCart class="w-5 h-5 text-[var(--text-primary)]" />
+                <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                  {{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutTitle : t('mail.checkout.title') }}
+                </h3>
+              </div>
+            </template>
+
             <div class="space-y-3 text-sm">
-              <div class="flex justify-between">
-                <span class="text-themed-muted">{{ t('mail.checkout.region') }}</span>
-                <span class="text-themed font-medium">{{ selectedSource?.name }}</span>
+              <div class="flex justify-between items-center">
+                <span class="text-[var(--text-secondary)]">{{ t('mail.checkout.region') }}</span>
+                <span class="text-[var(--text-primary)] font-medium">{{ selectedSource?.name }}</span>
               </div>
-              <div class="flex justify-between">
-                <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.mailBillingCycle : t('mail.billingCycle') }}</span>
-                <span class="text-themed font-medium">{{ getBillingCycleLabel(selectedPlan.billingCycle) }}</span>
+              <div class="flex justify-between items-center">
+                <span class="text-[var(--text-secondary)]">{{ configStore.freeSiteMode ? freeSiteCopy.mailBillingCycle : t('mail.billingCycle') }}</span>
+                <span class="text-[var(--text-primary)] font-medium">{{ getBillingCycleLabel(selectedPlan.billingCycle) }}</span>
               </div>
-              <div class="flex justify-between">
-                <span class="text-themed-muted">{{ t('mail.checkout.serviceStatus') }}</span>
-                <span class="text-green-500 font-medium">{{ t('mail.checkout.instant') }}</span>
+              <div class="flex justify-between items-center">
+                <span class="text-[var(--text-secondary)]">{{ t('mail.checkout.serviceStatus') }}</span>
+                <Badge variant="success" size="sm" dot>{{ t('mail.checkout.instant') }}</Badge>
               </div>
-              
-              <div class="border-t border-themed pt-4 mt-4">
-                <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-themed-muted mb-2">
+
+              <div class="border-t border-[var(--border-color)] pt-3 mt-3 space-y-2">
+                <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-[var(--text-secondary)]">
                   <span>{{ t('aff.originalPrice') }}</span>
                   <span>¥{{ checkoutPriceInfo.originalPrice.toFixed(2) }}</span>
                 </div>
-                <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-green-500 mb-2">
+                <div v-if="affCodeValid && checkoutPriceInfo" class="flex justify-between text-[var(--success)] font-medium">
                   <span>{{ t('aff.discountAmount') }}</span>
                   <span>-¥{{ checkoutPriceInfo.discountAmount.toFixed(2) }}</span>
                 </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-themed-muted">{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutAmount : t('mail.checkout.amount') }}</span>
-                  <span class="text-2xl font-bold text-themed">{{ formatPrice(checkoutPriceInfo?.finalPrice ?? selectedPlan.price) }}</span>
+                <div class="flex justify-between items-baseline pt-1">
+                  <span class="text-[var(--text-secondary)] font-medium">{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutAmount : t('mail.checkout.amount') }}</span>
+                  <span class="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{{ formatPrice(checkoutPriceInfo?.finalPrice ?? selectedPlan.price) }}</span>
                 </div>
               </div>
             </div>
-            
-            <button 
-              class="btn btn-primary w-full mt-5" 
+
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              class="mt-5"
+              :loading="buyLoading"
               :disabled="buyLoading"
               @click="purchaseSubscription"
             >
-              <span v-if="buyLoading" class="nimbus-spinner nimbus-spinner--sm mr-2"></span>
-              {{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutConfirm : t('mail.checkout.confirm') }}
-              <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            
-            <p class="text-xs text-themed-muted text-center mt-3 flex items-center justify-center gap-1">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {{ configStore.freeSiteMode ? freeSiteCopy.mailBalanceRequired : t('mail.checkout.balanceRequired') }}
+              <span>{{ configStore.freeSiteMode ? freeSiteCopy.mailCheckoutConfirm : t('mail.checkout.confirm') }}</span>
+              <template #suffix>
+                <ChevronRight class="w-4 h-4" />
+              </template>
+            </Button>
+
+            <p class="text-xs text-[var(--text-tertiary)] text-center mt-3 flex items-center justify-center gap-1.5">
+              <Info class="w-3.5 h-3.5 shrink-0" />
+              <span>{{ configStore.freeSiteMode ? freeSiteCopy.mailBalanceRequired : t('mail.checkout.balanceRequired') }}</span>
             </p>
-          </div>
-          
+          </Card>
+
           <!-- 帮助提示 -->
-          <div class="card p-4 mt-4 bg-themed-secondary">
+          <Card class="bg-[var(--bg-surface-soft)]" padding="sm">
             <div class="flex items-start gap-3">
-              <svg class="w-5 h-5 text-themed-muted flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <h4 class="text-sm font-medium text-themed">{{ t('mail.help.title') }}</h4>
-                <p class="text-xs text-themed-muted mt-1">{{ t('mail.help.desc') }}</p>
+              <HelpCircle class="w-5 h-5 text-[var(--text-tertiary)] shrink-0 mt-0.5" />
+              <div class="min-w-0">
+                <h4 class="text-sm font-semibold text-[var(--text-primary)]">{{ t('mail.help.title') }}</h4>
+                <p class="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">{{ t('mail.help.desc') }}</p>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>
 
-    <!-- 添加域名弹窗 -->
+    <!-- 添加域名弹窗 (Apple Modal Sheet) -->
     <Teleport to="body">
-      <div v-if="showAddDomainModal" class="modal-overlay">
-        <div class="modal-backdrop" @click="showAddDomainModal = false"></div>
-        <div class="modal-content max-w-md">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ t('mail.addDomain') }}</h3>
-            <button class="btn btn-ghost btn-sm" @click="showAddDomainModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div>
-              <label class="label">{{ t('mail.domainName') }}</label>
-              <input 
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="showAddDomainModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('mail.addDomain')"
+        >
+          <!-- 背景遮罩磨砂 -->
+          <div
+            class="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            @click="showAddDomainModal = false"
+          />
+
+          <!-- 对话框主体 -->
+          <div
+            class="relative w-full max-w-md rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col z-10"
+            @click.stop
+          >
+            <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
+              <h3 class="text-base md:text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ t('mail.addDomain') }}
+              </h3>
+              <button
+                type="button"
+                class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+                :title="t('common.cancel')"
+                :aria-label="t('common.cancel')"
+                @click="showAddDomainModal = false"
+              >
+                <X class="w-4 h-4 stroke-[2]" />
+              </button>
+            </div>
+            <div class="p-6 space-y-4">
+              <Input
                 v-model="newDomain"
-                type="text" 
+                :label="t('mail.domainName')"
                 :placeholder="t('mail.domainPlaceholder')"
-                class="input w-full"
-                @keyup.enter="addDomain"
+                :hint="t('mail.domainHint')"
+                @enter="addDomain"
               />
-              <p class="text-xs text-themed-muted mt-1">{{ t('mail.domainHint') }}</p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+              <Button variant="ghost" size="sm" @click="showAddDomainModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                :disabled="addDomainLoading || !newDomain.trim()"
+                :loading="addDomainLoading"
+                @click="addDomain"
+              >
+                {{ t('common.confirm') }}
+              </Button>
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showAddDomainModal = false">{{ t('common.cancel') }}</button>
-            <button 
-              class="btn btn-primary" 
-              :disabled="addDomainLoading || !newDomain.trim()"
-              @click="addDomain"
-            >
-              <span v-if="addDomainLoading" class="nimbus-spinner nimbus-spinner--sm mr-2"></span>
-              {{ t('common.confirm') }}
-            </button>
-          </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
 
-    <!-- 续费弹窗 -->
+    <!-- 续费弹窗 (Apple Modal Sheet) -->
     <Teleport to="body">
-      <div v-if="showRenewModal" class="modal-overlay">
-        <div class="modal-backdrop" @click="showRenewModal = false"></div>
-        <div class="modal-content max-w-sm">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ t('mail.renewSubscription') }}</h3>
-            <button class="btn btn-ghost btn-sm" @click="showRenewModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="modal-body space-y-4">
-            <!-- 续费时长选择 -->
-            <div>
-              <label class="label">{{ t('mail.renewDuration') }}</label>
-              <!-- 按年计费：只能续费1年 -->
-              <div v-if="subscription?.plan?.billingCycle === 'yearly'" class="input w-full bg-themed-secondary flex items-center">
-                1 {{ t('mail.year') }}
-              </div>
-              <!-- 按月计费：可选择1/3/6/12个月 -->
-              <select v-else v-model="renewMonths" class="input w-full">
-                <option :value="1">1 {{ t('mail.month') }}</option>
-                <option :value="3">3 {{ t('mail.months') }}</option>
-                <option :value="6">6 {{ t('mail.months') }}</option>
-                <option :value="12">12 {{ t('mail.months') }}</option>
-              </select>
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="showRenewModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('mail.renewSubscription')"
+        >
+          <!-- 背景遮罩磨砂 -->
+          <div
+            class="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            @click="showRenewModal = false"
+          />
+
+          <!-- 对话框主体 -->
+          <div
+            class="relative w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] overflow-hidden flex flex-col z-10"
+            @click.stop
+          >
+            <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
+              <h3 class="text-base md:text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ t('mail.renewSubscription') }}
+              </h3>
+              <button
+                type="button"
+                class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+                :title="t('common.cancel')"
+                :aria-label="t('common.cancel')"
+                @click="showRenewModal = false"
+              >
+                <X class="w-4 h-4 stroke-[2]" />
+              </button>
             </div>
-            
-            <!-- 费用明细 -->
-            <div class="bg-themed-secondary rounded-lg p-4 space-y-2">
-              <!-- 按年计费 -->
-              <template v-if="subscription?.plan?.billingCycle === 'yearly'">
-                <div class="flex justify-between text-sm">
-                  <span class="text-themed-muted">{{ t('mail.yearlyPrice') }}</span>
-                  <span class="text-themed">¥{{ Number(subscription.plan.price).toFixed(2) }}/{{ t('mail.year') }}</span>
+            <div class="p-6 space-y-4">
+              <!-- 续费时长选择 -->
+              <div>
+                <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5 block">
+                  {{ t('mail.renewDuration') }}
+                </label>
+                <!-- 按年计费：只能续费1年 -->
+                <div
+                  v-if="subscription?.plan?.billingCycle === 'yearly'"
+                  class="min-h-[44px] px-3.5 flex items-center rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] font-medium"
+                >
+                  1 {{ t('mail.year') }}
                 </div>
-              </template>
-              <!-- 按月计费 -->
-              <template v-else>
-                <div class="flex justify-between text-sm">
-                  <span class="text-themed-muted">{{ t('mail.monthlyPrice') }}</span>
-                  <span class="text-themed">¥{{ renewMonthlyPrice.toFixed(2) }}/{{ t('mail.month') }}</span>
-                </div>
-                <div class="flex justify-between text-sm">
-                  <span class="text-themed-muted">{{ t('mail.renewDuration') }}</span>
-                  <span class="text-themed">{{ renewMonths }} {{ renewMonths > 1 ? t('mail.months') : t('mail.month') }}</span>
-                </div>
-              </template>
-              <div v-if="renewDiscountRate > 0" class="flex justify-between text-sm text-green-500">
-                <span>{{ t('aff.promoDiscount') }} ({{ (renewDiscountRate * 100).toFixed(0) }}%)</span>
-                <span>-¥{{ renewDiscountAmount.toFixed(2) }}</span>
+                <!-- 按月计费：可选择1/3/6/12个月 -->
+                <Select
+                  v-else
+                  :model-value="renewMonths"
+                  :options="renewOptions"
+                  @update:model-value="(val: any) => renewMonths = Number(val)"
+                />
               </div>
-              <div class="border-t border-themed pt-2 flex justify-between font-medium">
-                <span class="text-themed-muted">{{ t('mail.totalPrice') }}</span>
-                <span class="text-themed text-lg">¥{{ renewFinalPrice.toFixed(2) }}</span>
+
+              <!-- 费用明细卡片 -->
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-4 space-y-2.5">
+                <!-- 按年计费 -->
+                <template v-if="subscription?.plan?.billingCycle === 'yearly'">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-[var(--text-secondary)]">{{ t('mail.yearlyPrice') }}</span>
+                    <span class="text-[var(--text-primary)] font-medium">¥{{ Number(subscription.plan.price).toFixed(2) }}/{{ t('mail.year') }}</span>
+                  </div>
+                </template>
+                <!-- 按月计费 -->
+                <template v-else>
+                  <div class="flex justify-between text-sm">
+                    <span class="text-[var(--text-secondary)]">{{ t('mail.monthlyPrice') }}</span>
+                    <span class="text-[var(--text-primary)] font-medium">¥{{ renewMonthlyPrice.toFixed(2) }}/{{ t('mail.month') }}</span>
+                  </div>
+                  <div class="flex justify-between text-sm">
+                    <span class="text-[var(--text-secondary)]">{{ t('mail.renewDuration') }}</span>
+                    <span class="text-[var(--text-primary)] font-medium">{{ renewMonths }} {{ renewMonths > 1 ? t('mail.months') : t('mail.month') }}</span>
+                  </div>
+                </template>
+                <div v-if="renewDiscountRate > 0" class="flex justify-between text-sm text-[var(--success)] font-medium">
+                  <span>{{ t('aff.promoDiscount') }} ({{ (renewDiscountRate * 100).toFixed(0) }}%)</span>
+                  <span>-¥{{ renewDiscountAmount.toFixed(2) }}</span>
+                </div>
+                <div class="border-t border-[var(--border-color)] pt-2.5 flex justify-between items-baseline font-medium">
+                  <span class="text-[var(--text-secondary)]">{{ t('mail.totalPrice') }}</span>
+                  <span class="text-[var(--text-primary)] text-xl font-bold tracking-tight">¥{{ renewFinalPrice.toFixed(2) }}</span>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showRenewModal = false">{{ t('common.cancel') }}</button>
-            <button 
-              class="btn btn-primary" 
-              :disabled="renewLoading"
-              @click="renewSubscription"
-            >
-              <span v-if="renewLoading" class="nimbus-spinner nimbus-spinner--sm mr-2"></span>
-              {{ t('mail.confirmRenew') }}
-            </button>
+            <div class="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+              <Button variant="ghost" size="sm" @click="showRenewModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                :disabled="renewLoading"
+                :loading="renewLoading"
+                @click="renewSubscription"
+              >
+                {{ t('mail.confirmRenew') }}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
-
-<style scoped>
-/* Nimbus kit — shared with MailDomainView */
-.nimbus-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  line-height: 1.1rem;
-  letter-spacing: 0.01em;
-}
-.nimbus-dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 9999px;
-  background: currentColor;
-  opacity: 0.7;
-  flex: none;
-}
-.nimbus-step {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 9999px;
-  background: var(--kawaii-primary);
-  color: var(--topbar-text);
-  font-size: 0.75rem;
-  font-weight: 600;
-  flex: none;
-}
-.nimbus-select {
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-.nimbus-select:hover {
-  transform: translateY(-2px);
-}
-.nimbus-spinner {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 9999px;
-  animation: nimbus-spin 0.6s linear infinite;
-  vertical-align: -0.125em;
-}
-.nimbus-spinner--sm {
-  width: 0.75rem;
-  height: 0.75rem;
-}
-.nimbus-spinner--lg {
-  width: 2rem;
-  height: 2rem;
-  border-width: 3px;
-}
-@keyframes nimbus-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-</style>

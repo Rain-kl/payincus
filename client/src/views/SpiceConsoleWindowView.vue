@@ -9,9 +9,11 @@ const instanceId = computed(() => {
   const id = Number(value)
   return /^[1-9]\d*$/.test(value) && Number.isSafeInteger(id) ? id : null
 })
-const instanceName = computed(() => typeof route.query.name === 'string' ? route.query.name : '')
+const instanceName = computed(() => (typeof route.query.name === 'string' ? route.query.name : ''))
 </script>
 
 <template>
-  <SpiceConsole :visible="true" :instance-id="instanceId" :instance-name="instanceName" standalone />
+  <div class="min-h-screen bg-[var(--bg-primary)] flex flex-col">
+    <SpiceConsole :visible="true" :instance-id="instanceId" :instance-name="instanceName" standalone />
+  </div>
 </template>
