@@ -79,7 +79,13 @@ func RateLimit() gin.HandlerFunc {
 		if rule := config.FindRateLimitRule(path, c.Request.Method); rule != nil {
 			max = rule.Max
 			window = config.ParseTimeWindow(rule.TimeWindow)
-			key = ip + ":" + rule.Path
+			// The bucket key MUST include the method. Several rules deliberately share a
+			// path with different limits — e.g. GET /api/instances/*/sites (60/min) and
+			// POST /api/instances/*/sites (10/min). Keying on the path alone makes them
+			// share one counter, so ordinary GET traffic exhausts the POST budget and
+			// produces false 429s. @fastify/rate-limit keeps a separate store per route
+			// (route = method + url), which is the behaviour mirrored here.
+			key = ip + ":" + rule.Method + ":" + rule.Path
 		}
 
 		if !limiter.allow(key, max, window) {

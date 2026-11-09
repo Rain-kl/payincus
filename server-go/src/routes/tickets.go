@@ -476,10 +476,16 @@ func ticketsReadMultipart(request *http.Request, contentType string) (ticketsPar
 
 	for {
 		part, err := reader.NextPart()
-		if err == io.EOF {
-			break
-		}
 		if err != nil {
+			// NextPart WRAPS io.EOF ("multipart: NextPart: EOF"), so a direct
+			// comparison never matches. An empty body is not an error: busboy emits no
+			// parts and `parts()` simply completes, which is why Node answers
+			// "Subject must be 2-200 characters" for a boundary-only request instead of
+			// a parse failure. A TRUNCATED body yields io.ErrUnexpectedEOF, which is a
+			// different error and correctly stays a 400 ("Unexpected end of form").
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			return ticketsParsedPayload{}, &ticketsPayloadError{
 				Status:  http.StatusBadRequest,
 				Message: err.Error(),

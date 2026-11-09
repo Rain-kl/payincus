@@ -1,0 +1,210 @@
+[
+  { "name": "proxy-sites-list-anon", "method": "GET", "path": "/api/instances/1/sites" },
+  {
+    "name": "proxy-sites-create-anon",
+    "method": "POST",
+    "path": "/api/instances/1/sites",
+    "body": { "domain": "example.com", "targetPort": 80 }
+  },
+  {
+    "name": "proxy-sites-delete-anon",
+    "method": "DELETE",
+    "path": "/api/instances/1/sites/1",
+    "body": {}
+  },
+  {
+    "name": "proxy-sites-check-dns-anon",
+    "method": "POST",
+    "path": "/api/instances/1/sites/1/check-dns",
+    "body": {}
+  },
+  { "name": "proxy-sites-certificate-anon", "method": "GET", "path": "/api/instances/1/sites/1/certificate" },
+
+  {
+    "name": "proxy-sites-list-invalid-id-text",
+    "method": "GET",
+    "path": "/api/instances/abc/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "proxy-sites-list-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/instances/0/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "proxy-sites-list-invalid-id-leading-zero",
+    "method": "GET",
+    "path": "/api/instances/01/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "proxy-sites-list-seeded",
+    "method": "GET",
+    "path": "/api/instances/1/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+
+  {
+    "name": "proxy-sites-create-missing-target-port",
+    "method": "POST",
+    "path": "/api/instances/1/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "example.com" }
+  },
+  {
+    "name": "proxy-sites-create-domain-too-short",
+    "method": "POST",
+    "path": "/api/instances/1/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "a.b", "targetPort": 80 }
+  },
+  {
+    "name": "proxy-sites-create-port-zero",
+    "method": "POST",
+    "path": "/api/instances/1/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "example.com", "targetPort": 0 }
+  },
+  {
+    "name": "proxy-sites-create-port-not-integer",
+    "method": "POST",
+    "path": "/api/instances/1/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "example.com", "targetPort": 1.5 }
+  },
+  {
+    "name": "proxy-sites-create-remark-too-long",
+    "method": "POST",
+    "path": "/api/instances/1/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {
+      "domain": "example.com",
+      "targetPort": 80,
+      "remark": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  },
+  {
+    "name": "proxy-sites-create-wildcard-domain",
+    "method": "POST",
+    "path": "/api/instances/999999999/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "*.example.com", "targetPort": 80 }
+  },
+  {
+    "name": "proxy-sites-create-internal-domain",
+    "method": "POST",
+    "path": "/api/instances/999999999/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "localhost", "targetPort": 80 }
+  },
+  {
+    "name": "proxy-sites-create-instance-not-found",
+    "method": "POST",
+    "path": "/api/instances/999999999/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "domain": "example.com", "targetPort": 80 }
+  },
+
+  {
+    "name": "proxy-sites-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/instances/0/sites/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "proxy-sites-delete-site-not-found",
+    "method": "DELETE",
+    "path": "/api/instances/1/sites/999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+
+  {
+    "name": "proxy-sites-check-dns-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/1/sites/0/check-dns",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "proxy-sites-check-dns-site-not-found",
+    "method": "POST",
+    "path": "/api/instances/1/sites/999999999/check-dns",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+
+  {
+    "name": "proxy-sites-refresh-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/0/sites/1/refresh",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "proxy-sites-refresh-site-not-found",
+    "method": "POST",
+    "path": "/api/instances/1/sites/999999999/refresh",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+
+  {
+    "name": "proxy-sites-toggle-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/1/sites/0/toggle",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "proxy-sites-toggle-site-not-found",
+    "method": "POST",
+    "path": "/api/instances/1/sites/999999999/toggle",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+
+  {
+    "name": "proxy-sites-patch-empty-body",
+    "method": "PATCH",
+    "path": "/api/instances/1/sites/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "proxy-sites-patch-invalid-id",
+    "method": "PATCH",
+    "path": "/api/instances/0/sites/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "targetPort": 80 }
+  },
+  {
+    "name": "proxy-sites-patch-port-zero",
+    "method": "PATCH",
+    "path": "/api/instances/1/sites/1",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "targetPort": 0 }
+  },
+  {
+    "name": "proxy-sites-patch-site-not-found",
+    "method": "PATCH",
+    "path": "/api/instances/1/sites/999999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": { "targetPort": 8080 }
+  },
+
+  {
+    "name": "proxy-sites-certificate-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/0/sites/1/certificate",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "proxy-sites-certificate-site-not-found",
+    "method": "GET",
+    "path": "/api/instances/1/sites/999999999/certificate",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  }
+]
