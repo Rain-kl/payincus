@@ -80,12 +80,12 @@ const sizeClasses = computed(() => {
 
 const wrapperBorderClasses = computed(() => {
   if (props.error) {
-    return 'border-[var(--error)] focus-within:ring-2 focus-within:ring-[var(--error)] focus-within:border-[var(--error)]'
+    return 'border-[var(--error)] focus-within:border-[var(--error)] focus-within:ring-2 focus-within:ring-[var(--error)]/20'
   }
   if (props.disabled) {
-    return 'border-[var(--border-color)] bg-[var(--bg-tertiary)] cursor-not-allowed'
+    return 'border-[var(--border-color)] bg-[var(--bg-tertiary)] opacity-60 cursor-not-allowed'
   }
-  return 'border-[var(--border-color)] hover:border-[var(--border-hover)] focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:border-[var(--accent)]'
+  return 'border-[var(--border-color)] hover:border-[var(--border-hover)] focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent)]/20'
 })
 </script>
 
@@ -119,7 +119,7 @@ const wrapperBorderClasses = computed(() => {
         :name="name || undefined"
         :value="modelValue"
         :disabled="disabled"
-        class="w-full bg-[var(--bg-surface-soft)] text-[var(--text-primary)] focus:outline-none disabled:cursor-not-allowed border-0 p-0 text-inherit cursor-pointer appearance-none"
+        class="ui-native-select w-full bg-transparent text-[var(--text-primary)] focus:outline-none disabled:cursor-not-allowed border-0 p-0 text-inherit cursor-pointer appearance-none"
         @change="handleChange"
         @focus="emit('focus', $event)"
         @blur="emit('blur', $event)"
@@ -158,3 +158,18 @@ const wrapperBorderClasses = computed(() => {
     </p>
   </div>
 </template>
+
+<style scoped>
+.ui-native-select {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+</style>

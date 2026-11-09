@@ -360,23 +360,23 @@
     border-color: var(--kawaii-line) !important;
   }
 
-  .kawaii-app-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea),
-  .kawaii-public-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea) {
-    border-color: var(--kawaii-line) !important;
-    border-radius: var(--radius-input);
-    background-color: var(--kawaii-surface) !important;
-    color: var(--kawaii-text) !important;
+  .kawaii-app-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.ui-native-input), select:not(.ui-native-select), textarea:not(.ui-native-textarea)),
+  .kawaii-public-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.ui-native-input), select:not(.ui-native-select), textarea:not(.ui-native-textarea)) {
+    border-color: var(--kawaii-line);
+    border-radius: var(--radius-xl, 12px);
+    background-color: var(--kawaii-surface);
+    color: var(--kawaii-text);
   }
 
   .kawaii-app-shell :where(input, textarea)::placeholder,
   .kawaii-public-shell :where(input, textarea)::placeholder {
-    color: var(--kawaii-faint) !important;
+    color: var(--kawaii-faint);
   }
 
-  .kawaii-app-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea):focus,
-  .kawaii-public-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea):focus {
-    border-color: var(--kawaii-primary) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--kawaii-primary) 18%, var(--kawaii-bg)) !important;
+  .kawaii-app-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.ui-native-input), select:not(.ui-native-select), textarea:not(.ui-native-textarea)):focus,
+  .kawaii-public-shell :where(input:not([type='checkbox']):not([type='radio']):not([type='range']):not(.ui-native-input), select:not(.ui-native-select), textarea:not(.ui-native-textarea)):focus {
+    border-color: var(--kawaii-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--kawaii-primary) 18%, var(--kawaii-bg));
     outline: none;
   }
 
@@ -2953,38 +2953,7 @@
     box-shadow: none;
   }
 
-  .kawaii-app-shell :where(.tabs, [role='tablist'], .nimbus-tabs) {
-    gap: 0.5rem;
-    border-color: var(--kawaii-line) !important;
-  }
 
-  .kawaii-app-shell :where(.tab, [role='tab'], .nimbus-tab) {
-    border-radius: 0 !important;
-    background: var(--kawaii-bg) !important;
-    box-shadow: none !important;
-    color: var(--kawaii-muted) !important;
-    border-bottom: 2px solid var(--kawaii-bg) !important;
-    padding-bottom: 8px !important;
-    transition: color 160ms ease, border-color 160ms ease;
-  }
-
-  .kawaii-app-shell :where(.tab, [role='tab'], .nimbus-tab):hover {
-    color: var(--kawaii-text) !important;
-  }
-
-  .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true'], .nimbus-tab.is-active, .nimbus-tab[aria-selected='true']) {
-    border-radius: 0 !important;
-    background: var(--kawaii-bg) !important;
-    color: var(--accent) !important;
-    border-bottom: 2px solid var(--accent) !important;
-    box-shadow: none !important;
-    font-weight: 600 !important;
-  }
-
-  .dark .kawaii-app-shell :where(.tab.active, .tab.is-active, [role='tab'][aria-selected='true'], .nimbus-tab.is-active, .nimbus-tab[aria-selected='true']) {
-    color: var(--accent) !important;
-    border-bottom: 2px solid var(--accent) !important;
-  }
 
   .kawaii-app-shell :where(.badge, .tag, [class*='badge'], [class*='Badge']) {
     border-radius: var(--radius-chip);

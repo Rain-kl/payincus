@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { XCircle, AlertCircle } from 'lucide-vue-next'
 
 export type InputSize = 'sm' | 'md' | 'lg'
@@ -50,6 +50,7 @@ const emit = defineEmits<{
 
 const generatedId = useId()
 const inputId = computed(() => props.id || generatedId)
+const inputRef = ref<HTMLInputElement | null>(null)
 
 const handleInput = (event: Event) => {
   const target = event.target as HTMLInputElement
@@ -59,11 +60,18 @@ const handleInput = (event: Event) => {
 const handleClear = () => {
   emit('update:modelValue', '')
   emit('clear')
+  inputRef.value?.focus()
 }
 
 const handleKeyDown = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {
     emit('enter', event)
+  }
+}
+
+const handleWrapperClick = () => {
+  if (!props.disabled && !props.readonly) {
+    inputRef.value?.focus()
   }
 }
 
@@ -81,12 +89,18 @@ const sizeClasses = computed(() => {
 
 const wrapperBorderClasses = computed(() => {
   if (props.error) {
-    return 'border-[var(--error)] focus-within:ring-2 focus-within:ring-[var(--error)] focus-within:border-[var(--error)]'
+    return 'border-[var(--error)] focus-within:border-[var(--error)] focus-within:ring-2 focus-within:ring-[var(--error)]/20'
   }
   if (props.disabled) {
-    return 'border-[var(--border-color)] bg-[var(--bg-tertiary)] cursor-not-allowed'
+    return 'border-[var(--border-color)] bg-[var(--bg-tertiary)] opacity-60 cursor-not-allowed'
   }
-  return 'border-[var(--border-color)] hover:border-[var(--border-hover)] focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:border-[var(--accent)]'
+  return 'border-[var(--border-color)] hover:border-[var(--border-hover)] focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent)]/20'
+})
+
+defineExpose({
+  focus: () => inputRef.value?.focus(),
+  blur: () => inputRef.value?.blur(),
+  inputRef
 })
 </script>
 
@@ -103,11 +117,12 @@ const wrapperBorderClasses = computed(() => {
 
     <!-- Input Box Wrapper -->
     <div
-      class="group relative flex items-center rounded-xl bg-[var(--bg-surface-soft)] border transition-all duration-200"
+      class="group relative flex items-center rounded-xl bg-[var(--bg-surface-soft)] border transition-all duration-200 cursor-text"
       :class="[
         sizeClasses,
         wrapperBorderClasses
       ]"
+      @click="handleWrapperClick"
     >
       <!-- Prefix Slot -->
       <div v-if="$slots.prefix" class="mr-2 flex items-center text-[var(--text-tertiary)] shrink-0">
@@ -117,6 +132,7 @@ const wrapperBorderClasses = computed(() => {
       <!-- Native Input -->
       <input
         :id="inputId"
+        ref="inputRef"
         :name="name || undefined"
         :type="type"
         :value="modelValue"
@@ -125,7 +141,7 @@ const wrapperBorderClasses = computed(() => {
         :readonly="readonly"
         :autocomplete="autocomplete"
         :maxlength="maxlength"
-        class="w-full bg-[var(--bg-surface-soft)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none disabled:cursor-not-allowed border-0 p-0 text-inherit"
+        class="ui-native-input w-full bg-transparent text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none disabled:cursor-not-allowed border-0 p-0 text-inherit"
         @input="handleInput"
         @focus="emit('focus', $event)"
         @blur="emit('blur', $event)"
@@ -163,3 +179,24 @@ const wrapperBorderClasses = computed(() => {
     </p>
   </div>
 </template>
+
+<style scoped>
+.ui-native-input {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  -webkit-appearance: none;
+}
+.ui-native-input::-webkit-outer-spin-button,
+.ui-native-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ui-native-input[type='number'] {
+  -moz-appearance: textfield;
+}
+</style>

@@ -15,7 +15,7 @@ import { RefreshCw } from 'lucide-vue-next'
 import BillingOverviewIcon from '@/components/admin/BillingOverviewIcon.vue'
 import { calculateDiscountedPrice } from '@/utils/billing'
 import { instanceDetailPath } from '@/utils/app-paths'
-import { PageHeader, Card, Button, Input, Select, Badge, EmptyState, Pagination } from '@/components/ui'
+import { PageHeader, Card, Button, Input, Select, Badge, EmptyState, Pagination, Tabs } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
 
 const PaymentProvidersView = defineAsyncComponent(() => import('@/views/admin/PaymentProvidersView.vue'))
@@ -1343,24 +1343,13 @@ function copyToClipboard(text: string) {
     />
 
     <!-- Tab 切换 (Apple 风格分段胶囊控制) -->
-    <div class="mb-6 flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-      <div class="flex items-center gap-1 shrink-0" role="tablist" :aria-label="$t('admin.billing.title')">
-        <button
-          v-for="tab in billingTabs"
-          :key="tab"
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === tab"
-          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          :class="activeTab === tab
-            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
-          @click="switchTab(tab)"
-        >
-          {{ $t(`admin.billing.tabs.${tab}`) }}
-        </button>
-      </div>
-    </div>
+    <Tabs
+      :model-value="activeTab"
+      :tabs="billingTabs.map(tab => ({ key: tab, label: $t(`admin.billing.tabs.${tab}`) }))"
+      :aria-label="$t('admin.billing.title')"
+      class="mb-6"
+      @update:model-value="switchTab($event as any)"
+    />
 
     <!-- 概览 Tab -->
     <div v-show="activeTab === 'overview'">

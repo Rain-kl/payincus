@@ -24,3 +24,6 @@ export type { PageHeaderProps } from './PageHeader.vue'
 
 export { default as Pagination } from './Pagination.vue'
 export type { PaginationProps } from './Pagination.vue'
+
+export { default as Tabs } from './Tabs.vue'
+export type { TabsProps, TabItem, TabsSize } from './Tabs.vue'

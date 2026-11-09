@@ -9,7 +9,7 @@ import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
 import { freeSiteCopy } from '@/utils/freeSiteFun'
 import { instanceDetailPath, walletPath } from '@/utils/app-paths'
 import { useReveal } from '@/composables/useReveal'
-import { PageHeader, Card, Button, Input, Badge, EmptyState, Pagination } from '@/components/ui'
+import { PageHeader, Card, Button, Input, Badge, EmptyState, Pagination, Tabs } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
 import {
   CreditCard,
@@ -995,24 +995,13 @@ function formatAmount() {
     </PageHeader>
 
     <!-- Apple 风格分段导航 (Segmented Tabs) -->
-    <div data-reveal class="flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full tab-scroll-hide shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
-      <div class="flex items-center gap-1 shrink-0" role="tablist" :aria-label="t('wallet.title')">
-        <button
-          v-for="tab in walletTabs"
-          :key="tab.key"
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === tab.key"
-          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          :class="activeTab === tab.key
-            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
-          @click="switchTab(tab.key)"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-    </div>
+    <Tabs
+      data-reveal
+      :model-value="activeTab"
+      :tabs="walletTabs"
+      :aria-label="t('wallet.title')"
+      @update:model-value="switchTab($event as any)"
+    />
 
     <!-- 账户余额 TAB -->
     <div v-show="activeTab === 'balance'" class="space-y-6">

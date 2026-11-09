@@ -18,7 +18,8 @@ import {
   Select,
   Badge,
   Table,
-  EmptyState
+  EmptyState,
+  Tabs
 } from '@/components/ui'
 import type { TableColumn, SelectOption, BadgeVariant } from '@/components/ui'
 import {
@@ -374,37 +375,16 @@ function getBillingCycleSuffix(cycle: string | null | undefined) {
     />
 
     <!-- Apple 风格分段导航 (Segmented Tabs) -->
-    <div
+    <Tabs
       data-reveal
-      class="flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
-    >
-      <div class="flex items-center gap-1 shrink-0" role="tablist" :aria-label="t('mail.title')">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === 'my'"
-          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          :class="activeTab === 'my'
-            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
-          @click="activeTab = 'my'"
-        >
-          {{ t('mail.tabs.my') }}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="activeTab === 'buy'"
-          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
-          :class="activeTab === 'buy'
-            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
-          @click="activeTab = 'buy'"
-        >
-          {{ t('mail.tabs.buy') }}
-        </button>
-      </div>
-    </div>
+      :model-value="activeTab"
+      :tabs="[
+        { key: 'my', label: t('mail.tabs.my') },
+        { key: 'buy', label: t('mail.tabs.buy') }
+      ]"
+      :aria-label="t('mail.title')"
+      @update:model-value="activeTab = $event as any"
+    />
 
     <!-- 加载状态 -->
     <Card v-if="loading" padding="lg" class="text-center">
