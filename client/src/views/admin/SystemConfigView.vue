@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { ExternalLink, Info, Radio, Send } from 'lucide-vue-next'
 import api from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useToast } from '@/stores/toast'
@@ -12,6 +13,14 @@ import {
   systemSettingsSections,
   type SystemSettingsSectionKey
 } from '@/constants/adminSettings'
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  PageHeader,
+  Select
+} from '@/components/ui'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -161,7 +170,6 @@ const configMeta = computed(() => {
     }
   } catch (err) {
     console.error('Config metadata computation failed:', err)
-    // 返回默认值，确保组件能正常渲染
     return {
       default_quota_host: { label: '默认宿主机配额', unit: '个', description: '新用户默认可创建宿主机数量（0 = 未授权）' },
       default_quota_package: { label: '默认套餐配额', unit: '个', description: '新用户默认可创建套餐数量（0 = 未授权）' }
@@ -170,7 +178,6 @@ const configMeta = computed(() => {
 })
 
 // 数字类型的配置键
-// 注意：不再限制实例配额，已删除 default_quota_instance
 const numericConfigKeys = ['default_quota_host', 'default_quota_friend', 'default_quota_package', 'smtp_port', 'free_site_register_gift_points', 'invite_default_expire_days', 'ticket_auto_close_hours']
 
 // 浮点数类型的配置键
@@ -232,7 +239,6 @@ onMounted(async () => {
     } catch (toastErr) {
       console.error('[SystemConfigView] Failed to show toast:', toastErr)
     }
-    // 即使加载失败，也要确保页面能够显示
     loading.value = false
   }
 })
@@ -247,7 +253,6 @@ async function loadConfigs() {
   loading.value = true
   try {
     const response = await api.systemConfig.list()
-
     if (!response || typeof response !== 'object') {
       console.warn('[SystemConfigView] Invalid response format:', response)
       configs.value = []
@@ -289,7 +294,6 @@ async function loadConfigs() {
     } catch (toastErr) {
       console.error('[SystemConfigView] Failed to show toast:', toastErr)
     }
-    // 确保configs是一个空数组，避免后续代码出错
     configs.value = []
   } finally {
     loading.value = false
@@ -314,6 +318,31 @@ async function loadPopupPromoPackages() {
     popupPromoPackagesLoading.value = false
   }
 }
+
+const promoPackageOptions = computed(() => {
+  const options: Array<{ label: string; value: string; disabled?: boolean }> = [
+    {
+      label: popupPromoPackagesLoading.value
+        ? (t('admin.system.popupAnnouncement.promoPackageLoading') || '加载套餐中...')
+        : (t('admin.system.popupAnnouncement.promoPackagePlaceholder') || '请选择促销套餐'),
+      value: ''
+    }
+  ]
+  if (!popupPromoPackagesLoading.value && popupPromoPackages.value.length === 0) {
+    options.push({
+      label: t('admin.system.popupAnnouncement.promoPackageEmpty') || '无可用套餐',
+      value: '',
+      disabled: true
+    })
+  }
+  for (const pkg of popupPromoPackages.value) {
+    options.push({
+      label: `#${pkg.id} · ${pkg.name}`,
+      value: String(pkg.id)
+    })
+  }
+  return options
+})
 
 // 通用保存函数
 async function saveConfigGroup(keys: string[], savingRef: { value: boolean }) {
@@ -684,664 +713,682 @@ async function sendTestEmail() {
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ t('admin.system.title') || '系统设置' }}</h1>
-        <p class="page-description">{{ t(currentSection.descriptionKey) || t('admin.system.description') }}</p>
-      </div>
-    </div>
+  <div class="max-w-6xl mx-auto space-y-6 pb-12">
+    <!-- Apple HIG Page Header -->
+    <PageHeader
+      :title="t('admin.system.title') || '系统设置'"
+      :description="t(currentSection.descriptionKey) || t('admin.system.description')"
+    />
 
-    <div class="grid grid-cols-2 gap-2 border-b border-gray-200 pb-2 dark:border-gray-700 sm:flex sm:gap-0 sm:overflow-x-auto sm:pb-0">
+    <!-- Segmented Navigation Bar -->
+    <nav class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto no-scrollbar shadow-sm">
       <router-link
         v-for="item in systemSettingsNavigationItems"
         :key="item.path"
         :to="item.path"
-        class="min-w-0 rounded-lg border px-3 py-2 text-center text-xs font-medium transition-colors sm:shrink-0 sm:rounded-none sm:border-0 sm:border-b-2 sm:px-4 sm:py-3 sm:text-left sm:text-sm"
+        class="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98] select-none"
         :class="route.path === item.path
-          ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-400 sm:bg-transparent sm:border-primary-500'
-          : 'border-themed text-themed-muted hover:text-themed sm:border-transparent'"
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold border border-[var(--border-color)]/60'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/50 border border-transparent'"
       >
         {{ t(item.labelKey) }}
       </router-link>
+    </nav>
+
+    <!-- Skeleton Loading State -->
+    <div v-if="loading" class="space-y-6 animate-pulse">
+      <Card v-for="i in 3" :key="i" padding="md">
+        <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-4 mb-6">
+          <div class="space-y-2">
+            <div class="h-5 w-40 bg-[var(--bg-surface-soft)] rounded-md"></div>
+            <div class="h-3.5 w-64 bg-[var(--bg-surface-soft)] rounded-md"></div>
+          </div>
+          <div class="h-8 w-20 bg-[var(--bg-surface-soft)] rounded-full"></div>
+        </div>
+        <div class="space-y-4">
+          <div v-for="j in 2" :key="j" class="h-16 bg-[var(--bg-surface-soft)] rounded-xl"></div>
+        </div>
+      </Card>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="card p-6 animate-pulse">
-      <div class="h-6 bg-themed-secondary rounded w-1/4 mb-6"></div>
-      <div class="space-y-4">
-        <div v-for="i in 7" :key="i" class="h-12 bg-themed-secondary rounded"></div>
-      </div>
-    </div>
-
-    <!-- Config Form -->
+    <!-- Main Config Container -->
     <div v-else class="space-y-6">
-      <div v-if="isPopupAnnouncementTab" class="card p-6">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-2">
-          <div>
-            <h3 class="text-themed font-semibold">{{ t('admin.system.popupAnnouncement.title') }}</h3>
-            <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.popupAnnouncement.description') }}</p>
-          </div>
-          <button
-            type="button"
-            class="btn-primary text-sm px-4 py-1.5 shrink-0"
-            :disabled="!hasPopupAnnouncementChanges || savingPopupAnnouncement || form.popup_announcement.length > 5000"
-            @click="savePopupAnnouncement"
-          >
-            {{ savingPopupAnnouncement ? t('admin.system.saving') : t('admin.system.save') }}
-          </button>
-        </div>
-
-        <div class="mt-6 space-y-2">
-          <label class="block text-sm text-themed-secondary">
-            {{ t('admin.system.popupAnnouncement.content') }}
-          </label>
-          <textarea
-            v-model="form.popup_announcement"
-            rows="8"
-            maxlength="5000"
-            class="input min-h-[180px] resize-y"
-            :placeholder="t('admin.system.popupAnnouncement.placeholder')"
-          />
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-xs text-themed-muted">{{ t('admin.system.popupAnnouncement.hint') }}</p>
-            <p class="text-xs tabular-nums" :class="form.popup_announcement.length > 5000 ? 'text-rose-600 dark:text-rose-400' : 'text-themed-muted'">
-              {{ form.popup_announcement.length }}/5000
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="isPopupAnnouncementTab" class="card p-6">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-2">
-          <div>
-            <h3 class="text-themed font-semibold">{{ t('admin.system.popupAnnouncement.promoTitle') }}</h3>
-            <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.popupAnnouncement.promoDescription') }}</p>
-          </div>
-          <button
-            type="button"
-            class="btn-primary text-sm px-4 py-1.5 shrink-0"
-            :disabled="!hasPopupPromoChanges || savingPopupPromo || form.popup_promo_image_url.length > 1000"
-            @click="savePopupPromo"
-          >
-            {{ savingPopupPromo ? t('admin.system.saving') : t('admin.system.save') }}
-          </button>
-        </div>
-
-        <div class="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm text-themed-secondary mb-1.5">
-                {{ t('admin.system.popupAnnouncement.promoImageUrl') }}
-              </label>
-              <input
-                v-model="form.popup_promo_image_url"
-                type="url"
-                maxlength="1000"
-                class="input w-full font-mono text-xs"
-                :placeholder="t('admin.system.popupAnnouncement.promoImagePlaceholder')"
-              />
-              <div class="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-xs text-themed-muted">{{ t('admin.system.popupAnnouncement.promoImageHint') }}</p>
-                <p class="text-xs tabular-nums" :class="form.popup_promo_image_url.length > 1000 ? 'text-rose-600 dark:text-rose-400' : 'text-themed-muted'">
-                  {{ form.popup_promo_image_url.length }}/1000
+      <!-- 弹窗公告与促销 Tab -->
+      <template v-if="isPopupAnnouncementTab">
+        <!-- 弹窗公告内容 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.popupAnnouncement.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.popupAnnouncement.description') }}
                 </p>
               </div>
-            </div>
-
-            <div>
-              <label class="block text-sm text-themed-secondary mb-1.5">
-                {{ t('admin.system.popupAnnouncement.promoPackage') }}
-              </label>
-              <select
-                v-model="form.popup_promo_package_id"
-                class="input w-full"
-                :disabled="popupPromoPackagesLoading"
-              >
-                <option value="">
-                  {{ popupPromoPackagesLoading ? t('admin.system.popupAnnouncement.promoPackageLoading') : t('admin.system.popupAnnouncement.promoPackagePlaceholder') }}
-                </option>
-                <option v-if="!popupPromoPackagesLoading && popupPromoPackages.length === 0" value="" disabled>
-                  {{ t('admin.system.popupAnnouncement.promoPackageEmpty') }}
-                </option>
-                <option v-for="pkg in popupPromoPackages" :key="pkg.id" :value="String(pkg.id)">
-                  #{{ pkg.id }} · {{ pkg.name }}
-                </option>
-              </select>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.popupAnnouncement.promoPackageHint') }}</p>
-            </div>
-          </div>
-
-          <div class="overflow-hidden rounded-xl border border-themed bg-themed-surface shadow-sm">
-            <div class="max-h-[360px] min-h-[160px] flex items-center justify-center overflow-hidden bg-themed-secondary/60">
-              <img
-                v-if="form.popup_promo_image_url"
-                :src="form.popup_promo_image_url"
-                :alt="selectedPopupPromoPackage?.name || t('admin.system.popupAnnouncement.promoPreview')"
-                class="max-h-[360px] max-w-full object-contain"
-              />
-              <div v-else class="px-6 text-center text-sm text-themed-muted">
-                {{ t('admin.system.popupAnnouncement.promoPreviewEmpty') }}
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasPopupAnnouncementChanges || savingPopupAnnouncement || form.popup_announcement.length > 5000"
+                  :loading="savingPopupAnnouncement"
+                  @click="savePopupAnnouncement"
+                >
+                  {{ savingPopupAnnouncement ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
               </div>
             </div>
-            <div class="border-t border-themed p-4">
-              <p class="text-2xs font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-400">{{ t('admin.system.popupAnnouncement.promoPreview') }}</p>
-              <p class="mt-1.5 text-sm font-semibold text-themed truncate">
-                {{ selectedPopupPromoPackage?.name || t('admin.system.popupAnnouncement.promoNoPackage') }}
+          </template>
+
+          <div class="space-y-2">
+            <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+              {{ t('admin.system.popupAnnouncement.content') }}
+            </label>
+            <textarea
+              v-model="form.popup_announcement"
+              rows="8"
+              maxlength="5000"
+              class="w-full min-h-[180px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 resize-y transition-all"
+              :placeholder="t('admin.system.popupAnnouncement.placeholder')"
+            />
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-[var(--text-secondary)]">
+              <p>{{ t('admin.system.popupAnnouncement.hint') }}</p>
+              <p class="tabular-nums font-medium" :class="form.popup_announcement.length > 5000 ? 'text-[var(--error)]' : 'text-[var(--text-tertiary)]'">
+                {{ form.popup_announcement.length }}/5000
               </p>
-              <button type="button" class="btn-primary w-full mt-3 text-sm" disabled>
-                {{ t('popupAnnouncement.buyNow', { name: selectedPopupPromoPackage?.name || t('admin.system.popupAnnouncement.promoPackageFallback') }) }}
-              </button>
             </div>
           </div>
-        </div>
-      </div>
+        </Card>
 
-      <template v-else>
-        <div v-if="isOperationsSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-2">
-            <div>
-              <h3 class="text-themed font-semibold">平台权限白名单</h3>
-              <p class="text-sm text-themed-muted mt-1">配置高风险后台能力允许操作的管理员 UID。多个 UID 用英文逗号分隔，环境变量会作为兜底白名单合并生效。</p>
+        <!-- 弹窗促销套餐推荐 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.popupAnnouncement.promoTitle') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.popupAnnouncement.promoDescription') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasPopupPromoChanges || savingPopupPromo || form.popup_promo_image_url.length > 1000"
+                  :loading="savingPopupPromo"
+                  @click="savePopupPromo"
+                >
+                  {{ savingPopupPromo ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasPlatformPermissionChanges || savingPlatformPermissions"
-              @click="savePlatformPermissions"
-            >
-              {{ savingPlatformPermissions ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
+          </template>
 
-          <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">OTA 更新管理员 UID</label>
-              <input v-model="form.system_update_allowed_admin_ids" type="text" class="input font-mono" placeholder="1,2,3" />
-              <p class="text-xs text-themed-muted">控制版本检查后的在线更新、回滚等高风险操作。留空时仅 admin 用户名可操作。</p>
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">礼品卡管理员 UID</label>
-              <input v-model="form.payincus_gift_card_admin_ids" type="text" class="input font-mono" placeholder="1,2,3" />
-              <p class="text-xs text-themed-muted">留空时所有管理员可操作；配置后仅白名单内的管理员可生成、禁用或删除礼品卡。</p>
-            </div>
-          </div>
-        </div>
-
-
-
-        <!-- Registration settings -->
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.registration') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.registrationDesc') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasRegistrationChanges || savingRegistration"
-              @click="saveRegistration"
-            >
-              {{ savingRegistration ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50 mb-4">
-            <div class="flex-1">
-              <label class="text-sm font-medium text-themed">{{ t('admin.system.registrationEnabled') }}</label>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.registrationEnabledDesc') }}</p>
-            </div>
-            <div class="flex items-center gap-3 ml-4">
-              <span class="text-xs" :class="form.registration_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                {{ t('admin.system.registrationClosed') }}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="form.registration_enabled"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="[
-                  form.registration_enabled
-                    ? 'bg-accent focus:ring-accent'
-                    : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                ]"
-                @click="form.registration_enabled = !form.registration_enabled"
-              >
-                <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.registration_enabled ? 'translate-x-5' : 'translate-x-0'"
+          <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div class="space-y-5">
+              <div class="space-y-1.5">
+                <Input
+                  v-model="form.popup_promo_image_url"
+                  type="url"
+                  :maxlength="1000"
+                  class="font-mono text-xs"
+                  :label="t('admin.system.popupAnnouncement.promoImageUrl')"
+                  :placeholder="t('admin.system.popupAnnouncement.promoImagePlaceholder')"
                 />
-              </button>
-              <span class="text-xs" :class="form.registration_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                {{ t('admin.system.registrationOpen') }}
-              </span>
-            </div>
-          </div>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-[var(--text-secondary)]">
+                  <p>{{ t('admin.system.popupAnnouncement.promoImageHint') }}</p>
+                  <p class="tabular-nums font-medium" :class="form.popup_promo_image_url.length > 1000 ? 'text-[var(--error)]' : 'text-[var(--text-tertiary)]'">
+                    {{ form.popup_promo_image_url.length }}/1000
+                  </p>
+                </div>
+              </div>
 
-          <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50">
-            <div class="flex-1">
-              <label class="text-sm font-medium text-themed">{{ t('admin.system.requireInviteCode') }}</label>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.requireInviteCodeDesc') }}</p>
-            </div>
-            <div class="flex items-center gap-3 ml-4">
-              <span class="text-xs" :class="form.require_invite_code ? 'text-themed-muted' : 'text-themed font-medium'">
-                {{ t('admin.system.openRegistration') }}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="form.require_invite_code"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="[
-                  form.require_invite_code
-                    ? 'bg-accent focus:ring-accent'
-                    : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                ]"
-                @click="form.require_invite_code = !form.require_invite_code"
-              >
-                <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.require_invite_code ? 'translate-x-5' : 'translate-x-0'"
+              <div class="space-y-1.5">
+                <Select
+                  v-model="form.popup_promo_package_id"
+                  :options="promoPackageOptions"
+                  :disabled="popupPromoPackagesLoading"
+                  :label="t('admin.system.popupAnnouncement.promoPackage')"
+                  :hint="t('admin.system.popupAnnouncement.promoPackageHint')"
                 />
-              </button>
-              <span class="text-xs" :class="form.require_invite_code ? 'text-themed font-medium' : 'text-themed-muted'">
-                {{ t('admin.system.inviteOnly') }}
-              </span>
+              </div>
+            </div>
+
+            <!-- Apple Style Live Preview Card -->
+            <div class="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-sm flex flex-col">
+              <div class="h-48 flex items-center justify-center overflow-hidden bg-[var(--bg-surface-soft)] p-4">
+                <img
+                  v-if="form.popup_promo_image_url"
+                  :src="form.popup_promo_image_url"
+                  :alt="selectedPopupPromoPackage?.name || t('admin.system.popupAnnouncement.promoPreview')"
+                  class="max-h-full max-w-full object-contain rounded-lg"
+                />
+                <div v-else class="px-6 text-center text-xs text-[var(--text-tertiary)]">
+                  {{ t('admin.system.popupAnnouncement.promoPreviewEmpty') }}
+                </div>
+              </div>
+              <div class="border-t border-[var(--border-color)] p-4 space-y-3 mt-auto bg-[var(--bg-surface)]">
+                <div class="flex items-center justify-between">
+                  <Badge variant="info" size="sm">
+                    {{ t('admin.system.popupAnnouncement.promoPreview') }}
+                  </Badge>
+                </div>
+                <p class="text-sm font-semibold text-[var(--text-primary)] truncate">
+                  {{ selectedPopupPromoPackage?.name || t('admin.system.popupAnnouncement.promoNoPackage') }}
+                </p>
+                <Button variant="primary" size="sm" block disabled class="opacity-80">
+                  {{ t('popupAnnouncement.buyNow', { name: selectedPopupPromoPackage?.name || t('admin.system.popupAnnouncement.promoPackageFallback') }) }}
+                </Button>
+              </div>
             </div>
           </div>
+        </Card>
+      </template>
 
-        </div>
-
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.affRates.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.affRates.description') }}</p>
+      <!-- 运营配置 Tab -->
+      <template v-else-if="isOperationsSection">
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  平台权限白名单
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  配置高风险后台能力允许操作的管理员 UID。多个 UID 用英文逗号分隔，环境变量会作为兜底白名单合并生效。
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasPlatformPermissionChanges || savingPlatformPermissions"
+                  :loading="savingPlatformPermissions"
+                  @click="savePlatformPermissions"
+                >
+                  {{ savingPlatformPermissions ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasAffRateChanges || savingAffRates"
-              @click="saveAffRates"
-            >
-              {{ savingAffRates ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
+          </template>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">{{ t('admin.system.affRates.commissionRate') }}</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Input
+              v-model="form.system_update_allowed_admin_ids"
+              type="text"
+              class="font-mono"
+              label="OTA 更新管理员 UID"
+              hint="控制版本检查后的在线更新、回滚等高风险操作。留空时仅 admin 用户名可操作。"
+              placeholder="1,2,3"
+            />
+            <Input
+              v-model="form.payincus_gift_card_admin_ids"
+              type="text"
+              class="font-mono"
+              label="礼品卡管理员 UID"
+              hint="留空时所有管理员可操作；配置后仅白名单内的管理员可生成、禁用或删除礼品卡。"
+              placeholder="1,2,3"
+            />
+          </div>
+        </Card>
+      </template>
+
+      <!-- 访问与注册 Tab -->
+      <template v-else-if="isAccessSection">
+        <!-- 注册设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.registration') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.registrationDesc') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasRegistrationChanges || savingRegistration"
+                  :loading="savingRegistration"
+                  @click="saveRegistration"
+                >
+                  {{ savingRegistration ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <!-- 开放注册开关 -->
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">
+                  {{ t('admin.system.registrationEnabled') }}
+                </label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.registrationEnabledDesc') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.registration_enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
+                  {{ t('admin.system.registrationClosed') }}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="form.registration_enabled"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.registration_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.registration_enabled = !form.registration_enabled"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.registration_enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
+                </button>
+                <span class="text-xs font-medium" :class="form.registration_enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
+                  {{ t('admin.system.registrationOpen') }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 强制邀请码开关 -->
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">
+                  {{ t('admin.system.requireInviteCode') }}
+                </label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.requireInviteCodeDesc') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.require_invite_code ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
+                  {{ t('admin.system.openRegistration') }}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="form.require_invite_code"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.require_invite_code ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.require_invite_code = !form.require_invite_code"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.require_invite_code ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
+                </button>
+                <span class="text-xs font-medium" :class="form.require_invite_code ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
+                  {{ t('admin.system.inviteOnly') }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <!-- 推广返利比例 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.affRates.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.affRates.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasAffRateChanges || savingAffRates"
+                  :loading="savingAffRates"
+                  @click="saveAffRates"
+                >
+                  {{ savingAffRates ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="space-y-1.5">
+              <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                {{ t('admin.system.affRates.commissionRate') }}
+              </label>
               <input
                 v-model.number="form.aff_commission_rate"
                 type="number"
                 min="0"
                 :max="MAX_AFF_COMMISSION_RATE"
                 step="0.01"
-                class="input tabular-nums"
+                class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
               />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.affRates.commissionRateHint') }}</p>
+              <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.affRates.commissionRateHint') }}</p>
             </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">{{ t('admin.system.affRates.discountRate') }}</label>
+
+            <div class="space-y-1.5">
+              <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                {{ t('admin.system.affRates.discountRate') }}
+              </label>
               <input
                 v-model.number="form.aff_discount_rate"
                 type="number"
                 min="0"
                 :max="MAX_AFF_DISCOUNT_RATE"
                 step="0.01"
-                class="input tabular-nums"
+                class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
               />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.affRates.discountRateHint') }}</p>
+              <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.affRates.discountRateHint') }}</p>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.vipBenefits.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.vipBenefits.description') }}</p>
+        <!-- VIP 会员权益配置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.vipBenefits.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.vipBenefits.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasVipBenefitsChanges || savingVipBenefits"
+                  :loading="savingVipBenefits"
+                  @click="saveVipBenefits"
+                >
+                  {{ savingVipBenefits ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasVipBenefitsChanges || savingVipBenefits"
-              @click="saveVipBenefits"
-            >
-              {{ savingVipBenefits ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
+          </template>
 
           <div class="space-y-3">
             <div
               v-for="level in 5"
               :key="level"
-              class="grid grid-cols-1 gap-3 rounded-lg bg-themed-secondary/50 p-4 md:grid-cols-4 md:items-end"
+              class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 grid grid-cols-1 md:grid-cols-4 gap-4 items-center"
             >
-              <div class="inline-flex w-fit items-center rounded-md bg-primary-500/10 px-2 py-1 text-xs font-semibold font-mono tabular-nums text-primary-600 dark:text-primary-400">VIP {{ level }}</div>
-              <label class="space-y-1 text-sm text-themed-secondary">
-                <span>{{ t('admin.system.vipBenefits.orderDiscount') }}</span>
-                <input
-                  v-model.number="form.vip_benefits_config.levels[String(level)].orderDiscountPercent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  class="input tabular-nums"
-                />
-              </label>
-              <label class="space-y-1 text-sm text-themed-secondary">
-                <span>{{ t('admin.system.vipBenefits.extraTraffic') }}</span>
-                <input
-                  v-model.number="form.vip_benefits_config.levels[String(level)].extraTrafficPercent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  class="input tabular-nums"
-                />
-              </label>
-              <label class="space-y-1 text-sm text-themed-secondary">
-                <span>{{ t('admin.system.vipBenefits.resourcePoolBonus') }}</span>
-                <input
-                  v-model.number="form.vip_benefits_config.levels[String(level)].resourcePoolBonusPercent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  class="input tabular-nums"
-                />
-              </label>
-            </div>
-          </div>
-          <p class="mt-4 text-xs text-themed-muted">{{ t('admin.system.vipBenefits.arbitrationHint') }}</p>
-        </div>
-
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">邀请码生成定价</h3>
-              <p class="text-sm text-themed-muted mt-1">配置普通用户生成一个邀请码需要消耗的资源。当前支持余额和积分，价格保存为可扩展的成本项列表。</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasInvitePricingChanges || savingInvitePricing"
-              @click="saveInvitePricing"
-            >
-              {{ savingInvitePricing ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-2">
-            <div
-              v-for="option in form.invite_generation_costs"
-              :key="option.resource"
-              class="rounded-lg bg-themed-secondary/50 p-4"
-            >
-              <div class="flex items-center justify-between gap-4">
-                <div>
-                  <label class="text-sm font-medium text-themed">
-                    {{ option.resource === 'balance' ? '余额生成' : option.resource === 'points' ? '积分生成' : option.resource }}
-                  </label>
-                  <p class="mt-1 text-xs text-themed-muted">
-                    {{ option.resource === 'balance' ? '用户每生成 1 个邀请码扣除账户余额' : '用户每生成 1 个邀请码扣除积分' }}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  :aria-checked="option.enabled"
-                  class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  :class="option.enabled ? 'bg-accent focus:ring-accent' : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'"
-                  @click="option.enabled = !option.enabled"
-                >
-                  <span
-                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                    :class="option.enabled ? 'translate-x-5' : 'translate-x-0'"
-                  />
-                </button>
+              <div class="flex items-center gap-2">
+                <Badge variant="info" size="md">VIP {{ level }}</Badge>
               </div>
-
-              <div class="mt-4">
-                <label class="block text-xs text-themed-muted mb-1.5">
-                  {{ option.resource === 'balance' ? '单个价格（元）' : '单个价格（积分）' }}
+              <div class="space-y-1">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                  {{ t('admin.system.vipBenefits.orderDiscount') }}
                 </label>
-                <div class="relative max-w-xs">
-                  <span v-if="option.resource === 'balance'" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-themed-muted">¥</span>
+                <div class="relative flex items-center">
                   <input
-                    v-model.number="option.amount"
+                    v-model.number="form.vip_benefits_config.levels[String(level)].orderDiscountPercent"
                     type="number"
                     min="0"
-                    :step="option.resource === 'balance' ? '0.01' : '1'"
-                    class="input tabular-nums"
-                    :class="option.resource === 'balance' ? 'pl-8' : ''"
+                    max="100"
+                    step="0.01"
+                    class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 pr-8 tabular-nums transition-all"
                   />
+                  <span class="absolute right-3 text-xs text-[var(--text-tertiary)] select-none pointer-events-none">%</span>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                  {{ t('admin.system.vipBenefits.extraTraffic') }}
+                </label>
+                <div class="relative flex items-center">
+                  <input
+                    v-model.number="form.vip_benefits_config.levels[String(level)].extraTrafficPercent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 pr-8 tabular-nums transition-all"
+                  />
+                  <span class="absolute right-3 text-xs text-[var(--text-tertiary)] select-none pointer-events-none">%</span>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                  {{ t('admin.system.vipBenefits.resourcePoolBonus') }}
+                </label>
+                <div class="relative flex items-center">
+                  <input
+                    v-model.number="form.vip_benefits_config.levels[String(level)].resourcePoolBonusPercent"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 pr-8 tabular-nums transition-all"
+                  />
+                  <span class="absolute right-3 text-xs text-[var(--text-tertiary)] select-none pointer-events-none">%</span>
                 </div>
               </div>
             </div>
           </div>
+          <p class="mt-4 text-xs text-[var(--text-tertiary)]">{{ t('admin.system.vipBenefits.arbitrationHint') }}</p>
+        </Card>
 
-          <div class="mt-5 space-y-2">
-            <label class="block text-sm text-themed-secondary">默认有效期</label>
-            <div class="relative max-w-xs">
-              <input
-                v-model.number="form.invite_default_expire_days"
-                type="number"
-                min="0"
-                max="3650"
-                step="1"
-                class="input pr-12 tabular-nums"
-              />
-              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-themed-muted">天</span>
+        <!-- 邀请码生成定价 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  邀请码生成定价
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  配置普通用户生成一个邀请码需要消耗的资源。当前支持余额和积分，价格保存为可扩展的成本项列表。
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasInvitePricingChanges || savingInvitePricing"
+                  :loading="savingInvitePricing"
+                  @click="saveInvitePricing"
+                >
+                  {{ savingInvitePricing ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <p class="text-xs text-themed-muted">0 表示用户生成的邀请码永不过期。</p>
-          </div>
-        </div>
+          </template>
 
-        <!-- Transfer Settings -->
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.transfer.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.transfer.description') }}</p>
+          <div class="space-y-5">
+            <div class="grid gap-4 lg:grid-cols-2">
+              <div
+                v-for="option in form.invite_generation_costs"
+                :key="option.resource"
+                class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 space-y-4"
+              >
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <label class="text-sm font-semibold text-[var(--text-primary)]">
+                      {{ option.resource === 'balance' ? '余额生成' : option.resource === 'points' ? '积分生成' : option.resource }}
+                    </label>
+                    <p class="mt-0.5 text-xs text-[var(--text-secondary)]">
+                      {{ option.resource === 'balance' ? '用户每生成 1 个邀请码扣除账户余额' : '用户每生成 1 个邀请码扣除积分' }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="option.enabled"
+                    class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                    :class="option.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                    @click="option.enabled = !option.enabled"
+                  >
+                    <span
+                      class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                      :class="option.enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                    />
+                  </button>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
+                    {{ option.resource === 'balance' ? '单个价格（元）' : '单个价格（积分）' }}
+                  </label>
+                  <div class="relative max-w-xs flex items-center">
+                    <span v-if="option.resource === 'balance'" class="absolute left-3.5 text-sm font-medium text-[var(--text-tertiary)] pointer-events-none select-none">¥</span>
+                    <input
+                      v-model.number="option.amount"
+                      type="number"
+                      min="0"
+                      :step="option.resource === 'balance' ? '0.01' : '1'"
+                      class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
+                      :class="option.resource === 'balance' ? 'pl-8 pr-3.5' : 'px-3.5'"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasTransferChanges || savingTransfer"
-              @click="saveTransfer"
-            >
-              {{ savingTransfer ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
 
-          <div class="space-y-2">
-            <label class="block text-sm text-themed-secondary">
+            <div class="space-y-1.5 max-w-sm pt-2">
+              <label class="block text-xs font-semibold text-[var(--text-secondary)]">默认有效期</label>
+              <div class="relative flex items-center">
+                <input
+                  v-model.number="form.invite_default_expire_days"
+                  type="number"
+                  min="0"
+                  max="3650"
+                  step="1"
+                  class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 pr-12 tabular-nums transition-all"
+                />
+                <span class="absolute right-3.5 text-xs text-[var(--text-tertiary)] select-none pointer-events-none">天</span>
+              </div>
+              <p class="text-xs text-[var(--text-tertiary)]">0 表示用户生成的邀请码永不过期。</p>
+            </div>
+          </div>
+        </Card>
+
+        <!-- 转移设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.transfer.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.transfer.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasTransferChanges || savingTransfer"
+                  :loading="savingTransfer"
+                  @click="saveTransfer"
+                >
+                  {{ savingTransfer ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-1.5 max-w-sm">
+            <label class="block text-xs font-semibold text-[var(--text-secondary)]">
               {{ t('admin.system.transfer.feeLabel') }}
             </label>
-            <div class="relative max-w-xs">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-themed-muted">¥</span>
+            <div class="relative flex items-center">
+              <span class="absolute left-3.5 text-sm font-medium text-[var(--text-tertiary)] pointer-events-none select-none">¥</span>
               <input
                 v-model.number="form.transfer_fee"
                 type="number"
                 min="0"
                 :max="MAX_TRANSFER_FEE"
                 step="0.01"
-                class="input pl-8 pr-12 tabular-nums"
+                class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] pl-8 pr-12 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
                 placeholder="0.00"
               />
-              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-themed-muted">
+              <span class="absolute right-3.5 text-xs text-[var(--text-tertiary)] pointer-events-none select-none">
                 {{ t('admin.system.transfer.feeUnit') }}
               </span>
             </div>
-            <p class="text-xs text-themed-muted">{{ t('admin.system.transfer.feeDesc') }}</p>
+            <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.transfer.feeDesc') }}</p>
           </div>
-        </div>
+        </Card>
 
-        <!-- Footer Contact Settings -->
-        <div v-if="isBrandSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.footerLinks.title') || '底部联系方式' }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.footerLinks.description') || '配置侧边栏底部的邮箱按钮' }}</p>
+        <!-- 免单模式与注册赠金 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.freeSite.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.freeSite.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasFreeSiteChanges || savingFreeSite"
+                  :loading="savingFreeSite"
+                  @click="saveFreeSite"
+                >
+                  {{ savingFreeSite ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasFooterLinkChanges || savingFooterLinks"
-              @click="saveFooterLinks"
-            >
-              {{ savingFooterLinks ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.footerLinks.email') || '联系邮箱' }}
-              </label>
-              <input
-                v-model="form.footer_contact_email"
-                type="text"
-                class="input font-mono"
-                :placeholder="t('admin.system.footerLinks.emailPlaceholder') || 'support@example.com 或 mailto:support@example.com'"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.footerLinks.emailDesc') || '留空则隐藏邮箱按钮；支持填写邮箱地址或完整 mailto: 链接。' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Brand Settings -->
-        <div v-if="isBrandSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.brand.title') || '品牌设置' }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.brand.description') || '配置站点顶部、登录页、SEO 等位置使用的系统名称与 Logo。留空则使用默认值。' }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasBrandChanges || savingBrand"
-              @click="saveBrand"
-            >
-              {{ savingBrand ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.brand.name') || '系统名称' }}
-              </label>
-              <input
-                v-model="form.brand_name"
-                type="text"
-                class="input"
-                placeholder="Incudal"
-              />
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.brand.subtitle') || '网站副标题' }}
-              </label>
-              <input
-                v-model="form.brand_subtitle"
-                type="text"
-                class="input"
-                :placeholder="t('admin.system.brand.subtitlePlaceholder') || '基于 Incus 的低价 NAT VPS'"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.brand.subtitleDesc') || '显示在公开站头部/底部、浏览器默认标题和 SEO 默认描述中。' }}</p>
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.brand.logo') || 'Logo 地址' }}
-              </label>
-              <input
-                v-model="form.brand_logo_url"
-                type="text"
-                class="input font-mono"
-                placeholder="/logo.svg"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.brand.logoDesc') || '支持 http(s) 图片地址或站点内绝对路径。' }}</p>
-            </div>
-            <div class="space-y-2 md:col-span-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.brand.copyright') || '版权所有' }}
-              </label>
-              <input
-                v-model="form.brand_copyright"
-                type="text"
-                class="input"
-                placeholder="版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.brand.copyrightDesc') || '显示在页面底部的版权所有文案，留空则使用默认值。' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Free Site Settings -->
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.freeSite.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.freeSite.description') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasFreeSiteChanges || savingFreeSite"
-              @click="saveFreeSite"
-            >
-              {{ savingFreeSite ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
+          </template>
 
           <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50">
-              <div class="flex-1">
-                <label class="text-sm font-medium text-themed">{{ t('admin.system.freeSite.enable') }}</label>
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.freeSite.enableDesc') }}</p>
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.freeSite.enable') }}</label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.freeSite.enableDesc') }}</p>
               </div>
-              <div class="flex items-center gap-3 ml-4">
-                <span class="text-xs" :class="form.free_site_mode ? 'text-themed-muted' : 'text-themed font-medium'">
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.free_site_mode ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
                   {{ t('admin.system.freeSite.disabled') }}
                 </span>
                 <button
                   type="button"
                   role="switch"
                   :aria-checked="form.free_site_mode"
-                  class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  :class="[
-                    form.free_site_mode
-                      ? 'bg-accent focus:ring-accent'
-                      : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                  ]"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.free_site_mode ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
                   @click="toggleFreeSiteMode"
                 >
                   <span
-                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                    :class="form.free_site_mode ? 'translate-x-5' : 'translate-x-0'"
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.free_site_mode ? 'translate-x-5' : 'translate-x-0.5'"
                   />
                 </button>
-                <span class="text-xs" :class="form.free_site_mode ? 'text-themed font-medium' : 'text-themed-muted'">
+                <span class="text-xs font-medium" :class="form.free_site_mode ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
                   {{ t('admin.system.freeSite.enabled') }}
                 </span>
               </div>
             </div>
 
             <div
-              class="space-y-4 p-4 rounded-lg bg-themed-secondary/50 transition-opacity"
-              :class="form.free_site_mode ? 'opacity-100' : 'opacity-60'"
+              class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 space-y-4 transition-all duration-300"
+              :class="form.free_site_mode ? 'opacity-100' : 'opacity-50 pointer-events-none'"
             >
               <div class="flex items-center justify-between">
-                <div class="flex-1">
-                  <label class="text-sm font-medium text-themed">{{ t('admin.system.freeSite.registerGift') }}</label>
-                  <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.freeSite.registerGiftDesc') }}</p>
+                <div class="flex-1 pr-4">
+                  <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.freeSite.registerGift') }}</label>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.freeSite.registerGiftDesc') }}</p>
                 </div>
-                <div class="flex items-center gap-3 ml-4">
-                  <span class="text-xs" :class="form.free_site_register_gift_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
+                <div class="flex items-center gap-3 shrink-0">
+                  <span class="text-xs font-medium" :class="form.free_site_register_gift_enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
                     {{ t('admin.system.freeSite.giftDisabled') }}
                   </span>
                   <button
@@ -1349,700 +1396,827 @@ async function sendTestEmail() {
                     role="switch"
                     :aria-checked="form.free_site_register_gift_enabled && form.free_site_mode"
                     :disabled="!form.free_site_mode"
-                    class="relative inline-flex h-7 w-12 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed"
-                    :class="[
-                      form.free_site_mode && form.free_site_register_gift_enabled
-                        ? 'bg-accent focus:ring-accent cursor-pointer'
-                        : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400',
-                      form.free_site_mode ? 'cursor-pointer' : 'cursor-not-allowed'
-                    ]"
+                    class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                    :class="form.free_site_mode && form.free_site_register_gift_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
                     @click="toggleFreeSiteRegisterGift"
                   >
                     <span
-                      class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                      :class="form.free_site_mode && form.free_site_register_gift_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                      :class="form.free_site_mode && form.free_site_register_gift_enabled ? 'translate-x-5' : 'translate-x-0.5'"
                     />
                   </button>
-                  <span class="text-xs" :class="form.free_site_mode && form.free_site_register_gift_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
+                  <span class="text-xs font-medium" :class="form.free_site_mode && form.free_site_register_gift_enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
                     {{ t('admin.system.freeSite.giftEnabled') }}
                   </span>
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="space-y-2">
-                  <label class="block text-sm text-themed-secondary">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)]">
                     {{ t('admin.system.freeSite.giftBalance') }}
                   </label>
-                  <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-themed-muted">¥</span>
+                  <div class="relative flex items-center">
+                    <span class="absolute left-3.5 text-sm font-medium text-[var(--text-tertiary)] pointer-events-none select-none">¥</span>
                     <input
                       v-model.number="form.free_site_register_gift_balance"
                       type="number"
                       min="0"
                       step="0.01"
-                      class="input pl-8 tabular-nums"
+                      class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] pl-8 pr-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
                       placeholder="0.00"
                       :disabled="!form.free_site_mode || !form.free_site_register_gift_enabled"
                     />
                   </div>
-                  <p class="text-xs text-themed-muted">{{ t('admin.system.freeSite.giftBalanceDesc') }}</p>
+                  <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.freeSite.giftBalanceDesc') }}</p>
                 </div>
 
-                <div class="space-y-2">
-                  <label class="block text-sm text-themed-secondary">
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)]">
                     {{ t('admin.system.freeSite.giftPoints') }}
                   </label>
-                  <input
-                    v-model.number="form.free_site_register_gift_points"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="input tabular-nums"
-                    placeholder="0"
-                    :disabled="!form.free_site_mode || !form.free_site_register_gift_enabled"
-                  />
-                  <p class="text-xs text-themed-muted">{{ t('admin.system.freeSite.giftPointsDesc') }}</p>
+                  <div class="relative flex items-center">
+                    <input
+                      v-model.number="form.free_site_register_gift_points"
+                      type="number"
+                      min="0"
+                      step="1"
+                      class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
+                      placeholder="0"
+                      :disabled="!form.free_site_mode || !form.free_site_register_gift_enabled"
+                    />
+                  </div>
+                  <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.freeSite.giftPointsDesc') }}</p>
                 </div>
               </div>
 
-              <p v-if="!form.free_site_mode" class="text-xs text-themed-muted">
+              <p v-if="!form.free_site_mode" class="text-xs text-[var(--text-tertiary)]">
                 {{ t('admin.system.freeSite.giftRequiresFreeSite') }}
               </p>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <!-- Ticket Settings -->
-        <div v-if="isTicketSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.ticket.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.ticket.description') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasTicketChanges || savingTicket"
-              @click="saveTicket"
-            >
-              {{ savingTicket ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50">
-            <div class="flex-1">
-              <label class="text-sm font-medium text-themed">{{ t('admin.system.ticket.enable') }}</label>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.ticket.enableDesc') }}</p>
-            </div>
-            <div class="flex items-center gap-3 ml-4">
-              <span class="text-xs" :class="form.ticket_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                {{ t('admin.system.ticket.disabled') }}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="form.ticket_enabled"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="[
-                  form.ticket_enabled
-                    ? 'bg-accent focus:ring-accent'
-                    : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                ]"
-                @click="form.ticket_enabled = !form.ticket_enabled"
-              >
-                <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.ticket_enabled ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-              <span class="text-xs" :class="form.ticket_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                {{ t('admin.system.ticket.enabled') }}
-              </span>
-            </div>
-          </div>
-
-          <div class="mt-4 p-4 rounded-lg bg-themed-secondary/50 space-y-4">
-            <div class="flex items-center justify-between">
-              <div class="flex-1">
-                <label class="text-sm font-medium text-themed">{{ t('admin.system.ticket.autoClose') }}</label>
-                <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.ticket.autoCloseDesc') }}</p>
+        <!-- 用户默认配额 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.defaultQuota') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.defaultQuotaDesc') }}
+                </p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="form.ticket_auto_close_enabled"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="form.ticket_auto_close_enabled ? 'bg-accent focus:ring-accent' : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'"
-                @click="form.ticket_auto_close_enabled = !form.ticket_auto_close_enabled"
-              >
-                <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.ticket_auto_close_enabled ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasQuotaChanges || savingQuota"
+                  :loading="savingQuota"
+                  @click="saveQuota"
+                >
+                  {{ savingQuota ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
+          </template>
 
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">{{ t('admin.system.ticket.autoCloseHours') }}</label>
-              <input
-                v-model.number="form.ticket_auto_close_hours"
-                type="number"
-                min="1"
-                step="1"
-                class="input tabular-nums"
-                :disabled="!form.ticket_auto_close_enabled"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.ticket.autoCloseHoursDesc') }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Ticket Image Settings -->
-        <div v-if="isTicketSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.ticketImages.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.ticketImages.description') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasTicketImageChanges || savingTicketImages"
-              @click="saveTicketImages"
-            >
-              {{ savingTicketImages ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.ticketImages.baseUrl') }}
-              </label>
-              <input
-                v-model="form.ticket_image_lsky_base_url"
-                type="text"
-                class="input font-mono"
-                :placeholder="t('admin.system.ticketImages.baseUrlPlaceholder')"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.ticketImages.baseUrlDesc') }}</p>
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.ticketImages.token') }}
-              </label>
-              <input
-                v-model="form.ticket_image_lsky_token"
-                type="password"
-                class="input font-mono"
-                :placeholder="t('admin.system.ticketImages.tokenPlaceholder')"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.ticketImages.tokenDesc') }}</p>
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.ticketImages.apiVersion') }}
-              </label>
-              <select v-model="form.ticket_image_lsky_api_version" class="input">
-                <option value="v1">v1</option>
-                <option value="v2">v2</option>
-              </select>
-              <p class="text-xs text-themed-muted">{{ t('admin.system.ticketImages.apiVersionDesc') }}</p>
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.ticketImages.targetId') }}
-              </label>
-              <input
-                v-model="form.ticket_image_lsky_target_id"
-                type="text"
-                class="input font-mono"
-                :placeholder="t('admin.system.ticketImages.targetIdPlaceholder')"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.ticketImages.targetIdDesc') }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Default user quota -->
-        <div v-if="isAccessSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.defaultQuota') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.defaultQuotaDesc') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasQuotaChanges || savingQuota"
-              @click="saveQuota"
-            >
-              {{ savingQuota ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div v-for="(meta, key) in configMeta" :key="key" class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div v-for="(meta, key) in configMeta" :key="key" class="space-y-1.5">
+              <label class="block text-xs font-semibold text-[var(--text-secondary)]">
                 {{ meta.label }}
               </label>
-              <div class="relative">
+              <div class="relative flex items-center">
                 <input
                   v-model.number="(form as any)[key]"
                   type="number"
                   min="0"
-                  class="input pr-12 tabular-nums"
+                  class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 pr-12 tabular-nums transition-all"
                   :placeholder="meta.label"
                 />
-                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-themed-muted">
+                <span class="absolute right-3.5 text-xs text-[var(--text-tertiary)] select-none pointer-events-none">
                   {{ meta.unit }}
                 </span>
               </div>
-              <p class="text-xs text-themed-muted">{{ meta.description }}</p>
+              <p class="text-xs text-[var(--text-tertiary)]">{{ meta.description }}</p>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <!-- Turnstile Settings -->
-        <div v-if="isSecuritySection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.turnstile.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.turnstile.description') }}</p>
-            </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasTurnstileChanges || savingTurnstile"
-              @click="saveTurnstile"
-            >
-              {{ savingTurnstile ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
+        <!-- 补充说明卡片 -->
+        <Card padding="md">
+          <div class="flex items-center gap-2 mb-4">
+            <Info class="w-4 h-4 text-[var(--accent)]" />
+            <h3 class="text-base font-semibold text-[var(--text-primary)]">
+              {{ t('admin.system.notes') }}
+            </h3>
           </div>
-
-          <!-- Enable Toggle -->
-          <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50 mb-6">
-            <div class="flex-1">
-              <label class="text-sm font-medium text-themed">{{ t('admin.system.turnstile.enable') }}</label>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.turnstile.enableDesc') }}</p>
+          <div class="space-y-3 text-sm text-[var(--text-secondary)]">
+            <div class="flex items-start gap-2.5">
+              <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+              <span>{{ t('admin.system.note1') }}</span>
             </div>
-            <div class="flex items-center gap-3 ml-4">
-              <span class="text-xs" :class="form.turnstile_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                {{ t('admin.system.turnstile.disabled') }}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="form.turnstile_enabled"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="[
-                  form.turnstile_enabled
-                    ? 'bg-accent focus:ring-accent'
-                    : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                ]"
-                @click="form.turnstile_enabled = !form.turnstile_enabled"
-              >
-                <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.turnstile_enabled ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-              <span class="text-xs" :class="form.turnstile_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                {{ t('admin.system.turnstile.enabled') }}
-              </span>
+            <div class="flex items-start gap-2.5">
+              <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+              <span>{{ t('admin.system.note2') }}</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+              <span>{{ t('admin.system.note3') }}</span>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+              <span>{{ t('admin.system.note4') }}</span>
             </div>
           </div>
+        </Card>
+      </template>
 
-          <!-- Site Key & Secret Key -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.turnstile.siteKey') }}
-              </label>
-              <input
-                v-model="form.turnstile_site_key"
-                type="text"
-                class="input font-mono"
-                :placeholder="t('admin.system.turnstile.siteKeyPlaceholder')"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.turnstile.siteKeyDesc') }}</p>
+      <!-- 品牌与外观 Tab -->
+      <template v-else-if="isBrandSection">
+        <!-- 底部联系方式 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.footerLinks.title') || '底部联系方式' }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.footerLinks.description') || '配置侧边栏底部的邮箱按钮' }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasFooterLinkChanges || savingFooterLinks"
+                  :loading="savingFooterLinks"
+                  @click="saveFooterLinks"
+                >
+                  {{ savingFooterLinks ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.turnstile.secretKey') }}
-              </label>
-              <input
-                v-model="form.turnstile_secret_key"
-                type="password"
-                class="input font-mono"
-                :placeholder="t('admin.system.turnstile.secretKeyPlaceholder')"
-              />
-              <p class="text-xs text-themed-muted">{{ t('admin.system.turnstile.secretKeyDesc') }}</p>
+          </template>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Input
+              v-model="form.footer_contact_email"
+              type="text"
+              class="font-mono"
+              :label="t('admin.system.footerLinks.email') || '联系邮箱'"
+              :hint="t('admin.system.footerLinks.emailDesc') || '留空则隐藏邮箱按钮；支持填写邮箱地址或完整 mailto: 链接。'"
+              :placeholder="t('admin.system.footerLinks.emailPlaceholder') || 'support@example.com 或 mailto:support@example.com'"
+            />
+          </div>
+        </Card>
+
+        <!-- 品牌设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.brand.title') || '品牌设置' }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.brand.description') || '配置站点顶部、登录页、SEO 等位置使用的系统名称与 Logo。留空则使用默认值。' }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasBrandChanges || savingBrand"
+                  :loading="savingBrand"
+                  @click="saveBrand"
+                >
+                  {{ savingBrand ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-          </div>
+          </template>
 
-          <!-- Help Link -->
-          <div class="mt-4 p-3 rounded-lg bg-themed-secondary/50 border border-themed">
-            <p class="text-sm text-themed-muted">
-              {{ t('admin.system.turnstile.helpText') }}
-              <a
-                href="https://dash.cloudflare.com/?to=/:account/turnstile"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="underline hover:text-themed"
-              >
-                Cloudflare Turnstile Dashboard
-              </a>
-            </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Input
+              v-model="form.brand_name"
+              type="text"
+              :label="t('admin.system.brand.name') || '系统名称'"
+              placeholder="Incudal"
+            />
+            <Input
+              v-model="form.brand_subtitle"
+              type="text"
+              :label="t('admin.system.brand.subtitle') || '网站副标题'"
+              :hint="t('admin.system.brand.subtitleDesc') || '显示在公开站头部/底部、浏览器默认标题和 SEO 默认描述中。'"
+              :placeholder="t('admin.system.brand.subtitlePlaceholder') || '基于 Incus 的低价 NAT VPS'"
+            />
+            <Input
+              v-model="form.brand_logo_url"
+              type="text"
+              class="font-mono"
+              :label="t('admin.system.brand.logo') || 'Logo 地址'"
+              :hint="t('admin.system.brand.logoDesc') || '支持 http(s) 图片地址或站点内绝对路径。'"
+              placeholder="/logo.svg"
+            />
+            <Input
+              v-model="form.brand_copyright"
+              type="text"
+              class="md:col-span-2"
+              :label="t('admin.system.brand.copyright') || '版权所有'"
+              :hint="t('admin.system.brand.copyrightDesc') || '显示在页面底部的版权所有文案，留空则使用默认值。'"
+              placeholder="版权所有 © 2026， Arctel 和/或其关联公司。保留所有权利。"
+            />
           </div>
-        </div>
+        </Card>
 
-        <!-- Avatar API Settings -->
-        <div v-if="isBrandSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.avatar.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.avatar.description') }}</p>
+        <!-- 头像 API 设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.avatar.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.avatar.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasAvatarChanges || savingAvatar"
+                  :loading="savingAvatar"
+                  @click="saveAvatar"
+                >
+                  {{ savingAvatar ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasAvatarChanges || savingAvatar"
-              @click="saveAvatar"
-            >
-              {{ savingAvatar ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
+          </template>
 
-          <div class="space-y-2">
-            <label class="block text-sm text-themed-secondary">
-              {{ t('admin.system.avatar.apiBase') }}
-            </label>
-            <input
+          <div class="max-w-xl space-y-4">
+            <Input
               v-model="form.avatar_api_base"
               type="text"
-              class="input font-mono"
+              class="font-mono"
+              :label="t('admin.system.avatar.apiBase')"
+              :hint="t('admin.system.avatar.apiBaseDesc')"
               placeholder="https://api.dicebear.com/9.x"
             />
-            <p class="text-xs text-themed-muted">{{ t('admin.system.avatar.apiBaseDesc') }}</p>
-          </div>
 
-          <!-- Help Link -->
-          <div class="mt-4 p-3 rounded-lg bg-themed-secondary/50 border border-themed">
-            <p class="text-sm text-themed-muted">
-              {{ t('admin.system.avatar.helpText') }}
+            <div class="p-3.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+              <span>{{ t('admin.system.avatar.helpText') }}</span>
               <a
                 href="https://www.dicebear.com/how-to-use/http-api"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="underline hover:text-themed"
+                class="inline-flex items-center gap-1 font-medium text-[var(--accent)] hover:underline ml-2"
               >
                 DiceBear HTTP API
+                <ExternalLink class="w-3.5 h-3.5" />
               </a>
-            </p>
-          </div>
-        </div>
-
-        <!-- SMTP Email Settings -->
-        <div v-if="isMailSection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.smtp.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.smtp.description') }}</p>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasSmtpChanges || savingSmtp"
-              @click="saveSmtp"
-            >
-              {{ savingSmtp ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
           </div>
+        </Card>
+      </template>
 
-          <!-- Enable Toggle -->
-          <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50 mb-6">
-            <div class="flex-1">
-              <label class="text-sm font-medium text-themed">{{ t('admin.system.smtp.enable') }}</label>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.smtp.enableDesc') }}</p>
+      <!-- 安全验证 Tab -->
+      <template v-else-if="isSecuritySection">
+        <!-- Turnstile 设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.turnstile.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.turnstile.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasTurnstileChanges || savingTurnstile"
+                  :loading="savingTurnstile"
+                  @click="saveTurnstile"
+                >
+                  {{ savingTurnstile ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <div class="flex items-center gap-3 ml-4">
-              <span class="text-xs" :class="form.smtp_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                {{ t('admin.system.smtp.disabled') }}
-              </span>
+          </template>
+
+          <div class="space-y-5">
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.turnstile.enable') }}</label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.turnstile.enableDesc') }}</p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.turnstile_enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
+                  {{ t('admin.system.turnstile.disabled') }}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="form.turnstile_enabled"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.turnstile_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.turnstile_enabled = !form.turnstile_enabled"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.turnstile_enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
+                </button>
+                <span class="text-xs font-medium" :class="form.turnstile_enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
+                  {{ t('admin.system.turnstile.enabled') }}
+                </span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Input
+                v-model="form.turnstile_site_key"
+                type="text"
+                class="font-mono"
+                :label="t('admin.system.turnstile.siteKey')"
+                :hint="t('admin.system.turnstile.siteKeyDesc')"
+                :placeholder="t('admin.system.turnstile.siteKeyPlaceholder')"
+              />
+              <Input
+                v-model="form.turnstile_secret_key"
+                type="password"
+                class="font-mono"
+                :label="t('admin.system.turnstile.secretKey')"
+                :hint="t('admin.system.turnstile.secretKeyDesc')"
+                :placeholder="t('admin.system.turnstile.secretKeyPlaceholder')"
+              />
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+              <span>{{ t('admin.system.turnstile.helpText') }}</span>
+              <a
+                href="https://dash.cloudflare.com/?to=/:account/turnstile"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 font-medium text-[var(--accent)] hover:underline ml-2"
+              >
+                Cloudflare Turnstile Dashboard
+                <ExternalLink class="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </Card>
+
+        <!-- 邮箱域名白名单 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.emailDomain.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.emailDomain.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasEmailDomainChanges || savingEmailDomain"
+                  :loading="savingEmailDomain"
+                  @click="saveEmailDomain"
+                >
+                  {{ savingEmailDomain ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-5">
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.emailDomain.enable') }}</label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.emailDomain.enableDesc') }}</p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.email_domain_whitelist_enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
+                  {{ t('admin.system.emailDomain.disabled') }}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="form.email_domain_whitelist_enabled"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.email_domain_whitelist_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.email_domain_whitelist_enabled = !form.email_domain_whitelist_enabled"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.email_domain_whitelist_enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
+                </button>
+                <span class="text-xs font-medium" :class="form.email_domain_whitelist_enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
+                  {{ t('admin.system.emailDomain.enabled') }}
+                </span>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                {{ t('admin.system.emailDomain.allowedDomains') }}
+              </label>
+              <textarea
+                v-model="form.email_allowed_domains"
+                class="w-full min-h-[120px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-sm font-mono text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                :placeholder="t('admin.system.emailDomain.allowedDomainsPlaceholder')"
+                :disabled="!form.email_domain_whitelist_enabled"
+              />
+              <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.emailDomain.allowedDomainsDesc') }}</p>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 text-xs text-[var(--text-secondary)]">
+              {{ t('admin.system.emailDomain.helpText') }}
+            </div>
+          </div>
+        </Card>
+      </template>
+
+      <!-- 邮件服务 Tab -->
+      <template v-else-if="isMailSection">
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.smtp.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.smtp.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasSmtpChanges || savingSmtp"
+                  :loading="savingSmtp"
+                  @click="saveSmtp"
+                >
+                  {{ savingSmtp ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-5">
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.smtp.enable') }}</label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.smtp.enableDesc') }}</p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.smtp_enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
+                  {{ t('admin.system.smtp.disabled') }}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="form.smtp_enabled"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.smtp_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.smtp_enabled = !form.smtp_enabled"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.smtp_enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
+                </button>
+                <span class="text-xs font-medium" :class="form.smtp_enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
+                  {{ t('admin.system.smtp.enabled') }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Server Settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Input
+                v-model="form.smtp_host"
+                type="text"
+                class="font-mono"
+                :label="t('admin.system.smtp.host')"
+                :placeholder="t('admin.system.smtp.hostPlaceholder')"
+              />
+              <div class="space-y-1.5">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                  {{ t('admin.system.smtp.port') }}
+                </label>
+                <input
+                  v-model.number="form.smtp_port"
+                  type="number"
+                  class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 tabular-nums transition-all"
+                  placeholder="587"
+                />
+              </div>
+            </div>
+
+            <!-- SSL/TLS Toggle row -->
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div>
+                <label class="text-sm font-semibold text-[var(--text-primary)]">
+                  {{ t('admin.system.smtp.secure') }}
+                </label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.smtp.secureHint') }}
+                </p>
+              </div>
               <button
                 type="button"
                 role="switch"
-                :aria-checked="form.smtp_enabled"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="[
-                  form.smtp_enabled
-                    ? 'bg-accent focus:ring-accent'
-                    : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                ]"
-                @click="form.smtp_enabled = !form.smtp_enabled"
+                :aria-checked="form.smtp_secure"
+                class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                :class="form.smtp_secure ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                @click="form.smtp_secure = !form.smtp_secure"
               >
                 <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.smtp_enabled ? 'translate-x-5' : 'translate-x-0'"
+                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                  :class="form.smtp_secure ? 'translate-x-5' : 'translate-x-0.5'"
                 />
               </button>
-              <span class="text-xs" :class="form.smtp_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                {{ t('admin.system.smtp.enabled') }}
-              </span>
             </div>
-          </div>
 
-          <!-- SMTP Server Settings -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.smtp.host') }}
-              </label>
-              <input
-                v-model="form.smtp_host"
-                type="text"
-                class="input font-mono"
-                :placeholder="t('admin.system.smtp.hostPlaceholder')"
-              />
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.smtp.port') }}
-              </label>
-              <input
-                v-model.number="form.smtp_port"
-                type="number"
-                class="input tabular-nums"
-                placeholder="587"
-              />
-            </div>
-          </div>
-
-          <!-- SSL/TLS Toggle -->
-          <div class="flex items-center gap-3 mb-6 p-3 rounded-lg bg-themed-secondary/30">
-            <input
-              id="smtp_secure"
-              v-model="form.smtp_secure"
-              type="checkbox"
-              class="h-4 w-4 text-accent rounded border-gray-300 focus:ring-accent"
-            />
-            <label for="smtp_secure" class="text-sm text-themed">
-              {{ t('admin.system.smtp.secure') }}
-            </label>
-            <span class="text-xs text-themed-muted">{{ t('admin.system.smtp.secureHint') }}</span>
-          </div>
-
-          <!-- Auth Settings -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.smtp.username') }}
-              </label>
-              <input
+            <!-- Auth settings -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Input
                 v-model="form.smtp_username"
                 type="text"
-                class="input"
+                :label="t('admin.system.smtp.username')"
                 :placeholder="t('admin.system.smtp.usernamePlaceholder')"
               />
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.smtp.password') }}
-              </label>
-              <input
+              <Input
                 v-model="form.smtp_password"
                 type="password"
-                class="input"
+                :label="t('admin.system.smtp.password')"
                 :placeholder="t('admin.system.smtp.passwordPlaceholder')"
               />
-            </div>
-          </div>
-
-          <!-- From Settings -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.smtp.fromEmail') }}
-              </label>
-              <input
+              <Input
                 v-model="form.smtp_from_email"
                 type="email"
-                class="input"
+                :label="t('admin.system.smtp.fromEmail')"
                 :placeholder="t('admin.system.smtp.fromEmailPlaceholder')"
               />
-            </div>
-            <div class="space-y-2">
-              <label class="block text-sm text-themed-secondary">
-                {{ t('admin.system.smtp.fromName') }}
-              </label>
-              <input
+              <Input
                 v-model="form.smtp_from_name"
                 type="text"
-                class="input"
+                :label="t('admin.system.smtp.fromName')"
                 placeholder="Incudal"
               />
             </div>
-          </div>
 
-          <!-- Test Connection & Send Test Email -->
-          <div class="space-y-4">
-            <!-- Test Connection Button -->
-            <div class="flex justify-end">
-              <button
-                type="button"
-                class="btn-secondary"
-                :disabled="testingSmtp || !form.smtp_host || !form.smtp_username"
-                @click="testSmtpConnection"
-              >
-                {{ testingSmtp ? t('admin.system.smtp.testing') : t('admin.system.smtp.testConnection') }}
-              </button>
+            <!-- Test Connection & Send Test Email -->
+            <div class="space-y-4 pt-2">
+              <div class="flex justify-end">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :disabled="testingSmtp || !form.smtp_host || !form.smtp_username"
+                  :loading="testingSmtp"
+                  @click="testSmtpConnection"
+                >
+                  <template #icon>
+                    <Radio class="w-4 h-4" />
+                  </template>
+                  {{ testingSmtp ? t('admin.system.smtp.testing') : t('admin.system.smtp.testConnection') }}
+                </Button>
+              </div>
+
+              <div class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 space-y-3">
+                <div>
+                  <label class="block text-sm font-semibold text-[var(--text-primary)]">
+                    {{ t('admin.system.smtp.sendTestEmail') }}
+                  </label>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ t('admin.system.smtp.sendTestEmailDesc') }}
+                  </p>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2.5">
+                  <Input
+                    v-model="testEmailTo"
+                    type="email"
+                    class="flex-1"
+                    :placeholder="t('admin.system.smtp.testEmailPlaceholder')"
+                    :disabled="sendingTestEmail"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    class="shrink-0"
+                    :disabled="sendingTestEmail || !testEmailTo || !form.smtp_host || !form.smtp_username"
+                    :loading="sendingTestEmail"
+                    @click="sendTestEmail"
+                  >
+                    <template #icon>
+                      <Send class="w-4 h-4" />
+                    </template>
+                    {{ sendingTestEmail ? t('admin.system.smtp.sending') : t('admin.system.smtp.send') }}
+                  </Button>
+                </div>
+              </div>
             </div>
 
-            <!-- Send Test Email -->
-            <div class="p-4 rounded-lg bg-themed-secondary/30 border border-themed-border">
-              <label class="block text-sm font-medium text-themed mb-2">
-                {{ t('admin.system.smtp.sendTestEmail') }}
-              </label>
-              <p class="text-xs text-themed-muted mb-3">
-                {{ t('admin.system.smtp.sendTestEmailDesc') }}
-              </p>
-              <div class="flex gap-2">
-                <input
-                  v-model="testEmailTo"
-                  type="email"
-                  class="input flex-1"
-                  :placeholder="t('admin.system.smtp.testEmailPlaceholder')"
-                  :disabled="sendingTestEmail"
-                />
+            <div class="p-3.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 text-xs text-[var(--text-secondary)]">
+              {{ t('admin.system.smtp.helpText') }}
+            </div>
+          </div>
+        </Card>
+      </template>
+
+      <!-- 工单与附件 Tab -->
+      <template v-else-if="isTicketSection">
+        <!-- 工单系统设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.ticket.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.ticket.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasTicketChanges || savingTicket"
+                  :loading="savingTicket"
+                  @click="saveTicket"
+                >
+                  {{ savingTicket ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <!-- 开启工单系统开关 -->
+            <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60">
+              <div class="flex-1 pr-4">
+                <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.ticket.enable') }}</label>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.ticket.enableDesc') }}</p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-xs font-medium" :class="form.ticket_enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'">
+                  {{ t('admin.system.ticket.disabled') }}
+                </span>
                 <button
                   type="button"
-                  class="btn-secondary whitespace-nowrap"
-                  :disabled="sendingTestEmail || !testEmailTo || !form.smtp_host || !form.smtp_username"
-                  @click="sendTestEmail"
+                  role="switch"
+                  :aria-checked="form.ticket_enabled"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.ticket_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.ticket_enabled = !form.ticket_enabled"
                 >
-                  {{ sendingTestEmail ? t('admin.system.smtp.sending') : t('admin.system.smtp.send') }}
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.ticket_enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
                 </button>
+                <span class="text-xs font-medium" :class="form.ticket_enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'">
+                  {{ t('admin.system.ticket.enabled') }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 工单自动关闭子设置 -->
+            <div
+              class="p-4 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]/60 space-y-4 transition-all duration-300"
+              :class="form.ticket_enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex-1 pr-4">
+                  <label class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.system.ticket.autoClose') }}</label>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.system.ticket.autoCloseDesc') }}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="form.ticket_auto_close_enabled"
+                  class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] active:scale-[0.96]"
+                  :class="form.ticket_auto_close_enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border-[var(--border-color)]'"
+                  @click="form.ticket_auto_close_enabled = !form.ticket_auto_close_enabled"
+                >
+                  <span
+                    class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+                    :class="form.ticket_auto_close_enabled ? 'translate-x-5' : 'translate-x-0.5'"
+                  />
+                </button>
+              </div>
+
+              <div class="space-y-1.5 max-w-sm">
+                <label class="block text-xs font-semibold text-[var(--text-secondary)]">
+                  {{ t('admin.system.ticket.autoCloseHours') }}
+                </label>
+                <div class="relative flex items-center">
+                  <input
+                    v-model.number="form.ticket_auto_close_hours"
+                    type="number"
+                    min="1"
+                    step="1"
+                    class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 pr-12 tabular-nums transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="!form.ticket_auto_close_enabled"
+                  />
+                  <span class="absolute right-3.5 text-xs text-[var(--text-tertiary)] select-none pointer-events-none">小时</span>
+                </div>
+                <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.system.ticket.autoCloseHoursDesc') }}</p>
               </div>
             </div>
           </div>
+        </Card>
 
-          <!-- Help Link -->
-          <div class="mt-4 p-3 rounded-lg bg-themed-secondary/50 border border-themed">
-            <p class="text-sm text-themed-muted">
-              {{ t('admin.system.smtp.helpText') }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Email Domain Whitelist Settings -->
-        <div v-if="isSecuritySection" class="card p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
-            <div>
-              <h3 class="text-themed font-semibold">{{ t('admin.system.emailDomain.title') }}</h3>
-              <p class="text-sm text-themed-muted mt-1">{{ t('admin.system.emailDomain.description') }}</p>
+        <!-- 工单图片图床设置 -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold tracking-tight text-base sm:text-lg text-[var(--text-primary)]">
+                  {{ t('admin.system.ticketImages.title') }}
+                </h3>
+                <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.system.ticketImages.description') }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  :disabled="!hasTicketImageChanges || savingTicketImages"
+                  :loading="savingTicketImages"
+                  @click="saveTicketImages"
+                >
+                  {{ savingTicketImages ? t('admin.system.saving') : t('admin.system.save') }}
+                </Button>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn-primary text-sm px-4 py-1.5 shrink-0"
-              :disabled="!hasEmailDomainChanges || savingEmailDomain"
-              @click="saveEmailDomain"
-            >
-              {{ savingEmailDomain ? t('admin.system.saving') : t('admin.system.save') }}
-            </button>
-          </div>
+          </template>
 
-          <!-- Enable Toggle -->
-          <div class="flex items-center justify-between p-4 rounded-lg bg-themed-secondary/50 mb-6">
-            <div class="flex-1">
-              <label class="text-sm font-medium text-themed">{{ t('admin.system.emailDomain.enable') }}</label>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.system.emailDomain.enableDesc') }}</p>
-            </div>
-            <div class="flex items-center gap-3 ml-4">
-              <span class="text-xs" :class="form.email_domain_whitelist_enabled ? 'text-themed-muted' : 'text-themed font-medium'">
-                {{ t('admin.system.emailDomain.disabled') }}
-              </span>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="form.email_domain_whitelist_enabled"
-                class="relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-                :class="[
-                  form.email_domain_whitelist_enabled
-                    ? 'bg-accent focus:ring-accent'
-                    : 'bg-gray-400 dark:bg-gray-500 focus:ring-gray-400'
-                ]"
-                @click="form.email_domain_whitelist_enabled = !form.email_domain_whitelist_enabled"
-              >
-                <span
-                  class="pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                  :class="form.email_domain_whitelist_enabled ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-              <span class="text-xs" :class="form.email_domain_whitelist_enabled ? 'text-themed font-medium' : 'text-themed-muted'">
-                {{ t('admin.system.emailDomain.enabled') }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Allowed Domains -->
-          <div class="space-y-2">
-            <label class="block text-sm text-themed-secondary">
-              {{ t('admin.system.emailDomain.allowedDomains') }}
-            </label>
-            <textarea
-              v-model="form.email_allowed_domains"
-              class="input min-h-[120px] font-mono text-sm"
-              :placeholder="t('admin.system.emailDomain.allowedDomainsPlaceholder')"
-              :disabled="!form.email_domain_whitelist_enabled"
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Input
+              v-model="form.ticket_image_lsky_base_url"
+              type="text"
+              class="font-mono"
+              :label="t('admin.system.ticketImages.baseUrl')"
+              :hint="t('admin.system.ticketImages.baseUrlDesc')"
+              :placeholder="t('admin.system.ticketImages.baseUrlPlaceholder')"
             />
-            <p class="text-xs text-themed-muted">{{ t('admin.system.emailDomain.allowedDomainsDesc') }}</p>
+            <Input
+              v-model="form.ticket_image_lsky_token"
+              type="password"
+              class="font-mono"
+              :label="t('admin.system.ticketImages.token')"
+              :hint="t('admin.system.ticketImages.tokenDesc')"
+              :placeholder="t('admin.system.ticketImages.tokenPlaceholder')"
+            />
+            <Select
+              v-model="form.ticket_image_lsky_api_version"
+              :options="[
+                { label: 'v1', value: 'v1' },
+                { label: 'v2', value: 'v2' }
+              ]"
+              :label="t('admin.system.ticketImages.apiVersion')"
+              :hint="t('admin.system.ticketImages.apiVersionDesc')"
+            />
+            <Input
+              v-model="form.ticket_image_lsky_target_id"
+              type="text"
+              class="font-mono"
+              :label="t('admin.system.ticketImages.targetId')"
+              :hint="t('admin.system.ticketImages.targetIdDesc')"
+              :placeholder="t('admin.system.ticketImages.targetIdPlaceholder')"
+            />
           </div>
-
-          <!-- Help Link -->
-          <div class="mt-4 p-3 rounded-lg bg-themed-secondary/50 border border-themed">
-            <p class="text-sm text-themed-muted">
-              {{ t('admin.system.emailDomain.helpText') }}
-            </p>
-          </div>
-        </div>
+        </Card>
       </template>
-    </div>
-    <!-- Notes -->
-    <div v-if="isAccessSection" class="card p-6">
-      <h3 class="text-themed font-semibold mb-4">{{ t('admin.system.notes') }}</h3>
-      <div class="space-y-2.5 text-sm text-themed-secondary">
-        <p class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary-500"></span>{{ t('admin.system.note1') }}</p>
-        <p class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary-500"></span>{{ t('admin.system.note2') }}</p>
-        <p class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary-500"></span>{{ t('admin.system.note3') }}</p>
-        <p class="flex gap-2"><span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary-500"></span>{{ t('admin.system.note4') }}</p>
-      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* ============================================================
-   Nimbus console · 系统设置页
-   卡片仅做极轻的边框/阴影响应，靛蓝信号色随 .light/.dark 主题类切换。
-   ============================================================ */
-.card {
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-
-.light .card:hover {
-  border-color: var(--border-color);
-  box-shadow: 0 6px 20px -14px rgb(15 23 42 / 0.18);
-}
-
-.dark .card:hover {
-  border-color: var(--border-color);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .card {
-    transition: none;
-  }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>

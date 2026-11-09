@@ -1,12 +1,40 @@
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  Users,
+  UserPlus,
+  Clock,
+  History,
+  Check,
+  X,
+  Trash2,
+  Share2,
+  Layers,
+  RefreshCw,
+  Search,
+  Sliders,
+  Plus,
+  Mail,
+  Calendar,
+  ChevronRight
+} from 'lucide-vue-next'
 import api from '@/api'
 import type { Package } from '@/types/api'
-import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import DrawerModal from '@/components/DrawerModal.vue'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Pagination,
+  Select,
+  type BadgeVariant
+} from '@/components/ui'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import { translateError } from '@/utils/errorHandler'
 
 // 为 KeepAlive include 匹配定义组件名称（必须在所有 import 之后）
@@ -17,9 +45,9 @@ let hasInitialLoad = false
 
 // 类型定义
 interface Friend {
-  id: number  // 好友的用户ID
-  friendshipId?: number  // friendship 记录的ID
-  friendId?: number  // 好友的用户ID（与 id 相同，为了向后兼容）
+  id: number // 好友的用户ID
+  friendshipId?: number // friendship 记录的ID
+  friendId?: number // 好友的用户ID（与 id 相同，为了向后兼容）
   username: string
   email?: string
   avatarStyle: string
@@ -55,21 +83,39 @@ interface HistoryRecord {
   createdAt: string
   acceptedAt: string | null
   rejectedAt: string | null
-  initiatedByMe: boolean  // 是否是我发起的请求
+  initiatedByMe: boolean // 是否是我发起的请求
+}
+
+interface PackageShare {
+  id: number
+  packageId: number
+  packageName: string
+  ownerId: number
+  ownerUsername: string
+  sharedToId: number
+  sharedToUsername: string
+  quotaMultiplier: number | null
+  maxInstances: number | null
+  usage?: {
+    instanceCount: number
+    totalCpu: number
+    totalMemory: number
+  }
+  createdAt: string
 }
 
 const { t } = useI18n()
 const toast = useToast()
-const themeStore = useThemeStore()
 
 // 当前激活的 Tab
-const activeTab = ref('friends')
+type TabKey = 'friends' | 'pending' | 'history'
+const activeTab = ref<TabKey>('friends')
 
 // 好友列表
 const friends = ref<Friend[]>([])
 const friendsLoading = ref(true)
 
-// 好友列表分页（3行 x 3列 = 9条/页）
+// 好友列表分页（9条/页）
 const friendsPage = ref(1)
 const friendsPageSize = 9
 
@@ -77,7 +123,7 @@ const friendsPageSize = 9
 const pendingRequests = ref<PendingRequest[]>([])
 const pendingLoading = ref(true)
 
-// 待处理请求分页（3行 x 3列 = 9条/页）
+// 待处理请求分页（9条/页）
 const pendingPage = ref(1)
 const pendingPageSize = 9
 const pendingTotalPages = computed(() => Math.max(1, Math.ceil(pendingRequests.value.length / pendingPageSize)))
@@ -140,24 +186,6 @@ const paginatedFilteredFriends = computed(() => {
 const pendingCount = computed(() => pendingRequests.value.length)
 
 // ========== 套餐共享相关 ==========
-interface PackageShare {
-  id: number
-  packageId: number
-  packageName: string
-  ownerId: number
-  ownerUsername: string
-  sharedToId: number
-  sharedToUsername: string
-  quotaMultiplier: number | null
-  maxInstances: number | null
-  usage?: {
-    instanceCount: number
-    totalCpu: number
-    totalMemory: number
-  }
-  createdAt: string
-}
-
 // 选中的好友
 const selectedFriend = ref<Friend | null>(null)
 
@@ -176,19 +204,51 @@ const unshareLoading = ref<number | null>(null)
 // 编辑配额弹窗
 const showEditQuotaModal = ref(false)
 const editingShare = ref<PackageShare | null>(null)
-const editQuotaMultiplier = ref<number | null>(null)
-const editMaxInstances = ref<number | null>(null)
+const editQuotaMultiplier = ref<string | number>('')
+const editMaxInstances = ref<string | number>('')
 const editQuotaLoading = ref(false)
 
 // 添加共享弹窗
 const showAddShareModal = ref(false)
-const selectedPackageId = ref<number | null>(null)
-const newQuotaMultiplier = ref<number | null>(null)
-const newMaxInstances = ref<number | null>(null)
+const selectedPackageId = ref<string | number>('')
+const newQuotaMultiplier = ref<string | number>('')
+const newMaxInstances = ref<string | number>('')
 const addShareLoading = ref(false)
 
 // 可共享套餐搜索
 const packageSearch = ref('')
+
+// Tabs 定义
+const tabs = computed(() => [
+  {
+    key: 'friends' as const,
+    label: t('friends.friendsList'),
+    badge: friends.value.length,
+    badgeVariant: 'default' as BadgeVariant,
+    icon: Users
+  },
+  {
+    key: 'pending' as const,
+    label: t('friends.pendingRequests'),
+    badge: pendingCount.value > 0 ? pendingCount.value : undefined,
+    badgeVariant: (pendingCount.value > 0 ? 'warning' : 'default') as BadgeVariant,
+    icon: Clock
+  },
+  {
+    key: 'history' as const,
+    label: t('friends.historyRequests'),
+    badge: historyRecords.value.length > 0 ? historyRecords.value.length : undefined,
+    badgeVariant: 'default' as BadgeVariant,
+    icon: History
+  }
+])
+
+// 历史记录筛选下拉选项
+const historyFilterOptions = computed(() => [
+  { label: t('friends.filterAll'), value: 'all' },
+  { label: t('friends.filterAccepted'), value: 'accepted' },
+  { label: t('friends.filterRejected'), value: 'rejected' }
+])
 
 // 选中好友
 function selectFriend(friend: Friend) {
@@ -207,7 +267,6 @@ async function loadMyPackages() {
   myPackagesLoading.value = true
   try {
     const res = await api.packages.list()
-    // 服务端返回 { packages: [...], total: ... }，需要提取 packages 数组
     myPackages.value = res.packages || []
   } catch (err) {
     toast.error(translateError(err))
@@ -219,10 +278,9 @@ async function loadMyPackages() {
 // 加载共享给当前好友的套餐
 async function loadFriendShares() {
   if (!selectedFriend.value) return
-  
+
   friendSharesLoading.value = true
   try {
-    // 获取我共享出去的所有套餐，然后过滤出共享给当前好友的
     const res = await api.packages.getShared()
     friendShares.value = (res.shares || []).filter(
       s => s.sharedToId === selectedFriend.value?.id
@@ -237,22 +295,28 @@ async function loadFriendShares() {
 
 // 打开添加共享弹窗
 function openAddShareModal(packageId?: number) {
-  // 从套餐卡片点击时传入 packageId，自动选中
-  // 从“添加共享”按钮点击时不传参数，清空选择
-  selectedPackageId.value = packageId ?? null
-  newQuotaMultiplier.value = null
-  newMaxInstances.value = null
+  selectedPackageId.value = packageId !== undefined ? packageId : ''
+  newQuotaMultiplier.value = ''
+  newMaxInstances.value = ''
   showAddShareModal.value = true
 }
 
 // 可以共享的套餐（只返回用户自己拥有的套餐，排除已共享给当前好友的）
 const availablePackages = computed(() => {
   const sharedIds = new Set(friendShares.value.map(s => s.packageId))
-  // 只返回用户自己拥有的套餐（isOwn === true），排除共享给自己的套餐
-  return myPackages.value.filter(p => 
+  return myPackages.value.filter(p =>
     (p.isOwn === true) && !sharedIds.has(p.id)
   )
 })
+
+// 添加共享的套餐下拉选项
+const packageSelectOptions = computed(() => [
+  { label: t('friends.selectPackagePlaceholder'), value: '' },
+  ...availablePackages.value.map(pkg => ({
+    label: `${pkg.name} (${pkg.cpu_max}% CPU, ${formatMemory(pkg.memory_max)})`,
+    value: pkg.id
+  }))
+])
 
 // 搜索过滤后的可共享套餐
 const filteredAvailablePackages = computed(() => {
@@ -273,18 +337,33 @@ async function refreshShareData() {
   toast.success(t('common.refresh') + ' ' + t('common.success'))
 }
 
+// 全局刷新所有数据
+async function refreshAllData() {
+  await Promise.all([
+    loadFriends(),
+    loadPendingRequests(),
+    loadHistoryRecords(),
+    loadMyPackages(),
+    selectedFriend.value ? loadFriendShares() : Promise.resolve()
+  ])
+  toast.success(t('common.refresh') + ' ' + t('common.success'))
+}
+
 // 添加共享
 async function addShare() {
-  if (!selectedFriend.value || !selectedPackageId.value) return
-  
-  // 处理 NaN 值（用户清空输入框时）
-  const quotaMultiplier = Number.isNaN(newQuotaMultiplier.value) ? null : newQuotaMultiplier.value
-  const maxInstances = Number.isNaN(newMaxInstances.value) ? null : newMaxInstances.value
-  
+  const pkgId = Number(selectedPackageId.value)
+  if (!selectedFriend.value || !pkgId) return
+
+  const qm = newQuotaMultiplier.value === '' ? null : Number(newQuotaMultiplier.value)
+  const quotaMultiplier = (qm !== null && !Number.isNaN(qm)) ? qm : null
+
+  const mi = newMaxInstances.value === '' ? null : Number(newMaxInstances.value)
+  const maxInstances = (mi !== null && !Number.isNaN(mi)) ? mi : null
+
   addShareLoading.value = true
   try {
     await api.packages.share(
-      selectedPackageId.value,
+      pkgId,
       selectedFriend.value.id,
       quotaMultiplier,
       maxInstances
@@ -303,7 +382,7 @@ async function addShare() {
 async function removeShare(share: PackageShare) {
   if (!selectedFriend.value) return
   if (!confirm(t('friends.confirmRemoveShare', { package: share.packageName }))) return
-  
+
   unshareLoading.value = share.id
   try {
     await api.packages.unshare(share.packageId, selectedFriend.value.id)
@@ -319,19 +398,21 @@ async function removeShare(share: PackageShare) {
 // 打开编辑配额弹窗
 function openEditQuotaModal(share: PackageShare) {
   editingShare.value = share
-  editQuotaMultiplier.value = share.quotaMultiplier
-  editMaxInstances.value = share.maxInstances
+  editQuotaMultiplier.value = share.quotaMultiplier !== null && share.quotaMultiplier !== undefined ? share.quotaMultiplier : ''
+  editMaxInstances.value = share.maxInstances !== null && share.maxInstances !== undefined ? share.maxInstances : ''
   showEditQuotaModal.value = true
 }
 
 // 保存配额编辑
 async function saveQuotaEdit() {
   if (!editingShare.value) return
-  
-  // 处理 NaN 值（用户清空输入框时）
-  const quotaMultiplier = Number.isNaN(editQuotaMultiplier.value) ? null : editQuotaMultiplier.value
-  const maxInstances = Number.isNaN(editMaxInstances.value) ? null : editMaxInstances.value
-  
+
+  const qm = editQuotaMultiplier.value === '' ? null : Number(editQuotaMultiplier.value)
+  const quotaMultiplier = (qm !== null && !Number.isNaN(qm)) ? qm : null
+
+  const mi = editMaxInstances.value === '' ? null : Number(editMaxInstances.value)
+  const maxInstances = (mi !== null && !Number.isNaN(mi)) ? mi : null
+
   editQuotaLoading.value = true
   try {
     await api.packages.updateShareQuota(
@@ -400,7 +481,7 @@ async function loadHistoryRecords() {
 // 发送好友请求
 async function sendFriendRequest() {
   if (!friendUsername.value.trim()) return
-  
+
   addFriendLoading.value = true
   try {
     await api.friends.sendRequest(friendUsername.value.trim(), friendRemark.value.trim() || undefined)
@@ -433,7 +514,6 @@ async function rejectRequest(request: PendingRequest) {
     await api.friends.reject(request.id)
     toast.success(t('friends.requestRejected'))
     pendingRequests.value = pendingRequests.value.filter(r => r.id !== request.id)
-    // 刷新历史记录
     loadHistoryRecords()
   } catch (err) {
     toast.error(translateError(err))
@@ -443,14 +523,12 @@ async function rejectRequest(request: PendingRequest) {
 // 删除好友
 async function removeFriend(friend: Friend) {
   if (!confirm(t('friends.confirmRemove', { name: friend.username }))) return
-  
+
   try {
-    // 必须使用 friendshipId（friendship 记录的ID），而不是 friend.id（好友的用户ID）
     const friendshipId = friend.friendshipId || friend.id
     await api.friends.remove(friendshipId)
     toast.success(t('friends.friendRemoved'))
     friends.value = friends.value.filter(f => f.id !== friend.id)
-    // 如果删除的是当前选中的好友，清空选中状态
     if (selectedFriend.value?.id === friend.id) {
       deselectFriend()
     }
@@ -465,612 +543,644 @@ function formatDate(dateStr: string | null | undefined) {
   return new Date(dateStr).toLocaleDateString()
 }
 
-// 切换tab时加载数据
-function switchTab(tab: string) {
+// 切换 tab
+function switchTab(tab: TabKey) {
   activeTab.value = tab
 }
 
 onMounted(async () => {
-  // 并行加载所有初始数据
   await Promise.all([loadFriends(), loadPendingRequests(), loadHistoryRecords(), loadMyPackages()])
   hasInitialLoad = true
 })
 
-// 当组件从 KeepAlive 缓存中激活时，重新加载数据
 onActivated(async () => {
   if (hasInitialLoad) {
-    // 并行刷新所有数据
     await Promise.all([loadFriends(), loadPendingRequests(), loadMyPackages()])
   }
 })
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ t('friends.title') }}</h1>
-        <p class="page-description">{{ t('friends.description') }}</p>
-      </div>
-    </div>
-
-    <!-- Tab 切换 -->
-    <div
-      class="flex items-center gap-1 p-1 rounded-lg w-full sm:w-fit overflow-x-auto"
-      :class="themeStore.isDark ? 'bg-gray-900/50' : 'bg-gray-100'"
+  <div class="space-y-6">
+    <!-- Apple HIG PageHeader -->
+    <PageHeader
+      :title="t('friends.title')"
+      :description="t('friends.description')"
     >
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :title="t('common.refresh')"
+          @click="refreshAllData"
+        >
+          <template #icon>
+            <RefreshCw class="w-4 h-4" />
+          </template>
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          @click="showAddFriendModal = true"
+        >
+          <template #icon>
+            <UserPlus class="w-4 h-4" />
+          </template>
+          <span>{{ t('friends.addFriend') }}</span>
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- Apple 风格分段控制栏 (Segmented Control Tabs) -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full">
       <button
-        :class="[
-          'px-3 sm:px-4 py-2 text-sm rounded-md transition-colors whitespace-nowrap flex-1 sm:flex-none',
-          activeTab === 'friends'
-            ? (themeStore.isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900 shadow')
-            : 'text-themed-muted hover:text-themed-secondary'
-        ]"
-        @click="switchTab('friends')"
+        v-for="tab in tabs"
+        :key="tab.key"
+        type="button"
+        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none"
+        :class="activeTab === tab.key
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+        @click="switchTab(tab.key)"
       >
-        {{ t('friends.friendsList') }}
-        <span class="ml-1.5 text-xs text-themed-muted">{{ friends.length }}</span>
-      </button>
-      <button
-        :class="[
-          'px-3 sm:px-4 py-2 text-sm rounded-md transition-colors whitespace-nowrap flex-1 sm:flex-none',
-          activeTab === 'pending'
-            ? (themeStore.isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900 shadow')
-            : 'text-themed-muted hover:text-themed-secondary'
-        ]"
-        @click="switchTab('pending')"
-      >
-        {{ t('friends.pendingRequests') }}
-        <span
-          v-if="pendingCount > 0"
-          class="ml-1.5 text-xs bg-accent text-white dark:text-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
-        >{{ pendingCount }}</span>
-      </button>
-      <button
-        :class="[
-          'px-3 sm:px-4 py-2 text-sm rounded-md transition-colors whitespace-nowrap flex-1 sm:flex-none',
-          activeTab === 'history'
-            ? (themeStore.isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-900 shadow')
-            : 'text-themed-muted hover:text-themed-secondary'
-        ]"
-        @click="switchTab('history')"
-      >
-        {{ t('friends.historyRequests') }}
+        <component
+          :is="tab.icon"
+          class="w-4 h-4 shrink-0"
+          :class="activeTab === tab.key ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'"
+        />
+        <span>{{ tab.label }}</span>
+        <Badge
+          v-if="tab.badge !== undefined"
+          size="sm"
+          :variant="tab.badgeVariant || (activeTab === tab.key ? 'info' : 'default')"
+        >
+          {{ tab.badge }}
+        </Badge>
       </button>
     </div>
 
-    <!-- Tab Content with Transition -->
+    <!-- Tab 动画过渡 -->
     <Transition name="tab" mode="out-in">
       <div :key="activeTab">
-        <!-- 好友列表 Tab - 双栏布局 -->
+        <!-- 好友列表 Tab -->
         <div v-if="activeTab === 'friends'" class="space-y-4">
           <!-- 工具栏 -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="relative w-full lg:w-80 xl:w-96">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div class="w-full sm:w-80 md:w-96">
+              <Input
                 v-model="friendsSearch"
-                type="text"
-                class="input pl-9 py-1.5 text-sm"
+                size="sm"
                 :placeholder="t('common.searchPlaceholder')"
-                @input="friendsPage = 1"
-              />
-            </div>
-            <button class="btn-primary" @click="showAddFriendModal = true">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-              {{ t('friends.addFriend') }}
-            </button>
-          </div>
-
-          <SkeletonLoader v-if="friendsLoading" type="list" />
-
-          <div v-else-if="friends.length === 0" class="card p-12 text-center">
-            <svg
-              class="w-12 h-12 mx-auto mb-4"
-              :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <p class="text-themed-secondary">{{ t('friends.noFriends') }}</p>
-            <p class="text-xs text-themed-muted mt-2">{{ t('friends.noFriendsHint') }}</p>
-          </div>
-
-          <div v-else-if="filteredFriends.length === 0" class="card p-12 text-center">
-            <svg
-              class="w-12 h-12 mx-auto mb-4"
-              :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <p class="text-themed-secondary">{{ t('friends.noSearchResult') }}</p>
-          </div>
-
-          <!-- 双栏布局 -->
-          <template v-else>
-            <div class="flex flex-col lg:flex-row gap-6">
-              <!-- 左侧: 好友列表 -->
-              <div class="lg:w-80 xl:w-96 flex-shrink-0">
-                <div class="space-y-2">
-                  <div
-                    v-for="friend in paginatedFilteredFriends"
-                    :key="friend.id"
-                    class="card nimbus-lift p-3 cursor-pointer transition-all"
-                    :class="[
-                      selectedFriend?.id === friend.id
-                        ? 'border-accent bg-themed-secondary'
-                        : (themeStore.isDark ? 'hover:border-gray-700' : 'hover:border-gray-300')
-                    ]"
-                    @click="selectFriend(friend)"
-                  >
-                    <div class="flex items-center gap-3">
-                      <UserAvatar
-                        :username="friend.username || ''"
-                        :email="friend.email"
-                        :avatar-style="friend.avatarStyle || ''"
-                        :badge-id="friend.avatarBadgeId || null"
-                        :size="36"
-                        class="flex-shrink-0"
-                      />
-                      <div class="flex-1 min-w-0">
-                        <div
-                          class="font-medium truncate text-sm"
-                          :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'"
-                        >
-                          {{ friend.username }}
-                        </div>
-                        <div class="text-xs text-themed-muted truncate">
-                          {{ friend.email || t('friends.addedOn') + ' ' + formatDate(friend.createdAt) }}
-                        </div>
-                      </div>
-                      <svg
-                        v-if="selectedFriend?.id === friend.id"
-                        class="w-5 h-5 text-accent flex-shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 好友列表分页控件 -->
-                <div v-if="filteredFriendsTotalPages > 1" class="flex items-center justify-between text-xs text-themed-muted mt-3 pt-3 border-t border-themed">
-                  <span>{{ filteredFriends.length }} {{ t('common.items') }}</span>
-                  <div class="flex items-center gap-1">
-                    <button :disabled="friendsPage <= 1" class="btn-ghost btn-xs" @click="friendsPage--">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <span>{{ friendsPage }}/{{ filteredFriendsTotalPages }}</span>
-                    <button :disabled="friendsPage >= filteredFriendsTotalPages" class="btn-ghost btn-xs" @click="friendsPage++">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 右侧: 套餐管理面板 -->
-              <div class="flex-1 min-w-0">
-                <!-- 未选择好友 -->
-                <div v-if="!selectedFriend" class="card p-12 text-center">
-                  <svg
-                    class="w-12 h-12 mx-auto mb-4"
-                    :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                  </svg>
-                  <p class="text-themed-secondary">{{ t('friends.selectFriendHint') }}</p>
-                  <p class="text-xs text-themed-muted mt-2">{{ t('friends.selectFriendDesc') }}</p>
-                </div>
-
-                <!-- 已选择好友 -->
-                <template v-else>
-                  <!-- 好友信息头部 -->
-                  <div class="card p-4 mb-4">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-3">
-                        <UserAvatar
-                          :username="selectedFriend.username || ''"
-                          :email="selectedFriend.email"
-                          :avatar-style="selectedFriend.avatarStyle || ''"
-                          :badge-id="selectedFriend.avatarBadgeId || null"
-                          :size="48"
-                        />
-                        <div>
-                          <div class="font-medium" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                            {{ selectedFriend.username }}
-                          </div>
-                          <div v-if="selectedFriend.email" class="text-sm text-themed-muted">{{ selectedFriend.email }}</div>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                        <button
-                          class="btn-ghost btn-xs sm:btn-sm p-1.5 sm:p-2"
-                          :title="t('common.refresh')"
-                          @click="refreshShareData"
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                        </button>
-                        <button
-                          class="btn-ghost btn-xs sm:btn-sm p-1.5 sm:p-2 text-error"
-                          :title="t('friends.removeFriend')"
-                          @click="removeFriend(selectedFriend)"
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                        <button class="btn-ghost btn-xs sm:btn-sm p-1.5 sm:p-2 lg:hidden" @click="deselectFriend">
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 已分配的套餐 -->
-                  <div class="mb-4">
-                    <div class="flex items-center justify-between mb-3">
-                      <h3 class="text-sm font-medium" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                        {{ t('friends.sharedPackages') }}
-                        <span class="text-themed-muted font-normal">({{ friendShares.length }})</span>
-                      </h3>
-                      <button
-                        v-if="availablePackages.length > 0"
-                        class="btn-primary btn-sm"
-                        @click="openAddShareModal()"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        {{ t('friends.addShare') }}
-                      </button>
-                    </div>
-
-                    <SkeletonLoader v-if="friendSharesLoading" type="card" />
-
-                    <div v-else-if="friendShares.length === 0" class="card p-8 text-center">
-                      <svg
-                        class="w-10 h-10 mx-auto mb-3"
-                        :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                      <p class="text-sm text-themed-secondary">{{ t('friends.noSharedPackages') }}</p>
-                      <button
-                        v-if="availablePackages.length > 0"
-                        class="btn-primary btn-sm mt-3"
-                        @click="openAddShareModal()"
-                      >
-                        {{ t('friends.addFirstShare') }}
-                      </button>
-                    </div>
-
-                    <div v-else class="space-y-2">
-                      <div
-                        v-for="share in friendShares"
-                        :key="share.id"
-                        class="card p-4"
-                      >
-                        <div class="flex items-start justify-between gap-4">
-                          <div class="flex-1 min-w-0">
-                            <div class="font-medium text-sm" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                              {{ share.packageName }}
-                            </div>
-                            <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-themed-muted">
-                              <span v-if="share.quotaMultiplier !== null">
-                                {{ t('friends.quotaMultiplier') }}: {{ share.quotaMultiplier }}x
-                              </span>
-                              <span v-if="share.maxInstances !== null">
-                                {{ t('friends.maxInstances') }}: {{ share.maxInstances }}
-                              </span>
-                              <span v-if="share.usage">
-                                {{ t('friends.currentUsage') }}: {{ share.usage.instanceCount }} {{ t('friends.instances') }}
-                              </span>
-                            </div>
-                          </div>
-                          <div class="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              class="btn-ghost btn-sm"
-                              :title="t('friends.editQuota')"
-                              @click="openEditQuotaModal(share)"
-                            >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              class="btn-ghost btn-sm text-error"
-                              :disabled="unshareLoading === share.id"
-                              :title="t('friends.removeShare')"
-                              @click="removeShare(share)"
-                            >
-                              <span v-if="unshareLoading === share.id" class="loading-spinner w-4 h-4"></span>
-                              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 可分配的套餐 -->
-                  <div v-if="availablePackages.length > 0">
-                    <div class="flex items-center justify-between mb-3">
-                      <h3 class="text-sm font-medium" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                        {{ t('friends.availablePackages') }}
-                        <span class="text-themed-muted font-normal">({{ filteredAvailablePackages.length }})</span>
-                      </h3>
-                      <!-- 套餐搜索框 -->
-                      <div v-if="availablePackages.length > 3" class="relative">
-                        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <input
-                          v-model="packageSearch"
-                          type="text"
-                          class="input pl-8 py-1 text-xs w-32"
-                          :placeholder="t('common.searchPlaceholder')"
-                        />
-                      </div>
-                    </div>
-
-                    <!-- 搜索无结果 -->
-                    <div v-if="filteredAvailablePackages.length === 0" class="card p-4 text-center">
-                      <p class="text-sm text-themed-muted">{{ t('friends.noPackageSearchResult') }}</p>
-                    </div>
-
-                    <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div
-                        v-for="pkg in filteredAvailablePackages"
-                        :key="pkg.id"
-                        class="card p-3 flex items-center justify-between gap-3"
-                      >
-                        <div class="flex-1 min-w-0">
-                          <div class="font-medium text-sm truncate" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                            {{ pkg.name }}
-                          </div>
-                          <div class="text-xs text-themed-muted">
-                            {{ pkg.cpu_max }}%CPU · {{ formatMemory(pkg.memory_max) }}
-                          </div>
-                        </div>
-                        <button
-                          class="btn-secondary btn-sm flex-shrink-0"
-                          :disabled="shareLoading"
-                          @click="openAddShareModal(pkg.id)"
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 用户没有套餐时的提示 -->
-                  <div v-else-if="myPackages.length === 0 && friendShares.length === 0" class="card p-6 text-center">
-                    <svg
-                      class="w-10 h-10 mx-auto mb-3"
-                      :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                    <p class="text-sm text-themed-secondary">{{ t('friends.noPackagesToShare') }}</p>
-                    <p class="text-xs text-themed-muted mt-1">{{ t('friends.createPackageFirst') }}</p>
-                  </div>
+                clearable
+                @update:model-value="friendsPage = 1"
+              >
+                <template #prefix>
+                  <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
                 </template>
+              </Input>
+            </div>
+            <div class="text-xs text-[var(--text-secondary)] flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <span>{{ t('friends.friendsList') }}: {{ filteredFriends.length }}</span>
+            </div>
+          </div>
+
+          <!-- 加载中 -->
+          <div v-if="friendsLoading" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="space-y-3">
+              <div v-for="i in 3" :key="i" class="h-16 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse border border-[var(--border-color)]"></div>
+            </div>
+            <div class="lg:col-span-2 h-64 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse border border-[var(--border-color)]"></div>
+          </div>
+
+          <!-- 无好友 -->
+          <Card v-else-if="friends.length === 0" padding="lg">
+            <EmptyState :title="t('friends.noFriends')" :description="t('friends.noFriendsHint')">
+              <template #icon>
+                <Users class="w-7 h-7 stroke-[1.5] text-[var(--accent)]" />
+              </template>
+              <template #action>
+                <Button variant="primary" @click="showAddFriendModal = true">
+                  <template #icon>
+                    <UserPlus class="w-4 h-4" />
+                  </template>
+                  <span>{{ t('friends.addFriend') }}</span>
+                </Button>
+              </template>
+            </EmptyState>
+          </Card>
+
+          <!-- 搜索无结果 -->
+          <Card v-else-if="filteredFriends.length === 0" padding="lg">
+            <EmptyState :title="t('friends.noSearchResult')" :description="t('friends.noFriendsHint')">
+              <template #icon>
+                <Search class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+              </template>
+            </EmptyState>
+          </Card>
+
+          <!-- 主从双栏布局 -->
+          <div v-else class="flex flex-col lg:flex-row gap-6 items-start">
+            <!-- 左侧：好友列表 -->
+            <div class="w-full lg:w-80 xl:w-96 shrink-0 space-y-3">
+              <div class="space-y-2">
+                <div
+                  v-for="friend in paginatedFilteredFriends"
+                  :key="friend.id"
+                  class="group relative rounded-2xl border p-3.5 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer select-none active:scale-[0.98]"
+                  :class="selectedFriend?.id === friend.id
+                    ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] shadow-sm ring-1 ring-[var(--accent)]'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]'"
+                  @click="selectFriend(friend)"
+                >
+                  <div class="flex items-center gap-3">
+                    <UserAvatar
+                      :username="friend.username || ''"
+                      :email="friend.email"
+                      :avatar-style="friend.avatarStyle || ''"
+                      :badge-id="friend.avatarBadgeId || null"
+                      :size="40"
+                      class="shrink-0"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="font-semibold text-sm text-[var(--text-primary)] truncate">
+                          {{ friend.username }}
+                        </span>
+                        <ChevronRight
+                          class="w-4 h-4 text-[var(--text-tertiary)] transition-transform duration-200"
+                          :class="selectedFriend?.id === friend.id ? 'text-[var(--accent)] translate-x-0.5' : 'group-hover:translate-x-0.5'"
+                        />
+                      </div>
+                      <p class="text-xs text-[var(--text-secondary)] truncate mt-0.5">
+                        {{ friend.email || (t('friends.addedOn') + ' ' + formatDate(friend.createdAt)) }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 好友列表分页 -->
+              <div v-if="filteredFriendsTotalPages > 1" class="pt-2">
+                <Pagination
+                  v-model:page="friendsPage"
+                  :page-size="friendsPageSize"
+                  :total="filteredFriends.length"
+                  :show-size-changer="false"
+                />
               </div>
             </div>
-          </template>
+
+            <!-- 右侧：套餐管理面板 -->
+            <div class="flex-1 min-w-0 w-full space-y-5">
+              <!-- 未选择好友 -->
+              <Card v-if="!selectedFriend" padding="lg">
+                <EmptyState
+                  :title="t('friends.selectFriendHint')"
+                  :description="t('friends.selectFriendDesc')"
+                >
+                  <template #icon>
+                    <Share2 class="w-7 h-7 stroke-[1.5] text-[var(--accent)]" />
+                  </template>
+                </EmptyState>
+              </Card>
+
+              <!-- 已选择好友 -->
+              <template v-else>
+                <!-- 好友信息横幅卡片 -->
+                <Card padding="sm">
+                  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex items-center gap-3.5 min-w-0">
+                      <UserAvatar
+                        :username="selectedFriend.username || ''"
+                        :email="selectedFriend.email"
+                        :avatar-style="selectedFriend.avatarStyle || ''"
+                        :badge-id="selectedFriend.avatarBadgeId || null"
+                        :size="48"
+                        class="shrink-0 ring-2 ring-[var(--border-color)] rounded-full"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <h3 class="font-semibold text-base md:text-lg text-[var(--text-primary)] truncate">
+                            {{ selectedFriend.username }}
+                          </h3>
+                          <Badge size="sm" variant="info">
+                            {{ t('friends.sharedPackages') }}: {{ friendShares.length }}
+                          </Badge>
+                        </div>
+                        <div class="flex items-center gap-3 mt-1 text-xs text-[var(--text-secondary)] flex-wrap">
+                          <span v-if="selectedFriend.email" class="flex items-center gap-1 truncate">
+                            <Mail class="w-3.5 h-3.5 shrink-0" />
+                            {{ selectedFriend.email }}
+                          </span>
+                          <span class="flex items-center gap-1">
+                            <Calendar class="w-3.5 h-3.5 shrink-0" />
+                            {{ t('friends.addedOn') }} {{ formatDate(selectedFriend.createdAt) }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        :title="t('common.refresh')"
+                        @click="refreshShareData"
+                      >
+                        <template #icon>
+                          <RefreshCw class="w-4 h-4" />
+                        </template>
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        @click="removeFriend(selectedFriend)"
+                      >
+                        <template #icon>
+                          <Trash2 class="w-4 h-4" />
+                        </template>
+                        <span>{{ t('friends.removeFriend') }}</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        class="lg:hidden"
+                        @click="deselectFriend"
+                      >
+                        <template #icon>
+                          <X class="w-4 h-4" />
+                        </template>
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+
+                <!-- 已共享的套餐 -->
+                <Card padding="md">
+                  <template #header>
+                    <div class="flex items-center justify-between w-full">
+                      <div class="flex items-center gap-2">
+                        <h3 class="font-semibold text-base text-[var(--text-primary)]">
+                          {{ t('friends.sharedPackages') }}
+                        </h3>
+                        <Badge size="sm" variant="default">{{ friendShares.length }}</Badge>
+                      </div>
+                      <Button
+                        v-if="availablePackages.length > 0"
+                        variant="primary"
+                        size="sm"
+                        @click="openAddShareModal()"
+                      >
+                        <template #icon>
+                          <Plus class="w-4 h-4" />
+                        </template>
+                        <span>{{ t('friends.addShare') }}</span>
+                      </Button>
+                    </div>
+                  </template>
+
+                  <div v-if="friendSharesLoading" class="space-y-3">
+                    <div v-for="i in 2" :key="i" class="h-20 rounded-xl bg-[var(--bg-surface-soft)] animate-pulse border border-[var(--border-color)]"></div>
+                  </div>
+
+                  <EmptyState
+                    v-else-if="friendShares.length === 0"
+                    :title="t('friends.noSharedPackages')"
+                    description=""
+                  >
+                    <template #icon>
+                      <Layers class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+                    </template>
+                    <template #action v-if="availablePackages.length > 0">
+                      <Button variant="primary" size="sm" @click="openAddShareModal()">
+                        <template #icon>
+                          <Plus class="w-4 h-4" />
+                        </template>
+                        <span>{{ t('friends.addFirstShare') }}</span>
+                      </Button>
+                    </template>
+                  </EmptyState>
+
+                  <div v-else class="space-y-3">
+                    <div
+                      v-for="share in friendShares"
+                      :key="share.id"
+                      class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-colors duration-200"
+                    >
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-semibold text-sm text-[var(--text-primary)] truncate">
+                            {{ share.packageName }}
+                          </span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-2">
+                          <Badge v-if="share.quotaMultiplier !== null" size="sm" variant="default">
+                            {{ t('friends.quotaMultiplier') }}: {{ share.quotaMultiplier }}x
+                          </Badge>
+                          <Badge v-if="share.maxInstances !== null" size="sm" variant="default">
+                            {{ t('friends.maxInstances') }}: {{ share.maxInstances }}
+                          </Badge>
+                          <Badge v-if="share.usage" size="sm" variant="info">
+                            {{ t('friends.currentUsage') }}: {{ share.usage.instanceCount }} {{ t('friends.instances') }}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          :title="t('friends.editQuota')"
+                          @click="openEditQuotaModal(share)"
+                        >
+                          <template #icon>
+                            <Sliders class="w-3.5 h-3.5" />
+                          </template>
+                          <span>{{ t('friends.editQuota') }}</span>
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          :loading="unshareLoading === share.id"
+                          :title="t('friends.removeShare')"
+                          @click="removeShare(share)"
+                        >
+                          <template #icon>
+                            <Trash2 class="w-3.5 h-3.5" />
+                          </template>
+                          <span>{{ t('friends.removeShare') }}</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <!-- 可共享的套餐 -->
+                <Card v-if="availablePackages.length > 0" padding="md">
+                  <template #header>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+                      <div class="flex items-center gap-2">
+                        <h3 class="font-semibold text-base text-[var(--text-primary)]">
+                          {{ t('friends.availablePackages') }}
+                        </h3>
+                        <Badge size="sm" variant="default">{{ filteredAvailablePackages.length }}</Badge>
+                      </div>
+                      <div v-if="availablePackages.length > 3" class="w-full sm:w-48">
+                        <Input
+                          v-model="packageSearch"
+                          size="sm"
+                          :placeholder="t('common.searchPlaceholder')"
+                          clearable
+                        >
+                          <template #prefix>
+                            <Search class="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                          </template>
+                        </Input>
+                      </div>
+                    </div>
+                  </template>
+
+                  <div v-if="filteredAvailablePackages.length === 0" class="py-6 text-center text-sm text-[var(--text-secondary)]">
+                    {{ t('friends.noPackageSearchResult') }}
+                  </div>
+
+                  <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div
+                      v-for="pkg in filteredAvailablePackages"
+                      :key="pkg.id"
+                      class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex items-center justify-between gap-3 hover:border-[var(--border-hover)] transition-colors duration-200"
+                    >
+                      <div class="min-w-0 flex-1">
+                        <p class="font-semibold text-sm text-[var(--text-primary)] truncate">
+                          {{ pkg.name }}
+                        </p>
+                        <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                          {{ pkg.cpu_max }}% CPU · {{ formatMemory(pkg.memory_max) }}
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        :disabled="shareLoading"
+                        @click="openAddShareModal(pkg.id)"
+                      >
+                        <template #icon>
+                          <Plus class="w-3.5 h-3.5" />
+                        </template>
+                        <span>{{ t('friends.addShare') }}</span>
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+
+                <!-- 用户没有套餐时的提示 -->
+                <Card v-else-if="myPackages.length === 0 && friendShares.length === 0" padding="md">
+                  <EmptyState
+                    :title="t('friends.noPackagesToShare')"
+                    :description="t('friends.createPackageFirst')"
+                  >
+                    <template #icon>
+                      <Layers class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+                    </template>
+                  </EmptyState>
+                </Card>
+              </template>
+            </div>
+          </div>
         </div>
 
         <!-- 待处理请求 Tab -->
         <div v-if="activeTab === 'pending'" class="space-y-4">
-          <SkeletonLoader v-if="pendingLoading" type="list" />
-
-          <div v-else-if="pendingRequests.length === 0" class="card p-12 text-center">
-            <svg
-              class="w-12 h-12 mx-auto mb-4"
-              :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <p class="text-themed-secondary">{{ t('friends.noPendingRequests') }}</p>
+          <div v-if="pendingLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="i in 3" :key="i" class="h-44 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse border border-[var(--border-color)]"></div>
           </div>
 
+          <Card v-else-if="pendingRequests.length === 0" padding="lg">
+            <EmptyState :title="t('friends.noPendingRequests')" description="">
+              <template #icon>
+                <Clock class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+              </template>
+            </EmptyState>
+          </Card>
+
           <template v-else>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card
                 v-for="request in paginatedPendingRequests"
                 :key="request.id"
-                class="card p-4"
+                padding="sm"
               >
-                <div class="flex items-start gap-3">
+                <div class="flex items-start gap-3.5">
                   <UserAvatar
                     :username="request.username || ''"
                     :email="request.email"
                     :avatar-style="request.avatarStyle || ''"
                     :badge-id="request.avatarBadgeId || null"
-                    :size="40"
-                    class="flex-shrink-0"
+                    :size="44"
+                    class="shrink-0 ring-1 ring-[var(--border-color)] rounded-full"
                   />
-                  <div class="flex-1 min-w-0">
-                    <div
-                      class="font-medium truncate"
-                      :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'"
-                    >
+                  <div class="min-w-0 flex-1">
+                    <h4 class="font-semibold text-base text-[var(--text-primary)] truncate">
                       {{ request.username }}
-                    </div>
-                    <div v-if="request.email" class="text-xs text-themed-secondary truncate">{{ request.email }}</div>
-                    <div class="text-xs text-themed-muted">
-                      {{ t('friends.requestedOn') }} {{ formatDate(request.createdAt) }}
-                    </div>
-                    <div v-if="request.remark" class="text-xs mt-1 truncate" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ t('friends.remark') }}: {{ request.remark }}
-                    </div>
-                    <div class="flex items-center gap-2 mt-3">
-                      <button
-                        class="btn-primary btn-sm"
-                        @click="acceptRequest(request)"
-                      >
-                        {{ t('friends.accept') }}
-                      </button>
-                      <button
-                        class="btn-secondary btn-sm"
-                        @click="rejectRequest(request)"
-                      >
-                        {{ t('friends.reject') }}
-                      </button>
+                    </h4>
+                    <p v-if="request.email" class="text-xs text-[var(--text-secondary)] truncate mt-0.5">
+                      {{ request.email }}
+                    </p>
+                    <div class="flex items-center gap-1 text-xs text-[var(--text-tertiary)] mt-1">
+                      <Clock class="w-3.5 h-3.5 shrink-0" />
+                      <span>{{ t('friends.requestedOn') }} {{ formatDate(request.createdAt) }}</span>
                     </div>
                   </div>
                 </div>
-              </div>
+
+                <div v-if="request.remark" class="mt-3 p-2.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
+                  <span class="font-medium text-[var(--text-primary)]">{{ t('friends.remark') }}:</span>
+                  <span class="break-words ml-1">{{ request.remark }}</span>
+                </div>
+
+                <div class="flex items-center gap-2.5 mt-4 pt-3.5 border-t border-[var(--border-color)]">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    block
+                    @click="acceptRequest(request)"
+                  >
+                    <template #icon>
+                      <Check class="w-4 h-4" />
+                    </template>
+                    <span>{{ t('friends.accept') }}</span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    block
+                    @click="rejectRequest(request)"
+                  >
+                    <template #icon>
+                      <X class="w-4 h-4" />
+                    </template>
+                    <span>{{ t('friends.reject') }}</span>
+                  </Button>
+                </div>
+              </Card>
+            </div>
+
+            <!-- 分页 -->
+            <div v-if="pendingTotalPages > 1" class="pt-2">
+              <Pagination
+                v-model:page="pendingPage"
+                :page-size="pendingPageSize"
+                :total="pendingRequests.length"
+              />
             </div>
           </template>
-
-          <!-- 待处理请求分页控件 -->
-          <div v-if="pendingTotalPages > 1" class="flex items-center justify-between text-sm text-themed-muted">
-            <span>{{ t('common.total') }} {{ pendingRequests.length }} {{ t('common.items') }}</span>
-            <div class="flex items-center gap-2">
-              <button :disabled="pendingPage <= 1" class="btn-ghost btn-sm" @click="pendingPage--">{{ t('instance.prevPage') }}</button>
-              <span>{{ pendingPage }} / {{ pendingTotalPages }}</span>
-              <button :disabled="pendingPage >= pendingTotalPages" class="btn-ghost btn-sm" @click="pendingPage++">{{ t('instance.nextPage') }}</button>
-            </div>
-          </div>
         </div>
 
         <!-- 历史记录 Tab -->
         <div v-if="activeTab === 'history'" class="space-y-4">
           <!-- 搜索和筛选工具栏 -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="relative flex-1 max-w-xs">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div class="w-full sm:w-80">
+              <Input
                 v-model="historySearch"
-                type="text"
-                class="input pl-9 py-1.5 text-sm"
+                size="sm"
                 :placeholder="t('common.searchPlaceholder')"
-                @input="historyPage = 1"
+                clearable
+                @update:model-value="historyPage = 1"
+              >
+                <template #prefix>
+                  <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+                </template>
+              </Input>
+            </div>
+            <div class="flex items-center gap-2 self-end sm:self-auto">
+              <span class="text-xs text-[var(--text-secondary)] shrink-0">{{ t('common.filter') }}:</span>
+              <Select
+                v-model="historyFilter"
+                size="sm"
+                :options="historyFilterOptions"
+                :block="false"
+                class="w-36"
+                @change="loadHistoryRecords(); historyPage = 1"
               />
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-themed-muted">{{ t('common.filter') }}:</span>
-              <select
-                v-model="historyFilter"
-                class="input py-1.5 px-3 text-sm w-auto"
-                @change="loadHistoryRecords(); historyPage = 1"
-              >
-                <option value="all">{{ t('friends.filterAll') }}</option>
-                <option value="accepted">{{ t('friends.filterAccepted') }}</option>
-                <option value="rejected">{{ t('friends.filterRejected') }}</option>
-              </select>
-            </div>
           </div>
 
-          <SkeletonLoader v-if="historyLoading" type="list" />
-
-          <div v-else-if="historyRecords.length === 0" class="card p-12 text-center">
-            <svg
-              class="w-12 h-12 mx-auto mb-4"
-              :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p class="text-themed-secondary">{{ t('friends.noHistoryRecords') }}</p>
-            <p class="text-xs text-themed-muted mt-2">{{ t('friends.noHistoryRecordsHint') }}</p>
+          <div v-if="historyLoading" class="space-y-3">
+            <div v-for="i in 4" :key="i" class="h-20 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse border border-[var(--border-color)]"></div>
           </div>
 
-          <div v-else-if="filteredHistoryRecords.length === 0" class="card p-12 text-center">
-            <svg
-              class="w-12 h-12 mx-auto mb-4"
-              :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <p class="text-themed-secondary">{{ t('friends.noHistorySearchResult') }}</p>
-          </div>
+          <Card v-else-if="historyRecords.length === 0" padding="lg">
+            <EmptyState :title="t('friends.noHistoryRecords')" :description="t('friends.noHistoryRecordsHint')">
+              <template #icon>
+                <History class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+              </template>
+            </EmptyState>
+          </Card>
+
+          <Card v-else-if="filteredHistoryRecords.length === 0" padding="lg">
+            <EmptyState :title="t('friends.noHistorySearchResult')">
+              <template #icon>
+                <Search class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+              </template>
+            </EmptyState>
+          </Card>
 
           <div v-else class="space-y-3">
             <div
               v-for="record in paginatedHistoryRecords"
               :key="record.id"
-              class="card p-4"
+              class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-200"
             >
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div class="flex items-start gap-3 min-w-0 flex-1">
+                <div class="flex items-start gap-3.5 min-w-0 flex-1">
                   <UserAvatar
                     :username="record.username || ''"
                     :email="record.email"
                     :avatar-style="record.avatarStyle || ''"
                     :badge-id="record.avatarBadgeId || null"
-                    :size="40"
-                    class="flex-shrink-0"
+                    :size="42"
+                    class="shrink-0 ring-1 ring-[var(--border-color)] rounded-full"
                   />
                   <div class="min-w-0 flex-1">
-                    <div
-                      class="font-medium truncate"
-                      :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'"
-                    >
-                      {{ record.initiatedByMe ? t('friends.sentTo', { username: record.username }) : record.username }}
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-sm text-[var(--text-primary)] truncate">
+                        {{ record.initiatedByMe ? t('friends.sentTo', { username: record.username }) : record.username }}
+                      </span>
+                      <Badge
+                        size="sm"
+                        :variant="record.status === 'accepted' ? 'success' : record.status === 'rejected' ? 'error' : 'default'"
+                        dot
+                      >
+                        {{ record.status === 'accepted' ? t('friends.statusAccepted') : record.status === 'rejected' ? t('friends.statusRejected') : record.status }}
+                      </Badge>
                     </div>
-                    <div v-if="record.email" class="text-xs text-themed-secondary truncate">{{ record.email }}</div>
-                    <div class="text-xs text-themed-muted">
-                      {{ record.initiatedByMe ? t('friends.sentOn') : t('friends.requestedOn') }} {{ formatDate(record.createdAt) }}
+                    <div class="flex items-center gap-3 mt-1 text-xs text-[var(--text-secondary)] flex-wrap">
+                      <span v-if="record.email" class="truncate">{{ record.email }}</span>
+                      <span class="flex items-center gap-1">
+                        <Calendar class="w-3.5 h-3.5 shrink-0" />
+                        {{ record.initiatedByMe ? t('friends.sentOn') : t('friends.requestedOn') }} {{ formatDate(record.createdAt) }}
+                      </span>
+                      <span v-if="record.acceptedAt || record.rejectedAt" class="flex items-center gap-1 text-[var(--text-tertiary)]">
+                        <Clock class="w-3.5 h-3.5 shrink-0" />
+                        {{ t('friends.processedOn') }} {{ formatDate(record.status === 'accepted' ? record.acceptedAt : record.rejectedAt) }}
+                      </span>
                     </div>
-                    <div v-if="record.remark" class="text-xs mt-1 truncate" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ t('friends.remark') }}: {{ record.remark }}
+                    <div v-if="record.remark" class="mt-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface-soft)] rounded-lg px-2.5 py-1.5 border border-[var(--border-color)] inline-block max-w-full truncate">
+                      <span class="text-[var(--text-tertiary)]">{{ t('friends.remark') }}:</span> {{ record.remark }}
                     </div>
                   </div>
                 </div>
-                <div class="flex flex-row sm:flex-col items-center sm:items-end gap-1 flex-shrink-0">
-                  <span
-                    class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full whitespace-nowrap"
-                    :class="record.status === 'accepted'
-                      ? (themeStore.isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')
-                      : (themeStore.isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600')
-                    "
-                  >
-                    <span class="h-1.5 w-1.5 rounded-full bg-current opacity-80"></span>
-                    {{ record.status === 'accepted' ? t('friends.statusAccepted') : t('friends.statusRejected') }}
-                  </span>
-                  <span class="text-xs text-themed-muted whitespace-nowrap">
-                    {{ t('friends.processedOn') }} {{ formatDate(record.status === 'accepted' ? record.acceptedAt : record.rejectedAt) }}
-                  </span>
-                </div>
               </div>
             </div>
-          </div>
 
-          <!-- 历史记录分页控件 -->
-          <div v-if="historyTotalPages > 1" class="flex items-center justify-between text-sm text-themed-muted">
-            <span>{{ t('common.total') }} {{ filteredHistoryRecords.length }} {{ t('common.items') }}</span>
-            <div class="flex items-center gap-2">
-              <button :disabled="historyPage <= 1" class="btn-ghost btn-sm" @click="historyPage--">{{ t('instance.prevPage') }}</button>
-              <span>{{ historyPage }} / {{ historyTotalPages }}</span>
-              <button :disabled="historyPage >= historyTotalPages" class="btn-ghost btn-sm" @click="historyPage++">{{ t('instance.nextPage') }}</button>
+            <!-- 历史记录分页 -->
+            <div v-if="historyTotalPages > 1" class="pt-2">
+              <Pagination
+                v-model:page="historyPage"
+                :page-size="historyPageSize"
+                :total="filteredHistoryRecords.length"
+              />
             </div>
           </div>
         </div>
@@ -1080,52 +1190,62 @@ onActivated(async () => {
     <!-- 添加好友弹窗 -->
     <DrawerModal
       :show="showAddFriendModal"
-      max-width="max-w-sm"
+      max-width="max-w-md"
       raw
       @close="showAddFriendModal = false"
     >
-            <div class="modal-header">
-              <h3 class="modal-title">{{ t('friends.addFriend') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showAddFriendModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form class="modal-body space-y-4" @submit.prevent="sendFriendRequest">
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.username') }} <span class="text-error">*</span></label>
-                <input
-                  v-model="friendUsername"
-                  type="text"
-                  class="input"
-                  :placeholder="t('friends.usernamePlaceholder')"
-                  required
-                />
-                <p class="text-xs text-themed-muted mt-1.5">{{ t('friends.usernameHint') }}</p>
-              </div>
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.remark') }}</label>
-                <textarea
-                  v-model="friendRemark"
-                  class="input"
-                  rows="3"
-                  :placeholder="t('friends.remarkPlaceholder')"
-                ></textarea>
-                <p class="text-xs text-themed-muted mt-1.5">{{ t('friends.remarkHint') }}</p>
-              </div>
-            </form>
-            <div class="modal-footer">
-              <button class="btn-secondary" @click="showAddFriendModal = false">{{ t('common.cancel') }}</button>
-              <button
-                :disabled="!friendUsername.trim() || addFriendLoading"
-                class="btn-primary"
-                @click="sendFriendRequest"
-              >
-                <span v-if="addFriendLoading" class="loading-spinner w-4 h-4"></span>
-                <span v-else>{{ t('friends.sendRequest') }}</span>
-              </button>
-            </div>
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_28%,var(--bg-surface))]">
+            <UserPlus class="h-5 w-5 stroke-[1.8]" />
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('friends.addFriend') }}</h3>
+            <p class="text-xs text-[var(--text-secondary)]">{{ t('friends.usernameHint') }}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showAddFriendModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <form class="modal-body p-6 space-y-4" @submit.prevent="sendFriendRequest">
+        <Input
+          v-model="friendUsername"
+          :label="t('friends.username')"
+          :placeholder="t('friends.usernamePlaceholder')"
+          :hint="t('friends.usernameHint')"
+          required
+        />
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)] select-none">
+            {{ t('friends.remark') }}
+          </label>
+          <textarea
+            v-model="friendRemark"
+            rows="3"
+            class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] hover:border-[var(--border-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] transition-all duration-200"
+            :placeholder="t('friends.remarkPlaceholder')"
+          ></textarea>
+          <p class="text-xs text-[var(--text-tertiary)] mt-0.5">{{ t('friends.remarkHint') }}</p>
+        </div>
+      </form>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end gap-3">
+        <Button variant="secondary" @click="showAddFriendModal = false">{{ t('common.cancel') }}</Button>
+        <Button
+          variant="primary"
+          :disabled="!friendUsername.trim() || addFriendLoading"
+          :loading="addFriendLoading"
+          @click="sendFriendRequest"
+        >
+          {{ t('friends.sendRequest') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- 添加共享弹窗 -->
@@ -1135,88 +1255,93 @@ onActivated(async () => {
       raw
       @close="showAddShareModal = false"
     >
-            <div class="modal-header">
-              <h3 class="modal-title">{{ t('friends.addShareTitle') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showAddShareModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="modal-body space-y-4">
-              <!-- 目标好友 -->
-              <div class="p-3 rounded-lg" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'">
-                <div class="flex items-center gap-3">
-                  <UserAvatar
-                    v-if="selectedFriend"
-                    :username="selectedFriend.username || ''"
-                    :email="selectedFriend.email"
-                    :avatar-style="selectedFriend.avatarStyle || ''"
-                    :badge-id="selectedFriend.avatarBadgeId || null"
-                    :size="36"
-                  />
-                  <div>
-                    <div class="text-sm font-medium" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                      {{ selectedFriend?.username }}
-                    </div>
-                    <div class="text-xs text-themed-muted">{{ t('friends.shareToFriend') }}</div>
-                  </div>
-                </div>
-              </div>
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_28%,var(--bg-surface))]">
+            <Share2 class="h-5 w-5 stroke-[1.8]" />
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('friends.addShareTitle') }}</h3>
+            <p class="text-xs text-[var(--text-secondary)]">{{ selectedFriend ? t('friends.sharedTo') + ': ' + selectedFriend.username : '' }}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showAddShareModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
 
-              <!-- 选择套餐 -->
-              <div>
-                <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.selectPackage') }} <span class="text-error">*</span></label>
-                <select v-model="selectedPackageId" class="input">
-                  <option :value="null" disabled>{{ t('friends.selectPackagePlaceholder') }}</option>
-                  <option v-for="pkg in availablePackages" :key="pkg.id" :value="pkg.id">
-                    {{ pkg.name }} ({{ pkg.cpu_max }} CPU, {{ formatMemory(pkg.memory_max) }})
-                  </option>
-                </select>
+      <div class="modal-body p-6 space-y-4">
+        <!-- 目标好友预览 -->
+        <div class="p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+          <div class="flex items-center gap-3">
+            <UserAvatar
+              v-if="selectedFriend"
+              :username="selectedFriend.username || ''"
+              :email="selectedFriend.email"
+              :avatar-style="selectedFriend.avatarStyle || ''"
+              :badge-id="selectedFriend.avatarBadgeId || null"
+              :size="36"
+            />
+            <div>
+              <div class="text-sm font-semibold text-[var(--text-primary)]">
+                {{ selectedFriend?.username }}
               </div>
+              <div class="text-xs text-[var(--text-secondary)]">{{ t('friends.shareToFriend') }}</div>
+            </div>
+          </div>
+        </div>
 
-              <!-- 配额限制 -->
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.quotaMultiplier') }}</label>
-                  <div class="relative">
-                    <input
-                      v-model.number="newQuotaMultiplier"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="10"
-                      class="input pr-8"
-                      :placeholder="t('friends.noLimit')"
-                    />
-                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-themed-muted text-sm">×</span>
-                  </div>
-                  <p class="text-xs text-themed-muted mt-1">{{ t('friends.quotaMultiplierHint') }}</p>
-                </div>
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.maxInstances') }}</label>
-                  <input
-                    v-model.number="newMaxInstances"
-                    type="number"
-                    min="0"
-                    class="input"
-                    :placeholder="t('friends.noLimit')"
-                  />
-                  <p class="text-xs text-themed-muted mt-1">{{ t('friends.maxInstancesHint') }}</p>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-secondary" @click="showAddShareModal = false">{{ t('common.cancel') }}</button>
-              <button
-                :disabled="!selectedPackageId || addShareLoading"
-                class="btn-primary"
-                @click="addShare"
-              >
-                <span v-if="addShareLoading" class="loading-spinner w-4 h-4"></span>
-                <span v-else>{{ t('friends.confirmShare') }}</span>
-              </button>
-            </div>
+        <!-- 选择套餐 -->
+        <div>
+          <Select
+            v-model="selectedPackageId"
+            :label="t('friends.selectPackage')"
+            :options="packageSelectOptions"
+          />
+        </div>
+
+        <!-- 配额限制 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <Input
+              v-model="newQuotaMultiplier"
+              type="number"
+              :label="t('friends.quotaMultiplier')"
+              :hint="t('friends.quotaMultiplierHint')"
+              :placeholder="t('friends.noLimit')"
+            >
+              <template #suffix>
+                <span class="text-xs text-[var(--text-tertiary)] font-medium">×</span>
+              </template>
+            </Input>
+          </div>
+          <div>
+            <Input
+              v-model="newMaxInstances"
+              type="number"
+              :label="t('friends.maxInstances')"
+              :hint="t('friends.maxInstancesHint')"
+              :placeholder="t('friends.noLimit')"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end gap-3">
+        <Button variant="secondary" @click="showAddShareModal = false">{{ t('common.cancel') }}</Button>
+        <Button
+          variant="primary"
+          :disabled="selectedPackageId === '' || addShareLoading"
+          :loading="addShareLoading"
+          @click="addShare"
+        >
+          {{ t('friends.confirmShare') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- 编辑配额弹窗 -->
@@ -1226,85 +1351,89 @@ onActivated(async () => {
       raw
       @close="showEditQuotaModal = false"
     >
-            <div class="modal-header">
-              <h3 class="modal-title">{{ t('friends.editQuotaTitle') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showEditQuotaModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="modal-body space-y-4">
-              <!-- 套餐信息 -->
-              <div class="p-3 rounded-lg" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'">
-                <div class="text-sm font-medium" :class="themeStore.isDark ? 'text-gray-200' : 'text-gray-900'">
-                  {{ editingShare?.packageName }}
-                </div>
-                <div class="text-xs text-themed-muted mt-1">
-                  {{ t('friends.sharedTo') }}: {{ selectedFriend?.username }}
-                </div>
-              </div>
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_28%,var(--bg-surface))]">
+            <Sliders class="h-5 w-5 stroke-[1.8]" />
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('friends.editQuotaTitle') }}</h3>
+            <p class="text-xs text-[var(--text-secondary)]">{{ editingShare?.packageName }}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showEditQuotaModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
 
-              <!-- 配额限制 -->
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.quotaMultiplier') }}</label>
-                  <div class="relative">
-                    <input
-                      v-model.number="editQuotaMultiplier"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="10"
-                      class="input pr-8"
-                      :placeholder="t('friends.noLimit')"
-                    />
-                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-themed-muted text-sm">×</span>
-                  </div>
-                  <p class="text-xs text-themed-muted mt-1">{{ t('friends.quotaMultiplierHint') }}</p>
-                </div>
-                <div>
-                  <label class="block text-xs text-themed-muted mb-1.5">{{ t('friends.maxInstances') }}</label>
-                  <input
-                    v-model.number="editMaxInstances"
-                    type="number"
-                    min="0"
-                    class="input"
-                    :placeholder="t('friends.noLimit')"
-                  />
-                  <p class="text-xs text-themed-muted mt-1">{{ t('friends.maxInstancesHint') }}</p>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-secondary" @click="showEditQuotaModal = false">{{ t('common.cancel') }}</button>
-              <button
-                :disabled="editQuotaLoading"
-                class="btn-primary"
-                @click="saveQuotaEdit"
-              >
-                <span v-if="editQuotaLoading" class="loading-spinner w-4 h-4"></span>
-                <span v-else>{{ t('common.save') }}</span>
-              </button>
-            </div>
+      <div class="modal-body p-6 space-y-4">
+        <!-- 套餐信息 -->
+        <div class="p-3 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+          <div class="text-sm font-semibold text-[var(--text-primary)]">
+            {{ editingShare?.packageName }}
+          </div>
+          <div class="text-xs text-[var(--text-secondary)] mt-1">
+            {{ t('friends.sharedTo') }}: {{ selectedFriend?.username }}
+          </div>
+        </div>
+
+        <!-- 配额限制 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <Input
+              v-model="editQuotaMultiplier"
+              type="number"
+              :label="t('friends.quotaMultiplier')"
+              :hint="t('friends.quotaMultiplierHint')"
+              :placeholder="t('friends.noLimit')"
+            >
+              <template #suffix>
+                <span class="text-xs text-[var(--text-tertiary)] font-medium">×</span>
+              </template>
+            </Input>
+          </div>
+          <div>
+            <Input
+              v-model="editMaxInstances"
+              type="number"
+              :label="t('friends.maxInstances')"
+              :hint="t('friends.maxInstancesHint')"
+              :placeholder="t('friends.noLimit')"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end gap-3">
+        <Button variant="secondary" @click="showEditQuotaModal = false">{{ t('common.cancel') }}</Button>
+        <Button
+          variant="primary"
+          :disabled="editQuotaLoading"
+          :loading="editQuotaLoading"
+          @click="saveQuotaEdit"
+        >
+          {{ t('common.save') }}
+        </Button>
+      </div>
     </DrawerModal>
   </div>
 </template>
 
 <style scoped>
-/* 可点击好友行：悬浮微抬升（accent 微光由全局 .card:hover 提供） */
-.nimbus-lift {
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+.tab-enter-active,
+.tab-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-.nimbus-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px rgb(16 24 40 / 0.18);
+.tab-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
 }
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-lift,
-  .nimbus-lift:hover {
-    transition: none;
-    transform: none;
-  }
+.tab-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

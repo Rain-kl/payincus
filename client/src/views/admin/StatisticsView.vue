@@ -1,9 +1,34 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  RefreshCw,
+  TrendingUp,
+  Users,
+  Server,
+  CircleDollarSign,
+  ShoppingCart,
+  HardDrive,
+  MessageSquare,
+  BarChart3,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  Activity,
+  Percent
+} from 'lucide-vue-next'
 import api from '@/api/admin'
-import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import { useToast } from '@/stores/toast'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  EmptyState,
+  Select
+} from '@/components/ui'
+
+defineOptions({ name: 'StatisticsView' })
 
 type StatisticsOverview = Awaited<ReturnType<typeof api.admin.getStatisticsOverview>>
 type TabKey = 'users' | 'instances' | 'billing'
@@ -50,12 +75,26 @@ const periodItems: Array<{ value: PeriodKey; labelKey: string }> = [
   { value: 'monthly', labelKey: 'admin.statistics.periods.monthly' }
 ]
 
+const periodOptions = computed(() =>
+  periodItems.map(item => ({
+    value: item.value,
+    label: t(item.labelKey)
+  }))
+)
+
 const billingMetricItems: Array<{ value: BillingMetricKey; labelKey: string; tone: Tone }> = [
   { value: 'recharge', labelKey: 'admin.statistics.billingMetrics.recharge', tone: 'blue' },
   { value: 'consume', labelKey: 'admin.statistics.billingMetrics.consume', tone: 'emerald' },
   { value: 'aff', labelKey: 'admin.statistics.billingMetrics.aff', tone: 'amber' },
   { value: 'destroyFee', labelKey: 'admin.statistics.billingMetrics.destroyFee', tone: 'rose' }
 ]
+
+const billingMetricOptions = computed(() =>
+  billingMetricItems.map(item => ({
+    value: item.value,
+    label: t(item.labelKey)
+  }))
+)
 
 const moneyFormatter = computed(() =>
   new Intl.NumberFormat(locale.value, {
@@ -64,6 +103,7 @@ const moneyFormatter = computed(() =>
     maximumFractionDigits: 2
   })
 )
+
 const compactMoneyFormatter = computed(() =>
   new Intl.NumberFormat(locale.value, {
     style: 'currency',
@@ -72,7 +112,9 @@ const compactMoneyFormatter = computed(() =>
     maximumFractionDigits: 1
   })
 )
+
 const numberFormatter = computed(() => new Intl.NumberFormat(locale.value))
+
 const compactNumberFormatter = computed(() =>
   new Intl.NumberFormat(locale.value, {
     notation: 'compact',
@@ -379,13 +421,13 @@ function getPercent(value: number, total: number): number {
 function cardToneClass(tone: Tone): string {
   switch (tone) {
     case 'emerald':
-      return 'text-themed bg-themed-secondary border-themed'
+      return 'text-[var(--chart-2)] bg-[color-mix(in_srgb,var(--chart-2)_12%,var(--bg-surface))] border-[color-mix(in_srgb,var(--chart-2)_24%,var(--bg-surface))]'
     case 'amber':
-      return 'text-themed bg-themed-secondary border-themed'
+      return 'text-[var(--chart-3)] bg-[color-mix(in_srgb,var(--chart-3)_12%,var(--bg-surface))] border-[color-mix(in_srgb,var(--chart-3)_24%,var(--bg-surface))]'
     case 'rose':
-      return 'text-themed bg-themed-secondary border-themed'
+      return 'text-[var(--chart-4)] bg-[color-mix(in_srgb,var(--chart-4)_12%,var(--bg-surface))] border-[color-mix(in_srgb,var(--chart-4)_24%,var(--bg-surface))]'
     default:
-      return 'text-themed bg-themed-secondary border-themed'
+      return 'text-[var(--chart-1)] bg-[color-mix(in_srgb,var(--chart-1)_12%,var(--bg-surface))] border-[color-mix(in_srgb,var(--chart-1)_24%,var(--bg-surface))]'
   }
 }
 
@@ -403,166 +445,347 @@ function barToneClass(tone: Tone): string {
 }
 
 function riskToneClass(severity: string): string {
-  if (severity === 'critical') return 'text-rose-600 bg-rose-500/10 border-rose-500/25'
-  if (severity === 'warning') return 'text-amber-600 bg-amber-500/10 border-amber-500/25'
-  return 'text-themed-muted bg-themed-secondary border-themed'
+  if (severity === 'critical') {
+    return 'text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] border-[color-mix(in_srgb,var(--error)_25%,var(--bg-surface))]'
+  }
+  if (severity === 'warning') {
+    return 'text-[var(--warning)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] border-[color-mix(in_srgb,var(--warning)_25%,var(--bg-surface))]'
+  }
+  return 'text-[var(--text-secondary)] bg-[var(--bg-surface-soft)] border-[var(--border-color)]'
+}
+
+function getOperationCardIcon(index: number) {
+  switch (index) {
+    case 0: return CircleDollarSign
+    case 1: return TrendingUp
+    case 2: return ShoppingCart
+    case 3: return Server
+    case 4: return HardDrive
+    case 5: return MessageSquare
+    default: return BarChart3
+  }
+}
+
+function getUserCardIcon(index: number) {
+  switch (index) {
+    case 0: return Users
+    case 1: return TrendingUp
+    default: return Activity
+  }
+}
+
+function getInstanceCardIcon(index: number) {
+  switch (index) {
+    case 0: return Server
+    case 1: return CheckCircle2
+    default: return TrendingUp
+  }
+}
+
+function getBillingCardIcon(index: number) {
+  switch (index) {
+    case 0: return CircleDollarSign
+    case 1: return ShoppingCart
+    case 2: return Users
+    default: return Percent
+  }
+}
+
+function getTabIcon(tab: TabKey) {
+  switch (tab) {
+    case 'users': return Users
+    case 'instances': return Server
+    case 'billing': return CircleDollarSign
+  }
 }
 </script>
 
 <template>
-  <div class="kawaii-page animate-fade-in">
-    <div class="page-header flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="page-title">{{ t('admin.statistics.title') }}</h1>
-        <p class="page-description">
+  <div class="space-y-6 md:space-y-8 animate-fade-in">
+    <!-- 顶部控制栏 (PageHeader) -->
+    <PageHeader>
+      <template #title>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl md:text-3xl font-semibold tracking-tight text-[var(--text-primary)] truncate">
+            {{ t('admin.statistics.title') }}
+          </h1>
+          <Badge v-if="stats?.meta.timezone" variant="default" size="sm" class="font-mono">
+            {{ t('admin.statistics.timezone', { timezone: stats.meta.timezone }) }}
+          </Badge>
+        </div>
+      </template>
+
+      <template #description>
+        <p class="text-sm text-[var(--text-secondary)] mt-1 max-w-2xl leading-relaxed">
           {{ t('admin.statistics.description') }}
-          <span v-if="stats" class="ml-2">{{ t('admin.statistics.timezone', { timezone: stats.meta.timezone }) }}</span>
         </p>
-      </div>
-      <button class="btn btn-secondary btn-sm" :disabled="loading" @click="loadStatistics">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4v5h.58m15.36 2A8 8 0 0 0 5.07 8.11M20 20v-5h-.58m0 0A8 8 0 0 1 4.06 12.03" />
-        </svg>
-        {{ t('admin.statistics.refresh') }}
-      </button>
-    </div>
+      </template>
 
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :loading="loading"
+          @click="loadStatistics"
+        >
+          <template #icon>
+            <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': loading }" />
+          </template>
+          <span>{{ t('admin.statistics.refresh') }}</span>
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- 加载骨架屏 -->
     <div v-if="loading" class="space-y-6">
-      <SkeletonLoader type="stats" />
-      <SkeletonLoader type="card" />
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card v-for="i in 6" :key="i" :loading="true" padding="sm" />
+      </div>
+      <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
+        <Card :loading="true" />
+        <Card :loading="true" />
+      </div>
     </div>
 
-    <div v-else-if="stats" class="space-y-6">
-
+    <!-- 统计详情内容 -->
+    <div v-else-if="stats" class="space-y-8">
+      <!-- 运营大盘总览 (Commercial Operations Overview) -->
       <section class="space-y-5">
-        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 class="text-lg font-semibold tracking-tight text-themed">{{ t('admin.statistics.operations.title') }}</h2>
-            <p class="text-sm text-themed-muted mt-1">{{ t('admin.statistics.operations.description') }}</p>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ t('admin.statistics.operations.title') }}
+              </h2>
+              <Badge variant="info" size="sm" dot>Live</Badge>
+            </div>
+            <p class="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+              {{ t('admin.statistics.operations.description') }}
+            </p>
           </div>
-          <div class="text-xs font-mono text-themed-faint">
-            {{ t('admin.statistics.operations.agentFreshness', { minutes: 30 }) }}
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-xs font-mono text-[var(--text-tertiary)] self-start sm:self-auto select-none">
+            <Activity class="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span>{{ t('admin.statistics.operations.agentFreshness', { minutes: 30 }) }}</span>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <div v-for="card in operationCards" :key="card.label" class="card p-4 sm:p-5">
+        <!-- 运营核心指标卡片 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card
+            v-for="(card, idx) in operationCards"
+            :key="card.label"
+            padding="sm"
+            class="transition-all duration-300 hover:shadow-md group"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" :class="cardToneClass(card.tone)">
-                <svg class="h-5 w-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 19V5m4 14v-7m4 7V8m4 11v-4m4 4H3" />
-                </svg>
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-105"
+                :class="cardToneClass(card.tone)"
+              >
+                <component :is="getOperationCardIcon(idx)" class="h-5 w-5" />
               </div>
-              <p class="min-w-0 flex-1 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ card.label }}</p>
+              <p class="min-w-0 flex-1 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] truncate">
+                {{ card.label }}
+              </p>
             </div>
-            <p class="mt-3 font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatCompactValue(card.value, card.type) }}</p>
-            <p class="mt-1 text-xs text-themed-faint">{{ card.caption }}</p>
-            <p v-if="card.detail" class="mt-1 text-xs text-themed-faint">{{ card.detail }}</p>
-          </div>
+            <div class="mt-4">
+              <p class="font-mono text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-[var(--text-primary)]">
+                {{ formatCompactValue(card.value, card.type) }}
+              </p>
+              <p class="mt-1.5 text-xs text-[var(--text-secondary)] truncate">
+                {{ card.caption }}
+              </p>
+              <p v-if="card.detail" class="mt-0.5 text-xs text-[var(--text-tertiary)] truncate">
+                {{ card.detail }}
+              </p>
+            </div>
+          </Card>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5">
-          <div class="card p-5">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <h3 class="text-base font-semibold tracking-tight text-themed">{{ t('admin.statistics.operations.riskTitle') }}</h3>
-                <p class="text-sm text-themed-muted mt-1">{{ t('admin.statistics.operations.riskDescription') }}</p>
+        <!-- 风险雷达与今日运营脉搏 -->
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
+          <!-- 运营风险雷达 -->
+          <Card class="transition-all duration-300">
+            <template #header>
+              <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-xl flex items-center justify-center bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_24%,var(--bg-surface))]">
+                    <ShieldAlert class="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 class="font-semibold tracking-tight text-base text-[var(--text-primary)]">
+                      {{ t('admin.statistics.operations.riskTitle') }}
+                    </h3>
+                    <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                      {{ t('admin.statistics.operations.riskDescription') }}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  :variant="operationRisks.length ? 'warning' : 'success'"
+                  :dot="true"
+                  :pulse="operationRisks.length > 0"
+                  size="sm"
+                >
+                  {{ operationRisks.length ? t('admin.statistics.operations.riskCount', { count: operationRisks.length }) : t('admin.statistics.operations.noRisk') }}
+                </Badge>
               </div>
-              <span :class="['px-2.5 py-1 rounded-full text-xs font-medium border', operationRisks.length ? 'text-amber-600 bg-amber-500/10 border-amber-500/25' : 'text-emerald-600 bg-emerald-500/10 border-emerald-500/25']">
-                {{ operationRisks.length ? t('admin.statistics.operations.riskCount', { count: operationRisks.length }) : t('admin.statistics.operations.noRisk') }}
-              </span>
-            </div>
+            </template>
 
-            <div v-if="operationRisks.length" class="mt-5 space-y-3">
+            <div v-if="operationRisks.length" class="space-y-3">
               <div
                 v-for="risk in operationRisks"
                 :key="risk.key"
-                :class="['border rounded-lg p-3', riskToneClass(risk.severity)]"
+                :class="['border rounded-xl p-3.5 transition-all duration-200', riskToneClass(risk.severity)]"
               >
                 <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="text-sm font-medium">{{ t(`admin.statistics.operations.risks.${risk.key}.title`, { count: risk.count }) }}</p>
-                    <p class="text-xs mt-1 opacity-80">{{ t(`admin.statistics.operations.risks.${risk.key}.description`, { count: risk.count }) }}</p>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <AlertTriangle v-if="risk.severity === 'critical' || risk.severity === 'warning'" class="w-4 h-4 shrink-0" />
+                      <p class="text-sm font-semibold tracking-tight">
+                        {{ t(`admin.statistics.operations.risks.${risk.key}.title`, { count: risk.count }) }}
+                      </p>
+                    </div>
+                    <p class="text-xs mt-1.5 opacity-85 leading-relaxed">
+                      {{ t(`admin.statistics.operations.risks.${risk.key}.description`, { count: risk.count }) }}
+                    </p>
                   </div>
-                  <span class="text-xs font-medium uppercase">{{ t(`admin.statistics.operations.severity.${risk.severity}`) }}</span>
+                  <Badge
+                    :variant="risk.severity === 'critical' ? 'error' : risk.severity === 'warning' ? 'warning' : 'info'"
+                    size="sm"
+                    class="shrink-0 uppercase font-mono text-[10px]"
+                  >
+                    {{ t(`admin.statistics.operations.severity.${risk.severity}`) }}
+                  </Badge>
                 </div>
               </div>
             </div>
 
-            <div v-else class="mt-5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-5">
-              <p class="text-sm font-medium text-emerald-600">{{ t('admin.statistics.operations.healthyTitle') }}</p>
-              <p class="text-xs text-themed-muted mt-1">{{ t('admin.statistics.operations.healthyDescription') }}</p>
+            <div v-else class="rounded-xl border border-[color-mix(in_srgb,var(--success)_25%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--success)_8%,var(--bg-surface))] p-5 text-center">
+              <div class="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center bg-[color-mix(in_srgb,var(--success)_16%,var(--bg-surface))] text-[var(--success)]">
+                <CheckCircle2 class="w-5 h-5" />
+              </div>
+              <p class="text-sm font-semibold text-[var(--success)]">{{ t('admin.statistics.operations.healthyTitle') }}</p>
+              <p class="text-xs text-[var(--text-secondary)] mt-1 max-w-sm mx-auto">{{ t('admin.statistics.operations.healthyDescription') }}</p>
             </div>
-          </div>
+          </Card>
 
-          <div class="card p-5">
-            <h3 class="text-base font-semibold tracking-tight text-themed">{{ t('admin.statistics.operations.todayTitle') }}</h3>
-            <p class="text-sm text-themed-muted mt-1">{{ t('admin.statistics.operations.todayDescription') }}</p>
-            <div class="mt-5 divide-y divide-themed">
-              <div v-for="fact in operationFacts" :key="fact.label" class="flex items-center justify-between gap-4 py-3">
-                <span class="text-sm text-themed-muted">{{ fact.label }}</span>
-                <span class="font-mono text-sm font-semibold tabular-nums text-themed">{{ fact.value }}</span>
+          <!-- 今日运营脉搏 -->
+          <Card class="transition-all duration-300">
+            <template #header>
+              <div>
+                <h3 class="font-semibold tracking-tight text-base text-[var(--text-primary)]">
+                  {{ t('admin.statistics.operations.todayTitle') }}
+                </h3>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.statistics.operations.todayDescription') }}
+                </p>
+              </div>
+            </template>
+
+            <div class="divide-y divide-[var(--border-color)]">
+              <div
+                v-for="fact in operationFacts"
+                :key="fact.label"
+                class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+              >
+                <span class="text-sm text-[var(--text-secondary)]">{{ fact.label }}</span>
+                <span class="font-mono text-sm font-semibold tabular-nums text-[var(--text-primary)]">{{ fact.value }}</span>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </section>
 
-      <div class="border-b border-themed">
-        <div class="-mb-px flex gap-1 overflow-x-auto">
+      <!-- 维度切换胶囊栏 (Apple Segmented Capsule Bar) -->
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+        <div class="inline-flex p-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
           <button
             v-for="tab in tabItems"
             :key="tab.value"
-            class="border-b-2 -mb-px whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors"
-            :class="activeTab === tab.value ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
+            type="button"
+            class="inline-flex items-center gap-2 px-4 sm:px-5 py-2 text-xs sm:text-sm font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-95"
+            :class="activeTab === tab.value
+              ? 'bg-[var(--accent)] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
             @click="activeTab = tab.value"
           >
-            {{ t(tab.labelKey) }}
+            <component :is="getTabIcon(tab.value)" class="w-4 h-4" />
+            <span>{{ t(tab.labelKey) }}</span>
           </button>
         </div>
       </div>
 
-      <section v-if="activeTab === 'users'" class="space-y-5">
+      <!-- 用户分析 Tab -->
+      <section v-if="activeTab === 'users'" class="space-y-6">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div v-for="card in userCards" :key="card.label" class="card p-4 sm:p-5">
+          <Card
+            v-for="(card, idx) in userCards"
+            :key="card.label"
+            padding="sm"
+            class="transition-all duration-300 hover:shadow-md group"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" :class="cardToneClass(card.tone)">
-                <svg class="h-5 w-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 19.13a9.38 9.38 0 0 0 2.63.37 9.34 9.34 0 0 0 4.12-.95 4.13 4.13 0 0 0-7.54-2.5M15 19.13v.1A12.32 12.32 0 0 1 8.62 21a12.32 12.32 0 0 1-6.37-1.77v-.1a6.38 6.38 0 0 1 11.96-3.08M12 6.38a3.38 3.38 0 1 1-6.75 0 3.38 3.38 0 0 1 6.75 0Zm8.25 2.25a2.63 2.63 0 1 1-5.25 0 2.63 2.63 0 0 1 5.25 0Z" />
-                </svg>
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-105"
+                :class="cardToneClass(card.tone)"
+              >
+                <component :is="getUserCardIcon(idx)" class="h-5 w-5" />
               </div>
-              <p class="min-w-0 flex-1 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ card.label }}</p>
-            </div>
-            <p class="mt-3 font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatValue(card.value, card.type) }}</p>
-            <p class="mt-1 text-xs text-themed-faint">{{ card.caption }}</p>
-          </div>
-        </div>
-
-        <div class="card p-5">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="chart-swatch chart-bar-blue"></span>
-                <h2 class="text-base font-semibold tracking-tight text-themed">{{ t('admin.statistics.sections.newUsers') }}</h2>
-              </div>
-              <p class="text-sm text-themed-muted mt-1">
-                {{ userPeriod === 'daily' ? t('admin.statistics.ranges.last30Days') : t('admin.statistics.ranges.last12Months') }}
+              <p class="min-w-0 flex-1 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] truncate">
+                {{ card.label }}
               </p>
             </div>
-            <div class="inline-flex rounded-lg border border-themed p-1 bg-themed-tertiary">
-              <button
-                v-for="period in periodItems"
-                :key="period.value"
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                :class="userPeriod === period.value ? 'bg-themed text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-                @click="userPeriod = period.value"
-              >
-                {{ t(period.labelKey) }}
-              </button>
+            <div class="mt-4">
+              <p class="font-mono text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-[var(--text-primary)]">
+                {{ formatValue(card.value, card.type) }}
+              </p>
+              <p class="mt-1.5 text-xs text-[var(--text-secondary)] truncate">{{ card.caption }}</p>
             </div>
-          </div>
+          </Card>
+        </div>
 
-          <div class="chart-area mt-6">
+        <Card class="transition-all duration-300">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+              <div>
+                <div class="flex items-center gap-2.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[var(--chart-1)] shrink-0"></span>
+                  <h3 class="font-semibold tracking-tight text-base text-[var(--text-primary)]">
+                    {{ t('admin.statistics.sections.newUsers') }}
+                  </h3>
+                </div>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ userPeriod === 'daily' ? t('admin.statistics.ranges.last30Days') : t('admin.statistics.ranges.last12Months') }}
+                </p>
+              </div>
+
+              <!-- 周期选择：桌面胶囊 / 移动端 Select -->
+              <div class="hidden sm:inline-flex p-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                <button
+                  v-for="period in periodItems"
+                  :key="period.value"
+                  type="button"
+                  class="px-3.5 py-1 text-xs font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-95"
+                  :class="userPeriod === period.value
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                  @click="userPeriod = period.value"
+                >
+                  {{ t(period.labelKey) }}
+                </button>
+              </div>
+              <div class="sm:hidden w-28">
+                <Select
+                  v-model="userPeriod"
+                  :options="periodOptions"
+                  size="sm"
+                />
+              </div>
+            </div>
+          </template>
+
+          <div class="chart-area mt-4">
             <div v-for="(point, index) in userSeries" :key="point.label" class="chart-column group">
               <div class="chart-value" :title="`${point.label}: ${formatValue(point.value, 'number')}`">
                 <span class="chart-tooltip">{{ t('admin.statistics.tooltip', { label: point.label, value: formatValue(point.value, 'number') }) }}</span>
@@ -574,51 +797,80 @@ function riskToneClass(severity: string): string {
               <span class="chart-tick">{{ shouldShowTick(index, userSeries.length) ? formatTick(point.label) : '' }}</span>
             </div>
           </div>
-        </div>
+        </Card>
       </section>
 
-      <section v-else-if="activeTab === 'instances'" class="space-y-5">
+      <!-- 实例分析 Tab -->
+      <section v-else-if="activeTab === 'instances'" class="space-y-6">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div v-for="card in instanceCards" :key="card.label" class="card p-4 sm:p-5">
+          <Card
+            v-for="(card, idx) in instanceCards"
+            :key="card.label"
+            padding="sm"
+            class="transition-all duration-300 hover:shadow-md group"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" :class="cardToneClass(card.tone)">
-                <svg class="h-5 w-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 7.5h14M5 12h14M5 16.5h14M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4Z" />
-                </svg>
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-105"
+                :class="cardToneClass(card.tone)"
+              >
+                <component :is="getInstanceCardIcon(idx)" class="h-5 w-5" />
               </div>
-              <p class="min-w-0 flex-1 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ card.label }}</p>
+              <p class="min-w-0 flex-1 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] truncate">
+                {{ card.label }}
+              </p>
             </div>
-            <p class="mt-3 font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatValue(card.value, card.type) }}</p>
-            <p class="mt-1 text-xs text-themed-faint">{{ card.caption }}</p>
-          </div>
+            <div class="mt-4">
+              <p class="font-mono text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-[var(--text-primary)]">
+                {{ formatValue(card.value, card.type) }}
+              </p>
+              <p class="mt-1.5 text-xs text-[var(--text-secondary)] truncate">{{ card.caption }}</p>
+            </div>
+          </Card>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
-          <div class="card p-5">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="chart-swatch chart-bar-emerald"></span>
-                  <h2 class="text-base font-semibold tracking-tight text-themed">{{ t('admin.statistics.sections.createdInstances') }}</h2>
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+          <Card class="transition-all duration-300">
+            <template #header>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+                <div>
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-[var(--chart-2)] shrink-0"></span>
+                    <h3 class="font-semibold tracking-tight text-base text-[var(--text-primary)]">
+                      {{ t('admin.statistics.sections.createdInstances') }}
+                    </h3>
+                  </div>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                    {{ instancePeriod === 'daily' ? t('admin.statistics.ranges.last30Days') : t('admin.statistics.ranges.last12Months') }}
+                  </p>
                 </div>
-                <p class="text-sm text-themed-muted mt-1">
-                  {{ instancePeriod === 'daily' ? t('admin.statistics.ranges.last30Days') : t('admin.statistics.ranges.last12Months') }}
-                </p>
-              </div>
-              <div class="inline-flex rounded-lg border border-themed p-1 bg-themed-tertiary">
-                <button
-                  v-for="period in periodItems"
-                  :key="period.value"
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="instancePeriod === period.value ? 'bg-themed text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-                  @click="instancePeriod = period.value"
-                >
-                  {{ t(period.labelKey) }}
-                </button>
-              </div>
-            </div>
 
-            <div class="chart-area mt-6">
+                <!-- 周期选择：桌面胶囊 / 移动端 Select -->
+                <div class="hidden sm:inline-flex p-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                  <button
+                    v-for="period in periodItems"
+                    :key="period.value"
+                    type="button"
+                    class="px-3.5 py-1 text-xs font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-95"
+                    :class="instancePeriod === period.value
+                      ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                    @click="instancePeriod = period.value"
+                  >
+                    {{ t(period.labelKey) }}
+                  </button>
+                </div>
+                <div class="sm:hidden w-28">
+                  <Select
+                    v-model="instancePeriod"
+                    :options="periodOptions"
+                    size="sm"
+                  />
+                </div>
+              </div>
+            </template>
+
+            <div class="chart-area mt-4">
               <div v-for="(point, index) in instanceSeries" :key="point.label" class="chart-column group">
                 <div class="chart-value" :title="`${point.label}: ${formatValue(point.value, 'number')}`">
                   <span class="chart-tooltip">{{ t('admin.statistics.tooltip', { label: point.label, value: formatValue(point.value, 'number') }) }}</span>
@@ -630,107 +882,166 @@ function riskToneClass(severity: string): string {
                 <span class="chart-tick">{{ shouldShowTick(index, instanceSeries.length) ? formatTick(point.label) : '' }}</span>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div class="card p-5">
-            <h2 class="text-base font-semibold tracking-tight text-themed">{{ t('admin.statistics.sections.paidFreeInstances') }}</h2>
-            <p class="text-sm text-themed-muted mt-1">{{ t('admin.statistics.sections.paidFreeDescription') }}</p>
+          <!-- 付费/免费占比卡片 -->
+          <Card class="transition-all duration-300">
+            <template #header>
+              <div>
+                <h3 class="font-semibold tracking-tight text-base text-[var(--text-primary)]">
+                  {{ t('admin.statistics.sections.paidFreeInstances') }}
+                </h3>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.statistics.sections.paidFreeDescription') }}
+                </p>
+              </div>
+            </template>
 
-            <div class="mt-8">
-              <div class="h-3 rounded-full overflow-hidden bg-themed-tertiary flex">
-                <div class="stat-split-seg bg-blue-500" :style="{ width: `${paidPercent}%` }"></div>
-                <div class="stat-split-seg bg-emerald-500" :style="{ width: `${freePercent}%` }"></div>
+            <div class="space-y-6 pt-2">
+              <!-- 分割比例进度条 -->
+              <div class="h-3 rounded-full overflow-hidden bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex p-0.5">
+                <div
+                  class="stat-split-seg rounded-l-full bg-[var(--chart-1)]"
+                  :style="{ width: `${paidPercent}%` }"
+                  :title="`${t('admin.statistics.labels.paidInstances')}: ${paidPercent}%`"
+                ></div>
+                <div
+                  class="stat-split-seg rounded-r-full bg-[var(--chart-2)]"
+                  :style="{ width: `${freePercent}%` }"
+                  :title="`${t('admin.statistics.labels.freeInstances')}: ${freePercent}%`"
+                ></div>
               </div>
 
-              <div class="mt-6 space-y-4">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                    <span class="text-sm text-themed-secondary">{{ t('admin.statistics.labels.paidInstances') }}</span>
+              <!-- 比例细分列表 -->
+              <div class="space-y-3">
+                <div class="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-colors">
+                  <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-[var(--chart-1)] shrink-0"></span>
+                    <span class="text-sm font-medium text-[var(--text-primary)]">{{ t('admin.statistics.labels.paidInstances') }}</span>
                   </div>
                   <div class="text-right">
-                    <p class="font-mono text-sm font-semibold tabular-nums text-themed">{{ formatValue(stats.instances.paid, 'number') }}</p>
-                    <p class="font-mono text-xs tabular-nums text-themed-muted">{{ paidPercent }}%</p>
+                    <p class="font-mono text-base font-semibold tabular-nums text-[var(--text-primary)]">{{ formatValue(stats.instances.paid, 'number') }}</p>
+                    <p class="font-mono text-xs tabular-nums text-[var(--text-tertiary)]">{{ paidPercent }}%</p>
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                    <span class="text-sm text-themed-secondary">{{ t('admin.statistics.labels.freeInstances') }}</span>
+                <div class="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] transition-colors">
+                  <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-[var(--chart-2)] shrink-0"></span>
+                    <span class="text-sm font-medium text-[var(--text-primary)]">{{ t('admin.statistics.labels.freeInstances') }}</span>
                   </div>
                   <div class="text-right">
-                    <p class="font-mono text-sm font-semibold tabular-nums text-themed">{{ formatValue(stats.instances.free, 'number') }}</p>
-                    <p class="font-mono text-xs tabular-nums text-themed-muted">{{ freePercent }}%</p>
+                    <p class="font-mono text-base font-semibold tabular-nums text-[var(--text-primary)]">{{ formatValue(stats.instances.free, 'number') }}</p>
+                    <p class="font-mono text-xs tabular-nums text-[var(--text-tertiary)]">{{ freePercent }}%</p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </section>
 
-      <section v-else class="space-y-5">
+      <!-- 财务营收 Tab -->
+      <section v-else class="space-y-6">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div v-for="card in billingCards" :key="card.label" class="card p-4 sm:p-5">
+          <Card
+            v-for="(card, idx) in billingCards"
+            :key="card.label"
+            padding="sm"
+            class="transition-all duration-300 hover:shadow-md group"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border" :class="cardToneClass(card.tone)">
-                <svg class="h-5 w-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 7.5A2.5 2.5 0 0 1 5.5 5h11A2.5 2.5 0 0 1 19 7.5V9h-2.5a3.5 3.5 0 1 0 0 7H19v.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 3 16.5v-9Z" />
-                  <circle cx="16.5" cy="12.5" r="0.75" fill="currentColor" />
-                </svg>
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-300 group-hover:scale-105"
+                :class="cardToneClass(card.tone)"
+              >
+                <component :is="getBillingCardIcon(idx)" class="h-5 w-5" />
               </div>
-              <p class="min-w-0 flex-1 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ card.label }}</p>
-            </div>
-            <p class="mt-3 font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatCompactValue(card.value, card.type) }}</p>
-            <p class="mt-1 text-xs text-themed-faint">{{ card.caption }}</p>
-          </div>
-        </div>
-
-        <div class="card p-5">
-          <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="chart-swatch" :class="barToneClass(currentBillingMetric.tone)"></span>
-                <h2 class="text-base font-semibold tracking-tight text-themed">
-                  {{ t('admin.statistics.sections.metricTrend', { metric: t(currentBillingMetric.labelKey) }) }}
-                </h2>
-              </div>
-              <p class="text-sm text-themed-muted mt-1">
-                {{ t('admin.statistics.sections.billingScope', {
-                  range: billingPeriod === 'daily' ? t('admin.statistics.ranges.last30Days') : t('admin.statistics.ranges.last12Months')
-                }) }}
+              <p class="min-w-0 flex-1 text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] truncate">
+                {{ card.label }}
               </p>
             </div>
+            <div class="mt-4">
+              <p class="font-mono text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-[var(--text-primary)]">
+                {{ formatCompactValue(card.value, card.type) }}
+              </p>
+              <p class="mt-1.5 text-xs text-[var(--text-secondary)] truncate">{{ card.caption }}</p>
+            </div>
+          </Card>
+        </div>
 
-            <div class="flex flex-col sm:flex-row gap-3">
-              <div class="flex flex-wrap rounded-lg border border-themed p-1 bg-themed-tertiary">
-                <button
-                  v-for="metric in billingMetricItems"
-                  :key="metric.value"
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="billingMetric === metric.value ? 'bg-themed text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-                  @click="billingMetric = metric.value"
-                >
-                  {{ t(metric.labelKey) }}
-                </button>
+        <Card class="transition-all duration-300">
+          <template #header>
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
+              <div>
+                <div class="flex items-center gap-2.5">
+                  <span class="chart-swatch" :class="barToneClass(currentBillingMetric.tone)"></span>
+                  <h3 class="font-semibold tracking-tight text-base text-[var(--text-primary)]">
+                    {{ t('admin.statistics.sections.metricTrend', { metric: t(currentBillingMetric.labelKey) }) }}
+                  </h3>
+                </div>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('admin.statistics.sections.billingScope', {
+                    range: billingPeriod === 'daily' ? t('admin.statistics.ranges.last30Days') : t('admin.statistics.ranges.last12Months')
+                  }) }}
+                </p>
               </div>
 
-              <div class="inline-flex rounded-lg border border-themed p-1 bg-themed-tertiary">
-                <button
-                  v-for="period in periodItems"
-                  :key="period.value"
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="billingPeriod === period.value ? 'bg-themed text-themed shadow-sm' : 'text-themed-muted hover:text-themed'"
-                  @click="billingPeriod = period.value"
-                >
-                  {{ t(period.labelKey) }}
-                </button>
+              <!-- 指标与周期选择器 -->
+              <div class="flex flex-col sm:flex-row gap-3">
+                <!-- 移动端 Select 选择器 -->
+                <div class="flex sm:hidden items-center gap-2 w-full">
+                  <div class="flex-1">
+                    <Select
+                      v-model="billingMetric"
+                      :options="billingMetricOptions"
+                      size="sm"
+                    />
+                  </div>
+                  <div class="w-28">
+                    <Select
+                      v-model="billingPeriod"
+                      :options="periodOptions"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+
+                <!-- 桌面端 Apple 胶囊药丸切换群 -->
+                <div class="hidden sm:inline-flex flex-wrap p-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] gap-1">
+                  <button
+                    v-for="metric in billingMetricItems"
+                    :key="metric.value"
+                    type="button"
+                    class="px-3 py-1 text-xs font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-95"
+                    :class="billingMetric === metric.value
+                      ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                    @click="billingMetric = metric.value"
+                  >
+                    {{ t(metric.labelKey) }}
+                  </button>
+                </div>
+
+                <div class="hidden sm:inline-flex p-1 rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                  <button
+                    v-for="period in periodItems"
+                    :key="period.value"
+                    type="button"
+                    class="px-3.5 py-1 text-xs font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-95"
+                    :class="billingPeriod === period.value
+                      ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                    @click="billingPeriod = period.value"
+                  >
+                    {{ t(period.labelKey) }}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
 
-          <div class="chart-area mt-6">
+          <div class="chart-area mt-4">
             <div v-for="(point, index) in billingSeries" :key="point.label" class="chart-column group">
               <div class="chart-value" :title="`${point.label}: ${formatValue(point.value, 'money')}`">
                 <span class="chart-tooltip">{{ t('admin.statistics.tooltip', { label: point.label, value: formatCompactValue(point.value, 'money') }) }}</span>
@@ -742,14 +1053,25 @@ function riskToneClass(severity: string): string {
               <span class="chart-tick">{{ shouldShowTick(index, billingSeries.length) ? formatTick(point.label) : '' }}</span>
             </div>
           </div>
-        </div>
+        </Card>
       </section>
     </div>
 
-    <div v-else class="card p-12 text-center">
-      <p class="text-themed-muted">{{ t('admin.statistics.noData') }}</p>
-      <button class="btn btn-primary mt-4" @click="loadStatistics">{{ t('admin.statistics.reload') }}</button>
-    </div>
+    <!-- 空数据 / 错误状态 -->
+    <Card v-else class="text-center py-16">
+      <EmptyState
+        :title="t('admin.statistics.noData')"
+      >
+        <template #action>
+          <Button variant="primary" @click="loadStatistics">
+            <template #icon>
+              <RefreshCw class="w-4 h-4" />
+            </template>
+            {{ t('admin.statistics.reload') }}
+          </Button>
+        </template>
+      </EmptyState>
+    </Card>
   </div>
 </template>
 
@@ -757,7 +1079,7 @@ function riskToneClass(severity: string): string {
 .chart-area {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(26px, 1fr);
+  grid-auto-columns: minmax(28px, 1fr);
   align-items: end;
   gap: 0.5rem;
   min-height: 18rem;
@@ -767,7 +1089,7 @@ function riskToneClass(severity: string): string {
 }
 
 .chart-column {
-  min-width: 26px;
+  min-width: 28px;
 }
 
 .chart-value {
@@ -780,33 +1102,41 @@ function riskToneClass(severity: string): string {
 }
 
 .chart-bar {
-  width: min(70%, 1.6rem);
+  width: min(72%, 1.6rem);
   min-height: 0;
-  border-radius: 0.45rem 0.45rem 0 0;
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0));
+  border-radius: 6px 6px 0 0;
   transform-origin: bottom;
-  transition: height 0.25s ease, opacity 0.15s ease;
-  animation: chart-grow 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  transition: height 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.2s ease;
+  animation: chart-grow 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) both;
 }
 
 .chart-column:hover .chart-bar {
-  opacity: 0.78;
+  opacity: 0.82;
 }
 
 @keyframes chart-grow {
-  from { transform: scaleY(0); opacity: 0.5; }
-  to { transform: scaleY(1); opacity: 1; }
+  from {
+    transform: scaleY(0);
+    opacity: 0.5;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 .stat-split-seg {
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0));
   transform-origin: left;
-  animation: stat-split-grow 0.85s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: stat-split-grow 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
 }
 
 @keyframes stat-split-grow {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .chart-bar-blue {
@@ -825,60 +1155,48 @@ function riskToneClass(severity: string): string {
   background-color: var(--chart-4);
 }
 
-:global(.dark) .chart-bar-blue {
-  background-color: var(--chart-1);
-}
-
-:global(.dark) .chart-bar-emerald {
-  background-color: var(--chart-2);
-}
-
-:global(.dark) .chart-bar-amber {
-  background-color: var(--chart-3);
-}
-
-:global(.dark) .chart-bar-rose {
-  background-color: var(--chart-4);
-}
-
 .chart-tooltip {
   position: absolute;
-  top: -2.25rem;
+  top: -2.5rem;
   left: 50%;
   z-index: 10;
   transform: translateX(-50%);
   white-space: nowrap;
-  border-radius: 0.375rem;
-  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.6rem;
   font-size: 0.75rem;
   line-height: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
   color: var(--text-primary);
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
 }
 
 .chart-column:hover .chart-tooltip {
   opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
 }
 
 .chart-tick {
   display: block;
   width: max-content;
   min-height: 1rem;
-  margin: 0.5rem auto 0;
+  margin: 0.6rem auto 0;
   text-align: center;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   line-height: 1rem;
   white-space: nowrap;
   word-break: keep-all;
   overflow-wrap: normal;
   color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-/* Nimbus legend swatch — reuses .chart-bar-* background colors to echo each series */
 .chart-swatch {
   display: inline-block;
   width: 0.625rem;
