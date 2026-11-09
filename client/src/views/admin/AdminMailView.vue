@@ -3,15 +3,38 @@ import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import { translateError } from '@/utils/errorHandler'
 import FlagIcon from '@/components/FlagIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import DrawerModal from '@/components/DrawerModal.vue'
 import { useTabQuery } from '@/composables/useTabQuery'
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  EmptyState,
+  Input,
+  Select,
+  Pagination
+} from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
+import {
+  Server,
+  Package,
+  Users,
+  Globe,
+  Plus,
+  RefreshCw,
+  Search,
+  Edit3,
+  Trash2,
+  X,
+  Loader2
+} from 'lucide-vue-next'
 
 const { t } = useI18n()
 const toast = useToast()
-const themeStore = useThemeStore()
 
 // TAB 状态
 type MailTab = 'sources' | 'plans' | 'subscriptions' | 'domains'
@@ -70,6 +93,30 @@ const domainsSearch = ref('')
 const subscriptionsTotalPages = computed(() => Math.ceil(totalSubscriptions.value / pageSize.value))
 const domainsTotalPages = computed(() => Math.ceil(totalDomains.value / pageSize.value))
 
+const regionSelectOptions = [
+  { value: 'us', label: '美国 (US)' },
+  { value: 'nl', label: '荷兰 (NL)' }
+]
+
+const sourceSelectOptions = computed(() =>
+  sources.value.map((s) => ({
+    value: s.id,
+    label: `${s.name} (${s.code.toUpperCase()})`
+  }))
+)
+
+const billingCycleOptions = computed(() => [
+  { value: 'monthly', label: t('mail.monthly') },
+  { value: 'yearly', label: t('mail.yearly') }
+])
+
+const tabItems = computed(() => [
+  { id: 'sources' as const, label: t('admin.mail.tabs.sources'), icon: Server, count: sources.value.length },
+  { id: 'plans' as const, label: t('admin.mail.tabs.plans'), icon: Package, count: plans.value.length },
+  { id: 'subscriptions' as const, label: t('admin.mail.tabs.subscriptions'), icon: Users, count: totalSubscriptions.value },
+  { id: 'domains' as const, label: t('admin.mail.tabs.domains'), icon: Globe, count: totalDomains.value }
+])
+
 onMounted(async () => {
   await loadTabData(activeTab.value)
 })
@@ -77,15 +124,20 @@ onMounted(async () => {
 async function loadTabData(tab: MailTab) {
   if (tab === 'sources' && sources.value.length === 0) {
     await loadSources()
-  } else if (tab === 'plans' && plans.value.length === 0) {
-    await loadPlans()
+  } else if (tab === 'plans') {
+    if (sources.value.length === 0) {
+      await loadSources()
+    }
+    if (plans.value.length === 0) {
+      await loadPlans()
+    }
   } else if (tab === 'subscriptions') {
     subscriptionsPage.value = 1
-    subscriptionsSearch.value = '' // 重置搜索条件
+    subscriptionsSearch.value = ''
     await loadSubscriptions()
   } else if (tab === 'domains') {
     domainsPage.value = 1
-    domainsSearch.value = '' // 重置搜索条件
+    domainsSearch.value = ''
     await loadDomains()
   }
 }
@@ -221,18 +273,27 @@ function openEditPlanModal(plan: any) {
 }
 
 async function savePlan() {
-  if (!planForm.value.name || !planForm.value.sourceId || planForm.value.price <= 0) {
+  const priceNum = Number(planForm.value.price)
+  const domainLimitNum = Number(planForm.value.domainLimit)
+  const diskLimitGbNum = Number(planForm.value.diskLimitGb)
+  if (!planForm.value.name || !planForm.value.sourceId || priceNum <= 0) {
     toast.error(t('admin.mail.fillRequired'))
     return
   }
 
   actionLoading.value = 'save-plan'
   try {
+    const payload = {
+      ...planForm.value,
+      price: priceNum,
+      domainLimit: domainLimitNum,
+      diskLimitGb: diskLimitGbNum
+    }
     if (editingPlan.value) {
-      await api.mail.adminUpdatePlan(editingPlan.value.id, planForm.value)
+      await api.mail.adminUpdatePlan(editingPlan.value.id, payload)
       toast.success(t('admin.mail.planUpdated'))
     } else {
-      await api.mail.adminCreatePlan(planForm.value)
+      await api.mail.adminCreatePlan(payload)
       toast.success(t('admin.mail.planCreated'))
     }
     showPlanModal.value = false
@@ -263,8 +324,8 @@ async function deletePlan(plan: any) {
 async function loadSubscriptions() {
   loading.value = true
   try {
-    const res = await api.mail.adminGetSubscriptions({ 
-      page: subscriptionsPage.value, 
+    const res = await api.mail.adminGetSubscriptions({
+      page: subscriptionsPage.value,
       pageSize: pageSize.value,
       search: subscriptionsSearch.value || undefined
     })
@@ -293,8 +354,8 @@ function goToSubscriptionsPage(newPage: number) {
 async function loadDomains() {
   loading.value = true
   try {
-    const res = await api.mail.adminGetDomains({ 
-      page: domainsPage.value, 
+    const res = await api.mail.adminGetDomains({
+      page: domainsPage.value,
       pageSize: pageSize.value,
       search: domainsSearch.value || undefined
     })
@@ -365,276 +426,421 @@ function formatPrice(price: number | string | null | undefined) {
   return `¥${num.toFixed(2)}`
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string | null | undefined) {
+  if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString()
 }
 
-function getStatusBadge(status: string) {
+function getStatusBadge(status: string): BadgeVariant {
   switch (status) {
     case 'active':
-    case 'verified': return 'badge-success'
-    case 'pending': return 'badge-warning'
+    case 'verified':
+      return 'success'
+    case 'pending':
+      return 'warning'
     case 'expired':
-    case 'suspended': return 'badge-error'
-    default: return 'badge-ghost'
+    case 'suspended':
+      return 'error'
+    default:
+      return 'default'
   }
 }
-
-const regionOptions = [
-  { code: 'us', name: '美国' },
-  { code: 'nl', name: '荷兰' }
-]
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
+  <div class="kawaii-page nimbus-view space-y-6 animate-fade-in">
     <!-- Header -->
-    <div class="page-header">
-      <div class="flex items-center gap-3">
-        <span class="nimbus-title-icon">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 8.25V18a1.5 1.5 0 0 0 1.5 1.5h15a1.5 1.5 0 0 0 1.5-1.5V8.25m-18 0A1.5 1.5 0 0 1 4.5 6.75h15A1.5 1.5 0 0 1 21 8.25m-18 0 8.303 5.19a1.5 1.5 0 0 0 1.594 0L21 8.25" />
-          </svg>
-        </span>
-        <div>
-          <h1 class="page-title">{{ t('admin.mail.title') }}</h1>
-          <p class="page-description">{{ t('admin.mail.description') }}</p>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      :title="t('admin.mail.title')"
+      :description="t('admin.mail.description')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :loading="loading"
+          @click="loadTabData(activeTab)"
+        >
+          <template #icon>
+            <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
+          </template>
+          <span>{{ t('common.refresh') || '刷新' }}</span>
+        </Button>
+        <Button
+          v-if="activeTab === 'sources'"
+          variant="primary"
+          size="sm"
+          @click="openCreateSourceModal"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2]" />
+          </template>
+          <span>{{ t('admin.mail.createSource') }}</span>
+        </Button>
+        <Button
+          v-else-if="activeTab === 'plans'"
+          variant="primary"
+          size="sm"
+          @click="openCreatePlanModal"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2]" />
+          </template>
+          <span>{{ t('admin.mail.createPlan') }}</span>
+        </Button>
+      </template>
+    </PageHeader>
 
-    <!-- TAB 切换 -->
-    <div class="flex flex-wrap gap-1 border-b border-themed">
+    <!-- TAB 导航 (Apple 风格分段控制器) -->
+    <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full w-fit">
       <button
-        class="-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'sources'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('sources')"
+        v-for="tab in tabItems"
+        :key="tab.id"
+        type="button"
+        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none"
+        :class="activeTab === tab.id
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
+        @click="switchTab(tab.id)"
       >
-        {{ t('admin.mail.tabs.sources') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'plans'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('plans')"
-      >
-        {{ t('admin.mail.tabs.plans') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'subscriptions'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('subscriptions')"
-      >
-        {{ t('admin.mail.tabs.subscriptions') }}
-      </button>
-      <button
-        class="-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-        :class="activeTab === 'domains'
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
-        @click="switchTab('domains')"
-      >
-        {{ t('admin.mail.tabs.domains') }}
+        <component :is="tab.icon" class="w-4 h-4 stroke-[1.8]" />
+        <span>{{ tab.label }}</span>
+        <Badge
+          v-if="tab.count !== undefined && tab.count > 0"
+          size="sm"
+          :variant="activeTab === tab.id ? 'info' : 'default'"
+        >
+          {{ tab.count }}
+        </Badge>
       </button>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="card p-12 text-center">
-      <div class="loading-spinner w-8 h-8 mx-auto"></div>
-      <p class="text-themed-muted mt-4">{{ t('common.loading') }}</p>
-    </div>
+    <Card v-if="loading" padding="lg" class="text-center">
+      <div class="flex flex-col items-center justify-center py-12">
+        <Loader2 class="w-8 h-8 animate-spin text-[var(--accent)]" />
+        <p class="text-sm text-[var(--text-secondary)] mt-4 font-medium">{{ t('common.loading') }}</p>
+      </div>
+    </Card>
 
     <!-- 邮箱源 TAB -->
     <div v-else-if="activeTab === 'sources'" class="space-y-4">
-      <div class="flex justify-end">
-        <button class="btn btn-primary btn-sm" @click="openCreateSourceModal">
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          {{ t('admin.mail.createSource') }}
-        </button>
-      </div>
-
-      <div v-if="sources.length === 0" class="card p-8 text-center text-themed-muted">
-        {{ t('admin.mail.noSources') }}
-      </div>
+      <Card v-if="sources.length === 0" padding="none">
+        <EmptyState
+          :title="t('admin.mail.noSources')"
+          description="暂未配置任何邮箱服务源，点击下方按钮添加第一个发信源"
+        >
+          <template #icon>
+            <Server class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template #action>
+            <Button variant="primary" size="sm" @click="openCreateSourceModal">
+              <template #icon>
+                <Plus class="w-4 h-4 stroke-[2]" />
+              </template>
+              <span>{{ t('admin.mail.createSource') }}</span>
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
       <template v-else>
+        <!-- Mobile Cards -->
         <div class="space-y-3 lg:hidden">
-          <div v-for="source in sources" :key="source.id" class="card p-4">
+          <Card
+            v-for="source in sources"
+            :key="source.id"
+            padding="sm"
+            class="transition-all duration-200"
+          >
             <div class="flex items-start justify-between gap-3">
-              <div class="flex min-w-0 items-center gap-2">
-                <FlagIcon :code="source.code" class="w-5 h-5 shrink-0" />
+              <div class="flex min-w-0 items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] flex items-center justify-center shrink-0">
+                  <FlagIcon :code="source.code" class="w-5 h-5 rounded-sm" />
+                </div>
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-themed">{{ source.name }}</div>
-                  <div class="text-xs uppercase text-themed-muted">{{ source.code }}</div>
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ source.name }}</div>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <Badge size="sm" variant="default" shape="rounded">
+                      {{ source.code.toUpperCase() }}
+                    </Badge>
+                  </div>
                 </div>
               </div>
-              <div class="shrink-0 text-right text-sm text-themed">
+              <Badge size="sm" variant="info">
                 {{ source.planCount || 0 }} {{ t('admin.mail.plans') }}
+              </Badge>
+            </div>
+
+            <div class="mt-3.5 space-y-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-xs">
+              <div>
+                <span class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide block mb-0.5">{{ t('admin.mail.apiEndpoint') }}</span>
+                <span class="font-mono text-[var(--text-secondary)] break-all">{{ source.apiUrl }}</span>
+              </div>
+              <div v-if="source.smarterMailUrl">
+                <span class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide block mb-0.5">{{ t('admin.mail.webmailUrl') }}</span>
+                <span class="font-mono text-[var(--text-secondary)] break-all">{{ source.smarterMailUrl }}</span>
               </div>
             </div>
-            <div class="mt-3 break-all font-mono text-xs text-themed-muted">{{ source.apiUrl }}</div>
-            <div class="mt-4 flex justify-end gap-2 border-t border-themed pt-3">
-              <button class="btn btn-ghost btn-xs" @click="openEditSourceModal(source)">
-                {{ t('common.edit') }}
-              </button>
-              <button
-                class="btn btn-ghost btn-xs text-error"
-                :disabled="actionLoading === `delete-source-${source.id}`"
+
+            <div class="mt-3.5 flex items-center justify-end gap-2 border-t border-[var(--border-color)] pt-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                @click="openEditSourceModal(source)"
+              >
+                <template #icon>
+                  <Edit3 class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('common.edit') }}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
+                :loading="actionLoading === `delete-source-${source.id}`"
                 @click="deleteSource(source)"
               >
-                <span v-if="actionLoading === `delete-source-${source.id}`" class="loading loading-spinner loading-xs"></span>
-                <span v-else>{{ t('common.delete') }}</span>
-              </button>
+                <template #icon>
+                  <Trash2 class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('common.delete') }}</span>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
 
+        <!-- Desktop Table -->
         <div class="card hidden overflow-hidden lg:block">
           <table class="w-full table-fixed">
-          <thead>
-            <tr class="border-b border-themed">
-              <th class="nimbus-th w-[12%]">{{ t('admin.mail.region') }}</th>
-              <th class="nimbus-th w-[22%]">{{ t('common.name') }}</th>
-              <th class="nimbus-th w-[38%]">{{ t('admin.mail.apiEndpoint') }}</th>
-              <th class="nimbus-th w-[12%]">{{ t('admin.mail.plans') }}</th>
-              <th class="nimbus-th nimbus-th-right w-[16%]">{{ t('common.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="source in sources" :key="source.id" class="nimbus-row border-b border-themed">
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <FlagIcon :code="source.code" class="w-5 h-5" />
-                  <span class="text-sm font-medium text-themed">{{ source.code.toUpperCase() }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3 text-sm text-themed truncate">{{ source.name }}</td>
-              <td class="px-4 py-3 font-mono text-xs text-themed-muted truncate" :title="source.apiUrl">{{ source.apiUrl }}</td>
-              <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ source.planCount || 0 }}</td>
-              <td class="px-4 py-3 text-right">
-                <button class="btn btn-ghost btn-xs" @click="openEditSourceModal(source)">
-                  {{ t('common.edit') }}
-                </button>
-                <button
-                  class="btn btn-ghost btn-xs text-error"
-                  :disabled="actionLoading === `delete-source-${source.id}`"
-                  @click="deleteSource(source)"
-                >
-                  <span v-if="actionLoading === `delete-source-${source.id}`" class="loading loading-spinner loading-xs"></span>
-                  <span v-else>{{ t('common.delete') }}</span>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            <colgroup>
+              <col class="w-[14%]" />
+              <col class="w-[22%]" />
+              <col class="w-[36%]" />
+              <col class="w-[12%]" />
+              <col class="w-[16%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+              <tr class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider select-none">
+                <th class="px-4 py-3.5">{{ t('admin.mail.region') }}</th>
+                <th class="px-4 py-3.5">{{ t('common.name') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.apiEndpoint') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.plans') }}</th>
+                <th class="px-4 py-3.5 text-right">{{ t('common.actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="source in sources"
+                :key="source.id"
+                class="transition-colors hover:bg-[var(--bg-surface-soft)]/50"
+              >
+                <td class="px-4 py-3.5">
+                  <div class="flex items-center gap-2">
+                    <FlagIcon :code="source.code" class="w-5 h-5 rounded-sm" />
+                    <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] font-mono">
+                      {{ source.code.toUpperCase() }}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-4 py-3.5 text-sm font-medium text-[var(--text-primary)] truncate" :title="source.name">
+                  {{ source.name }}
+                </td>
+                <td class="px-4 py-3.5 font-mono text-xs text-[var(--text-secondary)] truncate" :title="source.apiUrl">
+                  {{ source.apiUrl }}
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] tabular-nums">
+                  <Badge size="sm" variant="info">
+                    {{ source.planCount || 0 }} {{ t('admin.mail.plans') }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                  <div class="inline-flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      @click="openEditSourceModal(source)"
+                    >
+                      <template #icon>
+                        <Edit3 class="w-3.5 h-3.5" />
+                      </template>
+                      <span>{{ t('common.edit') }}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
+                      :loading="actionLoading === `delete-source-${source.id}`"
+                      @click="deleteSource(source)"
+                    >
+                      <template #icon>
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </template>
+                      <span>{{ t('common.delete') }}</span>
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </template>
     </div>
 
     <!-- 方案 TAB -->
     <div v-else-if="activeTab === 'plans'" class="space-y-4">
-      <div class="flex justify-end">
-        <button class="btn btn-primary btn-sm" @click="openCreatePlanModal">
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          {{ t('admin.mail.createPlan') }}
-        </button>
-      </div>
-
-      <div v-if="plans.length === 0" class="card p-8 text-center text-themed-muted">
-        {{ t('admin.mail.noPlans') }}
-      </div>
+      <Card v-if="plans.length === 0" padding="none">
+        <EmptyState
+          :title="t('admin.mail.noPlans')"
+          description="暂未配置任何邮箱方案套餐，点击下方按钮添加"
+        >
+          <template #icon>
+            <Package class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template #action>
+            <Button variant="primary" size="sm" @click="openCreatePlanModal">
+              <template #icon>
+                <Plus class="w-4 h-4 stroke-[2]" />
+              </template>
+              <span>{{ t('admin.mail.createPlan') }}</span>
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
       <template v-else>
+        <!-- Mobile Cards -->
         <div class="space-y-3 lg:hidden">
-          <div v-for="plan in plans" :key="plan.id" class="card p-4">
+          <Card
+            v-for="plan in plans"
+            :key="plan.id"
+            padding="sm"
+            class="transition-all duration-200"
+          >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="truncate text-sm font-medium text-themed">{{ plan.name }}</div>
-                <div v-if="plan.description" class="mt-1 line-clamp-2 text-xs text-themed-muted">{{ plan.description }}</div>
+                <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ plan.name }}</div>
+                <div v-if="plan.description" class="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">{{ plan.description }}</div>
               </div>
-              <div class="shrink-0 text-right text-sm font-medium text-themed">
-                {{ formatPrice(plan.price) }}/{{ plan.billingCycle === 'monthly' ? t('mail.month') : t('mail.year') }}
-              </div>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.mail.source') }}</div>
-                <div class="mt-1 truncate text-themed">{{ plan.source?.name || '-' }}</div>
-              </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.mail.domainLimit') }}</div>
-                <div class="mt-1 text-themed">{{ plan.domainLimit }}</div>
-              </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.mail.diskLimit') }}</div>
-                <div class="mt-1 text-themed">{{ plan.diskLimitGb }} GB</div>
+              <div class="shrink-0 text-right text-sm font-semibold text-[var(--text-primary)]">
+                {{ formatPrice(plan.price) }}<span class="text-xs font-normal text-[var(--text-secondary)]">/{{ plan.billingCycle === 'monthly' ? t('mail.month') : t('mail.year') }}</span>
               </div>
             </div>
-            <div class="mt-4 flex justify-end gap-2 border-t border-themed pt-3">
-              <button class="btn btn-ghost btn-xs" @click="openEditPlanModal(plan)">
-                {{ t('common.edit') }}
-              </button>
-              <button
-                class="btn btn-ghost btn-xs text-error"
-                :disabled="actionLoading === `delete-plan-${plan.id}`"
+
+            <div class="mt-3.5 grid grid-cols-3 gap-2 text-xs">
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.mail.source') }}</div>
+                <div class="truncate text-[var(--text-primary)] font-medium">{{ plan.source?.name || '-' }}</div>
+              </div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.mail.domainLimit') }}</div>
+                <div class="text-[var(--text-primary)] font-medium">{{ plan.domainLimit }}</div>
+              </div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.mail.diskLimit') }}</div>
+                <div class="text-[var(--text-primary)] font-medium">{{ plan.diskLimitGb }} GB</div>
+              </div>
+            </div>
+
+            <div class="mt-3.5 flex items-center justify-end gap-2 border-t border-[var(--border-color)] pt-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                @click="openEditPlanModal(plan)"
+              >
+                <template #icon>
+                  <Edit3 class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('common.edit') }}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
+                :loading="actionLoading === `delete-plan-${plan.id}`"
                 @click="deletePlan(plan)"
               >
-                <span v-if="actionLoading === `delete-plan-${plan.id}`" class="loading loading-spinner loading-xs"></span>
-                <span v-else>{{ t('common.delete') }}</span>
-              </button>
+                <template #icon>
+                  <Trash2 class="w-3.5 h-3.5" />
+                </template>
+                <span>{{ t('common.delete') }}</span>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
 
+        <!-- Desktop Table -->
         <div class="card hidden overflow-hidden lg:block">
           <table class="w-full table-fixed">
-          <thead>
-            <tr class="border-b border-themed">
-              <th class="nimbus-th w-[26%]">{{ t('common.name') }}</th>
-              <th class="nimbus-th w-[18%]">{{ t('admin.mail.source') }}</th>
-              <th class="nimbus-th w-[14%]">{{ t('admin.mail.domainLimit') }}</th>
-              <th class="nimbus-th w-[14%]">{{ t('admin.mail.diskLimit') }}</th>
-              <th class="nimbus-th w-[14%]">{{ t('admin.mail.price') }}</th>
-              <th class="nimbus-th nimbus-th-right w-[14%]">{{ t('common.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="plan in plans" :key="plan.id" class="nimbus-row border-b border-themed">
-              <td class="px-4 py-3">
-                <div class="text-sm font-medium text-themed">{{ plan.name }}</div>
-                <div v-if="plan.description" class="text-xs text-themed-muted truncate">{{ plan.description }}</div>
-              </td>
-              <td class="px-4 py-3 text-sm text-themed truncate">{{ plan.source?.name || '-' }}</td>
-              <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ plan.domainLimit }}</td>
-              <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ plan.diskLimitGb }} GB</td>
-              <td class="px-4 py-3 text-sm font-medium text-themed tabular-nums">
-                {{ formatPrice(plan.price) }}/{{ plan.billingCycle === 'monthly' ? t('mail.month') : t('mail.year') }}
-              </td>
-              <td class="px-4 py-3 text-right">
-                <button class="btn btn-ghost btn-xs" @click="openEditPlanModal(plan)">
-                  {{ t('common.edit') }}
-                </button>
-                <button
-                  class="btn btn-ghost btn-xs text-error"
-                  :disabled="actionLoading === `delete-plan-${plan.id}`"
-                  @click="deletePlan(plan)"
-                >
-                  <span v-if="actionLoading === `delete-plan-${plan.id}`" class="loading loading-spinner loading-xs"></span>
-                  <span v-else>{{ t('common.delete') }}</span>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            <colgroup>
+              <col class="w-[26%]" />
+              <col class="w-[18%]" />
+              <col class="w-[14%]" />
+              <col class="w-[14%]" />
+              <col class="w-[14%]" />
+              <col class="w-[14%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+              <tr class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider select-none">
+                <th class="px-4 py-3.5">{{ t('common.name') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.source') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.domainLimit') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.diskLimit') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.price') }}</th>
+                <th class="px-4 py-3.5 text-right">{{ t('common.actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="plan in plans"
+                :key="plan.id"
+                class="transition-colors hover:bg-[var(--bg-surface-soft)]/50"
+              >
+                <td class="px-4 py-3.5">
+                  <div class="text-sm font-semibold text-[var(--text-primary)]">{{ plan.name }}</div>
+                  <div v-if="plan.description" class="text-xs text-[var(--text-secondary)] truncate mt-0.5">{{ plan.description }}</div>
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] truncate">
+                  {{ plan.source?.name || '-' }}
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] tabular-nums">
+                  {{ plan.domainLimit }}
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] tabular-nums">
+                  {{ plan.diskLimitGb }} GB
+                </td>
+                <td class="px-4 py-3.5 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
+                  {{ formatPrice(plan.price) }}<span class="text-xs font-normal text-[var(--text-secondary)]">/{{ plan.billingCycle === 'monthly' ? t('mail.month') : t('mail.year') }}</span>
+                </td>
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                  <div class="inline-flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      @click="openEditPlanModal(plan)"
+                    >
+                      <template #icon>
+                        <Edit3 class="w-3.5 h-3.5" />
+                      </template>
+                      <span>{{ t('common.edit') }}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
+                      :loading="actionLoading === `delete-plan-${plan.id}`"
+                      @click="deletePlan(plan)"
+                    >
+                      <template #icon>
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </template>
+                      <span>{{ t('common.delete') }}</span>
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </template>
     </div>
@@ -642,257 +848,345 @@ const regionOptions = [
     <!-- 订阅 TAB -->
     <div v-else-if="activeTab === 'subscriptions'" class="space-y-4">
       <!-- 搜索框 -->
-      <div class="flex items-center gap-3">
-        <div class="relative flex-1 max-w-sm">
-          <input 
-            v-model="subscriptionsSearch" 
-            type="text" 
-            class="input w-full pl-10" 
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2 max-w-sm w-full">
+          <Input
+            v-model="subscriptionsSearch"
             :placeholder="t('admin.mail.searchSubscriptions')"
-            @keyup.enter="searchSubscriptions"
+            clearable
+            size="sm"
+            class="flex-1"
+            @enter="searchSubscriptions"
+            @clear="searchSubscriptions"
           />
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Button
+            variant="secondary"
+            size="sm"
+            @click="searchSubscriptions"
+          >
+            <template #icon>
+              <Search class="w-3.5 h-3.5" />
+            </template>
+            <span>{{ t('common.search') }}</span>
+          </Button>
         </div>
-        <button class="btn btn-primary btn-sm" @click="searchSubscriptions">
-          {{ t('common.search') }}
-        </button>
-      </div>
-
-      <!-- 加载中 -->
-      <div v-if="loading" class="card p-8 text-center text-themed-muted">
-        {{ t('common.loading') }}
       </div>
 
       <!-- 无数据/搜索无结果 -->
-      <div v-else-if="subscriptions.length === 0" class="card p-8 text-center text-themed-muted">
-        {{ subscriptionsSearch ? t('common.noSearchResults') : t('admin.mail.noSubscriptions') }}
-      </div>
+      <Card v-if="subscriptions.length === 0" padding="none">
+        <EmptyState
+          :title="subscriptionsSearch ? t('common.noSearchResults') : t('admin.mail.noSubscriptions')"
+          :description="subscriptionsSearch ? '没有找到匹配的订阅记录，请尝试其他关键词' : '当前暂无用户邮箱订阅'"
+        >
+          <template #icon>
+            <Users class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template v-if="subscriptionsSearch" #action>
+            <Button variant="secondary" size="sm" @click="subscriptionsSearch = ''; searchSubscriptions()">
+              重置搜索
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
       <template v-else>
+        <!-- Mobile Cards -->
         <div class="space-y-3 lg:hidden">
-          <div v-for="sub in subscriptions" :key="sub.id" class="card p-4">
+          <Card
+            v-for="sub in subscriptions"
+            :key="sub.id"
+            padding="sm"
+            class="transition-all duration-200"
+          >
             <div class="flex items-start justify-between gap-3">
-              <div class="flex min-w-0 items-center gap-3">
-                <UserAvatar :username="sub.user?.username || ''" :email="sub.user?.email" :avatar-style="sub.user?.avatarStyle" :badge-id="sub.user?.avatarBadgeId || null" :size="32" />
+              <div class="flex min-w-0 items-center gap-2.5">
+                <UserAvatar
+                  :username="sub.user?.username || ''"
+                  :email="sub.user?.email"
+                  :avatar-style="sub.user?.avatarStyle"
+                  :badge-id="sub.user?.avatarBadgeId || null"
+                  :size="36"
+                />
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-themed">{{ sub.user?.username || '-' }}</div>
-                  <div class="truncate text-xs text-themed-muted">ID: {{ sub.user?.id || '-' }} · {{ sub.user?.email || '-' }}</div>
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ sub.user?.username || '-' }}</div>
+                  <div class="truncate text-xs text-[var(--text-secondary)] mt-0.5">ID: {{ sub.user?.id || '-' }} · {{ sub.user?.email || '-' }}</div>
                 </div>
               </div>
-              <span :class="['badge badge-sm shrink-0', getStatusBadge(sub.status)]">
+              <Badge size="sm" :variant="getStatusBadge(sub.status)">
                 {{ t('mail.status.' + sub.status) }}
-              </span>
+              </Badge>
             </div>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.mail.plan') }}</div>
-                <div class="mt-1 truncate text-themed">{{ sub.plan?.name || '-' }}</div>
+
+            <div class="mt-3.5 grid grid-cols-3 gap-2 text-xs">
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.mail.plan') }}</div>
+                <div class="truncate text-[var(--text-primary)] font-medium">{{ sub.plan?.name || '-' }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.mail.expiresAt') }}</div>
-                <div class="mt-1 text-themed">{{ formatDate(sub.expiresAt) }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('admin.mail.expiresAt') }}</div>
+                <div class="text-[var(--text-primary)] font-mono text-[11px]">{{ formatDate(sub.expiresAt) }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('common.createdAt') }}</div>
-                <div class="mt-1 text-themed-muted">{{ formatDate(sub.createdAt) }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide mb-1">{{ t('common.createdAt') }}</div>
+                <div class="text-[var(--text-secondary)] font-mono text-[11px]">{{ formatDate(sub.createdAt) }}</div>
               </div>
             </div>
-            <div class="mt-4 flex justify-end border-t border-themed pt-3">
-              <button
-                class="btn btn-ghost btn-xs text-error"
-                :disabled="actionLoading === 'unsub'"
+
+            <div class="mt-3.5 flex items-center justify-end border-t border-[var(--border-color)] pt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
+                :loading="actionLoading === 'unsub'"
                 @click="openUnsubModal(sub)"
               >
-                {{ t('admin.mail.unsub.button') }}
-              </button>
+                <span>{{ t('admin.mail.unsub.button') }}</span>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
 
+        <!-- Desktop Table -->
         <div class="card hidden overflow-hidden lg:block">
           <table class="w-full table-fixed">
-          <thead>
-            <tr class="border-b border-themed">
-              <th class="nimbus-th w-[30%]">{{ t('admin.mail.user') }}</th>
-              <th class="nimbus-th w-[18%]">{{ t('admin.mail.plan') }}</th>
-              <th class="nimbus-th w-[12%]">{{ t('common.status') }}</th>
-              <th class="nimbus-th w-[16%]">{{ t('admin.mail.expiresAt') }}</th>
-              <th class="nimbus-th w-[14%]">{{ t('common.createdAt') }}</th>
-              <th class="nimbus-th nimbus-th-right w-[10%]">{{ t('common.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="sub in subscriptions" :key="sub.id" class="nimbus-row border-b border-themed">
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-3">
-                  <UserAvatar :username="sub.user?.username || ''" :email="sub.user?.email" :avatar-style="sub.user?.avatarStyle" :badge-id="sub.user?.avatarBadgeId || null" :size="32" />
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-medium text-themed">{{ sub.user?.username || '-' }}</div>
-                    <div class="truncate text-xs text-themed-muted">ID: {{ sub.user?.id || '-' }} · {{ sub.user?.email || '-' }}</div>
+            <colgroup>
+              <col class="w-[30%]" />
+              <col class="w-[18%]" />
+              <col class="w-[12%]" />
+              <col class="w-[14%]" />
+              <col class="w-[14%]" />
+              <col class="w-[12%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+              <tr class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider select-none">
+                <th class="px-4 py-3.5">{{ t('admin.mail.user') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.plan') }}</th>
+                <th class="px-4 py-3.5">{{ t('common.status') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.expiresAt') }}</th>
+                <th class="px-4 py-3.5">{{ t('common.createdAt') }}</th>
+                <th class="px-4 py-3.5 text-right">{{ t('common.actions') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="sub in subscriptions"
+                :key="sub.id"
+                class="transition-colors hover:bg-[var(--bg-surface-soft)]/50"
+              >
+                <td class="px-4 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <UserAvatar
+                      :username="sub.user?.username || ''"
+                      :email="sub.user?.email"
+                      :avatar-style="sub.user?.avatarStyle"
+                      :badge-id="sub.user?.avatarBadgeId || null"
+                      :size="32"
+                    />
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ sub.user?.username || '-' }}</div>
+                      <div class="truncate text-xs text-[var(--text-secondary)]">ID: {{ sub.user?.id || '-' }} · {{ sub.user?.email || '-' }}</div>
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td class="px-4 py-3 text-sm text-themed truncate">{{ sub.plan?.name || '-' }}</td>
-              <td class="px-4 py-3">
-                <span :class="['badge badge-sm', getStatusBadge(sub.status)]">
-                  {{ t('mail.status.' + sub.status) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ formatDate(sub.expiresAt) }}</td>
-              <td class="px-4 py-3 text-sm text-themed-muted tabular-nums">{{ formatDate(sub.createdAt) }}</td>
-              <td class="px-4 py-3 text-right">
-                <button
-                  class="btn btn-ghost btn-xs text-error"
-                  :disabled="actionLoading === 'unsub'"
-                  @click="openUnsubModal(sub)"
-                >
-                  {{ t('admin.mail.unsub.button') }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] truncate">
+                  {{ sub.plan?.name || '-' }}
+                </td>
+                <td class="px-4 py-3.5">
+                  <Badge size="sm" :variant="getStatusBadge(sub.status)">
+                    {{ t('mail.status.' + sub.status) }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] tabular-nums font-mono">
+                  {{ formatDate(sub.expiresAt) }}
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-secondary)] tabular-nums font-mono">
+                  {{ formatDate(sub.createdAt) }}
+                </td>
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,transparent)]"
+                    :loading="actionLoading === 'unsub'"
+                    @click="openUnsubModal(sub)"
+                  >
+                    <span>{{ t('admin.mail.unsub.button') }}</span>
+                  </Button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </template>
 
-      <!-- 订阅分页 -->
-      <div v-if="totalSubscriptions > 0" class="flex items-center justify-between text-sm text-themed-muted">
-        <span>{{ t('common.totalRecords', { count: totalSubscriptions }) }}</span>
-        <div v-if="subscriptionsTotalPages > 1" class="flex items-center gap-2">
-          <button 
-            class="btn btn-sm btn-ghost" 
-            :disabled="subscriptionsPage <= 1"
-            @click="goToSubscriptionsPage(subscriptionsPage - 1)"
-          >
-            {{ t('common.prevPage') }}
-          </button>
-          <span>{{ subscriptionsPage }} / {{ subscriptionsTotalPages }}</span>
-          <button 
-            class="btn btn-sm btn-ghost" 
-            :disabled="subscriptionsPage >= subscriptionsTotalPages"
-            @click="goToSubscriptionsPage(subscriptionsPage + 1)"
-          >
-            {{ t('common.nextPage') }}
-          </button>
-        </div>
-      </div>
+        <!-- 订阅分页 -->
+        <Card v-if="totalSubscriptions > 0" padding="sm">
+          <Pagination
+            :page="subscriptionsPage"
+            :page-size="pageSize"
+            :total="totalSubscriptions"
+            :show-total="true"
+            @update:page="goToSubscriptionsPage"
+          />
+        </Card>
+      </template>
     </div>
 
     <!-- 域名 TAB -->
     <div v-else-if="activeTab === 'domains'" class="space-y-4">
       <!-- 搜索框 -->
-      <div class="flex items-center gap-3">
-        <div class="relative flex-1 max-w-sm">
-          <input 
-            v-model="domainsSearch" 
-            type="text" 
-            class="input w-full pl-10" 
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2 max-w-sm w-full">
+          <Input
+            v-model="domainsSearch"
             :placeholder="t('admin.mail.searchDomains')"
-            @keyup.enter="searchDomains"
+            clearable
+            size="sm"
+            class="flex-1"
+            @enter="searchDomains"
+            @clear="searchDomains"
           />
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Button
+            variant="secondary"
+            size="sm"
+            @click="searchDomains"
+          >
+            <template #icon>
+              <Search class="w-3.5 h-3.5" />
+            </template>
+            <span>{{ t('common.search') }}</span>
+          </Button>
         </div>
-        <button class="btn btn-primary btn-sm" @click="searchDomains">
-          {{ t('common.search') }}
-        </button>
-      </div>
-
-      <!-- 加载中 -->
-      <div v-if="loading" class="card p-8 text-center text-themed-muted">
-        {{ t('common.loading') }}
       </div>
 
       <!-- 无数据/搜索无结果 -->
-      <div v-else-if="domains.length === 0" class="card p-8 text-center text-themed-muted">
-        {{ domainsSearch ? t('common.noSearchResults') : t('admin.mail.noDomains') }}
-      </div>
+      <Card v-if="domains.length === 0" padding="none">
+        <EmptyState
+          :title="domainsSearch ? t('common.noSearchResults') : t('admin.mail.noDomains')"
+          :description="domainsSearch ? '没有找到匹配的域名，请尝试其他关键词' : '当前暂无用户绑定的邮箱域名'"
+        >
+          <template #icon>
+            <Globe class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
+          </template>
+          <template v-if="domainsSearch" #action>
+            <Button variant="secondary" size="sm" @click="domainsSearch = ''; searchDomains()">
+              重置搜索
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
       <template v-else>
+        <!-- Mobile Cards -->
         <div class="space-y-3 lg:hidden">
-          <div v-for="domain in domains" :key="domain.id" class="card p-4">
+          <Card
+            v-for="domain in domains"
+            :key="domain.id"
+            padding="sm"
+            class="transition-all duration-200"
+          >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="break-all text-sm font-medium text-themed">{{ domain.domain }}</div>
-                <div class="mt-1 text-xs text-themed-muted">{{ t('common.createdAt') }}: {{ formatDate(domain.createdAt) }}</div>
+                <div class="break-all font-mono text-sm font-semibold text-[var(--text-primary)]">{{ domain.domain }}</div>
+                <div class="mt-1 text-xs text-[var(--text-secondary)] font-mono">{{ t('common.createdAt') }}: {{ formatDate(domain.createdAt) }}</div>
               </div>
-              <span :class="['badge badge-sm shrink-0', getStatusBadge(domain.status)]">
+              <Badge size="sm" :variant="getStatusBadge(domain.status)">
                 {{ t('mail.domainStatus.' + domain.status) }}
-              </span>
+              </Badge>
             </div>
-            <div class="mt-4 flex items-center gap-3">
-              <UserAvatar :username="domain.subscription?.user?.username || ''" :email="domain.subscription?.user?.email" :avatar-style="domain.subscription?.user?.avatarStyle" :badge-id="domain.subscription?.user?.avatarBadgeId || null" :size="32" />
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium text-themed">{{ domain.subscription?.user?.username || '-' }}</div>
-                <div class="truncate text-xs text-themed-muted">ID: {{ domain.subscription?.user?.id || '-' }} · {{ domain.subscription?.user?.email || '-' }}</div>
+
+            <div class="mt-3.5 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3">
+              <div class="flex min-w-0 items-center gap-2.5">
+                <UserAvatar
+                  :username="domain.subscription?.user?.username || ''"
+                  :email="domain.subscription?.user?.email"
+                  :avatar-style="domain.subscription?.user?.avatarStyle"
+                  :badge-id="domain.subscription?.user?.avatarBadgeId || null"
+                  :size="30"
+                />
+                <div class="min-w-0">
+                  <div class="truncate text-xs font-semibold text-[var(--text-primary)]">{{ domain.subscription?.user?.username || '-' }}</div>
+                  <div class="truncate text-[11px] text-[var(--text-secondary)]">ID: {{ domain.subscription?.user?.id || '-' }}</div>
+                </div>
               </div>
-              <div class="shrink-0 text-right text-sm text-themed">
+              <Badge size="sm" variant="default" shape="rounded">
                 {{ domain._count?.accounts || 0 }} {{ t('admin.mail.accounts') }}
-              </div>
+              </Badge>
             </div>
-          </div>
+          </Card>
         </div>
 
+        <!-- Desktop Table -->
         <div class="card hidden overflow-hidden lg:block">
           <table class="w-full table-fixed">
-          <thead>
-            <tr class="border-b border-themed">
-              <th class="nimbus-th w-[26%]">{{ t('admin.mail.domain') }}</th>
-              <th class="nimbus-th w-[32%]">{{ t('admin.mail.user') }}</th>
-              <th class="nimbus-th w-[14%]">{{ t('common.status') }}</th>
-              <th class="nimbus-th w-[12%]">{{ t('admin.mail.accounts') }}</th>
-              <th class="nimbus-th w-[16%]">{{ t('common.createdAt') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="domain in domains" :key="domain.id" class="nimbus-row border-b border-themed">
-              <td class="px-4 py-3 font-mono text-sm font-medium text-themed truncate" :title="domain.domain">{{ domain.domain }}</td>
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-3">
-                  <UserAvatar :username="domain.subscription?.user?.username || ''" :email="domain.subscription?.user?.email" :avatar-style="domain.subscription?.user?.avatarStyle" :badge-id="domain.subscription?.user?.avatarBadgeId || null" :size="32" />
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-medium text-themed">{{ domain.subscription?.user?.username || '-' }}</div>
-                    <div class="truncate text-xs text-themed-muted">ID: {{ domain.subscription?.user?.id || '-' }} · {{ domain.subscription?.user?.email || '-' }}</div>
+            <colgroup>
+              <col class="w-[28%]" />
+              <col class="w-[30%]" />
+              <col class="w-[14%]" />
+              <col class="w-[12%]" />
+              <col class="w-[16%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
+              <tr class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider select-none">
+                <th class="px-4 py-3.5">{{ t('admin.mail.domain') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.user') }}</th>
+                <th class="px-4 py-3.5">{{ t('common.status') }}</th>
+                <th class="px-4 py-3.5">{{ t('admin.mail.accounts') }}</th>
+                <th class="px-4 py-3.5">{{ t('common.createdAt') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="domain in domains"
+                :key="domain.id"
+                class="transition-colors hover:bg-[var(--bg-surface-soft)]/50"
+              >
+                <td class="px-4 py-3.5 font-mono text-sm font-semibold text-[var(--text-primary)] truncate" :title="domain.domain">
+                  {{ domain.domain }}
+                </td>
+                <td class="px-4 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <UserAvatar
+                      :username="domain.subscription?.user?.username || ''"
+                      :email="domain.subscription?.user?.email"
+                      :avatar-style="domain.subscription?.user?.avatarStyle"
+                      :badge-id="domain.subscription?.user?.avatarBadgeId || null"
+                      :size="32"
+                    />
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ domain.subscription?.user?.username || '-' }}</div>
+                      <div class="truncate text-xs text-[var(--text-secondary)]">ID: {{ domain.subscription?.user?.id || '-' }} · {{ domain.subscription?.user?.email || '-' }}</div>
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <span :class="['badge badge-sm', getStatusBadge(domain.status)]">
-                  {{ t('mail.domainStatus.' + domain.status) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-sm text-themed tabular-nums">{{ domain._count?.accounts || 0 }}</td>
-              <td class="px-4 py-3 text-sm text-themed-muted tabular-nums">{{ formatDate(domain.createdAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
+                </td>
+                <td class="px-4 py-3.5">
+                  <Badge size="sm" :variant="getStatusBadge(domain.status)">
+                    {{ t('mail.domainStatus.' + domain.status) }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-primary)] tabular-nums">
+                  <Badge size="sm" variant="default" shape="rounded">
+                    {{ domain._count?.accounts || 0 }} {{ t('admin.mail.accounts') }}
+                  </Badge>
+                </td>
+                <td class="px-4 py-3.5 text-sm text-[var(--text-secondary)] tabular-nums font-mono">
+                  {{ formatDate(domain.createdAt) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </template>
 
-      <!-- 域名分页 -->
-      <div v-if="totalDomains > 0" class="flex items-center justify-between text-sm text-themed-muted">
-        <span>{{ t('common.totalRecords', { count: totalDomains }) }}</span>
-        <div v-if="domainsTotalPages > 1" class="flex items-center gap-2">
-          <button 
-            class="btn btn-sm btn-ghost" 
-            :disabled="domainsPage <= 1"
-            @click="goToDomainsPage(domainsPage - 1)"
-          >
-            {{ t('common.prevPage') }}
-          </button>
-          <span>{{ domainsPage }} / {{ domainsTotalPages }}</span>
-          <button 
-            class="btn btn-sm btn-ghost" 
-            :disabled="domainsPage >= domainsTotalPages"
-            @click="goToDomainsPage(domainsPage + 1)"
-          >
-            {{ t('common.nextPage') }}
-          </button>
-        </div>
-      </div>
+        <!-- 域名分页 -->
+        <Card v-if="totalDomains > 0" padding="sm">
+          <Pagination
+            :page="domainsPage"
+            :page-size="pageSize"
+            :total="totalDomains"
+            :show-total="true"
+            @update:page="goToDomainsPage"
+          />
+        </Card>
+      </template>
     </div>
 
     <!-- 邮箱源弹窗 -->
@@ -902,61 +1196,72 @@ const regionOptions = [
       raw
       @close="showSourceModal = false"
     >
-          <div class="modal-header">
-            <h3 class="modal-title flex items-center gap-2">
-              <svg class="h-5 w-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M3 8.25V18a1.5 1.5 0 0 0 1.5 1.5h15a1.5 1.5 0 0 0 1.5-1.5V8.25m-18 0A1.5 1.5 0 0 1 4.5 6.75h15A1.5 1.5 0 0 1 21 8.25m-18 0 8.303 5.19a1.5 1.5 0 0 0 1.594 0L21 8.25" />
-              </svg>
-              {{ editingSource ? t('admin.mail.editSource') : t('admin.mail.createSource') }}
-            </h3>
-            <button class="btn btn-ghost btn-sm" @click="showSourceModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface)]">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+            <Server class="w-4 h-4 stroke-[2]" />
           </div>
-          <div class="modal-body space-y-4">
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('common.name') }} *</span>
-              <input v-model="sourceForm.name" type="text" class="input w-full" :placeholder="t('admin.mail.sourcePlaceholder')" />
-            </label>
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('admin.mail.region') }} *</span>
-              <select v-model="sourceForm.code" class="input w-full">
-                <option v-for="opt in regionOptions" :key="opt.code" :value="opt.code">
-                  {{ opt.name }} ({{ opt.code.toUpperCase() }})
-                </option>
-              </select>
-            </label>
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('admin.mail.apiEndpoint') }} *</span>
-              <input v-model="sourceForm.apiUrl" type="text" class="input w-full" placeholder="https://api.cranemail.com" />
-            </label>
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('admin.mail.apiKey') }}</span>
-              <input
-                v-model="sourceForm.apiKey"
-                type="password"
-                class="input w-full"
-                :placeholder="editingSource ? '留空表示不更改 API Key' : ''"
-              />
-            </label>
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('admin.mail.webmailUrl') }}</span>
-              <input v-model="sourceForm.smarterMailUrl" type="text" class="input w-full" placeholder="https://smartermail.example.com" />
-            </label>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" @click="showSourceModal = false">{{ t('common.cancel') }}</button>
-            <button 
-              class="btn btn-primary" 
-              :disabled="actionLoading === 'save-source'"
-              @click="saveSource"
-            >
-              <span v-if="actionLoading === 'save-source'" class="loading-spinner w-4 h-4 mr-2"></span>
-              {{ t('common.save') }}
-            </button>
-          </div>
+          <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">
+            {{ editingSource ? t('admin.mail.editSource') : t('admin.mail.createSource') }}
+          </h3>
+        </div>
+        <button
+          type="button"
+          class="w-8 h-8 inline-flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+          :aria-label="t('common.cancel')"
+          @click="showSourceModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <form class="flex-1 flex flex-col min-h-0 bg-[var(--bg-surface)]" @submit.prevent="saveSource">
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+          <Input
+            v-model="sourceForm.name"
+            :label="`${t('common.name')} *`"
+            :placeholder="t('admin.mail.sourcePlaceholder')"
+          />
+
+          <Select
+            v-model="sourceForm.code"
+            :label="`${t('admin.mail.region')} *`"
+            :options="regionSelectOptions"
+          />
+
+          <Input
+            v-model="sourceForm.apiUrl"
+            :label="`${t('admin.mail.apiEndpoint')} *`"
+            placeholder="https://api.cranemail.com"
+          />
+
+          <Input
+            v-model="sourceForm.apiKey"
+            type="password"
+            :label="t('admin.mail.apiKey')"
+            :placeholder="editingSource ? '留空表示不更改 API Key' : ''"
+          />
+
+          <Input
+            v-model="sourceForm.smarterMailUrl"
+            :label="t('admin.mail.webmailUrl')"
+            placeholder="https://smartermail.example.com"
+          />
+        </div>
+
+        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+          <Button type="button" variant="secondary" @click="showSourceModal = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            :loading="actionLoading === 'save-source'"
+          >
+            {{ t('common.save') }}
+          </Button>
+        </div>
+      </form>
     </DrawerModal>
 
     <!-- 方案弹窗 -->
@@ -966,71 +1271,90 @@ const regionOptions = [
       raw
       @close="showPlanModal = false"
     >
-          <div class="modal-header">
-            <h3 class="modal-title flex items-center gap-2">
-              <svg class="h-5 w-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
-              </svg>
-              {{ editingPlan ? t('admin.mail.editPlan') : t('admin.mail.createPlan') }}
-            </h3>
-            <button class="btn btn-ghost btn-sm" @click="showPlanModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface)]">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] flex items-center justify-center shrink-0">
+            <Package class="w-4 h-4 stroke-[2]" />
           </div>
-          <div class="modal-body space-y-4">
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('admin.mail.source') }} *</span>
-              <select v-model="planForm.sourceId" class="input w-full">
-                <option v-for="source in sources" :key="source.id" :value="source.id">
-                  {{ source.name }}
-                </option>
-              </select>
+          <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">
+            {{ editingPlan ? t('admin.mail.editPlan') : t('admin.mail.createPlan') }}
+          </h3>
+        </div>
+        <button
+          type="button"
+          class="w-8 h-8 inline-flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+          :aria-label="t('common.cancel')"
+          @click="showPlanModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <form class="flex-1 flex flex-col min-h-0 bg-[var(--bg-surface)]" @submit.prevent="savePlan">
+        <div class="p-6 space-y-4 overflow-y-auto flex-1">
+          <Select
+            v-model="planForm.sourceId"
+            :label="`${t('admin.mail.source')} *`"
+            :options="sourceSelectOptions"
+          />
+
+          <Input
+            v-model="planForm.name"
+            :label="`${t('common.name')} *`"
+            :placeholder="t('admin.mail.planPlaceholder')"
+          />
+
+          <div class="space-y-1.5">
+            <label class="block text-xs font-medium text-[var(--text-secondary)]">
+              {{ t('common.description') }}
             </label>
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('common.name') }} *</span>
-              <input v-model="planForm.name" type="text" class="input w-full" :placeholder="t('admin.mail.planPlaceholder')" />
-            </label>
-            <label class="block space-y-1.5">
-              <span class="nimbus-field-label">{{ t('common.description') }}</span>
-              <textarea v-model="planForm.description" class="input w-full" rows="2"></textarea>
-            </label>
-            <div class="grid grid-cols-2 gap-4">
-              <label class="block space-y-1.5">
-                <span class="nimbus-field-label">{{ t('admin.mail.domainLimit') }} *</span>
-                <input v-model.number="planForm.domainLimit" type="number" min="1" class="input w-full" />
-              </label>
-              <label class="block space-y-1.5">
-                <span class="nimbus-field-label">{{ t('admin.mail.diskLimitGb') }} *</span>
-                <input v-model.number="planForm.diskLimitGb" type="number" min="1" class="input w-full" />
-              </label>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <label class="block space-y-1.5">
-                <span class="nimbus-field-label">{{ t('admin.mail.price') }} (¥) *</span>
-                <input v-model.number="planForm.price" type="number" min="0" step="0.01" class="input w-full" />
-              </label>
-              <label class="block space-y-1.5">
-                <span class="nimbus-field-label">{{ t('admin.mail.billingCycle') }} *</span>
-                <select v-model="planForm.billingCycle" class="input w-full">
-                  <option value="monthly">{{ t('mail.monthly') }}</option>
-                  <option value="yearly">{{ t('mail.yearly') }}</option>
-                </select>
-              </label>
-            </div>
+            <textarea
+              v-model="planForm.description"
+              rows="2"
+              class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 transition-all resize-none"
+            ></textarea>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" @click="showPlanModal = false">{{ t('common.cancel') }}</button>
-            <button 
-              class="btn btn-primary" 
-              :disabled="actionLoading === 'save-plan'"
-              @click="savePlan"
-            >
-              <span v-if="actionLoading === 'save-plan'" class="loading-spinner w-4 h-4 mr-2"></span>
-              {{ t('common.save') }}
-            </button>
+
+          <div class="grid grid-cols-2 gap-4">
+            <Input
+              v-model="planForm.domainLimit"
+              type="number"
+              :label="`${t('admin.mail.domainLimit')} *`"
+            />
+            <Input
+              v-model="planForm.diskLimitGb"
+              type="number"
+              :label="`${t('admin.mail.diskLimitGb')} *`"
+            />
           </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <Input
+              v-model="planForm.price"
+              type="number"
+              :label="`${t('admin.mail.price')} (¥) *`"
+            />
+            <Select
+              v-model="planForm.billingCycle"
+              :label="`${t('admin.mail.billingCycle')} *`"
+              :options="billingCycleOptions"
+            />
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+          <Button type="button" variant="secondary" @click="showPlanModal = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            :loading="actionLoading === 'save-plan'"
+          >
+            {{ t('common.save') }}
+          </Button>
+        </div>
+      </form>
     </DrawerModal>
 
     <!-- 退订弹窗 -->
@@ -1040,142 +1364,129 @@ const regionOptions = [
       raw
       @close="showUnsubModal = false"
     >
-          <div class="modal-header">
-            <h3 class="modal-title flex items-center gap-2">
-              <svg class="h-5 w-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-              </svg>
-              {{ t('admin.mail.unsub.title') }}
-            </h3>
-            <button class="btn btn-ghost btn-sm" @click="showUnsubModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4 bg-[var(--bg-surface)]">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-full bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] flex items-center justify-center shrink-0">
+            <Users class="w-4 h-4 stroke-[2]" />
           </div>
-          <div v-if="unsubTarget" class="modal-body">
-            <!-- 订阅信息 -->
-            <div class="rounded-lg p-3 mb-4" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'">
-              <div class="text-sm space-y-1">
-                <div class="flex justify-between">
-                  <span class="text-themed-muted">{{ t('admin.mail.user') }}</span>
-                  <span class="text-themed font-medium">{{ unsubTarget.user?.username }} (ID: {{ unsubTarget.user?.id }})</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-themed-muted">{{ t('admin.mail.plan') }}</span>
-                  <span class="text-themed">{{ unsubTarget.plan?.name }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-themed-muted">{{ t('admin.mail.price') }}</span>
-                  <span class="text-themed">{{ formatPrice(unsubTarget.plan?.price) }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-themed-muted">{{ t('admin.mail.expiresAt') }}</span>
-                  <span class="text-themed">{{ formatDate(unsubTarget.expiresAt) }}</span>
-                </div>
-              </div>
-            </div>
+          <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">
+            {{ t('admin.mail.unsub.title') }}
+          </h3>
+        </div>
+        <button
+          type="button"
+          class="w-8 h-8 inline-flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors active:scale-95"
+          :aria-label="t('common.cancel')"
+          @click="showUnsubModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
 
-            <!-- 退款方式 -->
-            <div class="mb-4">
-              <span class="nimbus-field-label mb-2 block">{{ t('admin.mail.unsub.refundType') }}</span>
-              <div class="space-y-2">
-                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer" :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'">
-                  <input v-model="unsubForm.refundType" type="radio" value="none" class="radio radio-sm" />
-                  <div>
-                    <div class="text-sm font-medium text-themed">{{ t('admin.mail.unsub.refundNone') }}</div>
-                    <div class="text-xs text-themed-muted">{{ t('admin.mail.unsub.refundNoneDesc') }}</div>
-                  </div>
-                </label>
-                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer" :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'">
-                  <input v-model="unsubForm.refundType" type="radio" value="full" class="radio radio-sm" />
-                  <div>
-                    <div class="text-sm font-medium text-themed">{{ t('admin.mail.unsub.refundFull') }}</div>
-                    <div class="text-xs text-themed-muted">{{ t('admin.mail.unsub.refundFullDesc', { amount: formatPrice(unsubTarget.plan?.price) }) }}</div>
-                  </div>
-                </label>
-                <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer" :class="themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50'">
-                  <input v-model="unsubForm.refundType" type="radio" value="remaining" class="radio radio-sm" />
-                  <div>
-                    <div class="text-sm font-medium text-themed">{{ t('admin.mail.unsub.refundRemaining') }}</div>
-                    <div class="text-xs text-themed-muted">{{ t('admin.mail.unsub.refundRemainingDesc') }}</div>
-                  </div>
-                </label>
-              </div>
+      <div v-if="unsubTarget" class="p-6 space-y-4 overflow-y-auto flex-1 bg-[var(--bg-surface)]">
+        <!-- 订阅信息 -->
+        <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+          <div class="text-sm space-y-2.5">
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-[var(--text-secondary)]">{{ t('admin.mail.user') }}</span>
+              <span class="text-sm font-semibold text-[var(--text-primary)]">{{ unsubTarget.user?.username }} (ID: {{ unsubTarget.user?.id }})</span>
             </div>
-
-            <!-- 退款原因 -->
-            <div v-if="unsubForm.refundType !== 'none'">
-              <span class="nimbus-field-label mb-2 block">{{ t('admin.mail.unsub.reason') }} *</span>
-              <textarea
-                v-model="unsubForm.reason" 
-                class="input w-full" 
-                rows="3" 
-                :placeholder="t('admin.mail.unsub.reasonPlaceholder')"
-              ></textarea>
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-[var(--text-secondary)]">{{ t('admin.mail.plan') }}</span>
+              <span class="text-sm text-[var(--text-primary)] font-medium">{{ unsubTarget.plan?.name }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-[var(--text-secondary)]">{{ t('admin.mail.price') }}</span>
+              <span class="text-sm text-[var(--text-primary)] font-semibold">{{ formatPrice(unsubTarget.plan?.price) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-[var(--text-secondary)]">{{ t('admin.mail.expiresAt') }}</span>
+              <span class="text-sm text-[var(--text-primary)] font-mono">{{ formatDate(unsubTarget.expiresAt) }}</span>
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" @click="showUnsubModal = false">{{ t('common.cancel') }}</button>
-            <button 
-              class="btn btn-error" 
-              :disabled="actionLoading === 'unsub'"
-              @click="handleUnsubscribe"
+        </div>
+
+        <!-- 退款方式 -->
+        <div>
+          <span class="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5">{{ t('admin.mail.unsub.refundType') }}</span>
+          <div class="space-y-2">
+            <label
+              class="flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer select-none"
+              :class="unsubForm.refundType === 'none'
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))]'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-surface)]'"
             >
-              <span v-if="actionLoading === 'unsub'" class="loading-spinner w-4 h-4 mr-2"></span>
-              {{ t('admin.mail.unsub.confirm') }}
-            </button>
+              <input v-model="unsubForm.refundType" type="radio" value="none" class="w-4 h-4 mt-0.5 text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer" />
+              <div>
+                <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.mail.unsub.refundNone') }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.mail.unsub.refundNoneDesc') }}</div>
+              </div>
+            </label>
+            <label
+              class="flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer select-none"
+              :class="unsubForm.refundType === 'full'
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))]'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-surface)]'"
+            >
+              <input v-model="unsubForm.refundType" type="radio" value="full" class="w-4 h-4 mt-0.5 text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer" />
+              <div>
+                <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.mail.unsub.refundFull') }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.mail.unsub.refundFullDesc', { amount: formatPrice(unsubTarget.plan?.price) }) }}</div>
+              </div>
+            </label>
+            <label
+              class="flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer select-none"
+              :class="unsubForm.refundType === 'remaining'
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-surface))]'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-surface)]'"
+            >
+              <input v-model="unsubForm.refundType" type="radio" value="remaining" class="w-4 h-4 mt-0.5 text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer" />
+              <div>
+                <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.mail.unsub.refundRemaining') }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('admin.mail.unsub.refundRemainingDesc') }}</div>
+              </div>
+            </label>
           </div>
+        </div>
+
+        <!-- 退款原因 -->
+        <div v-if="unsubForm.refundType !== 'none'" class="space-y-1.5">
+          <label class="block text-xs font-medium text-[var(--text-secondary)]">
+            {{ t('admin.mail.unsub.reason') }} *
+          </label>
+          <textarea
+            v-model="unsubForm.reason"
+            rows="3"
+            class="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 transition-all resize-none"
+            :placeholder="t('admin.mail.unsub.reasonPlaceholder')"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+        <Button type="button" variant="secondary" @click="showUnsubModal = false">
+          {{ t('common.cancel') }}
+        </Button>
+        <Button
+          type="button"
+          variant="danger"
+          :loading="actionLoading === 'unsub'"
+          @click="handleUnsubscribe"
+        >
+          {{ t('admin.mail.unsub.confirm') }}
+        </Button>
+      </div>
     </DrawerModal>
   </div>
 </template>
 
 <style scoped>
-.nimbus-title-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  color: var(--kawaii-primary);
-  background: color-mix(in srgb, var(--kawaii-primary) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kawaii-primary) 28%, transparent);
-}
-
-.nimbus-th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--kawaii-faint);
-  white-space: nowrap;
-}
-
-.nimbus-th-right {
-  text-align: right;
-}
-
-.nimbus-row {
-  transition: background-color 0.12s ease;
-}
-
-.nimbus-row:hover {
-  background: color-mix(in srgb, var(--kawaii-primary) 5%, transparent);
-}
-
-.nimbus-field-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--kawaii-muted);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .nimbus-row {
-    transition: none;
+  .nimbus-view *,
+  .nimbus-view *::before,
+  .nimbus-view *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
   }
 }
 </style>

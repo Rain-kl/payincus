@@ -2,9 +2,32 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  AlertTriangle,
+  ArrowUpCircle,
+  Calendar,
+  Clock,
+  Cpu,
+  DownloadCloud,
+  GitBranch,
+  History,
+  Layers,
+  Package,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  Terminal
+} from 'lucide-vue-next'
 import api from '@/api/admin'
 import { useToast } from '@/stores/toast'
 import { systemSettingsNavigationItems } from '@/constants/adminSettings'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader
+} from '@/components/ui'
 import type {
   AvailableSystemUpdate,
   SystemUpdateCheckResult,
@@ -135,12 +158,20 @@ function statusLabel(status: SystemUpdateTask['status']): string {
   return labels[status]
 }
 
-function statusClass(status: SystemUpdateTask['status']): string {
-  if (status === 'success') return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30'
-  if (status === 'failed') return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
-  if (status === 'rolled_back') return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30'
-  if (status === 'running') return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30'
-  return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
+function statusBadgeVariant(status: SystemUpdateTask['status']): 'default' | 'info' | 'success' | 'error' | 'warning' {
+  switch (status) {
+    case 'running':
+      return 'info'
+    case 'success':
+      return 'success'
+    case 'failed':
+      return 'error'
+    case 'rolled_back':
+      return 'warning'
+    case 'pending':
+    default:
+      return 'default'
+  }
 }
 
 async function loadVersion() {
@@ -296,295 +327,508 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ t('admin.system.title') || '系统设置' }}</h1>
-        <p class="page-description">通过 Git release tag 进行受控在线更新，更新前会自动备份并执行验证。</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <button class="btn-secondary" :disabled="loading" @click="refreshAll">
-          <svg class="h-4 w-4" :class="loading ? 'animate-spin' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-          </svg>
-          刷新
-        </button>
-        <button class="btn-primary" :disabled="checking || hasRunningTask" @click="checkUpdates">
-          <svg v-if="checking" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 13.5V21m0 0-3.75-3.75M12 21l3.75-3.75M6.75 15a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 15h-1.5" />
-          </svg>
-          {{ checking ? '检查中...' : '检查更新' }}
-        </button>
-      </div>
-    </div>
+  <div class="max-w-6xl mx-auto space-y-6 pb-12">
+    <!-- Apple HIG Page Header -->
+    <PageHeader
+      :title="t('admin.system.title') || '系统设置'"
+      description="通过 Git release tag 与 OTA 发行包进行受控在线升级，更新前自动执行备份、数据迁移与健康自检。"
+    >
+      <template #actions>
+        <div class="flex items-center gap-2.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            :loading="loading"
+            class="shrink-0"
+            @click="refreshAll"
+          >
+            <template #icon>
+              <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': loading }" />
+            </template>
+            刷新
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            :loading="checking"
+            :disabled="checking || hasRunningTask"
+            class="shrink-0"
+            @click="checkUpdates"
+          >
+            <template #icon>
+              <DownloadCloud class="w-3.5 h-3.5" />
+            </template>
+            {{ checking ? '检查中...' : '检查更新' }}
+          </Button>
+        </div>
+      </template>
+    </PageHeader>
 
-    <div class="flex gap-1 overflow-x-auto border-b border-themed-border">
+    <!-- Segmented Navigation Bar -->
+    <nav class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto no-scrollbar shadow-sm">
       <router-link
         v-for="item in systemSettingsNavigationItems"
         :key="item.path"
         :to="item.path"
-        class="shrink-0 border-b-2 px-4 py-3 text-sm font-medium transition-colors duration-150"
+        class="shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98] select-none"
         :class="route.path === item.path
-          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-          : 'border-transparent text-themed-muted hover:text-themed'"
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold border border-[var(--border-color)]/60'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/50 border border-transparent'"
       >
         {{ t(item.labelKey) }}
       </router-link>
+    </nav>
+
+    <!-- Skeleton Loading State -->
+    <div v-if="loading" class="space-y-6 animate-pulse">
+      <div class="grid gap-6 xl:grid-cols-2">
+        <Card v-for="i in 2" :key="i" padding="md">
+          <div class="space-y-4">
+            <div class="h-5 w-32 bg-[var(--bg-surface-soft)] rounded-md"></div>
+            <div class="h-10 w-44 bg-[var(--bg-surface-soft)] rounded-xl"></div>
+            <div class="h-28 bg-[var(--bg-surface-soft)] rounded-xl"></div>
+          </div>
+        </Card>
+      </div>
+      <div class="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
+        <Card padding="md">
+          <div class="space-y-3">
+            <div class="h-5 w-28 bg-[var(--bg-surface-soft)] rounded-md"></div>
+            <div v-for="i in 4" :key="i" class="h-16 bg-[var(--bg-surface-soft)] rounded-xl"></div>
+          </div>
+        </Card>
+        <Card padding="md">
+          <div class="space-y-3">
+            <div class="h-5 w-32 bg-[var(--bg-surface-soft)] rounded-md"></div>
+            <div class="h-[420px] bg-[var(--bg-surface-soft)] rounded-xl"></div>
+          </div>
+        </Card>
+      </div>
     </div>
 
-    <div v-if="loading" class="flex items-center justify-center gap-2 py-16 text-sm text-themed-muted">
-      <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      加载中...
-    </div>
-
+    <!-- Main Content -->
     <template v-else>
-      <section class="grid gap-4 xl:grid-cols-2">
-        <div class="nimbus-card rounded-xl border border-themed bg-themed-surface p-6">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="text-[11px] font-medium uppercase tracking-[0.06em] text-themed-faint">当前版本</h2>
-              <p class="mt-1 text-3xl font-bold tabular-nums text-themed">{{ currentVersion?.version || '-' }}</p>
+      <!-- Dual Version Overview Cards -->
+      <section class="grid gap-6 xl:grid-cols-2">
+        <!-- Current Version Card -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div class="flex items-center gap-2">
+                <Layers class="w-4 h-4 text-[var(--accent)]" />
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">当前运行版本</h2>
+              </div>
+              <Badge variant="info" size="sm" dot>当前运行</Badge>
             </div>
-            <span class="inline-flex shrink-0 items-center rounded-full border border-themed bg-themed-secondary px-2.5 py-1 text-xs font-medium text-themed-muted">当前运行</span>
-          </div>
-          <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt class="text-xs text-themed-muted">Git Tag</dt>
-              <dd class="mt-1 font-mono text-themed">{{ currentVersion?.gitTag || '-' }}</dd>
-            </div>
-            <div>
-              <dt class="text-xs text-themed-muted">Commit</dt>
-              <dd class="mt-1 truncate font-mono text-xs text-themed">{{ currentVersion?.gitCommit || '-' }}</dd>
-            </div>
-            <div>
-              <dt class="text-xs text-themed-muted">构建时间</dt>
-              <dd class="mt-1 text-themed">{{ formatDate(currentVersion?.buildTime) }}</dd>
-            </div>
-            <div>
-              <dt class="text-xs text-themed-muted">部署时间</dt>
-              <dd class="mt-1 text-themed">{{ formatDate(currentVersion?.deployedAt) }}</dd>
-            </div>
-          </dl>
-          <div class="mt-6 border-t border-themed pt-4">
-            <h3 class="text-sm font-medium text-themed">当前版本更新内容</h3>
-            <ul v-if="currentVersion?.changelog?.length" class="mt-2 list-disc space-y-1 pl-5 text-sm text-themed-muted">
-              <li v-for="item in currentVersion.changelog" :key="item">{{ item }}</li>
-            </ul>
-            <p v-else class="mt-2 text-sm text-themed-muted">暂无版本说明。</p>
-          </div>
-        </div>
+          </template>
 
-        <div class="nimbus-card rounded-xl border border-themed bg-themed-surface p-6">
-          <div class="flex items-start justify-between gap-4">
+          <div class="space-y-6">
             <div>
-              <h2 class="text-[11px] font-medium uppercase tracking-[0.06em] text-themed-faint">最新版本</h2>
-              <p class="mt-1 text-3xl font-bold tabular-nums text-themed">{{ displayLatestUpdate?.version || '-' }}</p>
+              <div class="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-[var(--text-primary)] tabular-nums">
+                {{ currentVersion?.version || '-' }}
+              </div>
+              <p class="text-xs text-[var(--text-tertiary)] mt-1">当前主进程加载并运行的生产版本</p>
             </div>
-            <span
-              class="inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-medium"
-              :class="updateCheck ? (updateCheck.updateAvailable ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300') : 'border-themed bg-themed-secondary text-themed-muted'"
+
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-xs">
+              <div class="space-y-1">
+                <dt class="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <GitBranch class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  <span>Git Tag</span>
+                </dt>
+                <dd class="font-mono font-medium text-[var(--text-primary)] truncate">
+                  {{ currentVersion?.gitTag || '-' }}
+                </dd>
+              </div>
+              <div class="space-y-1">
+                <dt class="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <Cpu class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  <span>Git Commit</span>
+                </dt>
+                <dd class="font-mono text-[var(--text-primary)] truncate" :title="currentVersion?.gitCommit || ''">
+                  {{ currentVersion?.gitCommit || '-' }}
+                </dd>
+              </div>
+              <div class="space-y-1">
+                <dt class="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <Calendar class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  <span>构建时间</span>
+                </dt>
+                <dd class="text-[var(--text-primary)]">
+                  {{ formatDate(currentVersion?.buildTime) }}
+                </dd>
+              </div>
+              <div class="space-y-1">
+                <dt class="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <Clock class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  <span>部署时间</span>
+                </dt>
+                <dd class="text-[var(--text-primary)]">
+                  {{ formatDate(currentVersion?.deployedAt) }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="border-t border-[var(--border-color)] pt-4 space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">当前版本更新内容</h3>
+              <ul v-if="currentVersion?.changelog?.length" class="space-y-1.5 pl-1 text-xs text-[var(--text-secondary)]">
+                <li v-for="item in currentVersion.changelog" :key="item" class="flex items-start gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] mt-1.5 shrink-0"></span>
+                  <span class="leading-relaxed">{{ item }}</span>
+                </li>
+              </ul>
+              <p v-else class="text-xs text-[var(--text-tertiary)]">暂无版本说明。</p>
+            </div>
+          </div>
+        </Card>
+
+        <!-- Latest Available Version Card -->
+        <Card padding="md">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div class="flex items-center gap-2">
+                <ArrowUpCircle class="w-4 h-4 text-[var(--accent)]" />
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">最新可用版本</h2>
+              </div>
+              <Badge
+                :variant="updateCheck ? (updateCheck.updateAvailable ? 'info' : 'success') : 'default'"
+                :dot="updateCheck?.updateAvailable"
+                :pulse="updateCheck?.updateAvailable"
+                size="sm"
+              >
+                {{ updateCheck ? (updateCheck.updateAvailable ? '可更新' : '已最新') : '未检查' }}
+              </Badge>
+            </div>
+          </template>
+
+          <div class="space-y-6">
+            <div>
+              <div class="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-[var(--text-primary)] tabular-nums">
+                {{ displayLatestUpdate?.version || '-' }}
+              </div>
+              <p class="text-xs text-[var(--text-tertiary)] mt-1">官方远程仓库 / OTA 发布的最新版本</p>
+            </div>
+
+            <!-- Repository Unavailable Notice -->
+            <div
+              v-if="repositoryUnavailable"
+              class="flex items-start gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] p-4 text-xs text-[var(--warning)]"
             >
-              {{ updateCheck ? (updateCheck.updateAvailable ? '可更新' : '已最新') : '未检查' }}
-            </span>
-          </div>
-          <div
-            v-if="repositoryUnavailable"
-            class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
-          >
-            {{ updateCheck?.repositoryError || '当前部署目录不是 Git 工作区，无法在线更新。' }}
-          </div>
-          <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt class="text-xs text-themed-muted">Commit</dt>
-              <dd class="mt-1 truncate font-mono text-xs text-themed">{{ displayLatestUpdate?.commit || '-' }}</dd>
-            </div>
-            <div>
-              <dt class="text-xs text-themed-muted">发布时间</dt>
-              <dd class="mt-1 text-themed">{{ formatDate(displayLatestUpdate?.date) }}</dd>
-            </div>
-          </dl>
-          <div class="mt-6">
-            <h3 class="text-sm font-medium text-themed">最新版本更新内容</h3>
-            <ul v-if="displayLatestUpdate?.changelog?.length" class="mt-2 list-disc space-y-1 pl-5 text-sm text-themed-muted">
-              <li v-for="item in displayLatestUpdate.changelog" :key="item">{{ item }}</li>
-            </ul>
-            <p v-else class="mt-2 text-sm text-themed-muted">检查更新后显示 release tag 说明。</p>
-          </div>
-          <div class="mt-6 border-t border-themed pt-4">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-sm font-medium text-themed">OTA 发行包</h3>
-              <span
-                class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium"
-                :class="displayLatestUpdate?.ota?.manifestAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'"
-              >
-                {{ displayLatestUpdate?.ota?.manifestAvailable ? '已校验 manifest' : 'Git 更新兼容模式' }}
-              </span>
-            </div>
-            <div v-if="latestOtaArtifacts.length" class="mt-3 space-y-2">
-              <div
-                v-for="artifact in latestOtaArtifacts"
-                :key="artifact.name"
-                class="rounded-lg border border-themed bg-themed-secondary px-3 py-2 text-xs text-themed-muted"
-              >
-                <div class="font-medium text-themed">{{ artifact.name }}</div>
-                <div class="mt-1 grid gap-1 sm:grid-cols-3">
-                  <span>{{ artifact.platform }}/{{ artifact.arch }}</span>
-                  <span class="tabular-nums">{{ formatBytes(artifact.size) }}</span>
-                  <span class="font-mono">{{ shortSha(artifact.sha256) }}</span>
-                </div>
+              <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
+              <div class="leading-relaxed font-medium">
+                {{ updateCheck?.repositoryError || '当前部署目录不是 Git 工作区，无法在线更新。' }}
               </div>
             </div>
-            <p v-else class="mt-2 text-sm text-themed-muted">
-              {{ displayLatestUpdate?.ota?.error || '检查更新后显示 OTA manifest 和包校验信息。' }}
-            </p>
-          </div>
-          <button
-            class="btn-primary mt-6 w-full"
-            :disabled="updateActionDisabled"
-            @click="latestUpdate && startUpdate(latestUpdate.version)"
-          >
-            <svg v-if="starting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5 10.5 3l-1.5 7.5h6.75L9 21l1.5-7.5H3.75Z" />
-            </svg>
-            {{ updateActionLabel }}
-          </button>
-        </div>
-      </section>
 
-      <section v-if="updateCheck?.updates?.length" class="nimbus-card rounded-xl border border-themed bg-themed-surface">
-        <div class="border-b border-themed px-5 py-4">
-          <h2 class="text-lg font-semibold text-themed">可更新版本</h2>
-        </div>
-        <div class="divide-y divide-themed">
-          <div v-for="item in updateCheck.updates" :key="item.version" class="flex flex-col gap-3 px-5 py-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <div class="font-mono text-base font-semibold tabular-nums text-themed">{{ item.version }}</div>
-              <div class="mt-1 text-xs text-themed-muted">{{ formatDate(item.date) }} · <span class="font-mono">{{ item.commit || '-' }}</span></div>
-              <span
-                class="mt-2 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium"
-                :class="item.ota.manifestAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'"
-              >
-                {{ item.ota.manifestAvailable ? `OTA manifest · ${item.ota.artifacts.length} 个包` : (item.ota.error || '未发现 OTA manifest') }}
-              </span>
-              <ul v-if="item.changelog.length" class="mt-2 list-disc space-y-1 pl-5 text-sm text-themed-muted">
-                <li v-for="line in item.changelog.slice(0, 6)" :key="line">{{ line }}</li>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-xs">
+              <div class="space-y-1">
+                <dt class="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <Cpu class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  <span>Git Commit</span>
+                </dt>
+                <dd class="font-mono text-[var(--text-primary)] truncate" :title="displayLatestUpdate?.commit || ''">
+                  {{ displayLatestUpdate?.commit || '-' }}
+                </dd>
+              </div>
+              <div class="space-y-1">
+                <dt class="text-[var(--text-tertiary)] flex items-center gap-1.5">
+                  <Calendar class="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                  <span>发布时间</span>
+                </dt>
+                <dd class="text-[var(--text-primary)]">
+                  {{ formatDate(displayLatestUpdate?.date) }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">最新版本更新内容</h3>
+              <ul v-if="displayLatestUpdate?.changelog?.length" class="space-y-1.5 pl-1 text-xs text-[var(--text-secondary)]">
+                <li v-for="item in displayLatestUpdate.changelog" :key="item" class="flex items-start gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] mt-1.5 shrink-0"></span>
+                  <span class="leading-relaxed">{{ item }}</span>
+                </li>
               </ul>
+              <p v-else class="text-xs text-[var(--text-tertiary)]">检查更新后显示 release tag 说明。</p>
             </div>
-            <button class="btn-secondary shrink-0" :disabled="starting || hasRunningTask" @click="startUpdate(item.version)">
-              更新到此版本
-            </button>
+
+            <!-- OTA Manifest & Artifacts -->
+            <div class="border-t border-[var(--border-color)] pt-4 space-y-3">
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <Package class="w-4 h-4 text-[var(--text-secondary)]" />
+                  <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">OTA 发行包</h3>
+                </div>
+                <Badge
+                  :variant="displayLatestUpdate?.ota?.manifestAvailable ? 'success' : 'warning'"
+                  size="sm"
+                >
+                  {{ displayLatestUpdate?.ota?.manifestAvailable ? '已校验 manifest' : 'Git 更新兼容模式' }}
+                </Badge>
+              </div>
+
+              <div v-if="latestOtaArtifacts.length" class="space-y-2">
+                <div
+                  v-for="artifact in latestOtaArtifacts"
+                  :key="artifact.name"
+                  class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-xs"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-mono font-medium text-[var(--text-primary)] truncate">{{ artifact.name }}</span>
+                    <Badge variant="default" size="sm" class="font-mono shrink-0">
+                      {{ artifact.platform }}/{{ artifact.arch }}
+                    </Badge>
+                  </div>
+                  <div class="mt-2 flex items-center justify-between text-[var(--text-secondary)] font-mono text-[11px] gap-2">
+                    <span class="tabular-nums">{{ formatBytes(artifact.size) }}</span>
+                    <span class="truncate text-[var(--text-tertiary)]" :title="artifact.sha256">{{ shortSha(artifact.sha256) }}</span>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="text-xs text-[var(--text-tertiary)] leading-relaxed">
+                {{ displayLatestUpdate?.ota?.error || '检查更新后显示 OTA manifest 和包校验信息。' }}
+              </p>
+            </div>
+
+            <!-- Upgrade Trigger Button -->
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              :disabled="updateActionDisabled"
+              :loading="starting"
+              @click="latestUpdate && startUpdate(latestUpdate.version)"
+            >
+              <template #icon>
+                <Sparkles class="w-4 h-4" />
+              </template>
+              {{ updateActionLabel }}
+            </Button>
           </div>
-        </div>
+        </Card>
       </section>
 
-      <section class="grid gap-4 xl:grid-cols-[minmax(300px,440px)_1fr]">
-        <div class="nimbus-card overflow-hidden rounded-xl border border-themed bg-themed-surface">
-          <div class="flex items-center justify-between gap-3 border-b border-themed px-5 py-4">
-            <div>
-              <h2 class="text-lg font-semibold text-themed">更新任务</h2>
-              <p class="mt-1 text-xs text-themed-muted">每页最多显示 7 条，旧任务翻页查看。</p>
+      <!-- Available Versions Section -->
+      <section v-if="updateCheck?.updates?.length">
+        <Card padding="none">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div class="flex items-center gap-2.5">
+                <History class="w-4 h-4 text-[var(--accent)]" />
+                <div>
+                  <h2 class="text-base font-semibold text-[var(--text-primary)]">可更新版本列表</h2>
+                  <p class="text-xs text-[var(--text-secondary)] mt-0.5">发现可升级版本，支持按需直接跨步升级</p>
+                </div>
+              </div>
+              <Badge variant="info" size="sm">
+                {{ updateCheck.updates.length }} 个版本
+              </Badge>
             </div>
-            <span class="inline-flex shrink-0 items-center rounded-full border border-themed bg-themed-secondary px-2.5 py-1 text-xs font-medium tabular-nums text-themed-muted">{{ tasks.length }} 条</span>
+          </template>
+
+          <div class="divide-y divide-[var(--border-color)]">
+            <div
+              v-for="item in updateCheck.updates"
+              :key="item.version"
+              class="flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between hover:bg-[var(--bg-surface-soft)] transition-colors"
+            >
+              <div class="min-w-0 flex-1 space-y-2">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <span class="font-mono text-base font-bold tabular-nums text-[var(--text-primary)]">{{ item.version }}</span>
+                  <Badge
+                    :variant="item.ota.manifestAvailable ? 'success' : 'warning'"
+                    size="sm"
+                  >
+                    {{ item.ota.manifestAvailable ? `OTA manifest · ${item.ota.artifacts.length} 个包` : (item.ota.error || '未发现 OTA manifest') }}
+                  </Badge>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-[var(--text-secondary)] flex-wrap">
+                  <span>{{ formatDate(item.date) }}</span>
+                  <span>·</span>
+                  <span class="font-mono">{{ item.commit || '-' }}</span>
+                </div>
+                <ul v-if="item.changelog.length" class="space-y-1 pl-1 text-xs text-[var(--text-secondary)] pt-1">
+                  <li v-for="line in item.changelog.slice(0, 6)" :key="line" class="flex items-start gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)] mt-1.5 shrink-0"></span>
+                    <span class="leading-relaxed">{{ line }}</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="shrink-0 self-start md:self-center">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :disabled="starting || hasRunningTask"
+                  @click="startUpdate(item.version)"
+                >
+                  更新到此版本
+                </Button>
+              </div>
+            </div>
           </div>
-          <div v-if="tasks.length === 0" class="px-5 py-10 text-center text-sm text-themed-muted">暂无更新任务。</div>
-          <div v-else class="divide-y divide-themed">
+        </Card>
+      </section>
+
+      <!-- Tasks and Logs Section -->
+      <section class="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
+        <!-- Tasks Column -->
+        <Card padding="none" class="flex flex-col h-full">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div>
+                <h2 class="text-base font-semibold text-[var(--text-primary)]">更新任务</h2>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">每页最多显示 7 条，旧任务翻页查看</p>
+              </div>
+              <Badge variant="default" size="sm">
+                {{ tasks.length }} 条
+              </Badge>
+            </div>
+          </template>
+
+          <div v-if="tasks.length === 0" class="p-6">
+            <EmptyState
+              title="暂无更新任务"
+              description="当前系统尚未发起过任何更新或回滚任务。"
+            />
+          </div>
+
+          <div v-else class="divide-y divide-[var(--border-color)] flex-1 overflow-y-auto">
             <button
               v-for="task in paginatedTasks"
               :key="task.id"
-              class="nimbus-task-row block h-[76px] w-full overflow-hidden border-l-2 py-3 text-left hover:bg-themed-hover"
-              :class="selectedTaskId === task.id ? 'border-primary-500 bg-themed-hover pl-[18px] pr-5' : 'border-transparent px-5'"
+              type="button"
+              class="group relative block w-full text-left p-4 transition-all duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              :class="selectedTaskId === task.id
+                ? 'bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] text-[var(--text-primary)]'
+                : 'hover:bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
               @click="selectTask(task)"
             >
-              <div class="flex items-center justify-between gap-3">
-                <span class="truncate font-mono text-sm font-medium text-themed">#{{ task.id }} {{ task.fromVersion || '-' }} -> {{ task.targetVersion }}</span>
-                <span class="shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium" :class="statusClass(task.status)">
-                  {{ statusLabel(task.status) }}
+              <span
+                v-if="selectedTaskId === task.id"
+                class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[var(--accent)]"
+              />
+              <div class="flex items-center justify-between gap-2 min-w-0">
+                <span class="truncate font-mono text-sm font-semibold text-[var(--text-primary)]">
+                  #{{ task.id }} {{ task.fromVersion || '-' }} &rarr; {{ task.targetVersion }}
                 </span>
+                <Badge
+                  :variant="statusBadgeVariant(task.status)"
+                  :dot="task.status === 'running'"
+                  :pulse="task.status === 'running'"
+                  size="sm"
+                  class="shrink-0"
+                >
+                  {{ statusLabel(task.status) }}
+                </Badge>
               </div>
-              <div class="mt-1 text-xs text-themed-muted">
-                {{ task.startedByUsername || '-' }} · {{ formatDate(task.createdAt) }}
+              <div class="mt-1.5 flex items-center justify-between text-xs text-[var(--text-tertiary)] gap-2">
+                <span class="truncate">{{ task.startedByUsername || '-' }}</span>
+                <span class="shrink-0 tabular-nums">{{ formatDate(task.createdAt) }}</span>
               </div>
-              <p v-if="task.errorMessage" class="mt-1 truncate text-xs text-rose-600 dark:text-rose-400">{{ task.errorMessage }}</p>
+              <p v-if="task.errorMessage" class="mt-1.5 truncate text-xs text-[var(--error)]">
+                {{ task.errorMessage }}
+              </p>
             </button>
           </div>
-          <div class="flex min-h-[54px] items-center justify-between border-t border-themed px-5 py-3 text-xs text-themed-muted">
-            <span>第 {{ taskPage }} / {{ totalTaskPages }} 页 · 共 {{ tasks.length }} 个任务</span>
-            <div class="flex gap-2">
-              <button class="btn-secondary btn-sm" :disabled="taskPage <= 1" @click="setTaskPage(taskPage - 1)">上一页</button>
-              <button class="btn-secondary btn-sm" :disabled="taskPage >= totalTaskPages" @click="setTaskPage(taskPage + 1)">下一页</button>
-            </div>
-          </div>
-        </div>
 
-        <div class="nimbus-card overflow-hidden rounded-xl border border-themed bg-themed-surface">
-          <div class="flex flex-col gap-3 border-b border-themed px-5 py-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-themed">任务日志</h2>
-              <p class="mt-1 text-xs text-themed-muted">
-                {{ selectedTask ? `任务 #${selectedTask.id} · ${statusLabel(selectedTask.status)}` : '请选择任务' }}
-              </p>
-            </div>
-            <div class="flex gap-2">
-              <button class="btn-secondary" :disabled="!selectedTask || logsLoading" @click="loadSelectedTaskLogs">
-                <svg class="h-4 w-4" :class="logsLoading ? 'animate-spin' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-                {{ logsLoading ? '加载中...' : '刷新日志' }}
-              </button>
-              <button
-                class="btn-danger"
-                :disabled="!selectedTask?.backupPath || hasRunningTask || rollingBackTaskId === selectedTask?.id"
-                @click="selectedTask && rollbackTask(selectedTask)"
-              >
-                <svg v-if="rollingBackTaskId === selectedTask?.id" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                </svg>
-                {{ rollingBackTaskId === selectedTask?.id ? '回滚中...' : '回滚' }}
-              </button>
-            </div>
-          </div>
-          <div class="p-5">
-            <div class="overflow-hidden rounded-lg border border-white/10">
-              <div class="flex items-center gap-1.5 bg-gray-900 px-4 py-2">
-                <span class="h-2.5 w-2.5 rounded-full bg-rose-500/70"></span>
-                <span class="h-2.5 w-2.5 rounded-full bg-amber-500/70"></span>
-                <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/70"></span>
-                <span class="ml-2 font-mono text-[11px] text-gray-500">update.log</span>
+          <template v-if="tasks.length > 0" #footer>
+            <div class="flex items-center justify-between gap-3 text-xs text-[var(--text-secondary)]">
+              <span>第 {{ taskPage }} / {{ totalTaskPages }} 页 · 共 {{ tasks.length }} 个任务</span>
+              <div class="flex items-center gap-1.5">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :disabled="taskPage <= 1"
+                  @click="setTaskPage(taskPage - 1)"
+                >
+                  上一页
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :disabled="taskPage >= totalTaskPages"
+                  @click="setTaskPage(taskPage + 1)"
+                >
+                  下一页
+                </Button>
               </div>
-              <pre class="min-h-[420px] max-h-[600px] overflow-auto whitespace-pre-wrap bg-gray-950 p-5 font-mono text-xs leading-5 text-gray-100">{{ selectedTaskLogs || '暂无日志。' }}</pre>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Task Logs Column -->
+        <Card padding="none" class="flex flex-col h-full">
+          <template #header>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+              <div class="min-w-0 flex-1">
+                <h2 class="text-base font-semibold text-[var(--text-primary)]">任务日志</h2>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5 truncate">
+                  {{ selectedTask ? `任务 #${selectedTask.id} · ${statusLabel(selectedTask.status)} · ${formatDate(selectedTask.createdAt)}` : '请在左侧列表中选择任务' }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 flex-wrap">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  :loading="logsLoading"
+                  :disabled="!selectedTask || logsLoading"
+                  @click="loadSelectedTaskLogs"
+                >
+                  <template #icon>
+                    <RefreshCw class="w-3.5 h-3.5" />
+                  </template>
+                  {{ logsLoading ? '加载中...' : '刷新日志' }}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  :loading="rollingBackTaskId === selectedTask?.id"
+                  :disabled="!selectedTask?.backupPath || hasRunningTask || rollingBackTaskId === selectedTask?.id"
+                  @click="selectedTask && rollbackTask(selectedTask)"
+                >
+                  <template #icon>
+                    <RotateCcw class="w-3.5 h-3.5" />
+                  </template>
+                  {{ rollingBackTaskId === selectedTask?.id ? '回滚中...' : '回滚' }}
+                </Button>
+              </div>
+            </div>
+          </template>
+
+          <div class="p-4 md:p-6 flex-1 flex flex-col">
+            <div v-if="!selectedTask" class="py-12 flex-1 flex items-center justify-center">
+              <EmptyState
+                title="请选择任务"
+                description="在左侧任务列表中点击选中更新任务以查看对应的详细输出日志。"
+              />
+            </div>
+            <div v-else class="rounded-2xl border border-[var(--border-color)] bg-[var(--terminal-bg)] overflow-hidden shadow-sm flex-1 flex flex-col">
+              <!-- macOS Terminal Header Bar -->
+              <div class="flex items-center justify-between px-4 py-2.5 bg-[var(--bg-surface-soft)]/90 border-b border-[var(--border-color)] backdrop-blur-sm shrink-0">
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-[var(--error)] opacity-80 inline-block shadow-sm"></span>
+                  <span class="w-3 h-3 rounded-full bg-[var(--warning)] opacity-80 inline-block shadow-sm"></span>
+                  <span class="w-3 h-3 rounded-full bg-[var(--success)] opacity-80 inline-block shadow-sm"></span>
+                  <div class="flex items-center gap-1.5 ml-2 text-xs font-mono text-[var(--text-secondary)] font-medium">
+                    <Terminal class="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+                    <span>update.log</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Badge :variant="statusBadgeVariant(selectedTask.status)" size="sm">
+                    {{ statusLabel(selectedTask.status) }}
+                  </Badge>
+                  <span class="text-xs text-[var(--text-tertiary)] font-mono">
+                    #{{ selectedTask.id }}
+                  </span>
+                </div>
+              </div>
+              <!-- Log Output Container -->
+              <pre class="min-h-[420px] max-h-[640px] flex-1 overflow-auto p-4 md:p-5 font-mono text-xs leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap select-text selection:bg-[var(--accent)] selection:text-white">{{ selectedTaskLogs || (logsLoading ? '日志读取中...' : '暂无日志输出。') }}</pre>
             </div>
           </div>
-        </div>
+        </Card>
       </section>
     </template>
   </div>
 </template>
-
-<style scoped>
-.nimbus-card,
-.nimbus-task-row {
-  transition: background-color 0.15s ease, border-color 0.15s ease, padding 0.15s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-card,
-  .nimbus-task-row {
-    transition: none;
-  }
-}
-</style>
