@@ -386,7 +386,7 @@ function getIntervalLabel(minutes: number): string {
             </form>
             <div class="modal-footer">
               <button class="btn-secondary" @click="showCreateModal = false">{{ t('snapshot.createModal.cancel') }}</button>
-	              <button :disabled="createLoading || !createForm.name" class="btn-primary" @click="createSnapshot">
+              <button :disabled="createLoading || !createForm.name" class="btn-primary" @click="createSnapshot">
                 {{ createLoading ? t('snapshot.createModal.creating') : t('snapshot.createModal.create') }}
               </button>
             </div>
@@ -411,11 +411,11 @@ function getIntervalLabel(minutes: number): string {
             </div>
             <form class="modal-body" @submit.prevent="savePolicy">
               <label class="flex items-center gap-2 cursor-pointer">
-	                <input
-	                  v-model="policyForm.enabled"
-	                  type="checkbox"
-	                  class="w-4 h-4 rounded"
-	                  :class="themeStore.isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'"
+                <input
+                  v-model="policyForm.enabled"
+                  type="checkbox"
+                  class="w-4 h-4 rounded"
+                  :class="themeStore.isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'"
                 />
                 <span class="text-sm text-themed">{{ t('snapshot.policyModal.enable') }}</span>
               </label>
@@ -423,7 +423,7 @@ function getIntervalLabel(minutes: number): string {
               <div v-if="policyForm.enabled" class="space-y-4 pt-2">
                 <div>
                   <label class="block text-xs text-themed-muted mb-1.5">{{ t('snapshot.policyModal.interval') }}</label>
-	                  <select v-model="policyForm.intervalMinutes" class="input">
+                  <select v-model="policyForm.intervalMinutes" class="input">
                     <option :value="10">{{ t('snapshot.policyModal.intervalOptions.min10') }}</option>
                     <option :value="60">{{ t('snapshot.policyModal.intervalOptions.hour1') }}</option>
                     <option :value="360">{{ t('snapshot.policyModal.intervalOptions.hour6') }}</option>
@@ -437,7 +437,7 @@ function getIntervalLabel(minutes: number): string {
             </form>
             <div class="modal-footer">
               <button class="btn-secondary" @click="showPolicyModal = false">{{ t('snapshot.policyModal.cancel') }}</button>
-	              <button :disabled="policyLoading" class="btn-primary" @click="savePolicy">
+              <button :disabled="policyLoading" class="btn-primary" @click="savePolicy">
                 {{ policyLoading ? t('snapshot.policyModal.saving') : t('snapshot.policyModal.save') }}
               </button>
             </div>

@@ -192,75 +192,75 @@ onMounted(async () => {
     <!-- Desktop Table View -->
     <div v-else class="card overflow-hidden hidden sm:block">
       <table class="w-full table-fixed">
-          <thead>
-            <tr class="border-b border-themed">
-              <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.time') }}</th>
-              <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.action') }}</th>
-              <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.content') }}</th>
-              <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.result') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="logs.length === 0" class="border-b border-themed">
-              <td colspan="4" class="py-8 text-center text-themed-secondary">
-                {{ $t('logs.noLogs') }}
-              </td>
-            </tr>
-            <tr 
-              v-for="log in logs" 
-              :key="log.id"
-              class="border-b border-themed hover:bg-themed/5 transition-colors"
-            >
-              <td class="py-3 px-4 text-sm text-themed-secondary whitespace-nowrap">
-                {{ formatDate(log.created_at) }}
-              </td>
-              <td class="py-3 px-4 text-sm text-themed whitespace-nowrap">
-                {{ log.action }}
-              </td>
-              <td class="py-3 px-4 text-sm">
-                <div class="max-w-xs lg:max-w-md">
-                  <!-- 短内容直接显示 -->
-                  <span v-if="!isContentLong(log.content)" class="text-themed-secondary">
-                    {{ log.content }}
-                  </span>
-                  <!-- 长内容可展开 -->
-                  <template v-else>
-                    <div v-if="!expandedRows.has(log.id)" class="flex items-center gap-1.5">
-                      <span class="text-themed-secondary truncate flex-1">{{ log.content.slice(0, 40) }}...</span>
-                      <button
-                        class="flex-shrink-0 p-1 rounded transition-colors"
-                        :class="themeStore.isDark ? 'hover:bg-gray-700 text-blue-400' : 'hover:bg-gray-100 text-blue-500'"
-                        :title="$t('logs.expand')"
-                        @click="toggleContent(log.id)"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
-                    <div v-else class="space-y-2">
-                      <p class="text-themed-secondary whitespace-pre-wrap break-words">{{ log.content }}</p>
-                      <button
-                        class="text-xs flex items-center gap-1 transition-colors"
-                        :class="themeStore.isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-600'"
-                        @click="toggleContent(log.id)"
-                      >
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-                        </svg>
-                        {{ $t('logs.collapse') }}
-                      </button>
-                    </div>
-                  </template>
-                </div>
-              </td>
-              <td class="py-3 px-4 whitespace-nowrap">
-                <span :class="['badge whitespace-nowrap', getResultClass(log.result)]">
-                  {{ log.result }}
+        <thead>
+          <tr class="border-b border-themed">
+            <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.time') }}</th>
+            <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.action') }}</th>
+            <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.content') }}</th>
+            <th class="text-left py-3 px-4 text-xs font-medium text-themed-muted whitespace-nowrap">{{ $t('logs.result') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="logs.length === 0" class="border-b border-themed">
+            <td colspan="4" class="py-8 text-center text-themed-secondary">
+              {{ $t('logs.noLogs') }}
+            </td>
+          </tr>
+          <tr 
+            v-for="log in logs" 
+            :key="log.id"
+            class="border-b border-themed hover:bg-themed/5 transition-colors"
+          >
+            <td class="py-3 px-4 text-sm text-themed-secondary whitespace-nowrap">
+              {{ formatDate(log.created_at) }}
+            </td>
+            <td class="py-3 px-4 text-sm text-themed whitespace-nowrap">
+              {{ log.action }}
+            </td>
+            <td class="py-3 px-4 text-sm">
+              <div class="max-w-xs lg:max-w-md">
+                <!-- 短内容直接显示 -->
+                <span v-if="!isContentLong(log.content)" class="text-themed-secondary">
+                  {{ log.content }}
                 </span>
-              </td>
-            </tr>
-          </tbody>
+                <!-- 长内容可展开 -->
+                <template v-else>
+                  <div v-if="!expandedRows.has(log.id)" class="flex items-center gap-1.5">
+                    <span class="text-themed-secondary truncate flex-1">{{ log.content.slice(0, 40) }}...</span>
+                    <button
+                      class="flex-shrink-0 p-1 rounded transition-colors"
+                      :class="themeStore.isDark ? 'hover:bg-gray-700 text-blue-400' : 'hover:bg-gray-100 text-blue-500'"
+                      :title="$t('logs.expand')"
+                      @click="toggleContent(log.id)"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div v-else class="space-y-2">
+                    <p class="text-themed-secondary whitespace-pre-wrap break-words">{{ log.content }}</p>
+                    <button
+                      class="text-xs flex items-center gap-1 transition-colors"
+                      :class="themeStore.isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-600'"
+                      @click="toggleContent(log.id)"
+                    >
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                      </svg>
+                      {{ $t('logs.collapse') }}
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span :class="['badge whitespace-nowrap', getResultClass(log.result)]">
+                {{ log.result }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
       </table>
 
       <!-- Pagination (Desktop) -->

@@ -362,7 +362,7 @@ function getProviderInfo(provider: string): ProviderInfo {
               @click="loginWithOAuth(provider)"
             >
               <template #prefix>
-                <span v-html="getProviderInfo(provider).icon" class="inline-flex items-center shrink-0"></span>
+                <span class="inline-flex items-center shrink-0" v-html="getProviderInfo(provider).icon"></span>
               </template>
               <span>{{ getProviderInfo(provider).name }}</span>
             </Button>

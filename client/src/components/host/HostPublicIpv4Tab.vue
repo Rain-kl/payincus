@@ -193,27 +193,27 @@ onMounted(loadPools)
       </div>
 
       <table class="w-full table-fixed text-sm">
-          <thead class="text-left text-themed-muted border-b border-themed">
-            <tr>
-              <th class="py-2">{{ t('hostPublicIpv4.address') }}</th>
-              <th class="py-2">{{ t('common.status') }}</th>
-              <th class="py-2">{{ t('hostPublicIpv4.instance') }}</th>
-              <th class="py-2 text-right">{{ t('common.actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="address in pool.addresses" :key="address.id" class="border-b border-themed/60">
-              <td class="py-2 font-mono">{{ address.address }}/{{ address.prefixLength }}</td>
-              <td class="py-2">{{ t(`hostPublicIpv4.status.${address.status}`) }}</td>
-              <td class="py-2">{{ address.instanceId ? `#${address.instanceId}` : '-' }}</td>
-              <td class="py-2 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <IconButton v-if="address.status !== 'assigned'" :label="address.status === 'disabled' ? t('hostPublicIpv4.enable') : t('hostPublicIpv4.disable')" :disabled="!!actionLoading" @click="toggleAddress(address)"><Power v-if="address.status === 'disabled'" /><PowerOff v-else /></IconButton>
-                  <IconButton v-if="address.status !== 'assigned'" :label="t('common.delete')" variant="danger" :disabled="!!actionLoading" @click="deleteAddress(address)"><Trash2 /></IconButton>
-                </div>
-              </td>
-            </tr>
-          </tbody>
+        <thead class="text-left text-themed-muted border-b border-themed">
+          <tr>
+            <th class="py-2">{{ t('hostPublicIpv4.address') }}</th>
+            <th class="py-2">{{ t('common.status') }}</th>
+            <th class="py-2">{{ t('hostPublicIpv4.instance') }}</th>
+            <th class="py-2 text-right">{{ t('common.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="address in pool.addresses" :key="address.id" class="border-b border-themed/60">
+            <td class="py-2 font-mono">{{ address.address }}/{{ address.prefixLength }}</td>
+            <td class="py-2">{{ t(`hostPublicIpv4.status.${address.status}`) }}</td>
+            <td class="py-2">{{ address.instanceId ? `#${address.instanceId}` : '-' }}</td>
+            <td class="py-2 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <IconButton v-if="address.status !== 'assigned'" :label="address.status === 'disabled' ? t('hostPublicIpv4.enable') : t('hostPublicIpv4.disable')" :disabled="!!actionLoading" @click="toggleAddress(address)"><Power v-if="address.status === 'disabled'" /><PowerOff v-else /></IconButton>
+                <IconButton v-if="address.status !== 'assigned'" :label="t('common.delete')" variant="danger" :disabled="!!actionLoading" @click="deleteAddress(address)"><Trash2 /></IconButton>
+              </div>
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
 

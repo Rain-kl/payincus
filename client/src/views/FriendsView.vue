@@ -851,7 +851,7 @@ onActivated(async () => {
                     <template #icon>
                       <Layers class="w-7 h-7 stroke-[1.5] text-[var(--text-tertiary)]" />
                     </template>
-                    <template #action v-if="availablePackages.length > 0">
+                    <template v-if="availablePackages.length > 0" #action>
                       <Button variant="primary" size="sm" @click="openAddShareModal()">
                         <template #icon>
                           <Plus class="w-4 h-4" />

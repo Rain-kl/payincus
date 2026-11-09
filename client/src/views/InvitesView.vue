@@ -200,7 +200,7 @@ function onPageSizeChange(val: any): void {
       :description="t('invites.description')"
     >
       <template #actions>
-        <RouterLink :to="dashboardPath()" custom v-slot="{ navigate }">
+        <RouterLink v-slot="{ navigate }" :to="dashboardPath()" custom>
           <Button variant="secondary" class="w-full sm:w-auto" @click="navigate">
             <template #icon>
               <ArrowLeft class="h-4 w-4" />

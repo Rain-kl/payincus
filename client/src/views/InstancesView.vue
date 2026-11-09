@@ -2230,7 +2230,7 @@ async function confirmBatchDestroy(): Promise<void> {
       <Card padding="sm">
         <Pagination
           v-model:page="page"
-          v-model:pageSize="pageSize"
+          v-model:page-size="pageSize"
           :total="total"
           :show-size-changer="true"
           :page-size-options="pageSizeOptions"

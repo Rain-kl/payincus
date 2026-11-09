@@ -254,7 +254,6 @@ function getProviderInfo(provider: string): ProviderInfo {
     class="kawaii-public-shell kawaii-auth-shell kawaii-user-auth min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 bg-[var(--bg-primary)] transition-colors duration-200"
   >
     <div class="relative z-10 w-full max-w-[420px] mx-auto">
-
       <!-- Logo & 标题区域 (Apple Style Lockup) -->
       <div class="text-center mb-8" data-reveal>
         <div class="w-14 h-14 mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-transform duration-300 hover:scale-105">
@@ -520,7 +519,6 @@ function getProviderInfo(provider: string): ProviderInfo {
           <Monitor v-else class="w-4 h-4" />
         </button>
       </div>
-
     </div>
   </div>
 </template>

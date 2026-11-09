@@ -359,7 +359,6 @@ async function handleRegister(): Promise<void> {
   <div ref="revealRoot" class="nimbus-auth kawaii-public-shell kawaii-auth-shell kawaii-user-auth min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8">
     <div class="nimbus-aurora" aria-hidden="true"></div>
     <div class="relative z-10 w-full max-w-lg">
-
       <!-- Logo lockup -->
       <div class="text-center mb-7" data-reveal>
         <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">

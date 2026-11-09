@@ -72,7 +72,6 @@ void configStore.loadPublicConfig()
 
 <template>
   <footer class="kawaii-public-footer relative border-t">
-
     <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div
         class="kawaii-footer-panel rounded-[32px] border p-6 shadow-sm sm:p-8"

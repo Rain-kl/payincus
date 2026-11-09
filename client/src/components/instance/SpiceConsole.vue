@@ -127,9 +127,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <component :is="standalone ? 'section' : DrawerModal"
+  <component
+    :is="standalone ? 'section' : DrawerModal"
     v-bind="standalone ? { class: 'spice-window p-4' } : { modelValue: visible, title: `${t('spice.title')} · ${instanceName || ''}`, maxWidth: 'max-w-7xl', closeOnBackdrop: false }"
-    @update:model-value="emit('update:visible', $event)">
+    @update:model-value="emit('update:visible', $event)"
+  >
     <h1 v-if="standalone" class="text-lg font-semibold text-themed mb-4">{{ t('spice.title') }} · {{ instanceName }}</h1>
     <div class="flex flex-wrap items-center gap-3 mb-4">
       <span class="text-sm text-themed-secondary" role="status">{{ t(`spice.${status}`) }}</span>

@@ -528,7 +528,7 @@ function handleClose() {
                 v-if="error && plans.length"
                 class="p-3 rounded bg-error/10 text-error text-sm"
               >
-              {{ error }}
+                {{ error }}
               </div>
             </template>
           </div>

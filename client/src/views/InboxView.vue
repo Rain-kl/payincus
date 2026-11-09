@@ -626,7 +626,7 @@ watch(
         :title="filter === 'unread' ? t('inbox.noUnread') : t('inbox.noMessages')"
         :description="filter === 'unread' ? '' : t('inbox.description')"
       >
-        <template #action v-if="filter === 'unread'">
+        <template v-if="filter === 'unread'" #action>
           <Button variant="secondary" size="sm" @click="setFilter('all')">
             {{ t('inbox.all') }}
           </Button>

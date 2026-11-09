@@ -882,7 +882,7 @@ const greetingText = computed(() => t('dashboard.greeting.full', {
       </div>
 
       <!-- 查看全部底栏 -->
-      <template #footer v-if="instances.length > 5">
+      <template v-if="instances.length > 5" #footer>
         <div class="text-center py-1">
           <RouterLink :to="instancesPath()" class="text-sm font-medium text-[var(--accent)] hover:underline inline-flex items-center gap-1">
             <span>{{ t('dashboard.viewAllInstancesWithCount', { count: instances.length }) }}</span>

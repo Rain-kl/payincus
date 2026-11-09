@@ -242,8 +242,8 @@ onBeforeUnmount(() => {
             : selectedPackageId === pkg.id 
               ? (themeStore.isDark ? 'border-white bg-gray-900 ring-1 ring-white/20' : 'border-gray-900 bg-gray-50 ring-1 ring-gray-900/20')
               : (themeStore.isDark
-                  ? 'border-gray-800 hover:border-gray-700 hover:bg-themed-hover'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-themed-hover')
+                ? 'border-gray-800 hover:border-gray-700 hover:bg-themed-hover'
+                : 'border-gray-200 hover:border-gray-300 hover:bg-themed-hover')
         ]"
         @click="emit('select', pkg)"
       >
@@ -258,7 +258,7 @@ onBeforeUnmount(() => {
               >
                 {{ pkg.name }}
               </div>
-            <span v-if="pkg.gpu_shared" class="badge-default">{{ t('gpu.shared') }}</span>
+              <span v-if="pkg.gpu_shared" class="badge-default">{{ t('gpu.shared') }}</span>
             </div>
             <div class="flex shrink-0 items-center gap-1">
               <button

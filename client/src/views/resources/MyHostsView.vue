@@ -276,7 +276,7 @@ onActivated(() => {
 
 // 引用保留变量/函数以满足静态守卫检查并避免 TS6133
 void hostCreatePath
-void pageNumbers
+void pageNumbers.value
 void formatLocalizedNameList
 void getStatusClass
 </script>

@@ -353,7 +353,6 @@ function handleLinkClick() {
         </RouterLink>
       </template>
     </nav>
-
   </aside>
 </template>
 

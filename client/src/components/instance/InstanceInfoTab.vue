@@ -316,20 +316,20 @@ const canReassignIpv6 = computed(() => {
                 <dd v-if="displayIpv6" class="flex items-center gap-2">
                   <!-- 重新分配 IPv6 按钮 -->
                   <button
-                      v-if="isInstanceOwner !== false && instance.network_mode === 'nat_ipv6'"
-                      class="text-xs px-2 py-0.5 rounded transition-colors flex-shrink-0"
-                      :class="[
+                    v-if="isInstanceOwner !== false && instance.network_mode === 'nat_ipv6'"
+                    class="text-xs px-2 py-0.5 rounded transition-colors flex-shrink-0"
+                    :class="[
                       canReassignIpv6
                         ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500'
                     ]"
-                      :disabled="!canReassignIpv6 || reassignIpv6Loading"
-                      :title="ipv6ReassignCooldown.inCooldown
+                    :disabled="!canReassignIpv6 || reassignIpv6Loading"
+                    :title="ipv6ReassignCooldown.inCooldown
                       ? t('instance.detail.network.reassignIpv6Cooldown', { hours: ipv6ReassignCooldown.remainingHours })
                       : (instance.status !== 'stopped'
                         ? t('instance.detail.network.reassignIpv6StopRequired')
                         : t('instance.detail.network.reassignIpv6'))"
-                      @click="emit('reassign-ipv6')"
+                    @click="emit('reassign-ipv6')"
                   >
                     <span v-if="reassignIpv6Loading" class="flex items-center gap-1">
                       <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -435,8 +435,8 @@ const canReassignIpv6 = computed(() => {
         <div v-if="instance.expires_at" class="flex justify-between">
           <dt class="text-themed-muted">{{ t('instance.detail.info.expiresAt') }}</dt>
           <dd
-              class="text-xs"
-              :class="new Date(instance.expires_at) <= new Date() ? 'text-rose-600 dark:text-rose-400' : 'text-themed-muted'"
+            class="text-xs"
+            :class="new Date(instance.expires_at) <= new Date() ? 'text-rose-600 dark:text-rose-400' : 'text-themed-muted'"
           >
             {{ formatDate(instance.expires_at) }}
           </dd>
@@ -686,6 +686,5 @@ const canReassignIpv6 = computed(() => {
         </div>
       </Transition>
     </Teleport>
-
   </div>
 </template>

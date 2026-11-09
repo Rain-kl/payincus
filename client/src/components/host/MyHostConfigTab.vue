@@ -477,10 +477,10 @@ async function saveConfig() {
           <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.connectionMode') }}</label>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label
-                class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
-                :class="form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
+              class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
+              :class="form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
             >
-              <input type="radio" :value="true" v-model="form.tunnelEnabled" class="radio text-primary" />
+              <input v-model="form.tunnelEnabled" type="radio" :value="true" class="radio text-primary" />
               <div>
                 <div class="text-sm">{{ t('admin.hosts.tunnelMode') }}</div>
               </div>
@@ -489,7 +489,7 @@ async function saveConfig() {
               class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all"
               :class="!form.tunnelEnabled ? 'border-accent bg-themed-secondary text-themed font-medium' : 'border-themed bg-themed-surface text-themed-secondary hover:bg-themed-hover'"
             >
-              <input type="radio" :value="false" v-model="form.tunnelEnabled" class="radio text-primary" />
+              <input v-model="form.tunnelEnabled" type="radio" :value="false" class="radio text-primary" />
               <div>
                 <div class="text-sm">{{ t('admin.hosts.directMode') }}</div>
               </div>

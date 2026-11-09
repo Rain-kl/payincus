@@ -221,8 +221,10 @@ function reconnectNow(): void {
       </template>
     </div>
 
-    <div v-if="state === 'offline' || state === 'tunnelOff'" class="flex items-center justify-between text-xs mt-3"
-      :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'">
+    <div
+      v-if="state === 'offline' || state === 'tunnelOff'" class="flex items-center justify-between text-xs mt-3"
+      :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-500'"
+    >
       <span>{{ state === 'tunnelOff' ? t('host.agentLogs.tunnelRequiredHint') : t('host.agentLogs.emptyWaitingAgent') }}</span>
       <span v-if="state === 'offline'" class="text-gray-400">{{ t('host.agentLogs.autoRetry') }}</span>
     </div>

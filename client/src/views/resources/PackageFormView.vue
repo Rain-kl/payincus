@@ -1010,9 +1010,9 @@ const goBack = closeDrawer
 
             <!-- Egress Fields -->
             <PackageEgressFields
-              class="md:col-span-2"
               v-model:mode="form.egressMode"
               v-model:profile-id="form.egressProfileId"
+              class="md:col-span-2"
               :host-ids="form.hostIds"
               :network-mode="form.networkMode"
               :instance-type="form.instanceType"
