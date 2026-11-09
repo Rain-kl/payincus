@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Info } from 'lucide-vue-next'
+import { AlertCircle, Info, Loader2, RefreshCw, X } from 'lucide-vue-next'
 import api from '@/api'
 import { useReveal } from '@/composables/useReveal'
 import IconButton from '@/components/IconButton.vue'
+import { Badge, Button, Card, EmptyState, PageHeader, Select } from '@/components/ui'
 
 const revealRoot = ref<HTMLElement | null>(null)
 useReveal(revealRoot)
@@ -96,19 +97,40 @@ function statusLabel(order: OrderItem): string {
   const labels: Record<string, string> = {
     completed: '已完成',
     pending: '待处理',
+    paid: '处理中',
     failed: '失败',
     cancelled: '已取消',
-    refunded: '已退款'
+    refunded: '已退款',
+    newPurchase: '新购',
+    renew: '续费',
+    upgrade: '升级',
+    downgrade: '降级',
+    refund: '退款',
+    transfer_fee: '转移手续费'
   }
-  return labels[order.status] || order.rawStatus
+  return labels[order.status] || order.rawStatus || order.status
 }
 
-function statusClass(statusValue: string): string {
-  if (statusValue === 'completed') return 'bg-green-50 text-green-700 border-green-200'
-  if (statusValue === 'pending') return 'bg-yellow-50 text-yellow-700 border-yellow-200'
-  if (statusValue === 'refunded') return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-  if (statusValue === 'failed' || statusValue === 'cancelled') return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20'
-  return 'bg-gray-50 text-gray-700 border-gray-200'
+function statusBadgeVariant(statusValue: string): 'success' | 'warning' | 'error' | 'default' {
+  switch (statusValue) {
+    case 'completed':
+    case 'newPurchase':
+    case 'renew':
+      return 'success'
+    case 'pending':
+    case 'paid':
+    case 'upgrade':
+    case 'downgrade':
+      return 'warning'
+    case 'failed':
+      return 'error'
+    case 'cancelled':
+    case 'refunded':
+    case 'refund':
+    case 'transfer_fee':
+    default:
+      return 'default'
+  }
 }
 
 function sourceLabel(sourceType: OrderSourceType): string {
@@ -155,6 +177,17 @@ function applyFilters() {
   void loadOrders()
 }
 
+function onTypeChange(val: string) {
+  type.value = val
+  status.value = ''
+  applyFilters()
+}
+
+function onStatusChange(val: string) {
+  status.value = val
+  applyFilters()
+}
+
 function clearFilters() {
   type.value = ''
   status.value = ''
@@ -171,53 +204,63 @@ onMounted(loadOrders)
 </script>
 
 <template>
-  <div ref="revealRoot" class="space-y-5 animate-fade-in">
-    <header data-reveal class="page-header flex-col gap-4 sm:flex-row sm:items-center sm:gap-0">
-      <div>
-        <h1 class="page-title">订单中心</h1>
-        <p class="page-description">查看充值订单、实例新购、续费和退款账单。</p>
-      </div>
-      <button class="btn btn-secondary w-full justify-center gap-2 sm:w-auto" :disabled="loading" @click="loadOrders">
-        <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-          <polyline points="21 3 21 9 15 9" />
-        </svg>
-        刷新
-      </button>
-    </header>
+  <div ref="revealRoot" class="space-y-6 animate-fade-in">
+    <PageHeader
+      data-reveal
+      title="订单中心"
+      description="查看充值订单、实例新购、续费和退款账单。"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          :loading="loading"
+          class="w-full sm:w-auto"
+          @click="loadOrders"
+        >
+          <template #icon>
+            <RefreshCw class="h-4 w-4" />
+          </template>
+          刷新
+        </Button>
+      </template>
+    </PageHeader>
 
-    <section data-reveal class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-4 shadow-sm">
-      <div class="grid gap-3 md:grid-cols-[180px_180px_auto]">
-        <select v-model="type" class="input" @change="status = ''; applyFilters()">
-          <option v-for="item in typeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
-        <select v-model="status" class="input" @change="applyFilters">
-          <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
-        <button class="btn btn-secondary justify-self-start" @click="clearFilters">重置</button>
+    <Card data-reveal padding="sm">
+      <div class="grid gap-3 md:grid-cols-[180px_180px_auto] items-center">
+        <Select
+          v-model="type"
+          :options="typeOptions"
+          @change="onTypeChange"
+        />
+        <Select
+          v-model="status"
+          :options="statusOptions"
+          @change="onStatusChange"
+        />
+        <Button variant="secondary" class="justify-self-start" @click="clearFilters">
+          重置
+        </Button>
       </div>
-    </section>
+    </Card>
 
-    <div v-if="error" class="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-      <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="12" />
-        <line x1="12" y1="16" x2="12.01" y2="16" />
-      </svg>
+    <div
+      v-if="error"
+      class="flex items-center gap-2 rounded-xl border border-[color-mix(in_srgb,var(--error)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] p-3 text-sm text-[var(--error)]"
+    >
+      <AlertCircle class="h-4 w-4 shrink-0" />
       <span>{{ error }}</span>
     </div>
 
-    <section data-reveal class="overflow-hidden rounded-xl border border-themed bg-themed-surface shadow-sm">
-      <div v-if="loading" class="p-10 text-center text-sm text-themed-muted">正在加载订单...</div>
-      <div v-else-if="orders.length === 0" class="flex flex-col items-center gap-3 px-6 py-14 text-center">
-        <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-themed bg-themed-secondary text-themed-muted">
-          <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 4h11l3 3v13H5z" />
-            <path d="M9 12h6M9 16h6M9 8h3" />
-          </svg>
-        </div>
-        <div class="text-sm text-themed-muted">暂无订单记录</div>
+    <section data-reveal class="overflow-hidden rounded-2xl border border-themed bg-themed-surface shadow-sm">
+      <div v-if="loading" class="flex items-center justify-center gap-2 p-12 text-sm text-themed-muted">
+        <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+        <span>正在加载订单...</span>
       </div>
+      <EmptyState
+        v-else-if="orders.length === 0"
+        title="暂无订单记录"
+        description="当前没有符合条件的订单记录"
+      />
       <div v-else class="space-y-3 p-4 lg:hidden">
         <div
           v-for="order in orders"
@@ -229,9 +272,9 @@ onMounted(loadOrders)
               <div class="truncate text-sm font-semibold text-themed" :title="order.title">{{ order.title }}</div>
               <div class="mt-1 truncate font-mono text-xs text-themed-muted" :title="order.orderNo">{{ order.orderNo }}</div>
             </div>
-            <span :class="['inline-flex shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium', statusClass(order.status)]">
+            <Badge :variant="statusBadgeVariant(order.status)">
               {{ statusLabel(order) }}
-            </span>
+            </Badge>
           </div>
 
           <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -254,7 +297,7 @@ onMounted(loadOrders)
           </div>
 
           <div class="mt-4 flex justify-end">
-            <button class="btn btn-sm btn-secondary" @click="openDetail(order)">详情</button>
+            <Button size="sm" variant="secondary" @click="openDetail(order)">详情</Button>
           </div>
         </div>
       </div>
@@ -282,7 +325,9 @@ onMounted(loadOrders)
               </td>
               <td class="px-4 py-3 font-mono font-medium tabular-nums text-themed whitespace-nowrap">{{ formatMoney(order.amount) }}</td>
               <td class="px-4 py-3">
-                <span :class="['inline-flex max-w-full rounded-full border px-2 py-0.5 text-xs font-medium', statusClass(order.status)]">{{ statusLabel(order) }}</span>
+                <Badge :variant="statusBadgeVariant(order.status)">
+                  {{ statusLabel(order) }}
+                </Badge>
               </td>
               <td class="px-4 py-3 text-themed-muted">
                 <div class="truncate" :title="instanceName(order)">{{ instanceName(order) }}</div>
@@ -301,9 +346,9 @@ onMounted(loadOrders)
       <div class="flex flex-col items-stretch justify-between gap-3 border-t border-themed px-4 py-3 text-sm text-themed-muted sm:flex-row sm:items-center">
         <span>共 <span class="font-mono tabular-nums text-themed">{{ total }}</span> 条记录</span>
         <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex">
-          <button class="btn btn-sm btn-secondary justify-center" :disabled="page <= 1" @click="goPage(page - 1)">上一页</button>
+          <Button size="sm" variant="secondary" class="justify-center" :disabled="page <= 1" @click="goPage(page - 1)">上一页</Button>
           <span class="min-w-[72px] text-center font-mono tabular-nums">{{ page }} / {{ totalPages }}</span>
-          <button class="btn btn-sm btn-secondary justify-center" :disabled="page >= totalPages" @click="goPage(page + 1)">下一页</button>
+          <Button size="sm" variant="secondary" class="justify-center" :disabled="page >= totalPages" @click="goPage(page + 1)">下一页</Button>
         </div>
       </div>
     </section>
@@ -315,62 +360,89 @@ onMounted(loadOrders)
       raw
       @close="selectedOrder = null"
     >
-        <div class="modal-header">
-          <div class="min-w-0">
-            <h2 class="modal-title truncate">{{ selectedOrder.title }}</h2>
-            <p class="mt-0.5 truncate font-mono text-xs text-themed-muted">{{ selectedOrder.orderNo }}</p>
+      <div class="modal-header">
+        <div class="min-w-0">
+          <h2 class="modal-title truncate">{{ selectedOrder.title }}</h2>
+          <p class="mt-0.5 truncate font-mono text-xs text-themed-muted">{{ selectedOrder.orderNo }}</p>
+        </div>
+        <button class="btn btn-sm btn-ghost gap-1.5" @click="selectedOrder = null">
+          <X class="h-4 w-4" />
+          关闭
+        </button>
+      </div>
+
+      <div class="modal-body space-y-4">
+        <div v-if="detailLoading" class="flex items-center justify-center gap-2 p-6 text-sm text-themed-muted">
+          <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+          <span>正在加载详情...</span>
+        </div>
+        <dl v-else class="grid gap-2 text-sm">
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">状态</dt>
+            <dd>
+              <Badge :variant="statusBadgeVariant(selectedOrder.status)">
+                {{ statusLabel(selectedOrder) }}
+              </Badge>
+            </dd>
           </div>
-          <button class="btn btn-sm btn-ghost gap-1.5" @click="selectedOrder = null">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-            关闭
-          </button>
-        </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">金额</dt>
+            <dd class="font-mono font-medium tabular-nums text-themed">{{ formatMoney(selectedOrder.amount) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">实际到账</dt>
+            <dd class="font-mono tabular-nums text-themed">{{ selectedOrder.actualAmount === null ? '-' : formatMoney(selectedOrder.actualAmount) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">手续费</dt>
+            <dd class="font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.fee) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">支付渠道</dt>
+            <dd class="text-themed">{{ selectedOrder.provider?.name || selectedOrder.paymentMethod || '-' }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">交易号</dt>
+            <dd class="break-all font-mono text-xs text-themed">{{ selectedOrder.tradeNo || '-' }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">关联实例</dt>
+            <dd class="text-themed">{{ instanceName(selectedOrder) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">账期</dt>
+            <dd class="text-themed">{{ selectedOrder.months ? `${selectedOrder.months} 个月` : '-' }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">开始时间</dt>
+            <dd class="text-xs text-themed">{{ formatTime(selectedOrder.periodStart) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">结束时间</dt>
+            <dd class="text-xs text-themed">{{ formatTime(selectedOrder.periodEnd) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">创建时间</dt>
+            <dd class="text-xs text-themed">{{ formatTime(selectedOrder.createdAt) }}</dd>
+          </div>
+          <div class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">完成时间</dt>
+            <dd class="text-xs text-themed">{{ formatTime(selectedOrder.completedAt) }}</dd>
+          </div>
+          <div v-if="selectedOrder.failReason" class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">失败原因</dt>
+            <dd class="text-xs text-themed">{{ selectedOrder.failReason || '-' }}</dd>
+          </div>
+          <div v-if="selectedOrder.remark" class="flex items-center justify-between rounded-lg bg-themed-secondary px-3.5 py-2.5">
+            <dt class="text-xs uppercase tracking-wider text-themed-muted">备注</dt>
+            <dd class="text-xs text-themed">{{ selectedOrder.remark || '-' }}</dd>
+          </div>
+        </dl>
+      </div>
 
-        <div class="modal-body space-y-4">
-          <div v-if="detailLoading" class="p-6 text-sm text-themed-muted">正在加载详情...</div>
-          <dl v-else class="grid gap-2 text-sm">
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">状态</dt><dd><span :class="['inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', statusClass(selectedOrder.status)]">{{ statusLabel(selectedOrder) }}</span></dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">金额</dt><dd class="font-mono font-medium tabular-nums text-themed">{{ formatMoney(selectedOrder.amount) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">实际到账</dt><dd class="font-mono tabular-nums text-themed">{{ selectedOrder.actualAmount === null ? '-' : formatMoney(selectedOrder.actualAmount) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">手续费</dt><dd class="font-mono tabular-nums text-themed">{{ formatMoney(selectedOrder.fee) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">支付渠道</dt><dd class="text-themed">{{ selectedOrder.provider?.name || selectedOrder.paymentMethod || '-' }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">交易号</dt><dd class="break-all font-mono text-xs text-themed">{{ selectedOrder.tradeNo || '-' }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">关联实例</dt><dd class="text-themed">{{ instanceName(selectedOrder) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">账期</dt><dd class="text-themed">{{ selectedOrder.months ? `${selectedOrder.months} 个月` : '-' }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">开始时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.periodStart) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">结束时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.periodEnd) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">创建时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.createdAt) }}</dd></div>
-            <div class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">完成时间</dt><dd class="text-themed text-xs">{{ formatTime(selectedOrder.completedAt) }}</dd></div>
-            <div v-if="selectedOrder.failReason" class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">失败原因</dt><dd class="text-themed text-xs">{{ selectedOrder.failReason || '-' }}</dd></div>
-            <div v-if="selectedOrder.remark" class="flex items-center justify-between rounded bg-themed-secondary px-3.5 py-2.5"><dt class="text-xs uppercase tracking-wider text-themed-muted">备注</dt><dd class="text-themed text-xs">{{ selectedOrder.remark || '-' }}</dd></div>
-          </dl>
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="selectedOrder = null">关闭</button>
-        </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" @click="selectedOrder = null">关闭</button>
+      </div>
     </DrawerModal>
   </div>
 </template>
-
-<style scoped>
-.nimbus-lift {
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.nimbus-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.28);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-lift,
-  .nimbus-lift:hover {
-    transform: none;
-    transition: none;
-  }
-}
-</style>

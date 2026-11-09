@@ -11,11 +11,12 @@ import api, {
 import { useToast } from '@/stores/toast'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import IconButton from '@/components/IconButton.vue'
 import { RefreshCw } from 'lucide-vue-next'
 import BillingOverviewIcon from '@/components/admin/BillingOverviewIcon.vue'
 import { calculateDiscountedPrice } from '@/utils/billing'
 import { instanceDetailPath } from '@/utils/app-paths'
+import { PageHeader, Card, Button, Input, Select, Badge, EmptyState, Pagination } from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
 
 const PaymentProvidersView = defineAsyncComponent(() => import('@/views/admin/PaymentProvidersView.vue'))
 const AffReviewView = defineAsyncComponent(() => import('@/views/admin/AffReviewView.vue'))
@@ -1169,16 +1170,6 @@ function getReconciliationStatusLabel(status: FinancialReconciliationStatus): st
   return labels[status] || status
 }
 
-function getReconciliationStatusBadge(status: FinancialReconciliationStatus): string {
-  const map: Record<FinancialReconciliationStatus, string> = {
-    normal: 'badge-success',
-    discrepancy: 'badge-error',
-    confirmed: 'badge-info',
-    ignored: 'badge-ghost'
-  }
-  return map[status] || ''
-}
-
 function getReconciliationItemTypeLabel(type: FinancialReconciliationItemType): string {
   const labels: Record<FinancialReconciliationItemType, string> = {
     recharge_missing_balance_log: '成功充值未入账',
@@ -1231,23 +1222,59 @@ function getRecordTypeLabel(type: string): string {
   return labels[type] || type
 }
 
-function getStatusBadge(status: string) {
-  const map: Record<string, string> = {
-    running: 'badge-success',
-    stopped: 'badge-warning',
-    suspended: 'badge-error',
-    creating: 'badge-info'
+function getInstanceStatusBadgeVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'running':
+      return 'success'
+    case 'stopped':
+      return 'warning'
+    case 'suspended':
+      return 'error'
+    case 'creating':
+      return 'info'
+    default:
+      return 'default'
   }
-  return map[status] || ''
 }
 
-function getBatchPriceItemStatusClass(status: BatchPriceUpdateItemStatus): string {
-  const map: Record<BatchPriceUpdateItemStatus, string> = {
-    ready: 'text-blue-600 dark:text-blue-400',
-    unchanged: 'text-themed-muted',
-    failed: 'text-rose-600 dark:text-rose-400'
+function getRechargeStatusBadgeVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'completed':
+      return 'success'
+    case 'pending':
+      return 'warning'
+    case 'failed':
+      return 'error'
+    case 'cancelled':
+    default:
+      return 'default'
   }
-  return map[status]
+}
+
+function getReconciliationStatusBadgeVariant(status: FinancialReconciliationStatus): BadgeVariant {
+  switch (status) {
+    case 'normal':
+      return 'success'
+    case 'discrepancy':
+      return 'error'
+    case 'confirmed':
+      return 'info'
+    case 'ignored':
+    default:
+      return 'default'
+  }
+}
+
+function getBatchPriceItemBadgeVariant(status: BatchPriceUpdateItemStatus): BadgeVariant {
+  switch (status) {
+    case 'ready':
+      return 'info'
+    case 'failed':
+      return 'error'
+    case 'unchanged':
+    default:
+      return 'default'
+  }
 }
 
 function getBatchPriceItemStatusLabel(status: BatchPriceUpdateItemStatus): string {
@@ -1263,20 +1290,6 @@ function formatPriceDiff(value: number): string {
   if (value > 0) return `+${formatMoney(value)}`
   if (value < 0) return `-${formatMoney(Math.abs(value))}`
   return formatMoney(0)
-}
-
-const instancesTotalPages = computed(() => Math.ceil(instancesTotal.value / instancesPageSize.value))
-const recordsTotalPages = computed(() => Math.ceil(recordsTotal.value / recordsPageSize.value))
-const rechargeRecordsTotalPages = computed(() => Math.ceil(rechargeRecordsTotal.value / rechargeRecordsPageSize.value))
-
-function getRechargeStatusBadge(status: string) {
-  const map: Record<string, string> = {
-    pending: 'badge-warning',
-    completed: 'badge-success',
-    cancelled: 'badge-ghost',
-    failed: 'badge-error'
-  }
-  return map[status] || ''
 }
 
 // 获取支付渠道显示文本（渠道名 - 支付方式）
@@ -1322,214 +1335,218 @@ function copyToClipboard(text: string) {
 </script>
 
 <template>
-  <div class="kawaii-page animate-fade-in">
+  <div class="kawaii-page space-y-6 animate-fade-in">
     <!-- 页面头部 -->
-    <div class="page-header">
-      <h1 class="page-title">{{ $t('admin.billing.title') }}</h1>
-      <p class="page-description">{{ $t('admin.billing.description') }}</p>
-    </div>
+    <PageHeader
+      :title="$t('admin.billing.title')"
+      :description="$t('admin.billing.description')"
+    />
 
-    <!-- Tab 切换 -->
-    <div class="mb-6 overflow-x-auto border-b border-themed">
-      <nav class="flex min-w-max gap-5">
+    <!-- Tab 切换 (Apple 风格分段胶囊控制) -->
+    <div class="mb-6 flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+      <div class="flex items-center gap-1 shrink-0" role="tablist" :aria-label="$t('admin.billing.title')">
         <button
           v-for="tab in billingTabs"
           :key="tab"
-          class="border-b-2 px-1 pb-3 text-sm font-medium transition-colors"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === tab"
+          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           :class="activeTab === tab
-            ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-            : 'border-transparent text-themed-muted hover:text-themed'"
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
           @click="switchTab(tab)"
         >
           {{ $t(`admin.billing.tabs.${tab}`) }}
         </button>
-      </nav>
+      </div>
     </div>
 
     <!-- 概览 Tab -->
     <div v-show="activeTab === 'overview'">
-      <div v-if="overviewLoading" class="space-y-5">
+      <div v-if="overviewLoading" class="space-y-6">
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div v-for="i in 4" :key="`overview-kpi-${i}`" class="card h-36 animate-pulse p-5">
-            <div class="h-4 w-20 rounded bg-themed-secondary"></div>
-            <div class="mt-5 h-8 w-36 rounded bg-themed-secondary"></div>
-            <div class="mt-4 h-3 w-28 rounded bg-themed-secondary"></div>
-          </div>
+          <Card v-for="i in 4" :key="`overview-kpi-${i}`" class="h-36 animate-pulse" padding="md">
+            <div class="h-4 w-20 rounded-md bg-[var(--bg-surface-soft)]"></div>
+            <div class="mt-5 h-8 w-36 rounded-md bg-[var(--bg-surface-soft)]"></div>
+            <div class="mt-4 h-3 w-28 rounded-md bg-[var(--bg-surface-soft)]"></div>
+          </Card>
         </div>
         <div class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-          <div class="card h-80 animate-pulse p-5">
-            <div class="h-5 w-28 rounded bg-themed-secondary"></div>
-            <div class="mt-6 space-y-5">
-              <div v-for="i in 3" :key="`overview-mix-${i}`" class="h-16 rounded bg-themed-secondary"></div>
+          <Card class="h-80 animate-pulse" padding="md">
+            <div class="h-5 w-28 rounded-md bg-[var(--bg-surface-soft)]"></div>
+            <div class="mt-6 space-y-4">
+              <div v-for="i in 3" :key="`overview-mix-${i}`" class="h-16 rounded-xl bg-[var(--bg-surface-soft)]"></div>
             </div>
-          </div>
-          <div class="card h-80 animate-pulse p-5">
-            <div class="h-5 w-28 rounded bg-themed-secondary"></div>
-            <div class="mt-6 h-24 rounded bg-themed-secondary"></div>
+          </Card>
+          <Card class="h-80 animate-pulse" padding="md">
+            <div class="h-5 w-28 rounded-md bg-[var(--bg-surface-soft)]"></div>
+            <div class="mt-6 h-24 rounded-xl bg-[var(--bg-surface-soft)]"></div>
             <div class="mt-5 space-y-3">
-              <div v-for="i in 3" :key="`overview-health-${i}`" class="h-12 rounded bg-themed-secondary"></div>
+              <div v-for="i in 3" :key="`overview-health-${i}`" class="h-12 rounded-xl bg-[var(--bg-surface-soft)]"></div>
             </div>
-          </div>
+          </Card>
         </div>
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div v-for="i in 4" :key="`overview-aff-${i}`" class="card h-28 animate-pulse p-5">
-            <div class="h-4 w-24 rounded bg-themed-secondary"></div>
-            <div class="mt-5 h-7 w-32 rounded bg-themed-secondary"></div>
-          </div>
+          <Card v-for="i in 4" :key="`overview-aff-${i}`" class="h-28 animate-pulse" padding="md">
+            <div class="h-4 w-24 rounded-md bg-[var(--bg-surface-soft)]"></div>
+            <div class="mt-5 h-7 w-32 rounded-md bg-[var(--bg-surface-soft)]"></div>
+          </Card>
         </div>
       </div>
 
       <template v-else-if="overview">
         <div class="space-y-6">
           <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <article class="card min-w-0 p-5 sm:p-6 xl:col-span-2">
+            <Card class="min-w-0 xl:col-span-2" padding="md">
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-themed-muted">{{ $t('admin.billing.netRevenueLabel') }}</p>
-                  <p class="mt-3 break-words font-mono text-3xl font-semibold leading-tight tracking-normal tabular-nums text-themed md:text-4xl">
+                  <p class="text-xs font-semibold tracking-wide uppercase text-[var(--text-secondary)]">{{ $t('admin.billing.netRevenueLabel') }}</p>
+                  <p class="mt-3 break-words font-mono text-3xl font-semibold leading-tight tracking-normal tabular-nums text-[var(--text-primary)] md:text-4xl">
                     {{ formatMoney(overview.netRevenue) }}
                   </p>
                 </div>
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
                   <BillingOverviewIcon name="wallet" class="h-5 w-5" />
                 </div>
               </div>
 
               <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0 border-l-2 border-themed pl-3">
-                  <p class="text-xs text-themed-muted">{{ $t('admin.billing.todayRevenue') }}</p>
-                  <p class="mt-1 break-words font-mono text-xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.todayRevenue) }}</p>
-                  <p class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.todayRecharge') }} {{ formatMoney(overview.recharge.todayAmount) }}</p>
+                <div class="min-w-0 border-l-2 border-[var(--border-color)] pl-3.5">
+                  <p class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.todayRevenue') }}</p>
+                  <p class="mt-1 break-words font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(overview.todayRevenue) }}</p>
+                  <p class="mt-1 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.todayRecharge') }} {{ formatMoney(overview.recharge.todayAmount) }}</p>
                 </div>
-                <div class="min-w-0 border-l-2 border-themed pl-3">
-                  <p class="text-xs text-themed-muted">{{ $t('admin.billing.thisMonthRevenue') }}</p>
-                  <p class="mt-1 break-words font-mono text-xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.thisMonthRevenue) }}</p>
-                  <p class="mt-1 text-xs" :class="monthlyRevenueChange !== null && monthlyRevenueChange < 0 ? 'text-rose-500 dark:text-rose-300' : 'text-emerald-600 dark:text-emerald-300'">
+                <div class="min-w-0 border-l-2 border-[var(--border-color)] pl-3.5">
+                  <p class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.thisMonthRevenue') }}</p>
+                  <p class="mt-1 break-words font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(overview.thisMonthRevenue) }}</p>
+                  <p class="mt-1 text-xs font-medium" :class="monthlyRevenueChange !== null && monthlyRevenueChange < 0 ? 'text-[var(--error)]' : 'text-[var(--success)]'">
                     {{ $t('admin.billing.thisMonthVsLastMonth') }} {{ formatSignedPercent(monthlyRevenueChange) }}
                   </p>
                 </div>
               </div>
-            </article>
+            </Card>
 
-            <article class="card min-w-0 p-5">
+            <Card class="min-w-0" padding="md">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.totalRevenue') }}</p>
-                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.totalRevenue) }}</p>
+                  <p class="text-xs font-semibold tracking-wide uppercase text-[var(--text-secondary)]">{{ $t('admin.billing.totalRevenue') }}</p>
+                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(overview.totalRevenue) }}</p>
                 </div>
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
                   <BillingOverviewIcon name="chart" class="h-5 w-5" />
                 </div>
               </div>
-              <p class="mt-3 text-xs text-themed-muted">{{ $t('admin.billing.todayRevenue') }} {{ formatMoney(overview.todayRevenue) }}</p>
-            </article>
+              <p class="mt-3 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.todayRevenue') }} {{ formatMoney(overview.todayRevenue) }}</p>
+            </Card>
 
-            <article class="card min-w-0 p-5">
+            <Card class="min-w-0" padding="md">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.totalRecharge') }}</p>
-                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.recharge.totalAmount) }}</p>
+                  <p class="text-xs font-semibold tracking-wide uppercase text-[var(--text-secondary)]">{{ $t('admin.billing.totalRecharge') }}</p>
+                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(overview.recharge.totalAmount) }}</p>
                 </div>
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
                   <BillingOverviewIcon name="wallet" class="h-5 w-5" />
                 </div>
               </div>
-              <p class="mt-3 text-xs text-themed-muted">{{ formatCount(overview.recharge.totalCount) }} {{ $t('admin.billing.orders') }}</p>
-            </article>
+              <p class="mt-3 text-xs text-[var(--text-secondary)]">{{ formatCount(overview.recharge.totalCount) }} {{ $t('admin.billing.orders') }}</p>
+            </Card>
 
-            <article class="card min-w-0 p-5">
+            <Card class="min-w-0" padding="md">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.totalRefunds') }}</p>
-                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.totalRefunds) }}</p>
+                  <p class="text-xs font-semibold tracking-wide uppercase text-[var(--text-secondary)]">{{ $t('admin.billing.totalRefunds') }}</p>
+                  <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(overview.totalRefunds) }}</p>
                 </div>
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_24%,var(--bg-surface))]">
                   <BillingOverviewIcon name="ban" class="h-5 w-5" />
                 </div>
               </div>
-              <p class="mt-3 text-xs text-themed-muted">{{ formatPercent(refundRate) }}</p>
-            </article>
+              <p class="mt-3 text-xs text-[var(--text-secondary)]">{{ formatPercent(refundRate) }}</p>
+            </Card>
           </section>
 
           <section>
             <div class="mb-3 flex items-center justify-between gap-4">
               <div>
-                <h2 class="text-base font-semibold text-themed">{{ $t('admin.billing.rechargeLabel') }} / {{ $t('admin.billing.revenueLabel') }}</h2>
-                <p class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.overviewPeriods.total') }} · {{ $t('admin.billing.overviewPeriods.thisMonth') }} · {{ $t('admin.billing.overviewPeriods.today') }}</p>
+                <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.rechargeLabel') }} / {{ $t('admin.billing.revenueLabel') }}</h2>
+                <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.overviewPeriods.total') }} · {{ $t('admin.billing.overviewPeriods.thisMonth') }} · {{ $t('admin.billing.overviewPeriods.today') }}</p>
               </div>
             </div>
 
             <div class="grid gap-4 lg:grid-cols-3">
-              <article
+              <Card
                 v-for="period in periodComparisonCards"
                 :key="period.key"
-                class="card min-w-0 p-5"
+                class="min-w-0"
+                padding="md"
               >
                 <div class="flex items-start justify-between gap-4">
                   <div class="min-w-0">
-                    <span class="inline-flex rounded-md px-2.5 py-1 text-xs font-medium" :class="period.badgeClass">
+                    <Badge variant="default" size="sm">
                       {{ period.label }}
-                    </span>
-                    <p class="mt-3 text-xs text-themed-muted">{{ $t('admin.billing.rechargeLabel') }} / {{ $t('admin.billing.revenueLabel') }}</p>
+                    </Badge>
+                    <p class="mt-3 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.rechargeLabel') }} / {{ $t('admin.billing.revenueLabel') }}</p>
                   </div>
-                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-themed-tertiary" :class="period.iconClass">
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] border border-[var(--border-color)]">
                     <BillingOverviewIcon name="wallet" class="h-5 w-5" />
                   </div>
                 </div>
 
-                <dl class="mt-5 divide-y divide-themed">
+                <dl class="mt-5 divide-y divide-[var(--border-color)]">
                   <div class="flex items-center justify-between gap-4 pb-3">
-                    <dt class="text-sm text-themed-muted">{{ $t('admin.billing.rechargeLabel') }}</dt>
+                    <dt class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.rechargeLabel') }}</dt>
                     <dd class="min-w-0 text-right">
-                      <div class="break-words font-mono text-lg font-semibold tabular-nums text-themed">{{ formatMoney(period.rechargeAmount) }}</div>
-                      <div class="mt-1 text-xs text-themed-muted">{{ formatCount(period.rechargeCount) }} {{ $t('admin.billing.orders') }}</div>
+                      <div class="break-words font-mono text-lg font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(period.rechargeAmount) }}</div>
+                      <div class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ formatCount(period.rechargeCount) }} {{ $t('admin.billing.orders') }}</div>
                     </dd>
                   </div>
                   <div class="flex items-center justify-between gap-4 pt-3">
-                    <dt class="text-sm text-themed-muted">{{ $t('admin.billing.revenueLabel') }}</dt>
-                    <dd class="min-w-0 break-words text-right font-mono text-lg font-semibold tabular-nums text-themed">{{ formatMoney(period.revenueAmount) }}</dd>
+                    <dt class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.revenueLabel') }}</dt>
+                    <dd class="min-w-0 break-words text-right font-mono text-lg font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(period.revenueAmount) }}</dd>
                   </div>
                 </dl>
-              </article>
+              </Card>
             </div>
           </section>
 
           <div class="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-            <section class="card min-w-0 p-5">
-              <div class="flex flex-col gap-3 border-b border-themed pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <Card class="min-w-0" padding="md">
+              <div class="flex flex-col gap-3 border-b border-[var(--border-color)] pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
-                  <h2 class="text-base font-semibold text-themed">{{ $t('admin.billing.revenueBreakdownTitle') }}</h2>
-                  <p class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.revenueLabel') }}</p>
+                  <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.revenueBreakdownTitle') }}</h2>
+                  <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.revenueLabel') }}</p>
                 </div>
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
                   <BillingOverviewIcon name="chart" class="h-5 w-5" />
                 </div>
               </div>
 
               <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                <div class="min-w-0 border-l-2 border-sky-500 pl-3">
-                  <p class="text-sm text-themed-muted">{{ $t('admin.billing.revenueLabel') }}</p>
-                  <p class="mt-1 break-words font-mono text-2xl font-semibold tabular-nums text-themed">{{ formatMoney(overview.revenueMix.direct.totalAmount) }}</p>
+                <div class="min-w-0 border-l-2 border-[var(--accent)] pl-3.5">
+                  <p class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.revenueLabel') }}</p>
+                  <p class="mt-1 break-words font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(overview.revenueMix.direct.totalAmount) }}</p>
                 </div>
               </div>
 
-              <div class="mt-5 divide-y divide-themed">
-                <div v-for="row in revenueMixRows" :key="row.key" class="py-4 first:pt-0 last:pb-0">
+              <div class="mt-5 divide-y divide-[var(--border-color)]">
+                <div v-for="row in revenueMixRows" :key="row.key" class="py-3.5 first:pt-0 last:pb-0">
                   <div class="flex items-center justify-between gap-3">
-                    <p class="font-medium text-themed">{{ row.label }}</p>
-                    <span class="break-words text-right font-semibold text-themed">{{ formatMoney(row.directAmount) }}</span>
+                    <p class="text-sm font-medium text-[var(--text-primary)]">{{ row.label }}</p>
+                    <span class="break-words text-right font-mono font-semibold text-[var(--text-primary)]">{{ formatMoney(row.directAmount) }}</span>
                   </div>
                 </div>
               </div>
-            </section>
+            </Card>
 
-            <section class="card min-w-0 p-5">
-              <div class="flex items-start justify-between gap-4 border-b border-themed pb-4">
+            <Card class="min-w-0" padding="md">
+              <div class="flex items-start justify-between gap-4 border-b border-[var(--border-color)] pb-4">
                 <div class="min-w-0">
-                  <h2 class="text-base font-semibold text-themed">{{ $t('admin.billing.instanceHealthTitle') }}</h2>
-                  <p class="mt-1 text-sm text-themed-muted">{{ formatCount(overview.activePaidInstancesCount) }} / {{ formatCount(overview.paidInstancesCount) }}</p>
+                  <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.instanceHealthTitle') }}</h2>
+                  <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ formatCount(overview.activePaidInstancesCount) }} / {{ formatCount(overview.paidInstancesCount) }}</p>
                 </div>
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_24%,var(--bg-surface))]">
                   <BillingOverviewIcon name="server" class="h-5 w-5" />
                 </div>
               </div>
@@ -1537,157 +1554,167 @@ function copyToClipboard(text: string) {
               <div class="mt-5">
                 <div class="flex items-end justify-between gap-4">
                   <div class="min-w-0">
-                    <p class="text-sm text-themed-muted">{{ $t('admin.billing.paidInstances') }}</p>
-                    <p class="mt-1 break-words font-mono text-3xl font-semibold tabular-nums text-themed">{{ formatCount(overview.paidInstancesCount) }}</p>
+                    <p class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.paidInstances') }}</p>
+                    <p class="mt-1 break-words font-mono text-3xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatCount(overview.paidInstancesCount) }}</p>
                   </div>
-                  <div class="rounded-md bg-emerald-500/10 px-2.5 py-1 text-sm font-medium text-emerald-600 dark:text-emerald-300">
+                  <div class="rounded-full bg-[color-mix(in_srgb,var(--success)_12%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--success)_28%,var(--bg-surface))] px-2.5 py-0.5 text-xs font-semibold text-[var(--success)]">
                     {{ formatPercent(activeInstanceShare) }}
                   </div>
                 </div>
 
-                <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-themed-tertiary">
-                  <div class="h-full rounded-full bg-emerald-500" :style="{ width: `${activeInstanceShare}%` }"></div>
+                <div class="mt-4 h-2 overflow-hidden rounded-full bg-[var(--bg-surface-soft)]">
+                  <div class="h-full rounded-full bg-[var(--success)] transition-all duration-500" :style="{ width: `${activeInstanceShare}%` }"></div>
                 </div>
               </div>
 
-              <div class="mt-5 divide-y divide-themed">
+              <div class="mt-5 divide-y divide-[var(--border-color)]">
                 <div
                   v-for="card in instanceStatusCards"
                   :key="card.key"
-                  class="py-4 first:pt-0 last:pb-0"
+                  class="py-3.5 first:pt-0 last:pb-0"
                 >
                   <div class="flex items-center justify-between gap-4">
                     <div class="flex min-w-0 items-center gap-3">
-                      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" :class="card.surfaceClass">
+                      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" :class="card.surfaceClass">
                         <BillingOverviewIcon :name="card.icon" class="h-4 w-4" :class="card.toneClass" />
                       </div>
                       <div class="min-w-0">
-                        <p class="text-sm font-medium text-themed">{{ card.label }}</p>
-                        <p class="mt-1 text-xs text-themed-muted">{{ formatPercent(card.progress || 0) }}</p>
+                        <p class="text-sm font-medium text-[var(--text-primary)]">{{ card.label }}</p>
+                        <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ formatPercent(card.progress || 0) }}</p>
                       </div>
                     </div>
-                    <div class="shrink-0 font-mono text-xl font-semibold tabular-nums text-themed">{{ formatCount(card.value) }}</div>
+                    <div class="shrink-0 font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatCount(card.value) }}</div>
                   </div>
-                  <div class="mt-3 h-2 overflow-hidden rounded-full bg-themed-tertiary">
-                    <div class="h-full rounded-full bg-current" :class="card.toneClass" :style="{ width: `${card.progress || 0}%` }"></div>
+                  <div class="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[var(--bg-surface-soft)]">
+                    <div class="h-full rounded-full bg-current transition-all duration-500" :class="card.toneClass" :style="{ width: `${card.progress || 0}%` }"></div>
                   </div>
                 </div>
               </div>
-            </section>
+            </Card>
           </div>
 
           <section>
             <div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 class="text-base font-semibold text-themed">{{ $t('admin.billing.affOverviewTitle') }}</h2>
-                <p class="mt-1 text-sm text-themed-muted">{{ formatCount(overview.aff.totalOrders) }} {{ $t('admin.billing.orders') }}</p>
+                <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.affOverviewTitle') }}</h2>
+                <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ formatCount(overview.aff.totalOrders) }} {{ $t('admin.billing.orders') }}</p>
               </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <article
+              <Card
                 v-for="card in affCards"
                 :key="card.key"
-                class="card min-w-0 p-5"
+                class="min-w-0"
+                padding="md"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="text-sm text-themed-muted">{{ card.label }}</p>
-                    <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-themed">
+                    <p class="text-xs font-semibold tracking-wide uppercase text-[var(--text-secondary)]">{{ card.label }}</p>
+                    <p class="mt-2 break-words font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
                       {{ card.format === 'money' ? formatMoney(card.value) : formatCount(card.value) }}
                     </p>
                   </div>
-                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" :class="card.surfaceClass">
+                  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" :class="card.surfaceClass">
                     <BillingOverviewIcon :name="card.icon" class="h-5 w-5" :class="card.toneClass" />
                   </div>
                 </div>
-              </article>
+              </Card>
             </div>
           </section>
         </div>
       </template>
 
-      <div v-else class="card p-8 text-center text-sm text-themed-muted">
-        {{ $t('common.noData') }}
-      </div>
+      <Card v-else padding="none">
+        <EmptyState :title="$t('common.noData')" />
+      </Card>
     </div>
 
     <!-- 实例 Tab -->
     <div v-show="activeTab === 'instances'">
       <!-- 筛选 -->
-      <div class="card mb-4 p-4 md:p-5">
+      <Card class="mb-5" padding="md">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div class="text-sm font-medium text-themed">{{ $t('admin.billing.tabs.instances') }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.totalCount', { count: instancesTotal }) }}</div>
+            <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.tabs.instances') }}</h3>
+            <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.totalCount', { count: instancesTotal }) }}</p>
           </div>
           <div class="flex flex-wrap items-center gap-3">
-            <select v-model="instancesFilter" class="input w-40" @change="instancesPage = 1; loadInstances()">
-              <option value="">{{ $t('admin.billing.allStatus') }}</option>
-              <option value="running">{{ $t('instance.status.running') }}</option>
-              <option value="stopped">{{ $t('instance.status.stopped') }}</option>
-              <option value="suspended">{{ $t('instance.status.suspended') }}</option>
-            </select>
-            <select v-model="instancesHostFilter" class="input w-48" @change="instancesPage = 1; loadInstances()">
-              <option value="">{{ $t('admin.billing.allHosts') }}</option>
-              <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
-            </select>
-            <label class="inline-flex items-center gap-2 rounded-xl bg-themed-tertiary px-3 py-2 text-sm">
-              <input v-model="showExpiring" type="checkbox" class="checkbox" @change="instancesPage = 1; loadInstances()" />
-              {{ $t('admin.billing.showExpiring') }}
+            <div class="w-40">
+              <Select v-model="instancesFilter" size="sm" @change="instancesPage = 1; loadInstances()">
+                <option value="">{{ $t('admin.billing.allStatus') }}</option>
+                <option value="running">{{ $t('instance.status.running') }}</option>
+                <option value="stopped">{{ $t('instance.status.stopped') }}</option>
+                <option value="suspended">{{ $t('instance.status.suspended') }}</option>
+              </Select>
+            </div>
+            <div class="w-48">
+              <Select
+                :model-value="instancesHostFilter"
+                size="sm"
+                @update:model-value="val => instancesHostFilter = val === '' ? '' : Number(val)"
+                @change="instancesPage = 1; loadInstances()"
+              >
+                <option value="">{{ $t('admin.billing.allHosts') }}</option>
+                <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
+              </Select>
+            </div>
+            <label class="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors hover:bg-[var(--bg-surface)]">
+              <input v-model="showExpiring" type="checkbox" class="checkbox rounded-md" @change="instancesPage = 1; loadInstances()" />
+              <span>{{ $t('admin.billing.showExpiring') }}</span>
             </label>
-            <label class="inline-flex items-center gap-2 rounded-xl bg-themed-tertiary px-3 py-2 text-sm">
-              <input v-model="showDateColumns" type="checkbox" class="checkbox" />
-              {{ $t('admin.billing.showDateColumns') }}
+            <label class="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors hover:bg-[var(--bg-surface)]">
+              <input v-model="showDateColumns" type="checkbox" class="checkbox rounded-md" />
+              <span>{{ $t('admin.billing.showDateColumns') }}</span>
             </label>
           </div>
         </div>
 
-        <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div class="flex-1">
-            <input
+            <Input
               v-model="instancesSearch"
-              type="text"
-              class="input w-full"
+              clearable
               :placeholder="$t('admin.billing.searchPlaceholder')"
-              @keyup.enter="instancesPage = 1; loadInstances()"
+              @enter="instancesPage = 1; loadInstances()"
             />
           </div>
-          <button
-            class="btn btn-primary sm:w-auto"
+          <Button
+            variant="primary"
             @click="instancesPage = 1; loadInstances()"
           >
             {{ $t('common.search') }}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       <SkeletonLoader v-if="instancesLoading" :count="3" />
 
-      <div v-else-if="instances.length > 0" class="card overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-themed px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <Card v-else-if="instances.length > 0" padding="none">
+        <div class="flex flex-col gap-3 border-b border-[var(--border-color)] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div class="text-sm font-medium text-themed">{{ $t('admin.billing.tabs.instances') }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.totalCount', { count: instancesTotal }) }}</div>
+            <div class="text-sm font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.tabs.instances') }}</div>
+            <div class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.totalCount', { count: instancesTotal }) }}</div>
           </div>
           <div class="flex flex-wrap items-center gap-3 sm:justify-end">
-            <div class="hidden rounded-xl bg-themed-secondary px-3 py-2 text-xs text-themed-muted md:block">
+            <div class="hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-1 text-xs text-[var(--text-secondary)] md:block">
               {{ selectedInstancesCount > 0 ? $t('admin.billing.batchSelectedCount', { count: selectedInstancesCount }) : (showExpiring ? $t('admin.billing.showExpiring') : $t('admin.billing.allStatus')) }}
             </div>
-            <button
-              class="btn btn-primary btn-sm"
+            <Button
+              variant="primary"
+              size="sm"
               :disabled="selectedInstancesCount === 0"
               @click="openBatchPriceModal"
             >
               {{ $t('admin.billing.batchUpdatePrice') }}
-            </button>
+            </Button>
           </div>
         </div>
         <div class="space-y-3 p-4 lg:hidden">
           <div
             v-for="inst in instances"
             :key="inst.id"
-            class="rounded-xl border border-themed p-4"
+            class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all"
             :class="inst.status === 'deleted' ? 'opacity-60' : ''"
           >
             <div class="flex items-start justify-between gap-3">
@@ -1695,36 +1722,35 @@ function copyToClipboard(text: string) {
                 <input
                   v-model="selectedInstanceIds"
                   type="checkbox"
-                  class="checkbox mt-1"
+                  class="checkbox mt-1 rounded-md"
                   :value="inst.id"
                   :disabled="inst.status === 'deleted'"
                   :aria-label="$t('admin.billing.selectInstance')"
                 />
                 <div class="min-w-0">
                   <button
-                    class="truncate text-left text-sm font-semibold text-themed hover:text-themed"
+                    class="truncate text-left text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors"
                     @click="router.push(instanceDetailPath(inst.id))"
                   >
                     {{ inst.name }}
                   </button>
-                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-themed-muted">
-                    <button class="font-mono text-themed hover:text-themed-secondary" @click="router.push(instanceDetailPath(inst.id))">
+                  <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+                    <button class="font-mono text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors" @click="router.push(instanceDetailPath(inst.id))">
                       #{{ inst.id }}
                     </button>
                     <span v-if="inst.incusId" class="font-mono" :title="inst.incusId">{{ inst.incusId?.slice(0, 8) }}</span>
                   </div>
                 </div>
               </div>
-              <div class="flex shrink-0 flex-col items-end gap-1">
-                <span :class="['badge', getStatusBadge(inst.status)]">{{ $t('instance.status.' + inst.status) }}</span>
-                <span v-if="inst.autoRenew" class="badge badge-info">{{ $t('admin.billing.autoRenew') }}</span>
+              <div class="flex shrink-0 flex-col items-end gap-1.5">
+                <Badge :variant="getInstanceStatusBadgeVariant(inst.status)">{{ $t('instance.status.' + inst.status) }}</Badge>
+                <Badge v-if="inst.autoRenew" variant="info" size="sm">{{ $t('admin.billing.autoRenew') }}</Badge>
               </div>
             </div>
 
-            <div class="mt-4 flex flex-wrap gap-2">
+            <div class="mt-3 flex flex-wrap gap-2">
               <button
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
-                :class="inst.instanceTypeLabel === 'PRIME' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--bg-surface-soft)] text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] active:scale-95 transition-all"
                 @click="router.push(instanceDetailPath(inst.id))"
               >
                 {{ inst.instanceTypeLabel }}
@@ -1732,66 +1758,66 @@ function copyToClipboard(text: string) {
             </div>
 
             <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.user') }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.user') }}</div>
                 <div class="mt-1 min-w-0">
-                  <div class="truncate text-themed">{{ inst.user?.username || '-' }}</div>
-                  <div class="truncate text-xs text-themed-muted">#{{ inst.user?.id }} {{ inst.user?.email || '' }}</div>
+                  <div class="truncate font-medium text-[var(--text-primary)]">{{ inst.user?.username || '-' }}</div>
+                  <div class="truncate text-xs text-[var(--text-secondary)]">#{{ inst.user?.id }} {{ inst.user?.email || '' }}</div>
                 </div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.package') }}</div>
-                <div class="mt-1 truncate text-themed">{{ inst.package?.name || '-' }}</div>
-                <div class="truncate text-xs text-themed-muted">{{ inst.packagePlan?.name || '-' }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.package') }}</div>
+                <div class="mt-1 truncate font-medium text-[var(--text-primary)]">{{ inst.package?.name || '-' }}</div>
+                <div class="truncate text-xs text-[var(--text-secondary)]">{{ inst.packagePlan?.name || '-' }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.host') }}</div>
-                <div class="mt-1 truncate text-themed">{{ inst.host?.name || '-' }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.host') }}</div>
+                <div class="mt-1 truncate font-medium text-[var(--text-primary)]">{{ inst.host?.name || '-' }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.price') }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.price') }}</div>
                 <button
                   v-if="inst.billingPrice"
-                  class="mt-1 font-medium text-themed hover:text-themed-secondary hover:underline"
+                  class="mt-1 font-semibold text-[var(--accent)] hover:underline active:scale-95 transition-all"
                   @click="openPriceModal(inst)"
                 >
                   {{ formatMoney(inst.billingPrice) }}
                 </button>
-                <span v-else class="mt-1 block text-themed-muted">-</span>
-                <div class="text-xs text-themed-muted">{{ inst.billingCycle ? $t('admin.billing.cycleMonths', { months: inst.billingCycle }) : '-' }}</div>
+                <span v-else class="mt-1 block text-[var(--text-secondary)]">-</span>
+                <div class="text-xs text-[var(--text-secondary)]">{{ inst.billingCycle ? $t('admin.billing.cycleMonths', { months: inst.billingCycle }) : '-' }}</div>
               </div>
-              <div v-if="showDateColumns">
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.purchaseDate') }}</div>
-                <div class="mt-1 text-themed-muted">{{ formatDate(inst.createdAt) }}</div>
+              <div v-if="showDateColumns" class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.purchaseDate') }}</div>
+                <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatDate(inst.createdAt) }}</div>
               </div>
-              <div v-if="showDateColumns">
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.expiresAt') }}</div>
-                <div class="mt-1 text-themed-muted">{{ formatDate(inst.expiresAt) }}</div>
+              <div v-if="showDateColumns" class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.expiresAt') }}</div>
+                <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatDate(inst.expiresAt) }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.remainingDays') }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.remainingDays') }}</div>
                 <div class="mt-1">
                   <span
                     v-if="inst.remainingDays !== null"
                     :class="[
-                      'font-medium',
-                      inst.remainingDays <= 0 ? 'text-rose-500' :
-                      inst.remainingDays <= 7 ? 'text-yellow-500' : 'text-green-500'
+                      'font-semibold text-xs',
+                      inst.remainingDays <= 0 ? 'text-[var(--error)]' :
+                      inst.remainingDays <= 7 ? 'text-[var(--warning)]' : 'text-[var(--success)]'
                     ]"
                   >
                     {{ inst.remainingDays <= 0 ? $t('admin.billing.expired') : inst.remainingDays + ' ' + $t('admin.billing.days') }}
                   </span>
-                  <span v-else class="text-themed-muted">-</span>
+                  <span v-else class="text-[var(--text-secondary)]">-</span>
                 </div>
               </div>
             </div>
 
-            <div class="mt-4 flex flex-wrap justify-end gap-1 border-t border-themed pt-3">
+            <div class="mt-4 flex flex-wrap justify-end gap-1 border-t border-[var(--border-color)] pt-3">
               <div class="relative inline-block text-left billing-action-menu-container">
                 <button
                   type="button"
-                  class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
-                  :class="{ 'text-themed bg-themed-hover': activeInstanceMenuId === inst.id }"
+                  class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all"
+                  :class="{ 'text-[var(--text-primary)] bg-[var(--bg-surface-soft)]': activeInstanceMenuId === inst.id }"
                   :title="$t('common.actions')"
                   @click.stop="toggleInstanceMenu(inst.id, $event)"
                 >
@@ -1806,12 +1832,12 @@ function copyToClipboard(text: string) {
 
         <div class="hidden overflow-hidden lg:block">
           <table class="w-full table-fixed text-sm">
-            <thead class="bg-themed-secondary/80">
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
               <tr>
                 <th class="w-11 p-3 whitespace-nowrap">
                   <input
                     type="checkbox"
-                    class="checkbox"
+                    class="checkbox rounded-md"
                     :checked="allCurrentPageSelected"
                     :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
                     :disabled="selectableInstances.length === 0"
@@ -1835,13 +1861,13 @@ function copyToClipboard(text: string) {
                 <th class="text-right p-3 whitespace-nowrap">{{ $t('common.actions') }}</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="inst in instances" :key="inst.id" class="border-t border-themed hover:bg-themed-secondary/50 transition-colors">
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr v-for="inst in instances" :key="inst.id" class="border-t border-[var(--border-color)] hover:bg-[var(--bg-surface-soft)]/50 transition-colors">
                 <td class="p-3 whitespace-nowrap">
                   <input
                     v-model="selectedInstanceIds"
                     type="checkbox"
-                    class="checkbox"
+                    class="checkbox rounded-md"
                     :value="inst.id"
                     :disabled="inst.status === 'deleted'"
                     :aria-label="$t('admin.billing.selectInstance')"
@@ -1850,14 +1876,13 @@ function copyToClipboard(text: string) {
                 <!-- 实例类型图标 -->
                 <td class="p-3 whitespace-nowrap">
                   <span 
-                    class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer"
-                    :class="inst.instanceTypeLabel === 'PRIME' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'"
+                    class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer bg-[var(--bg-surface-soft)] text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface)] active:scale-95 transition-all"
                     @click="router.push(instanceDetailPath(inst.id))"
                   >
-                    <svg v-if="inst.instanceTypeLabel === 'PRIME'" class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <svg v-if="inst.instanceTypeLabel === 'PRIME'" class="w-3 h-3 text-[var(--accent)]" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                    <svg v-else class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <svg v-else class="w-3 h-3 text-[var(--text-secondary)]" fill="currentColor" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
                     </svg>
                     {{ inst.instanceTypeLabel }}
@@ -1867,79 +1892,79 @@ function copyToClipboard(text: string) {
                 <td class="p-3 whitespace-nowrap">
                   <div class="flex flex-col gap-0.5">
                     <span 
-                      class="text-themed hover:text-themed-secondary cursor-pointer font-mono text-xs"
+                      class="text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer font-mono text-xs font-medium transition-colors"
                       @click="router.push(instanceDetailPath(inst.id))"
                     >#{{ inst.id }}</span>
-                    <span class="text-themed-muted font-mono text-xs" :title="inst.incusId">{{ inst.incusId?.slice(0, 8) }}</span>
+                    <span class="text-[var(--text-secondary)] font-mono text-xs" :title="inst.incusId">{{ inst.incusId?.slice(0, 8) }}</span>
                   </div>
                 </td>
                 <!-- 实例名 -->
                 <td class="p-3">
                   <span 
-                    class="block truncate text-themed font-medium hover:text-themed cursor-pointer"
+                    class="block truncate text-[var(--text-primary)] font-medium hover:text-[var(--accent)] cursor-pointer transition-colors"
                     :title="inst.name"
                     @click="router.push(instanceDetailPath(inst.id))"
                   >{{ inst.name }}</span>
                 </td>
                 <!-- 状态 -->
                 <td class="p-3 whitespace-nowrap">
-                  <span :class="['badge', getStatusBadge(inst.status)]">{{ $t('instance.status.' + inst.status) }}</span>
-                  <span v-if="inst.autoRenew" class="badge badge-info ml-1">{{ $t('admin.billing.autoRenew') }}</span>
+                  <Badge :variant="getInstanceStatusBadgeVariant(inst.status)">{{ $t('instance.status.' + inst.status) }}</Badge>
+                  <Badge v-if="inst.autoRenew" variant="info" size="sm" class="ml-1">{{ $t('admin.billing.autoRenew') }}</Badge>
                 </td>
                 <!-- 用户 -->
                 <td class="p-3 whitespace-nowrap">
                   <div class="flex flex-col">
-                    <span class="truncate text-themed font-medium">{{ inst.user?.username || '-' }}</span>
-                    <div class="flex items-center gap-1 text-xs text-themed-muted">
+                    <span class="truncate text-[var(--text-primary)] font-medium">{{ inst.user?.username || '-' }}</span>
+                    <div class="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
                       <span>#{{ inst.user?.id }}</span>
                       <span v-if="inst.user?.email" class="truncate max-w-32" :title="inst.user.email">{{ inst.user.email }}</span>
                     </div>
                   </div>
                 </td>
                 <!-- 套餐名 -->
-                <td class="p-3 truncate" :title="inst.package?.name">{{ inst.package?.name || '-' }}</td>
+                <td class="p-3 truncate text-[var(--text-secondary)]" :title="inst.package?.name">{{ inst.package?.name || '-' }}</td>
                 <!-- 方案名 -->
-                <td class="p-3 truncate" :title="inst.packagePlan?.name">{{ inst.packagePlan?.name || '-' }}</td>
+                <td class="p-3 truncate text-[var(--text-secondary)]" :title="inst.packagePlan?.name">{{ inst.packagePlan?.name || '-' }}</td>
                 <!-- 宿主机名 -->
-                <td class="p-3 truncate" :title="inst.host?.name">{{ inst.host?.name || '-' }}</td>
+                <td class="p-3 truncate text-[var(--text-secondary)]" :title="inst.host?.name">{{ inst.host?.name || '-' }}</td>
                 <!-- 价格（可点击修改） -->
                 <td class="p-3 whitespace-nowrap">
                   <button
                     v-if="inst.billingPrice"
-                    class="text-themed hover:text-themed-secondary hover:underline cursor-pointer font-medium"
+                    class="text-[var(--accent)] hover:underline cursor-pointer font-semibold font-mono"
                     @click="openPriceModal(inst)"
                   >
                     {{ formatMoney(inst.billingPrice) }}
                   </button>
-                  <span v-else>-</span>
+                  <span v-else class="text-[var(--text-secondary)]">-</span>
                 </td>
                 <!-- 周期 -->
-                <td class="p-3 whitespace-nowrap">{{ inst.billingCycle ? $t('admin.billing.cycleMonths', { months: inst.billingCycle }) : '-' }}</td>
+                <td class="p-3 whitespace-nowrap text-[var(--text-secondary)]">{{ inst.billingCycle ? $t('admin.billing.cycleMonths', { months: inst.billingCycle }) : '-' }}</td>
                 <!-- 购买日期 -->
-                <td v-if="showDateColumns" class="p-3 whitespace-nowrap text-themed-muted">{{ formatDate(inst.createdAt) }}</td>
+                <td v-if="showDateColumns" class="p-3 whitespace-nowrap text-[var(--text-secondary)] text-xs">{{ formatDate(inst.createdAt) }}</td>
                 <!-- 到期时间 -->
-                <td v-if="showDateColumns" class="p-3 whitespace-nowrap text-themed-muted">{{ formatDate(inst.expiresAt) }}</td>
+                <td v-if="showDateColumns" class="p-3 whitespace-nowrap text-[var(--text-secondary)] text-xs">{{ formatDate(inst.expiresAt) }}</td>
                 <!-- 剩余天数 -->
                 <td class="p-3 whitespace-nowrap">
                   <span 
                     v-if="inst.remainingDays !== null"
                     :class="[
-                      'font-medium',
-                      inst.remainingDays <= 0 ? 'text-rose-500' :
-                      inst.remainingDays <= 7 ? 'text-yellow-500' : 'text-green-500'
+                      'font-semibold text-xs',
+                      inst.remainingDays <= 0 ? 'text-[var(--error)]' :
+                      inst.remainingDays <= 7 ? 'text-[var(--warning)]' : 'text-[var(--success)]'
                     ]"
                   >
                     {{ inst.remainingDays <= 0 ? $t('admin.billing.expired') : inst.remainingDays + ' ' + $t('admin.billing.days') }}
                   </span>
-                  <span v-else>-</span>
+                  <span v-else class="text-[var(--text-secondary)]">-</span>
                 </td>
                 <!-- 操作 -->
                 <td class="p-3 text-right whitespace-nowrap">
                   <div class="relative inline-block text-left billing-action-menu-container">
                     <button
                       type="button"
-                      class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
-                      :class="{ 'text-themed bg-themed-hover': activeInstanceMenuId === inst.id }"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-95 transition-all"
+                      :class="{ 'text-[var(--text-primary)] bg-[var(--bg-surface-soft)]': activeInstanceMenuId === inst.id }"
                       :title="$t('common.actions')"
                       @click.stop="toggleInstanceMenu(inst.id, $event)"
                     >
@@ -1953,51 +1978,27 @@ function copyToClipboard(text: string) {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      <div v-else class="card p-10 text-center">
-        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-themed-secondary text-themed-muted">
-          <BillingOverviewIcon name="server" class="h-7 w-7" />
-        </div>
-        <div class="mt-4 text-base font-medium text-themed">{{ $t('admin.billing.noInstances') }}</div>
-        <div class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.searchPlaceholder') }}</div>
-      </div>
+      <Card v-else padding="none">
+        <EmptyState
+          :title="$t('admin.billing.noInstances')"
+          :description="$t('admin.billing.searchPlaceholder')"
+        />
+      </Card>
 
       <!-- 分页 -->
-      <div v-if="instances.length > 0" class="card mt-4 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <!-- 每页条数选择器 -->
-        <div class="flex items-center gap-2 text-sm text-themed-muted">
-          <span>{{ $t('admin.billing.perPage') }}</span>
-          <select
-            :value="instancesPageSize"
-            class="input w-20 py-1"
-            @change="instancesPageSize = Number(($event.target as HTMLSelectElement).value); instancesPage = 1; loadInstances()"
-          >
-            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
-          </select>
-          <span>{{ $t('admin.billing.totalCount', { count: instancesTotal }) }}</span>
-        </div>
-        <!-- 分页导航 -->
-        <div v-if="instancesTotalPages > 1" class="flex items-center gap-2">
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="instancesPage <= 1"
-            @click="instancesPage--; loadInstances()"
-          >
-            {{ $t('common.prevPage') }}
-          </button>
-          <span class="text-sm text-themed-muted">
-            {{ instancesPage }} / {{ instancesTotalPages }}
-          </span>
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="instancesPage >= instancesTotalPages"
-            @click="instancesPage++; loadInstances()"
-          >
-            {{ $t('common.nextPage') }}
-          </button>
-        </div>
-      </div>
+      <Card v-if="instances.length > 0" class="mt-4" padding="sm">
+        <Pagination
+          :page="instancesPage"
+          :page-size="instancesPageSize"
+          :total="instancesTotal"
+          :show-size-changer="true"
+          :page-size-options="pageSizeOptions"
+          @update:page="instancesPage = $event; loadInstances()"
+          @update:page-size="instancesPageSize = $event; instancesPage = 1; loadInstances()"
+        />
+      </Card>
     </div>
 
     <!-- 实例操作下拉菜单 (Teleport 挂载到 body) -->
@@ -2009,7 +2010,7 @@ function copyToClipboard(text: string) {
       ></div>
       <div
         v-if="activeMenuInstance"
-        class="kawaii-menu-panel fixed z-50 min-w-[9.5rem] rounded py-1 border shadow-lg"
+        class="fixed z-50 min-w-[10rem] rounded-2xl p-1.5 border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-md transition-all animate-fade-in"
         :style="{ top: `${instanceMenuPosition.top}px`, right: `${instanceMenuPosition.right}px` }"
         @click.stop
       >
@@ -2018,7 +2019,7 @@ function copyToClipboard(text: string) {
           <button
             v-if="inst.status === 'suspended'"
             type="button"
-            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+            class="w-full flex items-center px-3 py-2 text-xs font-medium rounded-xl text-left transition-colors cursor-pointer text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
             @click="openActionModal('unsuspend', inst)"
           >
             {{ $t('admin.billing.unsuspend') }}
@@ -2027,7 +2028,7 @@ function copyToClipboard(text: string) {
           <!-- 延期 -->
           <button
             type="button"
-            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+            class="w-full flex items-center px-3 py-2 text-xs font-medium rounded-xl text-left transition-colors cursor-pointer text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
             @click="openActionModal('extend', inst)"
           >
             {{ $t('admin.billing.extend') }}
@@ -2037,7 +2038,7 @@ function copyToClipboard(text: string) {
           <button
             v-if="inst.remainingDays > 0"
             type="button"
-            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer text-themed"
+            class="w-full flex items-center px-3 py-2 text-xs font-medium rounded-xl text-left transition-colors cursor-pointer text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
             @click="openUpgradeModal(inst)"
           >
             {{ $t('admin.billing.upgradePlan') }}
@@ -2047,7 +2048,7 @@ function copyToClipboard(text: string) {
           <button
             v-if="!inst.hasAffBinding"
             type="button"
-            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+            class="w-full flex items-center px-3 py-2 text-xs font-medium rounded-xl text-left transition-colors cursor-pointer text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
             @click="openActionModal('applyDiscount', inst)"
           >
             {{ $t('admin.billing.applyDiscount') }}
@@ -2056,7 +2057,7 @@ function copyToClipboard(text: string) {
           <!-- 删除退款 -->
           <button
             type="button"
-            class="kawaii-menu-item w-full flex items-center px-3 py-1.5 text-xs text-left transition-colors cursor-pointer text-rose-500"
+            class="w-full flex items-center px-3 py-2 text-xs font-medium rounded-xl text-left transition-colors cursor-pointer text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))] active:scale-[0.98]"
             @click="openActionModal('deleteRefund', inst)"
           >
             {{ $t('admin.billing.deleteRefund') }}
@@ -2069,13 +2070,13 @@ function copyToClipboard(text: string) {
     <div v-show="activeTab === 'records'">
       <SkeletonLoader v-if="recordsLoading" :count="5" />
 
-      <div v-else-if="records.length > 0" class="card overflow-hidden">
-        <div class="flex items-center justify-between gap-4 border-b border-themed px-5 py-4">
+      <Card v-else-if="records.length > 0" padding="none">
+        <div class="flex items-center justify-between gap-4 border-b border-[var(--border-color)] px-6 py-4">
           <div>
-            <div class="text-sm font-medium text-themed">{{ $t('admin.billing.tabs.records') }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.totalCount', { count: recordsTotal }) }}</div>
+            <div class="text-sm font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.tabs.records') }}</div>
+            <div class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.totalCount', { count: recordsTotal }) }}</div>
           </div>
-          <div class="hidden rounded-xl bg-themed-secondary px-3 py-2 text-xs text-themed-muted md:block">
+          <div class="hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-1 text-xs text-[var(--text-secondary)] md:block">
             {{ $t('admin.billing.recordType') }} / {{ $t('admin.billing.amount') }}
           </div>
         </div>
@@ -2083,29 +2084,29 @@ function copyToClipboard(text: string) {
           <div
             v-for="rec in records"
             :key="rec.id"
-            class="rounded-xl border border-themed p-4"
+            class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <div class="text-sm font-medium text-themed">{{ getRecordTypeLabel(rec.type) }}</div>
-                <div class="mt-1 text-xs text-themed-muted">{{ formatDate(rec.createdAt) }}</div>
+                <div class="text-sm font-semibold text-[var(--text-primary)]">{{ getRecordTypeLabel(rec.type) }}</div>
+                <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatDate(rec.createdAt) }}</div>
               </div>
-              <div class="shrink-0 text-sm font-semibold" :class="rec.amount >= 0 ? 'text-green-500' : 'text-rose-500'">
+              <div class="shrink-0 text-sm font-semibold font-mono" :class="rec.amount >= 0 ? 'text-[var(--success)]' : 'text-[var(--error)]'">
                 {{ formatMoney(rec.amount) }}
               </div>
             </div>
             <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.instance') }}</div>
-                <div class="mt-1 truncate text-themed">{{ rec.instance?.name || '-' }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.instance') }}</div>
+                <div class="mt-1 truncate font-medium text-[var(--text-primary)]">{{ rec.instance?.name || '-' }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.user') }}</div>
-                <div class="mt-1 truncate text-themed">{{ rec.user?.username || '-' }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.user') }}</div>
+                <div class="mt-1 truncate font-medium text-[var(--text-primary)]">{{ rec.user?.username || '-' }}</div>
               </div>
-              <div class="col-span-2">
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.remark') }}</div>
-                <div class="mt-1 break-words text-themed-muted">{{ rec.remark || '-' }}</div>
+              <div class="col-span-2 rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.remark') }}</div>
+                <div class="mt-1 break-words text-xs text-[var(--text-secondary)] leading-relaxed">{{ rec.remark || '-' }}</div>
               </div>
             </div>
           </div>
@@ -2113,7 +2114,7 @@ function copyToClipboard(text: string) {
 
         <div class="hidden lg:block">
           <table class="w-full table-fixed text-sm">
-            <thead class="bg-themed-secondary/80">
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
               <tr>
                 <th class="w-[16%] text-left p-3">{{ $t('admin.billing.recordType') }}</th>
                 <th class="w-[12%] text-left p-3">{{ $t('admin.billing.amount') }}</th>
@@ -2123,128 +2124,104 @@ function copyToClipboard(text: string) {
                 <th class="w-[16%] text-left p-3">{{ $t('admin.billing.time') }}</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="rec in records" :key="rec.id" class="border-t border-themed hover:bg-themed-secondary/40 transition-colors">
-                <td class="p-3 whitespace-nowrap">{{ getRecordTypeLabel(rec.type) }}</td>
-                <td class="p-3 whitespace-nowrap" :class="rec.amount >= 0 ? 'text-green-500' : 'text-rose-500'">
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr v-for="rec in records" :key="rec.id" class="border-t border-[var(--border-color)] hover:bg-[var(--bg-surface-soft)]/50 transition-colors">
+                <td class="p-3 whitespace-nowrap font-medium text-[var(--text-primary)]">{{ getRecordTypeLabel(rec.type) }}</td>
+                <td class="p-3 whitespace-nowrap font-mono font-semibold" :class="rec.amount >= 0 ? 'text-[var(--success)]' : 'text-[var(--error)]'">
                   {{ formatMoney(rec.amount) }}
                 </td>
-                <td class="p-3 truncate" :title="rec.instance?.name">{{ rec.instance?.name || '-' }}</td>
-                <td class="p-3 truncate" :title="rec.user?.username">{{ rec.user?.username || '-' }}</td>
-                <td class="p-3 text-themed-muted truncate" :title="rec.remark">{{ rec.remark || '-' }}</td>
-                <td class="p-3 text-themed-muted whitespace-nowrap">{{ formatDate(rec.createdAt) }}</td>
+                <td class="p-3 truncate text-[var(--text-secondary)]" :title="rec.instance?.name">{{ rec.instance?.name || '-' }}</td>
+                <td class="p-3 truncate text-[var(--text-secondary)]" :title="rec.user?.username">{{ rec.user?.username || '-' }}</td>
+                <td class="p-3 text-[var(--text-secondary)] truncate text-xs" :title="rec.remark">{{ rec.remark || '-' }}</td>
+                <td class="p-3 text-[var(--text-secondary)] whitespace-nowrap text-xs font-mono">{{ formatDate(rec.createdAt) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      <div v-else class="card p-10 text-center">
-        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-themed-secondary text-themed-muted">
-          <BillingOverviewIcon name="chart" class="h-7 w-7" />
-        </div>
-        <div class="mt-4 text-base font-medium text-themed">{{ $t('admin.billing.noRecords') }}</div>
-        <div class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.tabs.records') }}</div>
-      </div>
+      <Card v-else padding="none">
+        <EmptyState
+          :title="$t('admin.billing.noRecords')"
+          :description="$t('admin.billing.tabs.records')"
+        />
+      </Card>
 
       <!-- 分页 -->
-      <div v-if="records.length > 0" class="card mt-4 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <!-- 每页条数选择器 -->
-        <div class="flex items-center gap-2 text-sm text-themed-muted">
-          <span>{{ $t('admin.billing.perPage') }}</span>
-          <select
-            :value="recordsPageSize"
-            class="input w-20 py-1"
-            @change="recordsPageSize = Number(($event.target as HTMLSelectElement).value); recordsPage = 1; loadRecords()"
-          >
-            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
-          </select>
-          <span>{{ $t('admin.billing.totalCount', { count: recordsTotal }) }}</span>
-        </div>
-        <!-- 分页导航 -->
-        <div v-if="recordsTotalPages > 1" class="flex items-center gap-2">
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="recordsPage <= 1"
-            @click="recordsPage--; loadRecords()"
-          >
-            {{ $t('common.prevPage') }}
-          </button>
-          <span class="text-sm text-themed-muted">
-            {{ recordsPage }} / {{ recordsTotalPages }}
-          </span>
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="recordsPage >= recordsTotalPages"
-            @click="recordsPage++; loadRecords()"
-          >
-            {{ $t('common.nextPage') }}
-          </button>
-        </div>
-      </div>
+      <Card v-if="records.length > 0" class="mt-4" padding="sm">
+        <Pagination
+          :page="recordsPage"
+          :page-size="recordsPageSize"
+          :total="recordsTotal"
+          :show-size-changer="true"
+          :page-size-options="pageSizeOptions"
+          @update:page="recordsPage = $event; loadRecords()"
+          @update:page-size="recordsPageSize = $event; recordsPage = 1; loadRecords()"
+        />
+      </Card>
     </div>
 
     <!-- 充值记录 Tab -->
     <div v-show="activeTab === 'rechargeRecords'">
       <!-- 筛选 -->
-      <div class="card mb-4 p-4 md:p-5">
+      <Card class="mb-5" padding="md">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div class="text-sm font-medium text-themed">{{ $t('admin.billing.tabs.rechargeRecords') }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.totalCount', { count: rechargeRecordsTotal }) }}</div>
+            <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.tabs.rechargeRecords') }}</h3>
+            <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.totalCount', { count: rechargeRecordsTotal }) }}</p>
           </div>
-          <div class="flex items-center gap-3">
-            <select v-model="rechargeRecordsFilter" class="input w-44" @change="rechargeRecordsPage = 1; loadRechargeRecords()">
+          <div class="w-48">
+            <Select v-model="rechargeRecordsFilter" size="sm" @change="rechargeRecordsPage = 1; loadRechargeRecords()">
               <option value="">{{ $t('admin.billing.allStatus') }}</option>
               <option value="pending">{{ $t('admin.billing.rechargeStatus.pending') }}</option>
               <option value="completed">{{ $t('admin.billing.rechargeStatus.completed') }}</option>
               <option value="cancelled">{{ $t('admin.billing.rechargeStatus.cancelled') }}</option>
               <option value="failed">{{ $t('admin.billing.rechargeStatus.failed') }}</option>
-            </select>
+            </Select>
           </div>
         </div>
-      </div>
+      </Card>
 
       <SkeletonLoader v-if="rechargeRecordsLoading" :count="5" />
 
-      <div v-else-if="rechargeRecords.length > 0" class="card overflow-hidden">
-        <div class="flex items-center justify-between gap-4 border-b border-themed px-5 py-4">
+      <Card v-else-if="rechargeRecords.length > 0" padding="none">
+        <div class="flex items-center justify-between gap-4 border-b border-[var(--border-color)] px-6 py-4">
           <div>
-            <div class="text-sm font-medium text-themed">{{ $t('admin.billing.tabs.rechargeRecords') }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ $t('admin.billing.totalCount', { count: rechargeRecordsTotal }) }}</div>
+            <div class="text-sm font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('admin.billing.tabs.rechargeRecords') }}</div>
+            <div class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ $t('admin.billing.totalCount', { count: rechargeRecordsTotal }) }}</div>
           </div>
-          <div class="hidden rounded-xl bg-themed-secondary px-3 py-2 text-xs text-themed-muted md:block">
+          <div class="hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3 py-1 text-xs text-[var(--text-secondary)] md:block">
             {{ rechargeRecordsFilter ? $t(`admin.billing.rechargeStatus.${rechargeRecordsFilter}`) : $t('admin.billing.allStatus') }}
           </div>
         </div>
-        <div class="divide-y divide-themed md:hidden">
-          <div v-for="rec in rechargeRecords" :key="rec.id" class="space-y-3 px-5 py-4">
+        <div class="divide-y divide-[var(--border-color)] md:hidden">
+          <div v-for="rec in rechargeRecords" :key="rec.id" class="space-y-3 p-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="truncate font-mono text-xs text-themed">
-                  <span class="cursor-pointer hover:text-themed" @click="copyToClipboard(rec.orderNo)">{{ rec.orderNo }}</span>
+                <div class="truncate font-mono text-xs text-[var(--text-primary)]">
+                  <span class="cursor-pointer hover:text-[var(--accent)] transition-colors" @click="copyToClipboard(rec.orderNo)">{{ rec.orderNo }}</span>
                 </div>
-                <div class="mt-1 text-sm text-themed">{{ rec.user?.username || '-' }}</div>
-                <div class="mt-1 text-xs text-themed-muted">{{ formatDate(rec.createdAt) }}</div>
+                <div class="mt-1 text-sm font-semibold text-[var(--text-primary)]">{{ rec.user?.username || '-' }}</div>
+                <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatDate(rec.createdAt) }}</div>
               </div>
-              <span :class="['badge', getRechargeStatusBadge(rec.status)]">{{ $t(`admin.billing.rechargeStatus.${rec.status}`) }}</span>
+              <Badge :variant="getRechargeStatusBadgeVariant(rec.status)">{{ $t(`admin.billing.rechargeStatus.${rec.status}`) }}</Badge>
             </div>
 
             <div class="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('admin.billing.amount') }}</div>
-                <div class="mt-1 text-themed">{{ formatMoney(rec.amount) }}</div>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs uppercase tracking-wide text-[var(--text-secondary)]">{{ $t('admin.billing.amount') }}</div>
+                <div class="mt-1 font-semibold font-mono text-[var(--text-primary)]">{{ formatMoney(rec.amount) }}</div>
               </div>
-              <div>
-                <div class="text-xs uppercase tracking-wide text-themed-muted">{{ $t('admin.billing.creditAmount') }}</div>
-                <div class="mt-1 text-themed">{{ rec.actualAmount !== null ? formatMoney(rec.actualAmount) : '-' }}</div>
-                <div v-if="rec.actualAmount !== null" class="mt-1 text-xs text-themed-muted">
+              <div class="rounded-xl bg-[var(--bg-surface-soft)]/60 border border-[var(--border-color)]/60 p-2.5">
+                <div class="text-xs uppercase tracking-wide text-[var(--text-secondary)]">{{ $t('admin.billing.creditAmount') }}</div>
+                <div class="mt-1 font-semibold font-mono text-[var(--text-primary)]">{{ rec.actualAmount !== null ? formatMoney(rec.actualAmount) : '-' }}</div>
+                <div v-if="rec.actualAmount !== null" class="mt-1 text-xs text-[var(--text-secondary)]">
                   {{ $t(getRechargeCreditLabelKey(rec.status)) }}
                 </div>
               </div>
             </div>
 
-            <div class="space-y-1 text-xs text-themed-muted">
+            <div class="space-y-1 text-xs text-[var(--text-secondary)]">
               <div>{{ $t('admin.billing.payChannel') }}: {{ getPayChannelDisplay(rec) }}</div>
               <div>{{ $t('admin.billing.paymentDetails') }}: {{ getRechargePaymentDetailsDisplay(rec) }}</div>
               <div v-if="getRechargeGatewayStatusText(rec)">{{ getRechargeGatewayStatusText(rec) }}</div>
@@ -2260,21 +2237,23 @@ function copyToClipboard(text: string) {
             </div>
 
             <div class="flex justify-end gap-2">
-              <button
+              <Button
                 v-if="rec.status === 'pending'"
-                class="btn btn-sm btn-ghost text-themed"
+                size="sm"
+                variant="ghost"
                 :disabled="syncingRecordId === rec.id"
+                :loading="syncingRecordId === rec.id"
                 @click="syncRechargeRecord(rec)"
               >
                 {{ syncingRecordId === rec.id ? $t('common.syncing') : $t('admin.billing.sync') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         <div class="hidden overflow-hidden md:block">
           <table class="w-full table-fixed text-sm">
-            <thead class="bg-themed-secondary/80">
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
               <tr>
                 <th class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.rechargeOrderNo') }}</th>
                 <th class="text-left p-3 whitespace-nowrap">{{ $t('admin.billing.user') }}</th>
@@ -2288,21 +2267,21 @@ function copyToClipboard(text: string) {
                 <th class="text-left p-3 whitespace-nowrap">{{ $t('common.actions') }}</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="rec in rechargeRecords" :key="rec.id" class="border-t border-themed hover:bg-themed-secondary/40 transition-colors">
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr v-for="rec in rechargeRecords" :key="rec.id" class="border-t border-[var(--border-color)] hover:bg-[var(--bg-surface-soft)]/50 transition-colors">
                 <td class="p-3 font-mono text-xs whitespace-nowrap">
-                  <span class="cursor-pointer hover:text-themed" @click="copyToClipboard(rec.orderNo)">{{ rec.orderNo }}</span>
+                  <span class="cursor-pointer hover:text-[var(--accent)] transition-colors" @click="copyToClipboard(rec.orderNo)">{{ rec.orderNo }}</span>
                 </td>
-                <td class="p-3 whitespace-nowrap">{{ rec.user?.username || '-' }}</td>
-                <td class="p-3 whitespace-nowrap">{{ formatMoney(rec.amount) }}</td>
-                <td class="p-3 whitespace-nowrap">
-                  <div>{{ rec.actualAmount !== null ? formatMoney(rec.actualAmount) : '-' }}</div>
-                  <div v-if="rec.actualAmount !== null" class="mt-1 text-xs text-themed-muted">
+                <td class="p-3 whitespace-nowrap font-medium text-[var(--text-primary)]">{{ rec.user?.username || '-' }}</td>
+                <td class="p-3 whitespace-nowrap font-mono font-semibold text-[var(--text-primary)]">{{ formatMoney(rec.amount) }}</td>
+                <td class="p-3 whitespace-nowrap font-mono">
+                  <div class="font-semibold text-[var(--text-primary)]">{{ rec.actualAmount !== null ? formatMoney(rec.actualAmount) : '-' }}</div>
+                  <div v-if="rec.actualAmount !== null" class="mt-0.5 text-xs text-[var(--text-secondary)]">
                     {{ $t(getRechargeCreditLabelKey(rec.status)) }}
                   </div>
                 </td>
-                <td class="p-3 whitespace-nowrap">{{ getPayChannelDisplay(rec) }}</td>
-                <td class="p-3 text-xs text-themed-muted max-w-[220px]">
+                <td class="p-3 whitespace-nowrap text-xs text-[var(--text-secondary)]">{{ getPayChannelDisplay(rec) }}</td>
+                <td class="p-3 text-xs text-[var(--text-secondary)] max-w-[220px]">
                   <div>{{ getRechargePaymentDetailsDisplay(rec) }}</div>
                   <div v-if="getRechargeGatewayStatusText(rec)" class="mt-1">{{ getRechargeGatewayStatusText(rec) }}</div>
                   <div v-if="rec.paymentUuid" class="mt-1 truncate font-mono" :title="rec.paymentUuid">
@@ -2313,221 +2292,224 @@ function copyToClipboard(text: string) {
                   </div>
                 </td>
                 <td class="p-3 whitespace-nowrap">
-                  <span :class="['badge', getRechargeStatusBadge(rec.status)]">{{ $t(`admin.billing.rechargeStatus.${rec.status}`) }}</span>
+                  <Badge :variant="getRechargeStatusBadgeVariant(rec.status)">{{ $t(`admin.billing.rechargeStatus.${rec.status}`) }}</Badge>
                 </td>
-                <td class="p-3 font-mono text-xs whitespace-nowrap text-themed-muted max-w-[150px] truncate" :title="rec.tradeNo || ''">
+                <td class="p-3 font-mono text-xs whitespace-nowrap text-[var(--text-secondary)] max-w-[150px] truncate" :title="rec.tradeNo || ''">
                   <span 
                     v-if="rec.tradeNo" 
-                    class="cursor-pointer hover:text-themed"
+                    class="cursor-pointer hover:text-[var(--accent)] transition-colors"
                     @click="copyToClipboard(rec.tradeNo)"
                   >{{ rec.tradeNo }}</span>
                   <span v-else>-</span>
                 </td>
-                <td class="p-3 text-themed-muted whitespace-nowrap">{{ formatDate(rec.createdAt) }}</td>
+                <td class="p-3 text-[var(--text-secondary)] whitespace-nowrap text-xs font-mono">{{ formatDate(rec.createdAt) }}</td>
                 <td class="p-3 whitespace-nowrap">
                   <div class="flex items-center gap-2">
-                  <IconButton
-                    v-if="rec.status === 'pending'"
-                    :label="syncingRecordId === rec.id ? $t('common.syncing') : $t('admin.billing.sync')"
-                    :disabled="syncingRecordId === rec.id"
-                    @click="syncRechargeRecord(rec)"
-                  >
-                    <RefreshCw />
-                  </IconButton>
-                  <span v-if="rec.status !== 'pending'" class="text-themed-muted">-</span>
+                    <Button
+                      v-if="rec.status === 'pending'"
+                      size="sm"
+                      variant="ghost"
+                      :disabled="syncingRecordId === rec.id"
+                      :loading="syncingRecordId === rec.id"
+                      @click="syncRechargeRecord(rec)"
+                    >
+                      <template #icon>
+                        <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': syncingRecordId === rec.id }" />
+                      </template>
+                      {{ syncingRecordId === rec.id ? $t('common.syncing') : $t('admin.billing.sync') }}
+                    </Button>
+                    <span v-if="rec.status !== 'pending'" class="text-[var(--text-tertiary)]">-</span>
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      <div v-else class="card p-10 text-center">
-        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-themed-secondary text-themed-muted">
-          <BillingOverviewIcon name="wallet" class="h-7 w-7" />
-        </div>
-        <div class="mt-4 text-base font-medium text-themed">{{ $t('admin.billing.noRechargeRecords') }}</div>
-        <div class="mt-1 text-sm text-themed-muted">{{ $t('admin.billing.tabs.rechargeRecords') }}</div>
-      </div>
+      <Card v-else padding="none">
+        <EmptyState
+          :title="$t('admin.billing.noRechargeRecords')"
+          :description="$t('admin.billing.tabs.rechargeRecords')"
+        />
+      </Card>
 
       <!-- 分页 -->
-      <div v-if="rechargeRecords.length > 0" class="card mt-4 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <!-- 每页条数选择器 -->
-        <div class="flex items-center gap-2 text-sm text-themed-muted">
-          <span>{{ $t('admin.billing.perPage') }}</span>
-          <select
-            :value="rechargeRecordsPageSize"
-            class="input w-20 py-1"
-            @change="rechargeRecordsPageSize = Number(($event.target as HTMLSelectElement).value); rechargeRecordsPage = 1; loadRechargeRecords()"
-          >
-            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
-          </select>
-          <span>{{ $t('admin.billing.totalCount', { count: rechargeRecordsTotal }) }}</span>
-        </div>
-        <!-- 分页导航 -->
-        <div v-if="rechargeRecordsTotalPages > 1" class="flex items-center gap-2">
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="rechargeRecordsPage <= 1"
-            @click="rechargeRecordsPage--; loadRechargeRecords()"
-          >
-            {{ $t('common.prevPage') }}
-          </button>
-          <span class="text-sm text-themed-muted">
-            {{ rechargeRecordsPage }} / {{ rechargeRecordsTotalPages }}
-          </span>
-          <button
-            class="btn btn-sm btn-ghost"
-            :disabled="rechargeRecordsPage >= rechargeRecordsTotalPages"
-            @click="rechargeRecordsPage++; loadRechargeRecords()"
-          >
-            {{ $t('common.nextPage') }}
-          </button>
-        </div>
-      </div>
+      <Card v-if="rechargeRecords.length > 0" class="mt-4" padding="sm">
+        <Pagination
+          :page="rechargeRecordsPage"
+          :page-size="rechargeRecordsPageSize"
+          :total="rechargeRecordsTotal"
+          :show-size-changer="true"
+          :page-size-options="pageSizeOptions"
+          @update:page="rechargeRecordsPage = $event; loadRechargeRecords()"
+          @update:page-size="rechargeRecordsPageSize = $event; rechargeRecordsPage = 1; loadRechargeRecords()"
+        />
+      </Card>
     </div>
 
     <!-- 财务对账 Tab -->
-    <div v-show="activeTab === 'reconciliation'" class="space-y-5">
-      <div class="card p-5">
+    <div v-show="activeTab === 'reconciliation'" class="space-y-6">
+      <Card padding="md">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 class="text-base font-semibold text-themed">日对账工作台</h2>
-            <p class="mt-1 text-sm text-themed-muted">按业务日汇总充值、余额流水、实例扣费和退款审批。</p>
+            <h2 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">日对账工作台</h2>
+            <p class="mt-1 text-sm text-[var(--text-secondary)]">按业务日汇总充值、余额流水、实例扣费和退款审批。</p>
           </div>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label class="block">
-              <span class="label">对账日期</span>
-              <input
+            <div class="min-w-[180px]">
+              <Input
                 v-model="reconciliationDate"
                 type="date"
-                class="input min-w-[180px]"
+                label="对账日期"
                 @change="loadFinancialReconciliation"
               />
-            </label>
-            <button class="btn btn-ghost" :disabled="reconciliationLoading" @click="loadFinancialReconciliation">
+            </div>
+            <Button variant="ghost" :disabled="reconciliationLoading" @click="loadFinancialReconciliation">
               刷新
-            </button>
-            <button class="btn btn-primary" :disabled="reconciliationRunning" @click="runFinancialReconciliation">
+            </Button>
+            <Button variant="primary" :disabled="reconciliationRunning" :loading="reconciliationRunning" @click="runFinancialReconciliation">
               {{ reconciliationRunning ? '对账中...' : '运行对账' }}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       <div v-if="reconciliationLoading" class="grid gap-4 md:grid-cols-4">
-        <div v-for="i in 4" :key="`reconciliation-loading-${i}`" class="card h-28 animate-pulse p-4">
-          <div class="h-4 w-20 rounded bg-themed-secondary"></div>
-          <div class="mt-5 h-7 w-28 rounded bg-themed-secondary"></div>
-        </div>
+        <Card v-for="i in 4" :key="`reconciliation-loading-${i}`" class="h-28 animate-pulse" padding="sm">
+          <div class="h-4 w-20 rounded-md bg-[var(--bg-surface-soft)]"></div>
+          <div class="mt-5 h-7 w-28 rounded-md bg-[var(--bg-surface-soft)]"></div>
+        </Card>
       </div>
 
       <template v-else-if="reconciliation">
-        <div class="grid gap-4 md:grid-cols-5">
-          <div class="card p-4">
-            <div class="text-xs text-themed-muted">对账状态</div>
-            <div class="mt-3">
-              <span :class="['badge', getReconciliationStatusBadge(reconciliation.status)]">
+        <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
+          <Card padding="sm">
+            <div class="text-xs text-[var(--text-secondary)]">对账状态</div>
+            <div class="mt-2.5">
+              <Badge :variant="getReconciliationStatusBadgeVariant(reconciliation.status)">
                 {{ getReconciliationStatusLabel(reconciliation.status) }}
-              </span>
+              </Badge>
             </div>
-            <div class="mt-3 text-xs text-themed-muted">{{ reconciliation.date }}</div>
-          </div>
-          <div class="card p-4">
-            <div class="text-xs text-themed-muted">成功充值</div>
-            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-themed">{{ formatMoney(getSummaryMoney('recharge')) }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ formatCount(getSummaryCount('recharge')) }} 笔</div>
-          </div>
-          <div class="card p-4">
-            <div class="text-xs text-themed-muted">余额流水</div>
-            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-themed">{{ formatMoney(getSummaryMoney('balanceLogs')) }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ formatCount(getSummaryCount('balanceLogs')) }} 条</div>
-          </div>
-          <div class="card p-4">
-            <div class="text-xs text-themed-muted">实例扣费</div>
-            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-themed">{{ formatMoney(getSummaryMoney('instanceBilling')) }}</div>
-            <div class="mt-1 text-xs text-themed-muted">{{ formatCount(getSummaryCount('instanceBilling')) }} 条</div>
-          </div>
-          <div class="card p-4">
-            <div class="text-xs text-themed-muted">差异项</div>
-            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-themed">{{ formatCount(reconciliation.summary?.discrepancies?.total || 0) }}</div>
-            <div class="mt-1 text-xs text-themed-muted">重跑不会重复写入</div>
-          </div>
+            <div class="mt-3 text-xs text-[var(--text-tertiary)] font-mono">{{ reconciliation.date }}</div>
+          </Card>
+          <Card padding="sm">
+            <div class="text-xs text-[var(--text-secondary)]">成功充值</div>
+            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(getSummaryMoney('recharge')) }}</div>
+            <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatCount(getSummaryCount('recharge')) }} 笔</div>
+          </Card>
+          <Card padding="sm">
+            <div class="text-xs text-[var(--text-secondary)]">余额流水</div>
+            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(getSummaryMoney('balanceLogs')) }}</div>
+            <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatCount(getSummaryCount('balanceLogs')) }} 条</div>
+          </Card>
+          <Card padding="sm">
+            <div class="text-xs text-[var(--text-secondary)]">实例扣费</div>
+            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatMoney(getSummaryMoney('instanceBilling')) }}</div>
+            <div class="mt-1 text-xs text-[var(--text-secondary)]">{{ formatCount(getSummaryCount('instanceBilling')) }} 条</div>
+          </Card>
+          <Card padding="sm">
+            <div class="text-xs text-[var(--text-secondary)]">差异项</div>
+            <div class="mt-2 font-mono text-xl font-semibold tabular-nums text-[var(--text-primary)]">{{ formatCount(reconciliation.summary?.discrepancies?.total || 0) }}</div>
+            <div class="mt-1 text-xs text-[var(--text-secondary)]">重跑不会重复写入</div>
+          </Card>
         </div>
 
-        <div class="card p-5">
+        <Card padding="md">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 class="text-base font-semibold text-themed">CSV 导出</h3>
-              <p class="mt-1 text-sm text-themed-muted">导出内容已脱敏，不包含回调原文、支付密钥、token 或密码。</p>
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">CSV 导出</h3>
+              <p class="mt-1 text-sm text-[var(--text-secondary)]">导出内容已脱敏，不包含回调原文、支付密钥、token 或密码。</p>
             </div>
             <div class="flex flex-wrap gap-2">
-              <button
+              <Button
                 v-for="type in ['orders', 'balance_logs', 'adjustments']"
                 :key="type"
-                class="btn btn-sm btn-ghost"
+                size="sm"
+                variant="secondary"
                 :disabled="!!reconciliationExporting"
+                :loading="reconciliationExporting === type"
                 @click="exportFinancialReconciliation(type as 'orders' | 'balance_logs' | 'adjustments')"
               >
                 {{ reconciliationExporting === type ? '导出中...' : `导出${getReconciliationExportLabel(type)}` }}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div class="card overflow-hidden">
-          <div class="border-b border-themed p-5">
-            <h3 class="text-base font-semibold text-themed">差异处理</h3>
-            <p class="mt-1 text-sm text-themed-muted">差异项可确认或忽略，备注和处理人会保留。</p>
+        <Card padding="none">
+          <div class="border-b border-[var(--border-color)] px-6 py-4">
+            <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">差异处理</h3>
+            <p class="mt-1 text-sm text-[var(--text-secondary)]">差异项可确认或忽略，备注和处理人会保留。</p>
           </div>
-          <div v-if="reconciliation.items.length === 0" class="p-10 text-center">
-            <div class="text-base font-medium text-themed">没有发现差异</div>
-            <div class="mt-1 text-sm text-themed-muted">当前日期对账结果正常。</div>
+          <div v-if="reconciliation.items.length === 0" class="p-8 text-center">
+            <EmptyState
+              title="没有发现差异"
+              description="当前日期对账结果正常。"
+            />
           </div>
-          <div v-else class="divide-y divide-themed">
-            <div v-for="item in reconciliation.items" :key="item.id" class="grid gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div v-else class="divide-y divide-[var(--border-color)]">
+            <div v-for="item in reconciliation.items" :key="item.id" class="grid gap-4 p-6 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span :class="['badge', getReconciliationStatusBadge(item.status)]">{{ getReconciliationStatusLabel(item.status) }}</span>
-                  <span class="badge badge-ghost">{{ getReconciliationItemTypeLabel(item.itemType) }}</span>
-                  <span class="text-xs text-themed-muted">#{{ item.id }}</span>
+                  <Badge :variant="getReconciliationStatusBadgeVariant(item.status)">
+                    {{ getReconciliationStatusLabel(item.status) }}
+                  </Badge>
+                  <Badge variant="default">
+                    {{ getReconciliationItemTypeLabel(item.itemType) }}
+                  </Badge>
+                  <span class="text-xs text-[var(--text-tertiary)] font-mono">#{{ item.id }}</span>
                 </div>
-                <div class="mt-3 text-sm font-medium text-themed">{{ item.title }}</div>
-                <div class="mt-2 grid gap-2 text-sm text-themed-muted sm:grid-cols-2 lg:grid-cols-4">
+                <div class="mt-3 text-sm font-semibold text-[var(--text-primary)]">{{ item.title }}</div>
+                <div class="mt-2 grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-4">
                   <div>用户：{{ item.user?.username || item.userId || '-' }}</div>
                   <div>来源：{{ item.sourceType }} {{ item.sourceId || '' }}</div>
                   <div>金额：{{ item.amount !== null ? formatMoney(item.amount) : '-' }}</div>
                   <div>处理人：{{ item.handledBy?.username || '-' }}</div>
                 </div>
-                <pre class="mt-3 max-h-28 overflow-auto rounded bg-themed-secondary p-3 text-xs text-themed-muted">{{ item.detail }}</pre>
+                <pre class="mt-3 max-h-28 overflow-auto rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-xs text-[var(--text-secondary)] font-mono leading-relaxed">{{ item.detail }}</pre>
               </div>
               <div class="space-y-3">
-                <label class="block">
-                  <span class="label">处理状态</span>
-                  <select v-model="reconciliationStatusDrafts[item.id]" class="input w-full">
-                    <option value="discrepancy">差异</option>
-                    <option value="confirmed">已确认</option>
-                    <option value="ignored">已忽略</option>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="label">处理备注</span>
-                  <textarea v-model="reconciliationNotes[item.id]" class="input w-full" rows="3" maxlength="500" placeholder="填写处理结论或忽略原因"></textarea>
-                </label>
-                <button class="btn btn-primary w-full" :disabled="reconciliationSavingId === item.id" @click="saveReconciliationItem(item)">
+                <Select
+                  v-model="reconciliationStatusDrafts[item.id]"
+                  label="处理状态"
+                  size="sm"
+                >
+                  <option value="discrepancy">差异</option>
+                  <option value="confirmed">已确认</option>
+                  <option value="ignored">已忽略</option>
+                </Select>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)]">处理备注</label>
+                  <textarea
+                    v-model="reconciliationNotes[item.id]"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all resize-y"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="填写处理结论或忽略原因"
+                  ></textarea>
+                </div>
+                <Button
+                  variant="primary"
+                  block
+                  :disabled="reconciliationSavingId === item.id"
+                  :loading="reconciliationSavingId === item.id"
+                  @click="saveReconciliationItem(item)"
+                >
                   {{ reconciliationSavingId === item.id ? '保存中...' : '保存处理结果' }}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
       </template>
 
-      <div v-else class="card p-10 text-center">
-        <div class="text-base font-medium text-themed">还没有生成这一天的对账结果</div>
-        <div class="mt-1 text-sm text-themed-muted">点击“运行对账”生成日对账任务。</div>
-      </div>
+      <Card v-else padding="none">
+        <EmptyState
+          title="还没有生成这一天的对账结果"
+          description="点击“运行对账”生成日对账任务。"
+        />
+      </Card>
     </div>
 
     <!-- 支付渠道 Tab -->
@@ -2548,7 +2530,11 @@ function copyToClipboard(text: string) {
           <div class="modal-content max-w-md">
             <div class="modal-header">
               <h3 class="modal-title">{{ $t(`admin.billing.${actionType}Title`) }}</h3>
-              <button class="btn btn-ghost btn-sm" @click="showActionModal = false">
+              <button
+                type="button"
+                class="p-1 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showActionModal = false"
+              >
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -2556,101 +2542,130 @@ function copyToClipboard(text: string) {
             </div>
             
             <div class="modal-body space-y-4">
-              <p class="text-themed-secondary">
-                {{ $t('admin.billing.targetInstance') }}: <strong>{{ actionTarget?.name }}</strong>
-              </p>
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm">
+                <span class="text-[var(--text-secondary)]">{{ $t('admin.billing.targetInstance') }}:</span>
+                <strong class="ml-1 text-[var(--text-primary)]">{{ actionTarget?.name }}</strong>
+              </div>
 
               <!-- 封停/解封 -->
               <template v-if="actionType === 'suspend'">
-                <div>
-                  <label class="label">{{ $t('admin.billing.reason') }}</label>
-                  <textarea v-model="actionForm.reason" class="input w-full" rows="3" :placeholder="$t('admin.billing.reasonPlaceholder')"></textarea>
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.reason') }}</label>
+                  <textarea
+                    v-model="actionForm.reason"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all resize-y"
+                    rows="3"
+                    :placeholder="$t('admin.billing.reasonPlaceholder')"
+                  ></textarea>
                 </div>
               </template>
 
               <!-- 延期 -->
               <template v-else-if="actionType === 'extend'">
-                <div>
-                  <label class="label">{{ $t('admin.billing.extendDays') }}</label>
-                  <input v-model.number="actionForm.days" type="number" min="1" max="365" class="input w-full" />
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.extendDays') }}</label>
+                  <input
+                    v-model.number="actionForm.days"
+                    type="number"
+                    min="1"
+                    max="365"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all font-mono"
+                  />
                 </div>
                 <div class="flex items-center gap-2">
-                  <input id="freeExtend" v-model="actionForm.freeExtend" type="checkbox" class="checkbox" />
-                  <label for="freeExtend" class="text-sm text-themed-secondary">{{ $t('admin.billing.freeExtend') }}</label>
+                  <input
+                    id="freeExtend"
+                    v-model="actionForm.freeExtend"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                  <label for="freeExtend" class="text-sm text-[var(--text-secondary)] cursor-pointer">{{ $t('admin.billing.freeExtend') }}</label>
                 </div>
-                <div>
-                  <label class="label">{{ $t('admin.billing.reason') }}</label>
-                  <input v-model="actionForm.reason" type="text" class="input w-full" :placeholder="$t('admin.billing.reasonPlaceholder')" />
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.reason') }}</label>
+                  <input
+                    v-model="actionForm.reason"
+                    type="text"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all"
+                    :placeholder="$t('admin.billing.reasonPlaceholder')"
+                  />
                 </div>
               </template>
 
               <!-- 删除退款 -->
               <template v-else-if="actionType === 'deleteRefund'">
-                <div class="p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 rounded-lg text-sm">
+                <div class="p-3 bg-[var(--error-soft)] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_20%,transparent)] rounded-xl text-sm">
                   {{ $t('admin.billing.deleteRefundWarning') }}
                 </div>
-                <div>
-                  <label class="label">{{ $t('admin.billing.refundTypeLabel') }} *</label>
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.refundTypeLabel') }} *</label>
                   <div class="flex flex-col gap-2">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="actionForm.refundType" type="radio" value="remaining" class="radio" />
-                      <span>{{ $t('admin.billing.refundTypeRemaining') }}</span>
+                    <label class="flex items-center gap-2 cursor-pointer p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-surface)] transition-colors">
+                      <input v-model="actionForm.refundType" type="radio" value="remaining" class="h-4 w-4 border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]" />
+                      <span class="text-sm text-[var(--text-primary)]">{{ $t('admin.billing.refundTypeRemaining') }}</span>
                     </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input v-model="actionForm.refundType" type="radio" value="full" class="radio" />
-                      <span>{{ $t('admin.billing.refundTypeFull') }}</span>
+                    <label class="flex items-center gap-2 cursor-pointer p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:bg-[var(--bg-surface)] transition-colors">
+                      <input v-model="actionForm.refundType" type="radio" value="full" class="h-4 w-4 border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]" />
+                      <span class="text-sm text-[var(--text-primary)]">{{ $t('admin.billing.refundTypeFull') }}</span>
                     </label>
                   </div>
                 </div>
-                <div>
-                  <label class="label">{{ $t('admin.billing.reason') }} *</label>
-                  <textarea v-model="actionForm.reason" class="input w-full" rows="3" :placeholder="$t('admin.billing.deleteRefundReasonPlaceholder')"></textarea>
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.reason') }} *</label>
+                  <textarea
+                    v-model="actionForm.reason"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all resize-y"
+                    rows="3"
+                    :placeholder="$t('admin.billing.deleteRefundReasonPlaceholder')"
+                  ></textarea>
                 </div>
               </template>
 
-            <!-- 应用折扣 -->
-            <template v-if="actionType === 'applyDiscount'">
-              <div class="p-3 bg-gray-50 dark:bg-gray-800/40 rounded-lg border border-gray-200 dark:border-gray-700">
-                <p class="text-sm text-themed-secondary">
-                  {{ $t('admin.billing.applyDiscountHint') }}
-                </p>
-              </div>
-              <div>
-                <label class="label">{{ $t('admin.billing.affCodeLabel') }} *</label>
-                <input 
-                  v-model="actionForm.affCode" 
-                  type="text" 
-                  class="input w-full uppercase" 
-                  :placeholder="$t('admin.billing.affCodePlaceholder')"
-                />
-              </div>
-            </template>
-          </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showActionModal = false">{{ $t('common.cancel') }}</button>
-            <!-- 删除并退款模式下显示仅数据库删除按钮 -->
-            <button
-              v-if="actionType === 'deleteRefund'"
-              class="btn btn-warning"
-              :disabled="actionLoading"
-              @click="actionType = 'deleteRefundDatabaseOnly'; executeAction()"
-            >
-              {{ actionLoading ? $t('common.processing') : $t('admin.billing.databaseOnlyDelete') }}
-            </button>
-            <button
-              class="btn"
-              :class="actionType === 'suspend' || actionType === 'deleteRefund' || actionType === 'deleteRefundDatabaseOnly' ? 'btn-error' : 'btn-primary'"
-              :disabled="actionLoading"
-              @click="executeAction"
-            >
-              {{ actionLoading ? $t('common.processing') : $t('common.confirm') }}
-            </button>
+              <!-- 应用折扣 -->
+              <template v-if="actionType === 'applyDiscount'">
+                <div class="p-3 bg-[var(--bg-surface-soft)] rounded-xl border border-[var(--border-color)]">
+                  <p class="text-sm text-[var(--text-secondary)]">
+                    {{ $t('admin.billing.applyDiscountHint') }}
+                  </p>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.affCodeLabel') }} *</label>
+                  <input 
+                    v-model="actionForm.affCode" 
+                    type="text" 
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all uppercase" 
+                    :placeholder="$t('admin.billing.affCodePlaceholder')"
+                  />
+                </div>
+              </template>
+            </div>
+            
+            <div class="modal-footer flex flex-row items-center justify-end gap-2">
+              <Button variant="ghost" @click="showActionModal = false">{{ $t('common.cancel') }}</Button>
+              <!-- 删除并退款模式下显示仅数据库删除按钮 -->
+              <Button
+                v-if="actionType === 'deleteRefund'"
+                variant="secondary"
+                class="!text-[var(--warning)] hover:!bg-[var(--warning-soft)]"
+                :disabled="actionLoading"
+                :loading="actionLoading"
+                @click="actionType = 'deleteRefundDatabaseOnly'; executeAction()"
+              >
+                {{ actionLoading ? $t('common.processing') : $t('admin.billing.databaseOnlyDelete') }}
+              </Button>
+              <Button
+                :variant="actionType === 'suspend' || actionType === 'deleteRefund' || actionType === 'deleteRefundDatabaseOnly' ? 'danger' : 'primary'"
+                :disabled="actionLoading"
+                :loading="actionLoading"
+                @click="executeAction"
+              >
+                {{ actionLoading ? $t('common.processing') : $t('common.confirm') }}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    </Transition>
-  </Teleport>
+      </Transition>
+    </Teleport>
 
     <!-- 批量修改价格弹窗 -->
     <Teleport to="body">
@@ -2658,210 +2673,222 @@ function copyToClipboard(text: string) {
         <div v-if="showBatchPriceModal" class="modal-overlay">
           <div class="modal-backdrop" @click="showBatchPriceModal = false"></div>
           <div class="modal-content max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t('admin.billing.batchUpdatePrice') }}</h3>
-            <button class="btn btn-ghost btn-sm" @click="showBatchPriceModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div class="modal-body space-y-4 overflow-y-auto flex-1">
-            <div class="grid gap-3 sm:grid-cols-3">
-              <div class="rounded-lg bg-themed-secondary p-3">
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.batchSelected') }}</div>
-                <div class="mt-1 text-lg font-semibold text-themed">{{ selectedInstancesCount }}</div>
-              </div>
-              <div class="rounded-lg bg-themed-secondary p-3">
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.batchPreviewChanged') }}</div>
-                <div class="mt-1 text-lg font-semibold text-themed">{{ batchPricePreview?.summary.changedCount || 0 }}</div>
-              </div>
-              <div class="rounded-lg bg-themed-secondary p-3">
-                <div class="text-xs text-themed-muted">{{ $t('admin.billing.batchPreviewFailed') }}</div>
-                <div class="mt-1 text-lg font-semibold" :class="(batchPricePreview?.summary.failedCount || 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-themed'">
-                  {{ batchPricePreview?.summary.failedCount || 0 }}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label class="label">{{ $t('admin.billing.newPrice') }} *</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-themed-muted">¥</span>
-                <input
-                  v-model.number="batchPriceForm.newPrice"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input input-bordered w-full pl-7"
-                  :placeholder="$t('admin.billing.enterNewPrice')"
-                />
-              </div>
-              <p class="text-xs text-themed-muted mt-1">{{ $t('admin.billing.batchPriceHint') }}</p>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <input
-                id="batchSettleBalance"
-                v-model="batchPriceForm.settleBalance"
-                type="checkbox"
-                class="checkbox"
-              />
-              <label for="batchSettleBalance" class="text-sm cursor-pointer">
-                {{ $t('admin.billing.settleBalance') }}
-              </label>
-            </div>
-
-            <div v-if="batchPricePreviewLoading" class="p-3 rounded-lg border bg-gray-50 dark:bg-gray-800 border-themed text-sm text-themed-muted">
-              {{ $t('common.loading') }}
-            </div>
-
-            <template v-else-if="batchPricePreview">
-              <div
-                class="rounded-lg border p-3"
-                :class="batchPricePreview.canSubmit ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20' : 'border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-900/20'"
+            <div class="modal-header">
+              <h3 class="modal-title">{{ $t('admin.billing.batchUpdatePrice') }}</h3>
+              <button
+                type="button"
+                class="p-1 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showBatchPriceModal = false"
               >
-                <div class="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <div class="text-xs text-themed-muted">{{ $t('admin.billing.batchTotalCharge') }}</div>
-                    <div class="mt-1 text-base font-semibold text-rose-600 dark:text-rose-400">{{ formatMoney(batchPricePreview.summary.totalCharge) }}</div>
-                  </div>
-                  <div>
-                    <div class="text-xs text-themed-muted">{{ $t('admin.billing.batchTotalRefund') }}</div>
-                    <div class="mt-1 text-base font-semibold text-green-600 dark:text-green-400">{{ formatMoney(batchPricePreview.summary.totalRefund) }}</div>
-                  </div>
-                  <div>
-                    <div class="text-xs text-themed-muted">{{ $t('admin.billing.batchNetAmount') }}</div>
-                    <div class="mt-1 text-base font-semibold text-themed">{{ formatPriceDiff(batchPricePreview.summary.netAmount) }}</div>
-                  </div>
-                </div>
-                <p v-if="!batchPricePreview.canSubmit" class="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300">
-                  {{ $t('admin.billing.batchPreviewBlocked') }}
-                </p>
-              </div>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-              <div v-if="batchPricePreview.userImpacts.length > 0" class="rounded-lg border border-themed overflow-hidden">
-                <div class="bg-themed-secondary px-3 py-2 text-sm font-medium text-themed">{{ $t('admin.billing.batchUserImpact') }}</div>
-                <div class="max-h-48 overflow-auto">
+            <div class="modal-body space-y-4 overflow-y-auto flex-1">
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3.5">
+                  <div class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">{{ $t('admin.billing.batchSelected') }}</div>
+                  <div class="mt-1 text-lg font-bold font-mono text-[var(--text-primary)]">{{ selectedInstancesCount }}</div>
+                </div>
+                <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3.5">
+                  <div class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">{{ $t('admin.billing.batchPreviewChanged') }}</div>
+                  <div class="mt-1 text-lg font-bold font-mono text-[var(--text-primary)]">{{ batchPricePreview?.summary.changedCount || 0 }}</div>
+                </div>
+                <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3.5">
+                  <div class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">{{ $t('admin.billing.batchPreviewFailed') }}</div>
                   <div
-                    v-for="impact in batchPricePreview.userImpacts"
-                    :key="impact.userId"
-                    class="grid grid-cols-2 gap-2 border-t border-themed px-3 py-2 text-sm md:grid-cols-4"
+                    class="mt-1 text-lg font-bold font-mono"
+                    :class="(batchPricePreview?.summary.failedCount || 0) > 0 ? 'text-[var(--error)]' : 'text-[var(--text-primary)]'"
                   >
-                    <div>
-                      <div class="text-xs text-themed-muted">{{ $t('admin.billing.user') }}</div>
-                      <div class="truncate font-medium text-themed" :title="impact.username">{{ impact.username }}</div>
-                    </div>
-                    <div>
-                      <div class="text-xs text-themed-muted">{{ $t('admin.billing.userBalance') }}</div>
-                      <div class="text-themed-muted">{{ formatMoney(impact.balanceBefore) }}</div>
-                    </div>
-                    <div>
-                      <div class="text-xs text-themed-muted">{{ $t('admin.billing.priceDifference') }}</div>
-                      <div :class="impact.netDiff > 0 ? 'text-rose-600 dark:text-rose-400' : impact.netDiff < 0 ? 'text-green-600 dark:text-green-400' : 'text-themed-muted'">{{ formatPriceDiff(impact.netDiff) }}</div>
-                    </div>
-                    <div>
-                      <div class="text-xs text-themed-muted">{{ $t('admin.billing.userBalance') }}</div>
-                      <div :class="impact.insufficientBalance ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-themed'">{{ formatMoney(impact.balanceAfter) }}</div>
-                    </div>
+                    {{ batchPricePreview?.summary.failedCount || 0 }}
                   </div>
                 </div>
               </div>
 
-              <div class="rounded-lg border border-themed overflow-hidden">
-                <div class="bg-themed-secondary px-3 py-2 text-sm font-medium text-themed">{{ $t('admin.billing.batchPreviewDetails') }}</div>
-                <div class="max-h-64 overflow-auto">
-                  <div class="space-y-2 p-3 lg:hidden">
+              <div class="space-y-1.5">
+                <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.newPrice') }} *</label>
+                <div class="relative">
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-mono text-sm">¥</span>
+                  <input
+                    v-model.number="batchPriceForm.newPrice"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] pl-8 pr-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all font-mono"
+                    :placeholder="$t('admin.billing.enterNewPrice')"
+                  />
+                </div>
+                <p class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.batchPriceHint') }}</p>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <input
+                  id="batchSettleBalance"
+                  v-model="batchPriceForm.settleBalance"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                />
+                <label for="batchSettleBalance" class="text-sm text-[var(--text-secondary)] cursor-pointer">
+                  {{ $t('admin.billing.settleBalance') }}
+                </label>
+              </div>
+
+              <div v-if="batchPricePreviewLoading" class="p-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-sm text-[var(--text-tertiary)]">
+                {{ $t('common.loading') }}
+              </div>
+
+              <template v-else-if="batchPricePreview">
+                <div
+                  class="rounded-xl border p-3.5"
+                  :class="batchPricePreview.canSubmit ? 'border-[color-mix(in_srgb,var(--accent)_20%,transparent)] bg-[var(--accent-soft)]' : 'border-[color-mix(in_srgb,var(--error)_20%,transparent)] bg-[var(--error-soft)]'"
+                >
+                  <div class="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <div class="text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.batchTotalCharge') }}</div>
+                      <div class="mt-1 text-base font-bold font-mono text-[var(--error)]">{{ formatMoney(batchPricePreview.summary.totalCharge) }}</div>
+                    </div>
+                    <div>
+                      <div class="text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.batchTotalRefund') }}</div>
+                      <div class="mt-1 text-base font-bold font-mono text-[var(--success)]">{{ formatMoney(batchPricePreview.summary.totalRefund) }}</div>
+                    </div>
+                    <div>
+                      <div class="text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.batchNetAmount') }}</div>
+                      <div class="mt-1 text-base font-bold font-mono text-[var(--text-primary)]">{{ formatPriceDiff(batchPricePreview.summary.netAmount) }}</div>
+                    </div>
+                  </div>
+                  <p v-if="!batchPricePreview.canSubmit" class="mt-3 text-sm font-medium text-[var(--error)]">
+                    {{ $t('admin.billing.batchPreviewBlocked') }}
+                  </p>
+                </div>
+
+                <div v-if="batchPricePreview.userImpacts.length > 0" class="rounded-xl border border-[var(--border-color)] overflow-hidden">
+                  <div class="bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ $t('admin.billing.batchUserImpact') }}</div>
+                  <div class="max-h-48 overflow-y-auto">
                     <div
-                      v-for="item in batchPricePreview.items"
-                      :key="item.id"
-                      class="rounded-lg border border-themed p-3 text-sm"
+                      v-for="impact in batchPricePreview.userImpacts"
+                      :key="impact.userId"
+                      class="grid grid-cols-2 gap-2 border-t border-[var(--border-color)] px-3.5 py-2.5 text-sm md:grid-cols-4"
                     >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                          <div class="truncate font-medium text-themed" :title="item.name || ''">{{ item.name || '-' }}</div>
-                          <div class="text-xs text-themed-muted">#{{ item.id }} · {{ item.user?.username || '-' }}</div>
-                        </div>
-                        <span class="shrink-0" :class="getBatchPriceItemStatusClass(item.status)">{{ item.error || getBatchPriceItemStatusLabel(item.status) }}</span>
+                      <div>
+                        <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.user') }}</div>
+                        <div class="truncate font-medium text-[var(--text-primary)]" :title="impact.username">{{ impact.username }}</div>
                       </div>
-                      <div class="mt-3 grid grid-cols-3 gap-2 text-right">
-                        <div>
-                          <div class="text-xs text-themed-muted">{{ $t('admin.billing.currentPrice') }}</div>
-                          <div>{{ item.oldPrice !== null ? formatMoney(item.oldPrice) : '-' }}</div>
+                      <div>
+                        <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.userBalance') }}</div>
+                        <div class="font-mono text-xs text-[var(--text-secondary)]">{{ formatMoney(impact.balanceBefore) }}</div>
+                      </div>
+                      <div>
+                        <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.priceDifference') }}</div>
+                        <div class="font-mono text-xs font-medium" :class="impact.netDiff > 0 ? 'text-[var(--error)]' : impact.netDiff < 0 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'">{{ formatPriceDiff(impact.netDiff) }}</div>
+                      </div>
+                      <div>
+                        <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.userBalance') }}</div>
+                        <div class="font-mono text-xs" :class="impact.insufficientBalance ? 'text-[var(--error)] font-medium' : 'text-[var(--text-primary)]'">{{ formatMoney(impact.balanceAfter) }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-[var(--border-color)] overflow-hidden">
+                  <div class="bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ $t('admin.billing.batchPreviewDetails') }}</div>
+                  <div class="max-h-64 overflow-y-auto">
+                    <div class="space-y-2 p-3 lg:hidden">
+                      <div
+                        v-for="item in batchPricePreview.items"
+                        :key="item.id"
+                        class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 text-sm"
+                      >
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <div class="truncate font-medium text-[var(--text-primary)]" :title="item.name || ''">{{ item.name || '-' }}</div>
+                            <div class="text-xs text-[var(--text-tertiary)] font-mono">#{{ item.id }} · {{ item.user?.username || '-' }}</div>
+                          </div>
+                          <Badge :variant="getBatchPriceItemBadgeVariant(item.status)" size="sm">
+                            {{ item.error || getBatchPriceItemStatusLabel(item.status) }}
+                          </Badge>
                         </div>
-                        <div>
-                          <div class="text-xs text-themed-muted">{{ $t('admin.billing.newPrice') }}</div>
-                          <div>{{ formatMoney(item.newPrice) }}</div>
-                        </div>
-                        <div>
-                          <div class="text-xs text-themed-muted">{{ $t('admin.billing.priceDifference') }}</div>
-                          <div :class="item.priceDiff > 0 ? 'text-rose-600 dark:text-rose-400' : item.priceDiff < 0 ? 'text-green-600 dark:text-green-400' : 'text-themed-muted'">
-                            {{ formatPriceDiff(item.priceDiff) }}
+                        <div class="mt-3 grid grid-cols-3 gap-2 text-right">
+                          <div>
+                            <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.currentPrice') }}</div>
+                            <div class="font-mono text-xs text-[var(--text-primary)]">{{ item.oldPrice !== null ? formatMoney(item.oldPrice) : '-' }}</div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.newPrice') }}</div>
+                            <div class="font-mono text-xs text-[var(--text-primary)]">{{ formatMoney(item.newPrice) }}</div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.priceDifference') }}</div>
+                            <div class="font-mono text-xs" :class="item.priceDiff > 0 ? 'text-[var(--error)]' : item.priceDiff < 0 ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'">
+                              {{ formatPriceDiff(item.priceDiff) }}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
+
+                    <table class="hidden w-full table-fixed text-sm lg:table">
+                      <thead class="bg-[var(--bg-surface-soft)]">
+                        <tr>
+                          <th class="w-[24%] text-left p-2.5">{{ $t('admin.billing.instance') }}</th>
+                          <th class="w-[16%] text-left p-2.5">{{ $t('admin.billing.user') }}</th>
+                          <th class="w-[14%] text-right p-2.5">{{ $t('admin.billing.currentPrice') }}</th>
+                          <th class="w-[14%] text-right p-2.5">{{ $t('admin.billing.newPrice') }}</th>
+                          <th class="w-[14%] text-right p-2.5">{{ $t('admin.billing.priceDifference') }}</th>
+                          <th class="w-[18%] text-left p-2.5">{{ $t('admin.billing.result') }}</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-[var(--border-color)]">
+                        <tr v-for="item in batchPricePreview.items" :key="item.id" class="hover:bg-[var(--bg-surface-soft)]/50 transition-colors">
+                          <td class="p-2.5">
+                            <div class="truncate font-medium text-[var(--text-primary)]" :title="item.name || ''">{{ item.name || '-' }}</div>
+                            <div class="text-xs text-[var(--text-tertiary)] font-mono">#{{ item.id }}</div>
+                          </td>
+                          <td class="p-2.5 text-[var(--text-secondary)] truncate" :title="item.user?.username || ''">{{ item.user?.username || '-' }}</td>
+                          <td class="p-2.5 text-right font-mono">{{ item.oldPrice !== null ? formatMoney(item.oldPrice) : '-' }}</td>
+                          <td class="p-2.5 text-right font-mono">{{ formatMoney(item.newPrice) }}</td>
+                          <td class="p-2.5 text-right font-mono" :class="item.priceDiff > 0 ? 'text-[var(--error)]' : item.priceDiff < 0 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'">
+                            {{ formatPriceDiff(item.priceDiff) }}
+                          </td>
+                          <td class="p-2.5">
+                            <Badge :variant="getBatchPriceItemBadgeVariant(item.status)" size="sm">
+                              {{ item.error || getBatchPriceItemStatusLabel(item.status) }}
+                            </Badge>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-
-                  <table class="hidden w-full table-fixed text-sm lg:table">
-                    <thead class="bg-themed-secondary/60">
-                      <tr>
-                        <th class="w-[24%] text-left p-2">{{ $t('admin.billing.instance') }}</th>
-                        <th class="w-[16%] text-left p-2">{{ $t('admin.billing.user') }}</th>
-                        <th class="w-[14%] text-right p-2">{{ $t('admin.billing.currentPrice') }}</th>
-                        <th class="w-[14%] text-right p-2">{{ $t('admin.billing.newPrice') }}</th>
-                        <th class="w-[14%] text-right p-2">{{ $t('admin.billing.priceDifference') }}</th>
-                        <th class="w-[18%] text-left p-2">{{ $t('admin.billing.result') }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="item in batchPricePreview.items" :key="item.id" class="border-t border-themed">
-                        <td class="p-2">
-                          <div class="truncate font-medium text-themed" :title="item.name || ''">{{ item.name || '-' }}</div>
-                          <div class="text-xs text-themed-muted">#{{ item.id }}</div>
-                        </td>
-                        <td class="p-2 text-themed-muted truncate" :title="item.user?.username || ''">{{ item.user?.username || '-' }}</td>
-                        <td class="p-2 text-right">{{ item.oldPrice !== null ? formatMoney(item.oldPrice) : '-' }}</td>
-                        <td class="p-2 text-right">{{ formatMoney(item.newPrice) }}</td>
-                        <td class="p-2 text-right" :class="item.priceDiff > 0 ? 'text-rose-600 dark:text-rose-400' : item.priceDiff < 0 ? 'text-green-600 dark:text-green-400' : 'text-themed-muted'">
-                          {{ formatPriceDiff(item.priceDiff) }}
-                        </td>
-                        <td class="p-2">
-                          <span :class="getBatchPriceItemStatusClass(item.status)">{{ item.error || getBatchPriceItemStatusLabel(item.status) }}</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
                 </div>
+              </template>
+
+              <div v-else class="p-3.5 rounded-xl border border-[var(--border-color)] text-sm text-[var(--text-tertiary)]">
+                {{ $t('admin.billing.batchPreviewWaiting') }}
               </div>
-            </template>
 
-            <div v-else class="p-3 rounded-lg border border-themed text-sm text-themed-muted">
-              {{ $t('admin.billing.batchPreviewWaiting') }}
+              <div v-if="!batchPriceForm.settleBalance" class="p-3.5 bg-[var(--warning-soft)] rounded-xl border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+                <p class="text-sm text-[var(--warning)]">
+                  {{ $t('admin.billing.noSettleHint') }}
+                </p>
+              </div>
             </div>
 
-            <div v-if="!batchPriceForm.settleBalance" class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                {{ $t('admin.billing.noSettleHint') }}
-              </p>
+            <div class="modal-footer flex flex-row items-center justify-end gap-2">
+              <Button variant="ghost" :disabled="batchPriceLoading" @click="showBatchPriceModal = false">{{ $t('common.cancel') }}</Button>
+              <Button
+                variant="primary"
+                :disabled="batchPriceLoading || batchPricePreviewLoading || !isValidPriceInput(batchPriceForm.newPrice) || !batchPricePreview?.canSubmit || !batchPricePreviewHasVersionSnapshot"
+                :loading="batchPriceLoading"
+                @click="submitBatchUpdatePrice"
+              >
+                {{ batchPriceLoading ? $t('common.processing') : $t('common.confirm') }}
+              </Button>
             </div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn btn-ghost" :disabled="batchPriceLoading" @click="showBatchPriceModal = false">{{ $t('common.cancel') }}</button>
-            <button
-              class="btn btn-primary"
-              :disabled="batchPriceLoading || batchPricePreviewLoading || !isValidPriceInput(batchPriceForm.newPrice) || !batchPricePreview?.canSubmit || !batchPricePreviewHasVersionSnapshot"
-              @click="submitBatchUpdatePrice"
-            >
-              {{ batchPriceLoading ? $t('common.processing') : $t('common.confirm') }}
-            </button>
           </div>
         </div>
-      </div>
-    </Transition>
-  </Teleport>
+      </Transition>
+    </Teleport>
 
     <!-- 修改价格弹窗 -->
     <Teleport to="body">
@@ -2869,141 +2896,150 @@ function copyToClipboard(text: string) {
         <div v-if="showPriceModal" class="modal-overlay">
           <div class="modal-backdrop" @click="showPriceModal = false"></div>
           <div class="modal-content max-w-md">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t('admin.billing.updatePrice') }}</h3>
-            <button class="btn btn-ghost btn-sm" @click="showPriceModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div class="modal-body space-y-4">
-            <!-- 实例信息 -->
-            <div class="p-3 bg-themed-secondary rounded-lg space-y-2">
-              <div class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.instanceName') }}:</span>
-                <span class="font-medium">{{ priceTarget?.name }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.owner') }}:</span>
-                <span>{{ priceTarget?.user?.username }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.currentPrice') }}:</span>
-                <span class="font-medium text-themed">¥{{ (priceTarget?.billingPrice || 0).toFixed(2) }}</span>
-              </div>
-              <!-- 优惠码状态 -->
-              <div v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0" class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.affDiscount') }}:</span>
-                <span class="text-green-500 font-medium">-{{ (priceTarget.affDiscountRate * 100).toFixed(0) }}%</span>
-              </div>
-              <!-- 实际续费价（如果有折扣） -->
-              <div v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0" class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.actualRenewPrice') }}:</span>
-                <span class="font-medium text-green-600 dark:text-green-400">¥{{ actualRenewPrice.old.toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.cycle') }}:</span>
-                <span>{{ formatBillingCycle(priceTarget?.billingCycle || 1) }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.remainingDays') }}:</span>
-                <span :class="priceTarget?.remainingDays <= 7 ? 'text-yellow-500' : ''">
-                  {{ Math.ceil(pricePreview?.remainingDays || priceTarget?.remainingDays || 0) }} {{ $t('admin.billing.days') }}
-                </span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-themed-muted">{{ $t('admin.billing.userBalance') }}:</span>
-                <span>¥{{ (priceTarget?.user?.balance || 0).toFixed(2) }}</span>
-              </div>
+            <div class="modal-header">
+              <h3 class="modal-title">{{ $t('admin.billing.updatePrice') }}</h3>
+              <button
+                type="button"
+                class="p-1 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showPriceModal = false"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             
-            <!-- 优惠码提示 -->
-            <div v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0" class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-              <p class="text-sm text-green-700 dark:text-green-300">
-                {{ $t('admin.billing.affAppliedHint', { discount: (priceTarget.affDiscountRate * 100).toFixed(0) }) }}
-              </p>
-            </div>
-            
-            <!-- 新价格输入 -->
-            <div>
-              <label class="label">{{ $t('admin.billing.newPrice') }} *</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-themed-muted">¥</span>
+            <div class="modal-body space-y-4">
+              <!-- 实例信息 -->
+              <div class="p-3.5 bg-[var(--bg-surface-soft)] rounded-xl border border-[var(--border-color)] space-y-2">
+                <div class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.instanceName') }}:</span>
+                  <span class="font-medium text-[var(--text-primary)]">{{ priceTarget?.name }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.owner') }}:</span>
+                  <span class="text-[var(--text-secondary)]">{{ priceTarget?.user?.username }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.currentPrice') }}:</span>
+                  <span class="font-mono font-medium text-[var(--text-primary)]">¥{{ (priceTarget?.billingPrice || 0).toFixed(2) }}</span>
+                </div>
+                <!-- 优惠码状态 -->
+                <div v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0" class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.affDiscount') }}:</span>
+                  <span class="text-[var(--success)] font-medium font-mono">-{{ (priceTarget.affDiscountRate * 100).toFixed(0) }}%</span>
+                </div>
+                <!-- 实际续费价（如果有折扣） -->
+                <div v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0" class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.actualRenewPrice') }}:</span>
+                  <span class="font-mono font-medium text-[var(--success)]">¥{{ actualRenewPrice.old.toFixed(2) }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.cycle') }}:</span>
+                  <span class="text-[var(--text-secondary)]">{{ formatBillingCycle(priceTarget?.billingCycle || 1) }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.remainingDays') }}:</span>
+                  <span :class="priceTarget?.remainingDays <= 7 ? 'text-[var(--warning)] font-medium' : 'text-[var(--text-secondary)]'">
+                    {{ Math.ceil(pricePreview?.remainingDays || priceTarget?.remainingDays || 0) }} {{ $t('admin.billing.days') }}
+                  </span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.userBalance') }}:</span>
+                  <span class="font-mono text-[var(--text-secondary)]">¥{{ (priceTarget?.user?.balance || 0).toFixed(2) }}</span>
+                </div>
+              </div>
+              
+              <!-- 优惠码提示 -->
+              <div v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0" class="p-3 bg-[var(--accent-soft)] rounded-xl border border-[color-mix(in_srgb,var(--accent)_20%,transparent)]">
+                <p class="text-sm text-[var(--accent)]">
+                  {{ $t('admin.billing.affAppliedHint', { discount: (priceTarget.affDiscountRate * 100).toFixed(0) }) }}
+                </p>
+              </div>
+              
+              <!-- 新价格输入 -->
+              <div class="space-y-1.5">
+                <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.newPrice') }} *</label>
+                <div class="relative">
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] font-mono text-sm">¥</span>
+                  <input 
+                    v-model.number="priceForm.newPrice" 
+                    type="number" 
+                    step="0.01" 
+                    min="0" 
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] pl-8 pr-3.5 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all font-mono" 
+                    :placeholder="$t('admin.billing.enterNewPrice')"
+                  />
+                </div>
+                <p class="text-xs text-[var(--text-tertiary)]">{{ $t('admin.billing.priceHint') }}</p>
+                <!-- 新价格的实际续费价（如果有折扣） -->
+                <p v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0 && priceForm.newPrice > 0" class="text-xs text-[var(--success)] mt-1 font-mono">
+                  → {{ $t('admin.billing.newActualPrice') }}: ¥{{ actualRenewPrice.new.toFixed(2) }}
+                </p>
+              </div>
+              
+              <!-- 是否结算差价 -->
+              <div class="flex items-center gap-3">
                 <input 
-                  v-model.number="priceForm.newPrice" 
-                  type="number" 
-                  step="0.01"
-                  min="0"
-                  class="input input-bordered w-full pl-7"
-                  :placeholder="$t('admin.billing.enterNewPrice')"
+                  id="settleBalance" 
+                  v-model="priceForm.settleBalance" 
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
                 />
+                <label for="settleBalance" class="text-sm text-[var(--text-secondary)] cursor-pointer">
+                  {{ $t('admin.billing.settleBalance') }}
+                </label>
               </div>
-              <p class="text-xs text-themed-muted mt-1">{{ $t('admin.billing.priceHint') }}</p>
-              <!-- 新价格的实际续费价（如果有折扣） -->
-              <p v-if="priceTarget?.hasAffBinding && priceTarget?.affDiscountRate > 0 && priceForm.newPrice > 0" class="text-xs text-green-600 dark:text-green-400 mt-1">
-                → {{ $t('admin.billing.newActualPrice') }}: ¥{{ actualRenewPrice.new.toFixed(2) }}
-              </p>
-            </div>
-            
-            <!-- 是否结算差价 -->
-            <div class="flex items-center gap-3">
-              <input 
-                id="settleBalance" 
-                v-model="priceForm.settleBalance" 
-                type="checkbox"
-                class="checkbox"
-              />
-              <label for="settleBalance" class="text-sm cursor-pointer">
-                {{ $t('admin.billing.settleBalance') }}
-              </label>
-            </div>
-            
-            <!-- 差价计算结果 -->
-            <div v-if="pricePreviewLoading" class="p-3 rounded-lg border bg-gray-50 dark:bg-gray-800 border-themed text-sm text-themed-muted">
-              {{ $t('common.loading') }}
-            </div>
+              
+              <!-- 差价计算结果 -->
+              <div v-if="pricePreviewLoading" class="p-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-sm text-[var(--text-tertiary)]">
+                {{ $t('common.loading') }}
+              </div>
 
-            <div v-else-if="priceForm.settleBalance && (pricePreview?.remainingDays || 0) > 0 && priceForm.newPrice !== priceTarget?.billingPrice" class="p-3 rounded-lg border" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'">
-              <div class="flex justify-between items-center">
-                <span class="text-sm" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'text-rose-700 dark:text-rose-300' : 'text-blue-700 dark:text-blue-300'">
-                  {{ priceDiff > 0 ? $t('admin.billing.needPay') : $t('admin.billing.willRefund') }}:
-                </span>
-                <span class="text-xl font-bold" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'">
-                  ¥{{ Math.abs(priceDiff).toFixed(2) }}
-                </span>
+              <div
+                v-else-if="priceForm.settleBalance && (pricePreview?.remainingDays || 0) > 0 && priceForm.newPrice !== priceTarget?.billingPrice"
+                class="p-3.5 rounded-xl border"
+                :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'bg-[var(--error-soft)] border-[color-mix(in_srgb,var(--error)_20%,transparent)]' : 'bg-[var(--accent-soft)] border-[color-mix(in_srgb,var(--accent)_20%,transparent)]'"
+              >
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'text-[var(--error)]' : 'text-[var(--accent)]'">
+                    {{ priceDiff > 0 ? $t('admin.billing.needPay') : $t('admin.billing.willRefund') }}:
+                  </span>
+                  <span class="text-xl font-bold font-mono" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'text-[var(--error)]' : 'text-[var(--accent)]'">
+                    ¥{{ Math.abs(priceDiff).toFixed(2) }}
+                  </span>
+                </div>
+                <p v-if="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0)" class="text-xs text-[var(--error)] mt-2 font-medium">
+                  {{ $t('admin.billing.insufficientBalance') }}
+                </p>
+                <p v-else class="text-xs mt-1" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'text-[var(--error)]' : 'text-[var(--accent)]'">
+                  {{ $t('admin.billing.priceDiffHint', { days: Math.ceil(pricePreview?.remainingDays || 0) }) }}
+                </p>
               </div>
-              <p v-if="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0)" class="text-xs text-rose-600 dark:text-rose-400 mt-2 font-medium">
-                {{ $t('admin.billing.insufficientBalance') }}
-              </p>
-              <p v-else class="text-xs mt-1" :class="priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0) ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'">
-                {{ $t('admin.billing.priceDiffHint', { days: Math.ceil(pricePreview?.remainingDays || 0) }) }}
-              </p>
+              
+              <!-- 不结算差价提示 -->
+              <div v-if="!priceForm.settleBalance" class="p-3.5 bg-[var(--warning-soft)] rounded-xl border border-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+                <p class="text-sm text-[var(--warning)]">
+                  {{ $t('admin.billing.noSettleHint') }}
+                </p>
+              </div>
             </div>
             
-            <!-- 不结算差价提示 -->
-            <div v-if="!priceForm.settleBalance" class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                {{ $t('admin.billing.noSettleHint') }}
-              </p>
+            <div class="modal-footer flex flex-row items-center justify-end gap-2">
+              <Button variant="ghost" :disabled="priceLoading" @click="showPriceModal = false">{{ $t('common.cancel') }}</Button>
+              <Button
+                variant="primary"
+                :disabled="priceLoading || pricePreviewLoading || !isValidPriceInput(priceForm.newPrice) || (priceForm.settleBalance && priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0))"
+                :loading="priceLoading"
+                @click="submitUpdatePrice"
+              >
+                {{ priceLoading ? $t('common.processing') : $t('common.confirm') }}
+              </Button>
             </div>
-          </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showPriceModal = false">{{ $t('common.cancel') }}</button>
-            <button
-              class="btn btn-primary"
-              :disabled="priceLoading || pricePreviewLoading || !isValidPriceInput(priceForm.newPrice) || (priceForm.settleBalance && priceDiff > 0 && priceDiff > (pricePreview?.userBalance || priceTarget?.user?.balance || 0))"
-              @click="submitUpdatePrice"
-            >
-              {{ priceLoading ? $t('common.processing') : $t('common.confirm') }}
-            </button>
           </div>
         </div>
-      </div>
-    </Transition>
-  </Teleport>
+      </Transition>
+    </Teleport>
 
     <!-- 切换方案弹窗 -->
     <Teleport to="body">
@@ -3011,115 +3047,131 @@ function copyToClipboard(text: string) {
         <div v-if="showUpgradeModal" class="modal-overlay">
           <div class="modal-backdrop" @click="showUpgradeModal = false"></div>
           <div class="modal-content max-w-lg">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t('admin.billing.upgradePlanTitle') }}</h3>
-            <button class="btn btn-ghost btn-sm" @click="showUpgradeModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div class="modal-body space-y-4">
-            <p class="text-themed-secondary">
-              {{ $t('admin.billing.targetInstance') }}: <strong>{{ upgradeTarget?.name }}</strong>
-            </p>
-
-            <!-- 加载中 -->
-            <div v-if="upgradeLoading" class="py-8 text-center">
-              <LoadingSpinner size="xl" color="primary" class="mx-auto" />
-              <p class="mt-2 text-themed-muted">{{ $t('common.loading') }}</p>
+            <div class="modal-header">
+              <h3 class="modal-title">{{ $t('admin.billing.upgradePlanTitle') }}</h3>
+              <button
+                type="button"
+                class="p-1 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showUpgradeModal = false"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-
-            <template v-else-if="upgradeData.currentPlan">
-              <!-- 当前方案信息 -->
-              <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <h4 class="text-sm font-medium text-themed-secondary mb-2">{{ $t('admin.billing.currentPlan') }}</h4>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                  <div>{{ $t('admin.billing.planName') }}: <strong>{{ upgradeData.currentPlan.name }}</strong></div>
-                  <div>{{ $t('admin.billing.monthlyPrice') }}: <strong>¥{{ upgradeData.currentPlan.monthlyPrice.toFixed(2) }}</strong></div>
-                  <div>CPU: <strong>{{ upgradeData.currentPlan.cpu }}%</strong></div>
-                  <div>{{ $t('admin.billing.memoryLabel') }}: <strong>{{ upgradeData.currentPlan.memory }}MB</strong></div>
-                  <div>{{ $t('admin.billing.diskLabel') }}: <strong>{{ upgradeData.currentPlan.disk }}MB</strong></div>
-                  <div>{{ $t('admin.billing.remainingDays') }}: <strong>{{ Math.ceil(upgradeData.remainingDays) }} {{ $t('admin.billing.days') }}</strong></div>
-                </div>
+            
+            <div class="modal-body space-y-4">
+              <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm">
+                <span class="text-[var(--text-secondary)]">{{ $t('admin.billing.targetInstance') }}:</span>
+                <strong class="ml-1 text-[var(--text-primary)]">{{ upgradeTarget?.name }}</strong>
               </div>
 
-              <!-- 可升级方案列表 -->
-              <div v-if="upgradeData.availablePlans.length > 0">
-                <label class="label">{{ $t('admin.billing.selectNewPlan') }} *</label>
-                <div class="space-y-2 max-h-48 overflow-y-auto">
-                  <label
-                    v-for="plan in upgradeData.availablePlans"
-                    :key="plan.id"
-                    class="flex items-start gap-3 p-3 rounded-lg border transition-colors"
-                    :class="[
-                      plan.canUpgrade === false
-                        ? 'cursor-not-allowed opacity-60 border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-900/20'
-                        : 'cursor-pointer',
-                      selectedPlanId === plan.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-themed hover:bg-gray-50 dark:hover:bg-gray-800'
-                    ]"
-                  >
-                    <input v-model="selectedPlanId" type="radio" :value="plan.id" class="radio mt-1" :disabled="plan.canUpgrade === false" />
-                    <div class="flex-1">
-                      <div class="font-medium">{{ plan.name }}</div>
-                      <div class="text-sm text-themed-muted">
-                        ¥{{ plan.price.toFixed(2) }} / {{ formatBillingCycle(plan.billingCycle) }}
-                        (¥{{ plan.monthlyPrice.toFixed(2) }}/{{ $t('admin.billing.month') }})
-                      </div>
-                      <div class="text-xs text-themed-muted mt-1">
-                        CPU {{ plan.cpu }}% | {{ plan.memory }}MB RAM | {{ plan.disk }}MB {{ $t('admin.billing.diskLabel') }}
-                      </div>
-                      <div v-if="plan.canUpgrade === false && plan.resourceWarnings?.length" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
-                        {{ plan.resourceWarnings[0] }}
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-              <div v-else class="p-4 text-center text-themed-muted bg-gray-50 dark:bg-gray-800 rounded-lg">
-                {{ $t('admin.billing.noAvailablePlans') }}
+              <!-- 加载中 -->
+              <div v-if="upgradeLoading" class="py-8 text-center">
+                <LoadingSpinner size="xl" color="primary" class="mx-auto" />
+                <p class="mt-2 text-sm text-[var(--text-tertiary)]">{{ $t('common.loading') }}</p>
               </div>
 
-              <!-- 差价计算结果 -->
-              <div v-if="selectedPlanId" class="p-3 rounded-lg border" :class="upgradePriceDiff > upgradeData.userBalance ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'">
-                <div class="flex justify-between items-center">
-                  <span :class="upgradePriceDiff > upgradeData.userBalance ? 'text-rose-700 dark:text-rose-300' : 'text-blue-700 dark:text-blue-300'">{{ $t('admin.billing.priceDifference') }}:</span>
-                  <span class="text-xl font-bold" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'">¥{{ upgradePriceDiff.toFixed(2) }}</span>
+              <template v-else-if="upgradeData.currentPlan">
+                <!-- 当前方案信息 -->
+                <div class="p-3.5 bg-[var(--bg-surface-soft)] rounded-xl border border-[var(--border-color)]">
+                  <h4 class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2.5">{{ $t('admin.billing.currentPlan') }}</h4>
+                  <div class="grid grid-cols-2 gap-2.5 text-sm">
+                    <div><span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.planName') }}:</span> <strong class="ml-1 text-[var(--text-primary)]">{{ upgradeData.currentPlan.name }}</strong></div>
+                    <div><span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.monthlyPrice') }}:</span> <strong class="ml-1 text-[var(--text-primary)] font-mono">¥{{ upgradeData.currentPlan.monthlyPrice.toFixed(2) }}</strong></div>
+                    <div><span class="text-[var(--text-tertiary)]">CPU:</span> <strong class="ml-1 text-[var(--text-primary)] font-mono">{{ upgradeData.currentPlan.cpu }}%</strong></div>
+                    <div><span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.memoryLabel') }}:</span> <strong class="ml-1 text-[var(--text-primary)] font-mono">{{ upgradeData.currentPlan.memory }}MB</strong></div>
+                    <div><span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.diskLabel') }}:</span> <strong class="ml-1 text-[var(--text-primary)] font-mono">{{ upgradeData.currentPlan.disk }}MB</strong></div>
+                    <div><span class="text-[var(--text-tertiary)]">{{ $t('admin.billing.remainingDays') }}:</span> <strong class="ml-1 text-[var(--text-primary)] font-mono">{{ Math.ceil(upgradeData.remainingDays) }} {{ $t('admin.billing.days') }}</strong></div>
+                  </div>
                 </div>
-                <div class="flex justify-between items-center mt-1">
-                  <span :class="upgradePriceDiff > upgradeData.userBalance ? 'text-rose-700 dark:text-rose-300' : 'text-blue-700 dark:text-blue-300'" class="text-sm">{{ $t('admin.billing.userBalance') }}:</span>
-                  <span class="font-medium" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'">¥{{ upgradeData.userBalance.toFixed(2) }}</span>
+
+                <!-- 可升级方案列表 -->
+                <div v-if="upgradeData.availablePlans.length > 0" class="space-y-1.5">
+                  <label class="block text-xs font-medium text-[var(--text-secondary)]">{{ $t('admin.billing.selectNewPlan') }} *</label>
+                  <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <label
+                      v-for="plan in upgradeData.availablePlans"
+                      :key="plan.id"
+                      class="flex items-start gap-3 p-3 rounded-xl border transition-all"
+                      :class="[
+                        plan.canUpgrade === false
+                          ? 'cursor-not-allowed opacity-60 border-[var(--error)]/30 bg-[var(--error-soft)]/50'
+                          : 'cursor-pointer hover:bg-[var(--bg-surface-soft)]',
+                        selectedPlanId === plan.id
+                          ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+                          : 'border-[var(--border-color)] bg-[var(--bg-surface)]'
+                      ]"
+                    >
+                      <input
+                        v-model="selectedPlanId"
+                        type="radio"
+                        :value="plan.id"
+                        class="h-4 w-4 mt-1 border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                        :disabled="plan.canUpgrade === false"
+                      />
+                      <div class="flex-1 min-w-0">
+                        <div class="font-medium text-sm text-[var(--text-primary)]">{{ plan.name }}</div>
+                        <div class="text-xs text-[var(--text-secondary)] font-mono">
+                          ¥{{ plan.price.toFixed(2) }} / {{ formatBillingCycle(plan.billingCycle) }}
+                          (¥{{ plan.monthlyPrice.toFixed(2) }}/{{ $t('admin.billing.month') }})
+                        </div>
+                        <div class="text-xs text-[var(--text-tertiary)] mt-1 font-mono">
+                          CPU {{ plan.cpu }}% | {{ plan.memory }}MB RAM | {{ plan.disk }}MB {{ $t('admin.billing.diskLabel') }}
+                        </div>
+                        <div v-if="plan.canUpgrade === false && plan.resourceWarnings?.length" class="mt-2 text-xs text-[var(--error)] font-medium">
+                          {{ plan.resourceWarnings[0] }}
+                        </div>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-                <p v-if="upgradePriceDiff > upgradeData.userBalance" class="text-xs text-rose-600 dark:text-rose-400 mt-2 font-medium">
-                  {{ $t('admin.billing.insufficientBalance') }}
-                </p>
-                <p v-else-if="selectedUpgradePlanBlocked" class="text-xs text-rose-600 dark:text-rose-400 mt-2 font-medium">
-                  {{ selectedUpgradePlan?.resourceWarnings?.[0] || '实例所在节点资源不足，无法升级方案' }}
-                </p>
-                <p v-else class="text-xs mt-1" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'">
-                  {{ $t('admin.billing.priceDifferenceHint') }}
-                </p>
-              </div>
-            </template>
-          </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showUpgradeModal = false">{{ $t('common.cancel') }}</button>
-            <button
-              class="btn btn-primary"
-              :disabled="upgradeSubmitting || !selectedPlanId || selectedUpgradePlanBlocked || upgradeData.availablePlans.length === 0"
-              @click="executeUpgrade"
-            >
-              {{ upgradeSubmitting ? $t('common.processing') : $t('admin.billing.confirmUpgrade') }}
-            </button>
+                <div v-else class="p-4 text-center text-sm text-[var(--text-tertiary)] bg-[var(--bg-surface-soft)] rounded-xl border border-[var(--border-color)]">
+                  {{ $t('admin.billing.noAvailablePlans') }}
+                </div>
+
+                <!-- 差价计算结果 -->
+                <div
+                  v-if="selectedPlanId"
+                  class="p-3.5 rounded-xl border"
+                  :class="upgradePriceDiff > upgradeData.userBalance ? 'bg-[var(--error-soft)] border-[color-mix(in_srgb,var(--error)_20%,transparent)]' : 'bg-[var(--accent-soft)] border-[color-mix(in_srgb,var(--accent)_20%,transparent)]'"
+                >
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-[var(--error)]' : 'text-[var(--accent)]'">{{ $t('admin.billing.priceDifference') }}:</span>
+                    <span class="text-xl font-bold font-mono" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-[var(--error)]' : 'text-[var(--accent)]'">¥{{ upgradePriceDiff.toFixed(2) }}</span>
+                  </div>
+                  <div class="flex justify-between items-center mt-1 text-sm">
+                    <span :class="upgradePriceDiff > upgradeData.userBalance ? 'text-[var(--error)]' : 'text-[var(--accent)]'">{{ $t('admin.billing.userBalance') }}:</span>
+                    <span class="font-medium font-mono" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-[var(--error)]' : 'text-[var(--accent)]'">¥{{ upgradeData.userBalance.toFixed(2) }}</span>
+                  </div>
+                  <p v-if="upgradePriceDiff > upgradeData.userBalance" class="text-xs text-[var(--error)] mt-2 font-medium">
+                    {{ $t('admin.billing.insufficientBalance') }}
+                  </p>
+                  <p v-else-if="selectedUpgradePlanBlocked" class="text-xs text-[var(--error)] mt-2 font-medium">
+                    {{ selectedUpgradePlan?.resourceWarnings?.[0] || '实例所在节点资源不足，无法升级方案' }}
+                  </p>
+                  <p v-else class="text-xs mt-1" :class="upgradePriceDiff > upgradeData.userBalance ? 'text-[var(--error)]' : 'text-[var(--accent)]'">
+                    {{ $t('admin.billing.priceDifferenceHint') }}
+                  </p>
+                </div>
+              </template>
+            </div>
+            
+            <div class="modal-footer flex flex-row items-center justify-end gap-2">
+              <Button variant="ghost" :disabled="upgradeSubmitting" @click="showUpgradeModal = false">{{ $t('common.cancel') }}</Button>
+              <Button
+                variant="primary"
+                :disabled="upgradeSubmitting || !selectedPlanId || selectedUpgradePlanBlocked || upgradeData.availablePlans.length === 0"
+                :loading="upgradeSubmitting"
+                @click="executeUpgrade"
+              >
+                {{ upgradeSubmitting ? $t('common.processing') : $t('admin.billing.confirmUpgrade') }}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    </Transition>
-  </Teleport>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 

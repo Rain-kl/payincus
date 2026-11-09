@@ -9,6 +9,22 @@ import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
 import { freeSiteCopy } from '@/utils/freeSiteFun'
 import { instanceDetailPath, walletPath } from '@/utils/app-paths'
 import { useReveal } from '@/composables/useReveal'
+import { PageHeader, Card, Button, Input, Badge, EmptyState, Pagination } from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
+import {
+  CreditCard,
+  Plus,
+  Gift,
+  Copy,
+  Trash2,
+  Trophy,
+  AlertCircle,
+  Coins,
+  Share2,
+  X,
+  Loader2,
+  Info
+} from 'lucide-vue-next'
 
 const revealRoot = ref<HTMLElement | null>(null)
 useReveal(revealRoot)
@@ -289,7 +305,7 @@ async function loadLogs() {
     logs.value = res.records || []
     logsTotal.value = res.total
   } catch (err: any) {
-    toast.error(t('wallet.loadLogsFailed') + ': ' + err.message)
+    toast.error(t('wallet.loadLogsFailed') + ': ' + (err?.message || ''))
   } finally {
     logsLoading.value = false
   }
@@ -317,7 +333,7 @@ async function loadProviders() {
     }
   } catch (err: any) {
     if (loadSeq === providersLoadSeq) {
-      toast.error(t('wallet.loadProvidersFailed') + ': ' + err.message)
+      toast.error(t('wallet.loadProvidersFailed') + ': ' + (err?.message || ''))
     }
   } finally {
     if (loadSeq === providersLoadSeq) {
@@ -355,7 +371,7 @@ async function loadRecords() {
     rechargeRecords.value = res.records || []
     recordsTotal.value = res.total
   } catch (err: any) {
-    toast.error(t('wallet.loadRecordsFailed') + ': ' + err.message)
+    toast.error(t('wallet.loadRecordsFailed') + ': ' + (err?.message || ''))
   } finally {
     recordsLoading.value = false
   }
@@ -385,7 +401,7 @@ async function repayOrder(orderNo: string) {
       toast.error(t('wallet.noPayUrl'))
     }
   } catch (err: any) {
-    toast.error(t('wallet.repayFailed') + ': ' + err.message)
+    toast.error(t('wallet.repayFailed') + ': ' + (err?.message || ''))
   } finally {
     repayLoading.value = null
   }
@@ -399,7 +415,7 @@ async function cancelOrder(orderNo: string) {
     toast.success(t('wallet.orderCancelled'))
     loadRecords()
   } catch (err: any) {
-    toast.error(t('wallet.cancelFailed') + ': ' + err.message)
+    toast.error(t('wallet.cancelFailed') + ': ' + (err?.message || ''))
   } finally {
     cancelLoading.value = null
   }
@@ -497,7 +513,7 @@ async function createRechargeOrder() {
       loadRecords()
     }
   } catch (err: any) {
-    toast.error(t('wallet.createOrderFailed') + ': ' + err.message)
+    toast.error(t('wallet.createOrderFailed') + ': ' + (err?.message || ''))
   } finally {
     rechargeLoading.value = false
   }
@@ -584,84 +600,86 @@ function isOrderExpired(expiredAt: string | null): boolean {
   return new Date(expiredAt) < new Date()
 }
 
-function getTagClass(tone: MetricTone): string {
-  const map: Record<MetricTone, string> = {
-    slate: 'border-zinc-200/80 bg-white text-zinc-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300',
-    emerald: 'border-emerald-200/80 bg-emerald-50/70 text-emerald-700 dark:border-emerald-500/15 dark:bg-emerald-500/[0.08] dark:text-emerald-200',
-    rose: 'border-rose-200/80 bg-rose-50/70 text-rose-700 dark:border-rose-500/15 dark:bg-rose-500/[0.08] dark:text-rose-200',
-    amber: 'border-amber-200/80 bg-amber-50/70 text-amber-700 dark:border-amber-500/15 dark:bg-amber-500/[0.08] dark:text-amber-200',
-    blue: 'border-zinc-200/80 bg-white text-zinc-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300',
-    violet: 'border-zinc-200/80 bg-white text-zinc-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300'
-  }
-
-  return map[tone]
-}
-
 function getMetricDotClass(tone: MetricTone): string {
   const map: Record<MetricTone, string> = {
     slate: 'bg-zinc-400 dark:bg-zinc-500',
-    emerald: 'bg-emerald-500/70 dark:bg-emerald-400/80',
-    rose: 'bg-rose-500/70 dark:bg-rose-400/80',
-    amber: 'bg-amber-500/70 dark:bg-amber-400/80',
-    blue: 'bg-zinc-400 dark:bg-zinc-500',
-    violet: 'bg-zinc-400 dark:bg-zinc-500'
+    emerald: 'bg-[var(--success)]',
+    rose: 'bg-[var(--error)]',
+    amber: 'bg-[var(--warning)]',
+    blue: 'bg-[var(--accent)]',
+    violet: 'bg-purple-500'
   }
 
-  return map[tone]
+  return map[tone] || 'bg-zinc-400'
 }
 
 function getAmountValueClass(amount: number): string {
   return amount >= 0
-    ? 'text-emerald-700 dark:text-emerald-200'
-    : 'text-zinc-950 dark:text-zinc-100'
+    ? 'text-[var(--success)]'
+    : 'text-[var(--text-primary)]'
 }
 
-function getLogTypeTagClass(type: string): string {
-  const map: Record<string, MetricTone> = {
-    recharge: 'emerald',
-    refund: 'blue',
-    admin_adjust: 'blue',
-    gift: 'violet',
-    transfer_refund: 'blue',
-    consume: 'rose',
-    transfer_fee: 'slate',
-    invite_generate: 'violet'
+function getLogBadgeVariant(type: string): BadgeVariant {
+  switch (type) {
+    case 'recharge':
+      return 'success'
+    case 'consume':
+      return 'error'
+    case 'refund':
+    case 'admin_adjust':
+    case 'transfer_refund':
+      return 'info'
+    case 'gift':
+      return 'warning'
+    case 'transfer_fee':
+    case 'invite_generate':
+    default:
+      return 'default'
   }
-
-  return getTagClass(map[type] || 'slate')
 }
 
-function getStatusTagClass(status: string): string {
-  const map: Record<string, MetricTone> = {
-    pending: 'amber',
-    paid: 'blue',
-    completed: 'emerald',
-    failed: 'rose',
-    cancelled: 'slate',
-    refunded: 'violet'
+function getStatusBadgeVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'completed':
+      return 'success'
+    case 'pending':
+      return 'warning'
+    case 'paid':
+      return 'info'
+    case 'failed':
+      return 'error'
+    case 'cancelled':
+      return 'default'
+    case 'refunded':
+      return 'info'
+    default:
+      return 'default'
   }
-
-  return getTagClass(map[status] || 'slate')
 }
 
-function getAffLogTypeTagClass(type: string): string {
-  const map: Record<string, MetricTone> = {
-    new_purchase: 'emerald',
-    renew: 'blue',
-    convert: 'violet'
+function getAffLogBadgeVariant(type: string): BadgeVariant {
+  switch (type) {
+    case 'new_purchase':
+      return 'success'
+    case 'renew':
+      return 'info'
+    case 'convert':
+    default:
+      return 'default'
   }
-
-  return getTagClass(map[type] || 'slate')
 }
 
-function getWithdrawalStatusTagClass(status: string): string {
-  const map: Record<string, MetricTone> = {
-    pending: 'amber',
-    approved: 'emerald',
-    rejected: 'rose'
+function getWithdrawalBadgeVariant(status: string): BadgeVariant {
+  switch (status) {
+    case 'approved':
+      return 'success'
+    case 'pending':
+      return 'warning'
+    case 'rejected':
+      return 'error'
+    default:
+      return 'default'
   }
-
-  return getTagClass(map[status] || 'slate')
 }
 
 const logsTotalPages = computed(() => Math.ceil(logsTotal.value / logsPageSize.value))
@@ -843,7 +861,7 @@ async function createAffCode() {
     loadAffCodes()
     loadAffPlans() // 刷新全局码状态
   } catch (err: any) {
-    toast.error(t('aff.createFailed') + ': ' + err.message)
+    toast.error(t('aff.createFailed') + ': ' + (err?.message || ''))
   } finally {
     createCodeLoading.value = false
   }
@@ -863,24 +881,18 @@ async function openLeaderboardModal() {
     const res = await api.aff.getLeaderboard()
     leaderboard.value = res.leaderboard
   } catch (err: any) {
-    toast.error(t('aff.leaderboard.loadFailed') + ': ' + err.message)
+    toast.error(t('aff.leaderboard.loadFailed') + ': ' + (err?.message || ''))
   } finally {
     leaderboardLoading.value = false
   }
 }
 
-// 获取榜单排名样式（收敛为纯色状态底，去掉渐变奖牌观感）
+// 获取榜单排名样式
 function getRankStyle(rank: number): string {
-  if (rank === 1) return 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
-  if (rank === 2) return 'bg-gray-100 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300'
-  if (rank === 3) return 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300'
-  return 'bg-themed-secondary text-themed'
-}
-
-// 获取榜单排名标记（去掉奖牌 emoji，用纯数字名次）
-function getRankEmoji(rank: number): string {
-  if (rank <= 3) return String(rank)
-  return ''
+  if (rank === 1) return 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+  if (rank === 2) return 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700/40 dark:text-zinc-200'
+  if (rank === 3) return 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300'
+  return 'bg-[var(--bg-surface-soft)] text-[var(--text-secondary)]'
 }
 
 // 提交转化申请
@@ -902,7 +914,7 @@ async function submitConvert() {
     // 切换到账户余额标签页，让用户看到更新后的余额
     switchTab('balance')
   } catch (err: any) {
-    toast.error(t('aff.convertModal.failed') + ': ' + err.message)
+    toast.error(t('aff.convertModal.failed') + ': ' + (err?.message || ''))
   } finally {
     convertLoading.value = false
   }
@@ -928,7 +940,6 @@ function getWithdrawalStatusName(status: string): string {
   return map[status] || status
 }
 
-// AFF 转化状态样式
 // 复制优惠码
 async function copyCode(code: string) {
   try {
@@ -951,7 +962,7 @@ async function deleteAffCode(codeId: number, code: string) {
     toast.success(t('aff.deleteCodeSuccess'))
     loadAffCodes()
   } catch (err: any) {
-    toast.error(t('aff.deleteCodeFailed') + ': ' + err.message)
+    toast.error(t('aff.deleteCodeFailed') + ': ' + (err?.message || ''))
   } finally {
     deleteCodeLoading.value = null
   }
@@ -960,45 +971,42 @@ async function deleteAffCode(codeId: number, code: string) {
 // 格式化金额：限制两位小数
 function formatAmount() {
   if (rechargeAmount.value) {
-    rechargeAmount.value = Math.round(rechargeAmount.value * 100) / 100
+    rechargeAmount.value = Math.round(Number(rechargeAmount.value) * 100) / 100
   }
 }
 </script>
 
 <template>
-  <div ref="revealRoot" class="space-y-5 animate-fade-in">
-    <div data-reveal class="page-header flex-col gap-4 sm:flex-row sm:items-center sm:gap-0">
-      <div>
-        <h1 class="page-title">{{ configStore.freeSiteMode ? freeSiteCopy.walletBalanceTab : $t('wallet.title') }}</h1>
-        <p class="page-description">
-          {{ configStore.freeSiteMode ? freeSiteCopy.walletDescription : $t('wallet.description') }}
-        </p>
-      </div>
-      <button v-if="!configStore.freeSiteMode" class="btn btn-primary w-full justify-center sm:w-auto" @click="openRechargeModal">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ $t('wallet.recharge') }}
-      </button>
-    </div>
+  <div ref="revealRoot" class="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-fade-in">
+    <!-- 页面顶栏 -->
+    <PageHeader
+      data-reveal
+      :title="configStore.freeSiteMode ? freeSiteCopy.walletBalanceTab : t('wallet.title')"
+      :description="configStore.freeSiteMode ? freeSiteCopy.walletDescription : t('wallet.description')"
+    >
+      <template v-if="!configStore.freeSiteMode" #actions>
+        <Button variant="primary" @click="openRechargeModal">
+          <template #icon>
+            <Plus class="w-4 h-4" />
+          </template>
+          <span>{{ t('wallet.recharge') }}</span>
+        </Button>
+      </template>
+    </PageHeader>
 
-    <!-- Nimbus 下划线 Tabs -->
-    <div data-reveal class="nimbus-tabs border-b border-themed">
-      <div
-        class="nimbus-tab-scroll -mb-px flex min-w-max gap-1 overflow-x-auto"
-        role="tablist"
-        :aria-label="$t('wallet.title')"
-      >
+    <!-- Apple 风格分段导航 (Segmented Tabs) -->
+    <div data-reveal class="flex items-center overflow-x-auto p-1.5 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] w-fit max-w-full tab-scroll-hide shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+      <div class="flex items-center gap-1 shrink-0" role="tablist" :aria-label="t('wallet.title')">
         <button
           v-for="tab in walletTabs"
           :key="tab.key"
           type="button"
           role="tab"
           :aria-selected="activeTab === tab.key"
-          class="nimbus-tab whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition-colors focus-visible:outline-none"
+          class="whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           :class="activeTab === tab.key
-            ? 'border-primary-500 font-semibold text-primary-600 dark:text-primary-300'
-            : 'border-transparent font-medium text-themed-muted hover:text-themed'"
+            ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]/40'"
           @click="switchTab(tab.key)"
         >
           {{ tab.label }}
@@ -1008,605 +1016,617 @@ function formatAmount() {
 
     <!-- 账户余额 TAB -->
     <div v-show="activeTab === 'balance'" class="space-y-6">
-      <div data-reveal class="card nimbus-lift rounded-2xl border border-themed bg-themed-surface p-6 sm:p-8">
+      <Card data-reveal padding="md">
         <div v-if="loading" class="animate-pulse space-y-6">
-          <div class="h-3 w-24 rounded bg-themed-secondary"></div>
-          <div class="h-16 w-64 rounded bg-themed-secondary"></div>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <div v-for="i in 3" :key="i" class="h-32 rounded-xl bg-themed-secondary"></div>
+          <div class="h-3 w-24 rounded bg-[var(--bg-surface-soft)]" />
+          <div class="h-16 w-64 rounded bg-[var(--bg-surface-soft)]" />
+          <div class="grid gap-4 sm:grid-cols-3">
+            <div v-for="i in 3" :key="i" class="h-28 rounded-2xl bg-[var(--bg-surface-soft)]" />
           </div>
         </div>
         <div v-else>
           <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div class="max-w-3xl">
-              <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
-                {{ configStore.freeSiteMode ? freeSiteCopy.walletCurrentBalance : $t('wallet.currentBalance') }}
+              <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                {{ configStore.freeSiteMode ? freeSiteCopy.walletCurrentBalance : t('wallet.currentBalance') }}
               </div>
-              <div class="mt-4 font-mono text-5xl font-semibold figure-hero text-themed tabular-nums sm:text-6xl">
+              <div class="mt-3 font-mono text-5xl sm:text-6xl font-semibold figure-hero text-[var(--text-primary)] tabular-nums">
                 {{ formatMoney(balance.balance) }}
               </div>
-              <p class="mt-4 max-w-2xl text-sm leading-6 text-themed-muted">
-                {{ configStore.freeSiteMode ? freeSiteCopy.walletDescription : $t('wallet.description') }}
+              <p class="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
+                {{ configStore.freeSiteMode ? freeSiteCopy.walletDescription : t('wallet.description') }}
               </p>
+            </div>
+            <div v-if="!configStore.freeSiteMode" class="shrink-0">
+              <Button variant="primary" size="md" @click="openRechargeModal">
+                <template #icon>
+                  <Plus class="w-4 h-4" />
+                </template>
+                <span>{{ t('wallet.recharge') }}</span>
+              </Button>
             </div>
           </div>
 
-          <div class="mt-8 grid gap-3 lg:grid-cols-3">
-            <div
+          <div class="mt-8 grid gap-4 sm:grid-cols-3">
+            <Card
               v-for="metric in balanceMetrics"
               :key="metric.label"
-              class="nimbus-lift rounded-xl border border-themed bg-themed p-5"
+              hoverable
+              padding="sm"
+              class="group"
             >
               <div class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)"></span>
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
+                <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)" />
+                <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
                   {{ metric.label }}
-                </div>
+                </span>
               </div>
-              <div class="mt-4 font-mono text-[30px] font-semibold figure-stat text-themed tabular-nums">
+              <div class="mt-3 font-mono text-2xl sm:text-3xl font-semibold figure-stat text-[var(--text-primary)] tabular-nums">
                 {{ metric.value }}
               </div>
-            </div>
+            </Card>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- 余额明细 TAB -->
     <div v-show="activeTab === 'logs'" class="space-y-6">
-      <div class="card nimbus-lift rounded-2xl border border-themed bg-themed-surface p-6 sm:p-7">
+      <Card data-reveal padding="md">
         <div class="flex flex-col gap-6">
-          <div class="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
-                {{ configStore.freeSiteMode ? freeSiteCopy.walletLogsTab : $t('wallet.tabs.logs') }}
+              <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                {{ configStore.freeSiteMode ? freeSiteCopy.walletLogsTab : t('wallet.tabs.logs') }}
               </div>
-              <div class="mt-4 font-mono text-4xl font-semibold figure-hero text-themed tabular-nums sm:text-5xl">
+              <div class="mt-3 font-mono text-4xl sm:text-5xl font-semibold figure-hero text-[var(--text-primary)] tabular-nums">
                 {{ logsTotal.toLocaleString() }}
               </div>
-              <div class="mt-2 text-sm text-themed-muted">
-                {{ $t('common.total') }} {{ logsTotal }} {{ $t('common.items') }}
+              <div class="mt-1.5 text-xs text-[var(--text-secondary)]">
+                {{ t('common.total') }} {{ logsTotal }} {{ t('common.items') }}
               </div>
             </div>
 
-            <button
-              class="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
-              :class="showLotteryGiftOnly
-                ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-300'
-                : 'border-themed bg-themed-surface text-themed-secondary hover:border-themed hover:bg-themed-hover hover:text-themed'"
+            <Button
+              :variant="showLotteryGiftOnly ? 'primary' : 'secondary'"
+              size="sm"
               @click="showLotteryGiftOnly = !showLotteryGiftOnly; logsPage = 1; loadLogs()"
             >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              {{ showLotteryGiftOnly ? $t('wallet.showingLotteryGift') : $t('wallet.showLotteryGift') }}
-            </button>
+              <template #icon>
+                <Gift class="h-4 w-4" />
+              </template>
+              <span>{{ showLotteryGiftOnly ? t('wallet.showingLotteryGift') : t('wallet.showLotteryGift') }}</span>
+            </Button>
           </div>
 
-          <div class="grid gap-3 lg:grid-cols-2">
-            <div
+          <div class="grid gap-4 sm:grid-cols-2">
+            <Card
               v-for="metric in logMetrics"
               :key="metric.label"
-              class="nimbus-lift rounded-xl border border-themed bg-themed p-5"
+              hoverable
+              padding="sm"
+              class="group"
             >
               <div class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)"></span>
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
+                <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)" />
+                <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
                   {{ metric.label }}
-                </div>
+                </span>
               </div>
-              <div class="mt-4 font-mono text-[28px] font-semibold figure-stat text-themed tabular-nums">
+              <div class="mt-3 font-mono text-2xl font-semibold figure-stat text-[var(--text-primary)] tabular-nums">
                 {{ metric.value }}
               </div>
+            </Card>
+          </div>
+        </div>
+      </Card>
+
+      <Card data-reveal padding="none">
+        <template #header>
+          <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 w-full">
+            <div>
+              <h3 class="font-semibold text-lg text-[var(--text-primary)]">
+                {{ configStore.freeSiteMode ? freeSiteCopy.walletLogsTab : t('wallet.tabs.logs') }}
+              </h3>
+              <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                {{ showLotteryGiftOnly ? t('wallet.showingLotteryGift') : (configStore.freeSiteMode ? freeSiteCopy.walletLogsDescription : t('wallet.description')) }}
+              </p>
             </div>
           </div>
-        </div>
-      </div>
+        </template>
 
-      <div class="card overflow-hidden rounded-2xl border border-themed bg-themed-surface">
-        <div class="border-b border-themed px-5 py-5 sm:px-6">
-          <div class="text-base font-semibold text-themed">{{ configStore.freeSiteMode ? freeSiteCopy.walletLogsTab : $t('wallet.tabs.logs') }}</div>
-          <div class="mt-1 text-sm text-themed-muted">
-            {{ showLotteryGiftOnly ? $t('wallet.showingLotteryGift') : (configStore.freeSiteMode ? freeSiteCopy.walletLogsDescription : $t('wallet.description')) }}
-          </div>
+        <div v-if="logsLoading" class="p-12 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+          <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+          <span>{{ t('common.loading') }}...</span>
         </div>
-
-        <div v-if="logsLoading" class="p-8 text-center text-themed-muted">
-          {{ $t('common.loading') }}...
-        </div>
-        <div v-else-if="logs.length === 0" class="p-12 text-center">
-          <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-            <svg class="h-7 w-7 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <p class="text-themed-secondary">{{ $t('wallet.noLogs') }}</p>
-        </div>
+        <EmptyState
+          v-else-if="logs.length === 0"
+          :title="t('wallet.noLogs')"
+          :description="showLotteryGiftOnly ? t('wallet.showingLotteryGift') : (configStore.freeSiteMode ? freeSiteCopy.walletLogsDescription : t('wallet.description'))"
+        />
         <div v-else>
-          <div class="hidden grid-cols-[minmax(0,1fr)_128px_128px_196px] gap-5 border-b border-themed bg-themed-tertiary px-5 py-3 text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:grid sm:px-6">
-            <div>{{ $t('wallet.instanceOrRemark') }}</div>
-            <div>{{ $t('wallet.amount') }}</div>
-            <div>{{ $t('wallet.balanceAfter') }}</div>
-            <div>{{ $t('wallet.time') }}</div>
+          <!-- 表头 (桌面端) -->
+          <div class="hidden grid-cols-[minmax(0,1fr)_130px_130px_180px] gap-4 border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] lg:grid">
+            <div>{{ t('wallet.instanceOrRemark') }}</div>
+            <div>{{ t('wallet.amount') }}</div>
+            <div>{{ t('wallet.balanceAfter') }}</div>
+            <div>{{ t('wallet.time') }}</div>
           </div>
 
-          <div class="divide-y divide-themed">
+          <!-- 行数据 -->
+          <div class="divide-y divide-[var(--border-color)]">
             <div
               v-for="log in logs"
               :key="log.id"
-              class="grid gap-4 px-5 py-5 transition-colors hover:bg-themed-hover sm:px-6 lg:grid-cols-[minmax(0,1fr)_128px_128px_196px] lg:items-center lg:py-3.5"
+              class="grid gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-surface-soft)] sm:px-6 lg:grid-cols-[minmax(0,1fr)_130px_130px_180px] lg:items-center lg:py-3.5"
             >
               <div class="min-w-0">
+                <!-- 移动端视图 -->
                 <div class="lg:hidden">
-                  <div class="flex flex-wrap items-center gap-2.5">
-                    <span :class="['inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium', getLogTypeTagClass(log.type)]">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Badge :variant="getLogBadgeVariant(log.type)">
                       {{ getLogTypeName(log.type) }}
-                    </span>
+                    </Badge>
                     <button
                       v-if="log.instanceId"
-                      class="text-sm font-medium text-primary-600 transition-colors hover:underline dark:text-primary-300"
+                      class="text-sm font-medium text-[var(--accent)] transition-colors hover:underline"
                       @click="router.push(instanceDetailPath(log.instanceId))"
                     >
                       #{{ log.instanceId }}
                     </button>
                   </div>
-                  <div class="mt-3 truncate text-[15px] leading-7 text-themed-muted">
+                  <div class="mt-2 truncate text-sm text-[var(--text-secondary)]">
                     {{ log.remark || '-' }}
                   </div>
                 </div>
 
-                <div class="hidden min-w-0 items-center gap-3 lg:flex">
-                  <span :class="['inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-medium', getLogTypeTagClass(log.type)]">
+                <!-- 桌面端视图 -->
+                <div class="hidden min-w-0 items-center gap-2.5 lg:flex">
+                  <Badge :variant="getLogBadgeVariant(log.type)" class="shrink-0">
                     {{ getLogTypeName(log.type) }}
-                  </span>
+                  </Badge>
                   <button
                     v-if="log.instanceId"
-                    class="shrink-0 text-sm font-medium text-primary-600 transition-colors hover:underline dark:text-primary-300"
+                    class="shrink-0 text-sm font-medium text-[var(--accent)] transition-colors hover:underline"
                     @click="router.push(instanceDetailPath(log.instanceId))"
                   >
                     #{{ log.instanceId }}
                   </button>
-                  <span class="min-w-0 truncate text-[15px] leading-6 text-themed-secondary">
+                  <span class="min-w-0 truncate text-sm text-[var(--text-secondary)]" :title="log.remark || undefined">
                     {{ log.remark || '-' }}
                   </span>
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.amount') }}
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.amount') }}
                 </div>
-                <div class="font-mono text-[15px] font-semibold tabular-nums" :class="getAmountValueClass(log.amount)">
+                <div class="font-mono text-sm font-semibold tabular-nums" :class="getAmountValueClass(log.amount)">
                   {{ log.amount >= 0 ? '+' : '-' }}{{ formatMoney(Math.abs(log.amount)) }}
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.balanceAfter') }}
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.balanceAfter') }}
                 </div>
-                <div class="font-mono text-[15px] font-medium text-themed tabular-nums">
+                <div class="font-mono text-sm font-medium text-[var(--text-primary)] tabular-nums">
                   {{ formatMoney(log.balanceAfter) }}
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.time') }}
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.time') }}
                 </div>
-                <div class="text-[15px] leading-6 text-themed-secondary">
+                <div class="text-sm text-[var(--text-secondary)]">
                   {{ formatDate(log.createdAt) }}
                 </div>
               </div>
             </div>
           </div>
 
-          <div v-if="logsTotalPages > 1" class="flex flex-col gap-3 border-t border-themed px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <span class="text-sm text-themed-muted">
-              {{ $t('common.total') }} {{ logsTotal }} {{ $t('common.items') }}
-            </span>
-            <div class="flex items-center gap-2">
-              <button
-                class="btn btn-sm btn-ghost"
-                :disabled="logsPage <= 1"
-                @click="logsPage--; loadLogs()"
-              >
-                {{ $t('common.prevPage') }}
-              </button>
-              <span class="rounded-full border border-themed px-3 py-1.5 text-sm text-themed-muted">
-                {{ logsPage }} / {{ logsTotalPages }}
-              </span>
-              <button
-                class="btn btn-sm btn-ghost"
-                :disabled="logsPage >= logsTotalPages"
-                @click="logsPage++; loadLogs()"
-              >
-                {{ $t('common.nextPage') }}
-              </button>
-            </div>
+          <!-- 分页器 -->
+          <div v-if="logsTotalPages > 1" class="border-t border-[var(--border-color)] px-5 py-4 sm:px-6">
+            <Pagination
+              :page="logsPage"
+              :page-size="logsPageSize"
+              :total="logsTotal"
+              @update:page="(p) => { logsPage = p; loadLogs() }"
+            >
+              <template #total>
+                <span>{{ t('common.total') }} {{ logsTotal }} {{ t('common.items') }}</span>
+              </template>
+            </Pagination>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- 充值记录 TAB -->
     <div v-if="!configStore.freeSiteMode" v-show="activeTab === 'records'" class="space-y-6">
-      <div class="card nimbus-lift rounded-2xl border border-themed bg-themed-surface p-6 sm:p-7">
+      <Card data-reveal padding="md">
         <div class="flex flex-col gap-6">
-          <div class="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
-                {{ $t('wallet.tabs.records') }}
+              <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                {{ t('wallet.tabs.records') }}
               </div>
-              <div class="mt-4 font-mono text-4xl font-semibold figure-hero text-themed tabular-nums sm:text-5xl">
+              <div class="mt-3 font-mono text-4xl sm:text-5xl font-semibold figure-hero text-[var(--text-primary)] tabular-nums">
                 {{ recordsTotal.toLocaleString() }}
               </div>
-              <div class="mt-2 text-sm text-themed-muted">
-                {{ $t('common.total') }} {{ recordsTotal }} {{ $t('common.items') }}
+              <div class="mt-1.5 text-xs text-[var(--text-secondary)]">
+                {{ t('common.total') }} {{ recordsTotal }} {{ t('common.items') }}
               </div>
-              <div v-if="verifyingRecharge" :class="['mt-4 inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', getTagClass('blue')]">
-                {{ $t('wallet.verifyingPayment') }}
+              <div v-if="verifyingRecharge" class="mt-3">
+                <Badge variant="info" pulse>
+                  {{ t('wallet.verifyingPayment') }}
+                </Badge>
               </div>
             </div>
 
-            <button class="btn btn-primary btn-lg" @click="openRechargeModal">
-              <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              {{ $t('wallet.recharge') }}
-            </button>
+            <Button variant="primary" size="md" @click="openRechargeModal">
+              <template #icon>
+                <Plus class="h-4 w-4" />
+              </template>
+              <span>{{ t('wallet.recharge') }}</span>
+            </Button>
           </div>
 
-          <div class="grid gap-3 lg:grid-cols-3">
-            <div
+          <div class="grid gap-4 sm:grid-cols-3">
+            <Card
               v-for="metric in recordMetrics"
               :key="metric.label"
-              class="nimbus-lift rounded-xl border border-themed bg-themed p-5"
+              hoverable
+              padding="sm"
+              class="group"
             >
               <div class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)"></span>
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
+                <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)" />
+                <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
                   {{ metric.label }}
-                </div>
+                </span>
               </div>
-              <div class="mt-4 font-mono text-[28px] font-semibold figure-stat text-themed tabular-nums">
+              <div class="mt-3 font-mono text-2xl font-semibold figure-stat text-[var(--text-primary)] tabular-nums">
                 {{ metric.value }}
               </div>
+            </Card>
+          </div>
+        </div>
+      </Card>
+
+      <Card data-reveal padding="none">
+        <template #header>
+          <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 w-full">
+            <div>
+              <h3 class="font-semibold text-lg text-[var(--text-primary)]">{{ t('wallet.tabs.records') }}</h3>
+              <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('wallet.description') }}</p>
             </div>
           </div>
-        </div>
-      </div>
+        </template>
 
-      <div class="card overflow-hidden rounded-2xl border border-themed bg-themed-surface">
-        <div class="border-b border-themed px-5 py-5 sm:px-6">
-          <div class="text-base font-semibold text-themed">{{ $t('wallet.tabs.records') }}</div>
-          <div class="mt-1 text-sm text-themed-muted">{{ $t('wallet.description') }}</div>
+        <div v-if="recordsLoading" class="p-12 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+          <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+          <span>{{ t('common.loading') }}...</span>
         </div>
-
-        <div v-if="recordsLoading" class="p-8 text-center text-themed-muted">
-          {{ $t('common.loading') }}...
-        </div>
-        <div v-else-if="rechargeRecords.length === 0" class="p-12 text-center">
-          <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-            <svg class="h-7 w-7 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-          </div>
-          <p class="text-themed-secondary">{{ $t('wallet.noRecords') }}</p>
-        </div>
+        <EmptyState
+          v-else-if="rechargeRecords.length === 0"
+          :title="t('wallet.noRecords')"
+          :description="t('wallet.description')"
+        />
         <div v-else>
-          <div class="hidden grid-cols-[minmax(0,1fr)_110px_150px_110px_188px_auto] gap-5 border-b border-themed bg-themed-tertiary px-5 py-3 text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:grid sm:px-6">
-            <div>{{ $t('wallet.orderNo') }}</div>
-            <div>{{ $t('wallet.amount') }}</div>
-            <div>{{ $t('wallet.paymentChannel') }}</div>
-            <div>{{ $t('wallet.statusLabel') }}</div>
-            <div>{{ $t('wallet.time') }}</div>
-            <div>{{ $t('common.actions') }}</div>
+          <!-- 表头 (桌面端) -->
+          <div class="hidden grid-cols-[minmax(0,1.2fr)_120px_160px_120px_180px_auto] gap-4 border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] lg:grid">
+            <div>{{ t('wallet.orderNo') }}</div>
+            <div>{{ t('wallet.amount') }}</div>
+            <div>{{ t('wallet.paymentChannel') }}</div>
+            <div>{{ t('wallet.statusLabel') }}</div>
+            <div>{{ t('wallet.time') }}</div>
+            <div class="text-right">{{ t('common.actions') }}</div>
           </div>
 
-          <div class="divide-y divide-themed">
+          <!-- 行数据 -->
+          <div class="divide-y divide-[var(--border-color)]">
             <div
               v-for="rec in rechargeRecords"
               :key="rec.id"
-              class="grid gap-4 px-5 py-5 transition-colors hover:bg-themed-hover sm:px-6 lg:grid-cols-[minmax(0,1fr)_110px_150px_110px_188px_auto] lg:items-center lg:py-3.5"
+              class="grid gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-surface-soft)] sm:px-6 lg:grid-cols-[minmax(0,1.2fr)_120px_160px_120px_180px_auto] lg:items-center lg:py-3.5"
             >
               <div class="min-w-0">
+                <!-- 移动端视图 -->
                 <div class="lg:hidden">
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="truncate font-mono text-[15px] font-semibold text-themed">{{ rec.orderNo }}</span>
+                    <span class="truncate font-mono text-sm font-semibold text-[var(--text-primary)]">{{ rec.orderNo }}</span>
                   </div>
-                  <div class="mt-2 text-[15px] leading-7 text-themed-muted">
+                  <div class="mt-1 text-sm text-[var(--text-secondary)]">
                     {{ rec.provider?.name || '-' }}
                     <span v-if="getRechargeMethodDisplay(rec)">· {{ getRechargeMethodDisplay(rec) }}</span>
                   </div>
-                  <div v-if="rec.paymentUuid || rec.paymentTxid || rec.completedAt" class="mt-1 break-all font-mono text-xs leading-6 text-themed-muted">
-                    <span v-if="rec.paymentUuid">{{ $t('wallet.paymentUuid') }} {{ rec.paymentUuid }}</span>
+                  <div v-if="rec.paymentUuid || rec.paymentTxid || rec.completedAt" class="mt-1 break-all font-mono text-xs text-[var(--text-tertiary)]">
+                    <span v-if="rec.paymentUuid">{{ t('wallet.paymentUuid') }} {{ rec.paymentUuid }}</span>
                     <span v-if="rec.paymentUuid && (rec.paymentTxid || rec.completedAt)"> · </span>
-                    <span v-if="rec.paymentTxid">{{ $t('wallet.paymentTxid') }} {{ rec.paymentTxid }}</span>
+                    <span v-if="rec.paymentTxid">{{ t('wallet.paymentTxid') }} {{ rec.paymentTxid }}</span>
                     <span v-if="rec.paymentTxid && rec.completedAt"> · </span>
-                    <span v-if="rec.completedAt">{{ $t('wallet.completedAt') }} {{ formatDate(rec.completedAt) }}</span>
+                    <span v-if="rec.completedAt">{{ t('wallet.completedAt') }} {{ formatDate(rec.completedAt) }}</span>
                   </div>
                 </div>
 
-                <div class="hidden lg:block">
-                  <span class="block truncate font-mono text-[15px] font-semibold text-themed">
+                <!-- 桌面端视图 -->
+                <div class="hidden lg:block min-w-0">
+                  <span class="block truncate font-mono text-sm font-semibold text-[var(--text-primary)]" :title="rec.orderNo">
                     {{ rec.orderNo }}
                   </span>
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.amount') }}
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.amount') }}
                 </div>
-                <div class="font-mono text-[15px] font-medium text-themed tabular-nums">
+                <div class="font-mono text-sm font-medium text-[var(--text-primary)] tabular-nums">
                   {{ formatMoney(rec.amount) }}
                 </div>
-                <div v-if="rec.actualAmount !== null" class="mt-1 font-mono text-xs text-themed-muted">
-                  {{ $t(getRechargeCreditLabelKey(rec.status)) }} {{ formatMoney(rec.actualAmount) }}
+                <div v-if="rec.actualAmount !== null" class="mt-0.5 font-mono text-xs text-[var(--text-secondary)]">
+                  {{ t(getRechargeCreditLabelKey(rec.status)) }} {{ formatMoney(rec.actualAmount) }}
                 </div>
               </div>
 
-              <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.paymentChannel') }}
+              <div class="flex items-center justify-between gap-3 lg:block min-w-0">
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.paymentChannel') }}
                 </div>
-                <div class="text-[15px] leading-6 text-themed-secondary lg:truncate">
+                <div class="text-sm text-[var(--text-secondary)] lg:truncate">
                   {{ rec.provider?.name || '-' }}<span v-if="getRechargeMethodDisplay(rec)"> · {{ getRechargeMethodDisplay(rec) }}</span>
                 </div>
-                <div v-if="rec.paymentUuid" class="mt-1 hidden truncate font-mono text-xs text-themed-muted lg:block" :title="rec.paymentUuid">
-                  {{ $t('wallet.paymentUuid') }} {{ rec.paymentUuid }}
+                <div v-if="rec.paymentUuid" class="mt-0.5 hidden truncate font-mono text-xs text-[var(--text-tertiary)] lg:block" :title="rec.paymentUuid">
+                  {{ t('wallet.paymentUuid') }} {{ rec.paymentUuid }}
                 </div>
-                <div v-if="rec.paymentTxid" class="mt-1 hidden truncate font-mono text-xs text-themed-muted lg:block" :title="rec.paymentTxid">
-                  {{ $t('wallet.paymentTxid') }} {{ rec.paymentTxid }}
+                <div v-if="rec.paymentTxid" class="mt-0.5 hidden truncate font-mono text-xs text-[var(--text-tertiary)] lg:block" :title="rec.paymentTxid">
+                  {{ t('wallet.paymentTxid') }} {{ rec.paymentTxid }}
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.statusLabel') }}
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.statusLabel') }}
                 </div>
-                <span :class="['inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium', getStatusTagClass(rec.status)]">
+                <Badge :variant="getStatusBadgeVariant(rec.status)">
                   {{ getStatusName(rec.status) }}
-                </span>
-                <div v-if="getRechargeGatewayStatusText(rec)" class="mt-1 text-xs text-themed-muted">
+                </Badge>
+                <div v-if="getRechargeGatewayStatusText(rec)" class="mt-1 text-xs text-[var(--text-secondary)]">
                   {{ getRechargeGatewayStatusText(rec) }}
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-3 lg:block">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                  {{ $t('wallet.time') }}
+                <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                  {{ t('wallet.time') }}
                 </div>
-                <div class="text-[15px] leading-6 text-themed-secondary">
+                <div class="text-sm text-[var(--text-secondary)]">
                   {{ formatDate(rec.createdAt) }}
                 </div>
-                <div v-if="rec.completedAt" class="mt-1 hidden text-xs text-themed-muted lg:block">
-                  {{ $t('wallet.completedAt') }} {{ formatDate(rec.completedAt) }}
+                <div v-if="rec.completedAt" class="mt-0.5 hidden text-xs text-[var(--text-tertiary)] lg:block">
+                  {{ t('wallet.completedAt') }} {{ formatDate(rec.completedAt) }}
                 </div>
               </div>
 
-              <div class="flex flex-wrap gap-2 lg:justify-end">
+              <div class="flex flex-wrap items-center gap-2 lg:justify-end">
                 <template v-if="rec.status === 'pending' && !isOrderExpired(rec.expiredAt)">
-                  <button
-                    class="btn btn-sm btn-primary"
-                    :disabled="repayLoading === rec.orderNo"
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    :loading="repayLoading === rec.orderNo"
                     @click="repayOrder(rec.orderNo)"
                   >
-                    {{ repayLoading === rec.orderNo ? $t('common.processing') : $t('wallet.pay') }}
-                  </button>
-                  <button
-                    class="btn btn-sm btn-ghost text-red-500 hover:bg-red-500/10"
-                    :disabled="cancelLoading === rec.orderNo"
+                    {{ repayLoading === rec.orderNo ? t('common.processing') : t('wallet.pay') }}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    class="text-[var(--error)] hover:bg-[var(--error)]/10"
+                    :loading="cancelLoading === rec.orderNo"
                     @click="cancelOrder(rec.orderNo)"
                   >
-                    {{ cancelLoading === rec.orderNo ? $t('common.processing') : $t('wallet.void') }}
-                  </button>
+                    {{ cancelLoading === rec.orderNo ? t('common.processing') : t('wallet.void') }}
+                  </Button>
                 </template>
                 <template v-else-if="rec.status === 'pending' && isOrderExpired(rec.expiredAt)">
-                  <span :class="['inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium', getTagClass('rose')]">
-                    {{ $t('wallet.orderExpired') }}
-                  </span>
+                  <Badge variant="error">
+                    {{ t('wallet.orderExpired') }}
+                  </Badge>
                 </template>
                 <template v-else>
-                  <span class="text-sm text-themed-muted">-</span>
+                  <span class="text-sm text-[var(--text-tertiary)]">-</span>
                 </template>
               </div>
             </div>
           </div>
 
-          <div v-if="recordsTotalPages > 1" class="flex flex-col gap-3 border-t border-themed px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <span class="text-sm text-themed-muted">
-              {{ $t('common.total') }} {{ recordsTotal }} {{ $t('common.items') }}
-            </span>
-            <div class="flex items-center gap-2">
-              <button
-                class="btn btn-sm btn-ghost"
-                :disabled="recordsPage <= 1"
-                @click="recordsPage--; loadRecords()"
-              >
-                {{ $t('common.prevPage') }}
-              </button>
-              <span class="rounded-full border border-themed px-3 py-1.5 text-sm text-themed-muted">
-                {{ recordsPage }} / {{ recordsTotalPages }}
-              </span>
-              <button
-                class="btn btn-sm btn-ghost"
-                :disabled="recordsPage >= recordsTotalPages"
-                @click="recordsPage++; loadRecords()"
-              >
-                {{ $t('common.nextPage') }}
-              </button>
-            </div>
+          <!-- 分页器 -->
+          <div v-if="recordsTotalPages > 1" class="border-t border-[var(--border-color)] px-5 py-4 sm:px-6">
+            <Pagination
+              :page="recordsPage"
+              :page-size="recordsPageSize"
+              :total="recordsTotal"
+              @update:page="(p) => { recordsPage = p; loadRecords() }"
+            >
+              <template #total>
+                <span>{{ t('common.total') }} {{ recordsTotal }} {{ t('common.items') }}</span>
+              </template>
+            </Pagination>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- 推荐计划 TAB -->
     <div v-if="!configStore.freeSiteMode" v-show="activeTab === 'aff'" class="space-y-6">
-      <!-- 加载中 -->
-      <div v-if="affLoading" class="card p-8 text-center text-themed-muted">
-        {{ $t('common.loading') }}...
+      <div v-if="affLoading" class="p-12 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+        <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+        <span>{{ t('common.loading') }}...</span>
       </div>
 
-      <div v-else-if="affStatus && !affStatus.activated" class="card rounded-2xl border border-themed bg-themed-surface p-8 text-center sm:p-10">
-        <div>
-          <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-300">
-            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-themed">{{ $t('aff.notActivated') }}</h3>
-          <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-themed-muted">{{ $t('aff.activateHint') }}</p>
-          <div class="mt-6 flex justify-center">
-            <button class="btn btn-primary" @click="switchTab('balance'); openRechargeModal()">
-              {{ $t('aff.goRecharge') }}
-            </button>
-          </div>
+      <!-- 未激活 -->
+      <Card v-else-if="affStatus && !affStatus.activated" data-reveal padding="lg" class="text-center">
+        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--bg-surface-soft)] text-[var(--accent)] border border-[var(--border-color)]">
+          <Share2 class="h-8 w-8 stroke-[1.8]" />
         </div>
-      </div>
+        <h3 class="text-xl font-semibold tracking-tight text-[var(--text-primary)]">{{ t('aff.notActivated') }}</h3>
+        <p class="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">{{ t('aff.activateHint') }}</p>
+        <div class="mt-6 flex justify-center">
+          <Button variant="primary" @click="switchTab('balance'); openRechargeModal()">
+            {{ t('aff.goRecharge') }}
+          </Button>
+        </div>
+      </Card>
 
+      <!-- 已激活 -->
       <template v-else-if="affStatus && affStatus.activated">
-        <div class="card nimbus-lift rounded-2xl border border-themed bg-themed-surface p-6 sm:p-8">
+        <Card data-reveal padding="md">
           <div class="flex flex-col gap-6">
             <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0 flex-1">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
-                  {{ $t('aff.affBalance') }}
+                <div class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                  {{ t('aff.affBalance') }}
                 </div>
-                <div class="mt-4 font-mono text-5xl font-semibold figure-hero text-themed tabular-nums sm:text-6xl">
+                <div class="mt-3 font-mono text-5xl sm:text-6xl font-semibold figure-hero text-[var(--text-primary)] tabular-nums">
                   {{ formatMoney(affStatus.currentBalance) }}
                 </div>
-                <p class="mt-4 max-w-2xl text-sm leading-6 text-themed-muted">
-                  {{ $t('aff.balanceHint') }}
+                <p class="mt-3 max-w-2xl text-sm leading-relaxed text-[var(--text-secondary)]">
+                  {{ t('aff.balanceHint') }}
                 </p>
               </div>
 
-              <div class="flex flex-wrap gap-2">
-                <button class="btn btn-secondary" @click="openLeaderboardModal">
-                  <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  {{ $t('aff.leaderboard.title') }}
-                </button>
-                <button
-                  class="btn btn-primary"
+              <div class="flex flex-wrap items-center gap-3">
+                <Button variant="secondary" @click="openLeaderboardModal">
+                  <template #icon>
+                    <Trophy class="h-4 w-4" />
+                  </template>
+                  <span>{{ t('aff.leaderboard.title') }}</span>
+                </Button>
+                <Button
+                  variant="primary"
                   :disabled="affStatus.currentBalance < 0.1"
                   @click="openConvertModal"
                 >
-                  {{ $t('aff.convert') }}
-                </button>
+                  <template #icon>
+                    <Coins class="h-4 w-4" />
+                  </template>
+                  <span>{{ t('aff.convert') }}</span>
+                </Button>
               </div>
             </div>
 
-            <div class="grid gap-3 xl:grid-cols-4">
-              <div
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Card
                 v-for="metric in affMetrics"
                 :key="metric.label"
-                class="nimbus-lift rounded-xl border border-themed bg-themed p-5"
+                hoverable
+                padding="sm"
+                class="group"
               >
                 <div class="flex items-center gap-2">
-                  <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)"></span>
-                  <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">
+                  <span class="h-2 w-2 rounded-full" :class="getMetricDotClass(metric.tone)" />
+                  <span class="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)]">
                     {{ metric.label }}
-                  </div>
+                  </span>
                 </div>
-                <div class="mt-4 font-mono text-[28px] font-semibold figure-stat text-themed tabular-nums">
+                <div class="mt-3 font-mono text-2xl font-semibold figure-stat text-[var(--text-primary)] tabular-nums">
                   {{ metric.value }}
                 </div>
-              </div>
+              </Card>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div class="card overflow-hidden rounded-2xl border border-themed bg-themed-surface">
-          <div class="flex flex-col gap-4 border-b border-themed px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div>
-              <div class="text-base font-semibold text-themed">{{ $t('aff.myCodes') }}</div>
-              <div class="mt-1 text-sm text-themed-muted">
-                {{ $t('common.total') }} {{ affStatus.totalCodes }} {{ $t('common.items') }}
+        <!-- 我的优惠码卡片 -->
+        <Card data-reveal padding="none">
+          <template #header>
+            <div class="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between w-full">
+              <div>
+                <h3 class="font-semibold text-lg text-[var(--text-primary)]">{{ t('aff.myCodes') }}</h3>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ t('common.total') }} {{ affStatus.totalCodes }} {{ t('common.items') }}
+                </p>
               </div>
+              <Button size="sm" variant="primary" @click="openCreateCodeModal">
+                <template #icon>
+                  <Plus class="h-4 w-4" />
+                </template>
+                <span>{{ t('aff.createCode') }}</span>
+              </Button>
             </div>
-            <button class="btn btn-sm btn-primary" @click="openCreateCodeModal">
-              <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              {{ $t('aff.createCode') }}
-            </button>
+          </template>
+
+          <div v-if="affCodesLoading" class="p-12 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+            <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+            <span>{{ t('common.loading') }}...</span>
           </div>
-          
-          <div v-if="affCodesLoading" class="p-8 text-center text-themed-muted">
-            {{ $t('common.loading') }}...
-          </div>
-          <div v-else-if="affCodes.length === 0" class="p-12 text-center">
-            <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-              <svg class="h-7 w-7 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </div>
-            <p class="text-themed-secondary">{{ $t('aff.noCodes') }}</p>
-          </div>
+          <EmptyState
+            v-else-if="affCodes.length === 0"
+            :title="t('aff.noCodes')"
+          />
           <div v-else>
-            <div class="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1.25fr)_150px_100px_120px_auto] gap-5 border-b border-themed bg-themed-tertiary px-5 py-3 text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:grid sm:px-6">
-              <div>{{ $t('aff.code') }}</div>
-              <div>{{ $t('aff.plan') }}</div>
-              <div>{{ $t('aff.discount') }}/{{ $t('aff.commission') }}</div>
-              <div>{{ $t('aff.usedCount') }}</div>
-              <div>{{ $t('aff.earnings') }}</div>
-              <div></div>
+            <div class="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1.25fr)_150px_100px_120px_auto] gap-4 border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] lg:grid">
+              <div>{{ t('aff.code') }}</div>
+              <div>{{ t('aff.plan') }}</div>
+              <div>{{ t('aff.discount') }}/{{ t('aff.commission') }}</div>
+              <div>{{ t('aff.usedCount') }}</div>
+              <div>{{ t('aff.earnings') }}</div>
+              <div class="text-right"></div>
             </div>
 
-            <div class="divide-y divide-themed">
+            <div class="divide-y divide-[var(--border-color)]">
               <div
                 v-for="code in affCodes"
                 :key="code.id"
-                class="grid gap-4 px-5 py-5 transition-colors hover:bg-themed-hover sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.25fr)_150px_100px_120px_auto] lg:items-center lg:py-3.5"
+                class="grid gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-surface-soft)] sm:px-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1.25fr)_150px_100px_120px_auto] lg:items-center lg:py-3.5"
               >
                 <div class="min-w-0">
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-mono text-[15px] font-semibold text-themed">{{ code.code }}</span>
-                    <button class="text-themed-muted transition-colors hover:text-themed" @click="copyCode(code.code)">
-                      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    <span
-                      v-if="code.isGlobal"
-                      :class="['inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium', getTagClass('blue')]"
+                    <span class="font-mono text-sm font-semibold text-[var(--text-primary)]">{{ code.code }}</span>
+                    <button
+                      type="button"
+                      class="text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] active:scale-95"
+                      :title="t('common.copy')"
+                      @click="copyCode(code.code)"
                     >
-                      {{ $t('aff.globalCodeBadge') }}
-                    </span>
+                      <Copy class="h-4 w-4" />
+                    </button>
+                    <Badge v-if="code.isGlobal" variant="info">
+                      {{ t('aff.globalCodeBadge') }}
+                    </Badge>
                   </div>
                 </div>
 
-                <div class="text-[15px] leading-6 text-themed-secondary lg:truncate">
-                  {{ code.isGlobal ? $t('aff.globalCode') : `${code.packageName} / ${code.planName}` }}
+                <div class="text-sm text-[var(--text-secondary)] lg:truncate">
+                  {{ code.isGlobal ? t('aff.globalCode') : `${code.packageName} / ${code.planName}` }}
                 </div>
 
                 <div class="flex items-center justify-between gap-3 lg:block">
-                  <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                    {{ $t('aff.discount') }}/{{ $t('aff.commission') }}
+                  <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                    {{ t('aff.discount') }}/{{ t('aff.commission') }}
                   </div>
-                  <div class="font-mono text-[15px] leading-6 text-themed-secondary tabular-nums">
+                  <div class="font-mono text-sm text-[var(--text-secondary)] tabular-nums">
                     {{ (code.discountRate * 100).toFixed(0) }}% / {{ (code.commissionRate * 100).toFixed(0) }}%
                   </div>
                 </div>
 
                 <div class="flex items-center justify-between gap-3 lg:block">
-                  <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                    {{ $t('aff.usedCount') }}
+                  <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                    {{ t('aff.usedCount') }}
                   </div>
-                  <div class="font-mono text-[15px] font-medium text-themed tabular-nums">
+                  <div class="font-mono text-sm font-medium text-[var(--text-primary)] tabular-nums">
                     {{ code.usedCount.toLocaleString() }}
                   </div>
                 </div>
 
                 <div class="flex items-center justify-between gap-3 lg:block">
-                  <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                    {{ $t('aff.earnings') }}
+                  <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                    {{ t('aff.earnings') }}
                   </div>
-                  <div class="font-mono text-[15px] font-medium text-themed tabular-nums">
+                  <div class="font-mono text-sm font-medium text-[var(--text-primary)] tabular-nums">
                     {{ formatMoney(code.totalEarnings) }}
                   </div>
                 </div>
@@ -1614,245 +1634,220 @@ function formatAmount() {
                 <div class="flex justify-start lg:justify-end">
                   <button
                     v-if="code.usedCount === 0"
-                    class="rounded-full p-2 text-red-500 transition-colors hover:bg-red-500/10"
+                    type="button"
+                    class="rounded-full p-2 text-[var(--error)] transition-colors hover:bg-[var(--error)]/10 active:scale-95"
                     :disabled="deleteCodeLoading === code.id"
-                    :title="$t('common.delete')"
+                    :title="t('common.delete')"
                     @click="deleteAffCode(code.id, code.code)"
                   >
-                    <svg v-if="deleteCodeLoading !== code.id" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <svg v-else class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <Trash2 v-if="deleteCodeLoading !== code.id" class="h-4 w-4" />
+                    <Loader2 v-else class="h-4 w-4 animate-spin" />
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.95fr)]">
-          <div class="card overflow-hidden rounded-2xl border border-themed bg-themed-surface">
-            <div class="border-b border-themed px-5 py-5 sm:px-6">
-              <div class="text-base font-semibold text-themed">{{ $t('aff.earningsLog') }}</div>
-              <div class="mt-1 text-sm text-themed-muted">{{ $t('common.total') }} {{ affLogsTotal }} {{ $t('common.items') }}</div>
-            </div>
-
-            <div v-if="affLogsLoading" class="p-8 text-center text-themed-muted">
-              {{ $t('common.loading') }}...
-            </div>
-            <div v-else-if="affLogs.length === 0" class="p-12 text-center">
-              <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-                <svg class="h-7 w-7 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+        <!-- 收益明细与提现记录 -->
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,1fr)]">
+          <!-- 收益明细 -->
+          <Card data-reveal padding="none">
+            <template #header>
+              <div class="px-6 py-4">
+                <h3 class="font-semibold text-lg text-[var(--text-primary)]">{{ t('aff.earningsLog') }}</h3>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('common.total') }} {{ affLogsTotal }} {{ t('common.items') }}</p>
               </div>
-              <p class="text-themed-secondary">{{ $t('aff.noLogs') }}</p>
+            </template>
+
+            <div v-if="affLogsLoading" class="p-12 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+              <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+              <span>{{ t('common.loading') }}...</span>
             </div>
+            <EmptyState
+              v-else-if="affLogs.length === 0"
+              :title="t('aff.noLogs')"
+            />
             <div v-else>
-              <div class="hidden grid-cols-[minmax(0,1fr)_128px_128px_196px] gap-5 border-b border-themed bg-themed-tertiary px-5 py-3 text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:grid sm:px-6">
-                <div>{{ $t('wallet.instanceOrRemark') }}</div>
-                <div>{{ $t('wallet.amount') }}</div>
-                <div>{{ $t('wallet.balanceAfter') }}</div>
-                <div>{{ $t('wallet.time') }}</div>
+              <div class="hidden grid-cols-[minmax(0,1fr)_120px_120px_180px] gap-4 border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] lg:grid">
+                <div>{{ t('wallet.instanceOrRemark') }}</div>
+                <div>{{ t('wallet.amount') }}</div>
+                <div>{{ t('wallet.balanceAfter') }}</div>
+                <div>{{ t('wallet.time') }}</div>
               </div>
 
-              <div class="divide-y divide-themed">
+              <div class="divide-y divide-[var(--border-color)]">
                 <div
                   v-for="log in affLogs"
                   :key="log.id"
-                  class="grid gap-4 px-5 py-5 transition-colors hover:bg-themed-hover sm:px-6 lg:grid-cols-[minmax(0,1fr)_128px_128px_196px] lg:items-center lg:py-3.5"
+                  class="grid gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-surface-soft)] sm:px-6 lg:grid-cols-[minmax(0,1fr)_120px_120px_180px] lg:items-center lg:py-3.5"
                 >
                   <div class="min-w-0">
                     <div class="lg:hidden">
                       <div class="flex flex-wrap items-center gap-2">
-                        <span :class="['inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium', getAffLogTypeTagClass(log.type)]">
+                        <Badge :variant="getAffLogBadgeVariant(log.type)">
                           {{ getAffLogTypeName(log.type) }}
-                        </span>
+                        </Badge>
                         <button
                           v-if="log.instanceId"
-                          class="text-sm font-medium text-primary-600 transition-colors hover:underline dark:text-primary-300"
+                          class="text-sm font-medium text-[var(--accent)] transition-colors hover:underline"
                           @click="router.push(instanceDetailPath(log.instanceId))"
                         >
                           #{{ log.instanceId }}
                         </button>
-                        <span v-else-if="log.affCode" class="font-mono text-sm text-themed-muted">
+                        <span v-else-if="log.affCode" class="font-mono text-sm text-[var(--text-secondary)]">
                           {{ log.affCode }}
                         </span>
                       </div>
-                      <div class="mt-3 truncate text-[15px] leading-7 text-themed-muted">
+                      <div class="mt-2 truncate text-sm text-[var(--text-secondary)]">
                         {{ log.remark || '-' }}
                       </div>
                     </div>
 
-                    <div class="hidden min-w-0 items-center gap-3 lg:flex">
-                      <span :class="['inline-flex shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-medium', getAffLogTypeTagClass(log.type)]">
+                    <div class="hidden min-w-0 items-center gap-2.5 lg:flex">
+                      <Badge :variant="getAffLogBadgeVariant(log.type)" class="shrink-0">
                         {{ getAffLogTypeName(log.type) }}
-                      </span>
+                      </Badge>
                       <button
                         v-if="log.instanceId"
-                        class="shrink-0 text-sm font-medium text-primary-600 transition-colors hover:underline dark:text-primary-300"
+                        class="shrink-0 text-sm font-medium text-[var(--accent)] transition-colors hover:underline"
                         @click="router.push(instanceDetailPath(log.instanceId))"
                       >
                         #{{ log.instanceId }}
                       </button>
-                      <span v-else-if="log.affCode" class="shrink-0 font-mono text-sm text-themed-muted">
+                      <span v-else-if="log.affCode" class="shrink-0 font-mono text-sm text-[var(--text-secondary)]">
                         {{ log.affCode }}
                       </span>
-                      <span class="min-w-0 truncate text-[15px] leading-6 text-themed-secondary">
+                      <span class="min-w-0 truncate text-sm text-[var(--text-secondary)]" :title="log.remark || undefined">
                         {{ log.remark || '-' }}
                       </span>
                     </div>
                   </div>
 
                   <div class="flex items-center justify-between gap-3 lg:block">
-                    <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                      {{ $t('wallet.amount') }}
+                    <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                      {{ t('wallet.amount') }}
                     </div>
-                    <div class="font-mono text-[15px] font-semibold tabular-nums" :class="getAmountValueClass(log.amount)">
+                    <div class="font-mono text-sm font-semibold tabular-nums" :class="getAmountValueClass(log.amount)">
                       {{ log.amount >= 0 ? '+' : '-' }}{{ formatMoney(Math.abs(log.amount)) }}
                     </div>
                   </div>
 
                   <div class="flex items-center justify-between gap-3 lg:block">
-                    <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                      {{ $t('wallet.balanceAfter') }}
+                    <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                      {{ t('wallet.balanceAfter') }}
                     </div>
-                    <div class="font-mono text-[15px] font-medium text-themed tabular-nums">
+                    <div class="font-mono text-sm font-medium text-[var(--text-primary)] tabular-nums">
                       {{ formatMoney(log.balanceAfter) }}
                     </div>
                   </div>
 
                   <div class="flex items-center justify-between gap-3 lg:block">
-                    <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                      {{ $t('wallet.time') }}
+                    <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                      {{ t('wallet.time') }}
                     </div>
-                    <div class="text-[15px] leading-6 text-themed-secondary">
+                    <div class="text-sm text-[var(--text-secondary)]">
                       {{ formatDate(log.createdAt) }}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div v-if="affLogsTotalPages > 1" class="flex flex-col gap-3 border-t border-themed px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <span class="text-sm text-themed-muted">
-                  {{ $t('common.total') }} {{ affLogsTotal }} {{ $t('common.items') }}
-                </span>
-                <div class="flex items-center gap-2">
-                  <button
-                    class="btn btn-sm btn-ghost"
-                    :disabled="affLogsPage <= 1"
-                    @click="affLogsPage--; loadAffLogs()"
-                  >
-                    {{ $t('common.prevPage') }}
-                  </button>
-                  <span class="rounded-full border border-themed px-3 py-1.5 text-sm text-themed-muted">
-                    {{ affLogsPage }} / {{ affLogsTotalPages }}
-                  </span>
-                  <button
-                    class="btn btn-sm btn-ghost"
-                    :disabled="affLogsPage >= affLogsTotalPages"
-                    @click="affLogsPage++; loadAffLogs()"
-                  >
-                    {{ $t('common.nextPage') }}
-                  </button>
-                </div>
+              <!-- 分页器 -->
+              <div v-if="affLogsTotalPages > 1" class="border-t border-[var(--border-color)] px-5 py-4 sm:px-6">
+                <Pagination
+                  :page="affLogsPage"
+                  :page-size="affLogsPageSize"
+                  :total="affLogsTotal"
+                  @update:page="(p) => { affLogsPage = p; loadAffLogs() }"
+                >
+                  <template #total>
+                    <span>{{ t('common.total') }} {{ affLogsTotal }} {{ t('common.items') }}</span>
+                  </template>
+                </Pagination>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div class="card overflow-hidden rounded-2xl border border-themed bg-themed-surface">
-            <div class="border-b border-themed px-5 py-5 sm:px-6">
-              <div class="text-base font-semibold text-themed">{{ $t('aff.withdrawals') }}</div>
-              <div class="mt-1 text-sm text-themed-muted">{{ $t('common.total') }} {{ affWithdrawalsTotal }} {{ $t('common.items') }}</div>
-            </div>
-
-            <div v-if="affWithdrawalsLoading" class="p-8 text-center text-themed-muted">
-              {{ $t('common.loading') }}...
-            </div>
-            <div v-else-if="affWithdrawals.length === 0" class="p-12 text-center">
-              <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-themed bg-themed-secondary">
-                <svg class="h-7 w-7 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          <!-- 提现记录 -->
+          <Card data-reveal padding="none">
+            <template #header>
+              <div class="px-6 py-4">
+                <h3 class="font-semibold text-lg text-[var(--text-primary)]">{{ t('aff.withdrawals') }}</h3>
+                <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('common.total') }} {{ affWithdrawalsTotal }} {{ t('common.items') }}</p>
               </div>
-              <p class="text-themed-secondary">{{ $t('aff.noWithdrawals') }}</p>
+            </template>
+
+            <div v-if="affWithdrawalsLoading" class="p-12 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+              <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+              <span>{{ t('common.loading') }}...</span>
             </div>
+            <EmptyState
+              v-else-if="affWithdrawals.length === 0"
+              :title="t('aff.noWithdrawals')"
+            />
             <div v-else>
-              <div class="hidden grid-cols-[120px_110px_180px_minmax(0,1fr)] gap-5 border-b border-themed bg-themed-tertiary px-5 py-3 text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:grid sm:px-6">
-                <div>{{ $t('wallet.amount') }}</div>
-                <div>{{ $t('aff.status') }}</div>
-                <div>{{ $t('aff.requestTime') }}</div>
-                <div>{{ $t('aff.rejectReason') }}</div>
+              <div class="hidden grid-cols-[110px_100px_160px_minmax(0,1fr)] gap-4 border-b border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] lg:grid">
+                <div>{{ t('wallet.amount') }}</div>
+                <div>{{ t('aff.status') }}</div>
+                <div>{{ t('aff.requestTime') }}</div>
+                <div>{{ t('aff.rejectReason') }}</div>
               </div>
 
-              <div class="divide-y divide-themed">
+              <div class="divide-y divide-[var(--border-color)]">
                 <div
                   v-for="w in affWithdrawals"
                   :key="w.id"
-                  class="grid gap-4 px-5 py-5 transition-colors hover:bg-themed-hover sm:px-6 lg:grid-cols-[120px_110px_180px_minmax(0,1fr)] lg:items-center lg:py-3.5"
+                  class="grid gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-surface-soft)] sm:px-6 lg:grid-cols-[110px_100px_160px_minmax(0,1fr)] lg:items-center lg:py-3.5"
                 >
                   <div class="flex items-center justify-between gap-3 lg:block">
-                    <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                      {{ $t('wallet.amount') }}
+                    <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                      {{ t('wallet.amount') }}
                     </div>
-                    <div class="font-mono text-[15px] font-medium text-themed tabular-nums">
+                    <div class="font-mono text-sm font-medium text-[var(--text-primary)] tabular-nums">
                       {{ formatMoney(w.amount) }}
                     </div>
                   </div>
 
                   <div class="flex items-center justify-between gap-3 lg:block">
-                    <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                      {{ $t('aff.status') }}
+                    <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                      {{ t('aff.status') }}
                     </div>
-                    <span :class="['inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium', getWithdrawalStatusTagClass(w.status)]">
+                    <Badge :variant="getWithdrawalBadgeVariant(w.status)">
                       {{ getWithdrawalStatusName(w.status) }}
-                    </span>
+                    </Badge>
                   </div>
 
                   <div class="flex items-center justify-between gap-3 lg:block">
-                    <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted lg:hidden">
-                      {{ $t('aff.requestTime') }}
+                    <div class="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)] lg:hidden">
+                      {{ t('aff.requestTime') }}
                     </div>
-                    <div class="text-[15px] leading-6 text-themed-secondary">
+                    <div class="text-sm text-[var(--text-secondary)]">
                       {{ formatDate(w.createdAt) }}
                     </div>
                   </div>
 
-                  <div class="text-[15px] leading-7 text-themed-muted lg:truncate lg:leading-6">
+                  <div class="text-sm text-[var(--text-secondary)] lg:truncate">
                     {{ w.rejectReason || '-' }}
                   </div>
                 </div>
               </div>
 
-              <div v-if="affWithdrawalsTotalPages > 1" class="flex flex-col gap-3 border-t border-themed px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <span class="text-sm text-themed-muted">
-                  {{ $t('common.total') }} {{ affWithdrawalsTotal }} {{ $t('common.items') }}
-                </span>
-                <div class="flex items-center gap-2">
-                  <button
-                    class="btn btn-sm btn-ghost"
-                    :disabled="affWithdrawalsPage <= 1"
-                    @click="affWithdrawalsPage--; loadAffWithdrawals()"
-                  >
-                    {{ $t('common.prevPage') }}
-                  </button>
-                  <span class="rounded-full border border-themed px-3 py-1.5 text-sm text-themed-muted">
-                    {{ affWithdrawalsPage }} / {{ affWithdrawalsTotalPages }}
-                  </span>
-                  <button
-                    class="btn btn-sm btn-ghost"
-                    :disabled="affWithdrawalsPage >= affWithdrawalsTotalPages"
-                    @click="affWithdrawalsPage++; loadAffWithdrawals()"
-                  >
-                    {{ $t('common.nextPage') }}
-                  </button>
-                </div>
+              <!-- 分页器 -->
+              <div v-if="affWithdrawalsTotalPages > 1" class="border-t border-[var(--border-color)] px-5 py-4 sm:px-6">
+                <Pagination
+                  :page="affWithdrawalsPage"
+                  :page-size="affWithdrawalsPageSize"
+                  :total="affWithdrawalsTotal"
+                  @update:page="(p) => { affWithdrawalsPage = p; loadAffWithdrawals() }"
+                >
+                  <template #total>
+                    <span>{{ t('common.total') }} {{ affWithdrawalsTotal }} {{ t('common.items') }}</span>
+                  </template>
+                </Pagination>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </template>
     </div>
@@ -1865,229 +1860,218 @@ function formatAmount() {
       raw
       @close="showRechargeModal = false"
     >
-          <!-- 头部 -->
-          <div class="modal-header">
-            <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-300">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+      <!-- 头部 -->
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_28%,var(--bg-surface))]">
+            <CreditCard class="h-5 w-5 stroke-[1.8]" />
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('wallet.recharge') }}</h3>
+            <p class="text-xs text-[var(--text-secondary)]">{{ t('wallet.description') }}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showRechargeModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <div class="modal-body p-6 space-y-5">
+        <!-- 支付渠道选择 -->
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.paymentMethod') }}</label>
+          <div v-if="providersLoading" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-center text-sm text-[var(--text-secondary)]">
+            <span class="inline-flex items-center justify-center gap-2">
+              <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+              {{ t('common.loading') }}
+            </span>
+          </div>
+          <div v-else-if="providers.length === 0" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-center text-sm text-[var(--text-secondary)]">
+            {{ t('wallet.noProviders') }}
+          </div>
+          <div v-else class="grid grid-cols-2 gap-3">
+            <button
+              v-for="p in providers"
+              :key="p.id"
+              type="button"
+              class="flex items-center justify-center gap-2 rounded-xl border p-4 text-sm font-medium transition-all duration-200 active:scale-95"
+              :class="selectedProvider === p.id
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] font-semibold shadow-sm'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]'"
+              @click="selectedProvider = p.id; selectedPaymentMethod = ''"
+            >
+              {{ p.name }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 支付方式选择 (仅当所选渠道支持多种方式时显示) -->
+        <div v-if="selectedProviderInfo && selectedProviderInfo.type !== 'heleket' && selectedProviderInfo.methods && selectedProviderInfo.methods.length > 1">
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.paymentMethodType') }}</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              v-for="method in selectedProviderInfo.methods"
+              :key="method"
+              type="button"
+              class="p-3.5 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-95"
+              :class="[
+                selectedPaymentMethod === method || (!selectedPaymentMethod && selectedProviderInfo.methods[0] === method)
+                  ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] font-semibold shadow-sm'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]'
+              ]"
+              @click="selectedPaymentMethod = method"
+            >
+              <!-- 支付宝图标 -->
+              <svg v-if="method === 'alipay'" class="w-5 h-5 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M21.422 15.358c-3.83-1.153-6.055-1.84-7.358-2.22a15.503 15.503 0 001.07-3.122h-4.067v-1.2h4.89V7.69h-4.89V5.5H9.333v2.19H4.5v1.126h4.833v1.2H5.266v1.124h7.09a12.14 12.14 0 01-.671 1.883c-1.627-.396-3.177-.586-4.384-.513-3.407.206-5.136 2.051-5.26 3.708-.153 2.038 1.57 3.728 4.49 3.782 2.448.045 4.793-1.083 6.51-3.058.756.39 1.603.831 2.542 1.323.939.492 1.97 1.033 3.114 1.632h5.25v-3.514c-.167-.053-.324-.095-.525-.025zM7.028 18.93c-1.86-.143-2.66-1.062-2.583-1.95.076-.882.973-1.712 2.526-1.806.984-.06 2.243.13 3.685.508a7.016 7.016 0 01-3.628 3.248z" />
+              </svg>
+              <!-- 微信支付图标 -->
+              <svg v-else-if="method === 'wxpay'" class="w-5 h-5 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 01.598.082l1.584.926a.272.272 0 00.14.045c.133 0 .241-.108.241-.241 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 01-.023-.156.49.49 0 01.201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088l-.105-.001-.301-.033zm-2.746 2.769a.96.96 0 110 1.92.96.96 0 010-1.92zm4.93 0a.96.96 0 110 1.92.96.96 0 010-1.92z" />
+              </svg>
+              <!-- 其他支付方式 -->
+              <CreditCard v-else class="w-5 h-5 text-[var(--text-secondary)] shrink-0" />
+              <span>{{ getPaymentMethodName(method) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="selectedProviderInfo?.type === 'heleket'" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs text-[var(--text-secondary)]">
+          {{ t('wallet.heleketSelectionHint') }}
+        </div>
+
+        <!-- 充值金额 -->
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.amountLabel') }}</label>
+          <div class="mb-3 grid grid-cols-4 gap-2">
+            <button
+              v-for="amt in [10, 50, 100, 200]"
+              :key="amt"
+              type="button"
+              class="rounded-xl py-2.5 font-mono text-sm font-semibold tabular-nums border transition-all duration-200 active:scale-95"
+              :class="Number(rechargeAmount) === amt
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] text-[var(--accent)] font-bold'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-primary)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface)]'"
+              @click="rechargeAmount = amt"
+            >
+              ¥{{ amt }}
+            </button>
+          </div>
+          <Input
+            :model-value="rechargeAmount"
+            type="number"
+            size="lg"
+            placeholder="0"
+            @update:model-value="(val) => rechargeAmount = Number(val)"
+            @blur="formatAmount"
+          >
+            <template #prefix>
+              <span class="font-semibold text-base text-[var(--text-secondary)]">¥</span>
+            </template>
+          </Input>
+          <div v-if="selectedProviderInfo" class="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Info class="h-3.5 w-3.5 shrink-0" />
+            <span>
+              {{ t('wallet.amountRange') }}:
+              {{ selectedProviderInfo.minAmount.toFixed(2) }} -
+              {{ selectedProviderInfo.maxAmount ? selectedProviderInfo.maxAmount.toFixed(2) : t('common.unlimited') }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 费用预览 -->
+        <div
+          v-if="selectedProviderInfo && selectedRechargeFee > 0"
+          class="rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] p-3.5 text-sm text-[var(--warning)]"
+        >
+          <div class="flex items-start gap-2.5">
+            <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />
+            <div class="min-w-0 space-y-1">
+              <div>
+                {{ t('wallet.feeNote') }}:
+                <span v-if="selectedFeeConfig.feeRate > 0" class="font-mono font-medium tabular-nums">{{ (selectedFeeConfig.feeRate * 100).toFixed(2) }}%</span>
+                <span v-if="selectedFeeConfig.feeRate > 0 && selectedFeeConfig.feeFixed > 0"> + </span>
+                <span v-if="selectedFeeConfig.feeFixed > 0" class="font-mono font-medium tabular-nums">¥{{ selectedFeeConfig.feeFixed.toFixed(2) }}</span>
+                <span class="font-mono font-medium tabular-nums"> = ¥{{ selectedRechargeFee.toFixed(2) }}</span>
               </div>
               <div>
-                <h3 class="modal-title text-base sm:text-lg">{{ $t('wallet.recharge') }}</h3>
-                <p class="text-xs text-themed-muted">{{ $t('wallet.description') }}</p>
+                {{ t('wallet.payableAmount') }}:
+                <span class="font-mono font-semibold tabular-nums">¥{{ selectedPayableAmount.toFixed(2) }}</span>
+                <span class="text-[var(--text-secondary)]"> / {{ t('wallet.actualAmount') }} <span class="font-mono tabular-nums">¥{{ selectedCreditAmount.toFixed(2) }}</span></span>
               </div>
-            </div>
-            <button class="btn btn-ghost btn-sm rounded-full" @click="showRechargeModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div class="modal-body space-y-5">
-            <!-- 支付渠道选择 -->
-            <div>
-              <label class="mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.paymentMethod') }}</label>
-              <div v-if="providersLoading" class="rounded-lg border border-themed bg-themed-secondary p-4 text-center text-sm text-themed-muted">
-                <span class="inline-flex items-center justify-center gap-2">
-                  <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {{ $t('common.loading') }}
-                </span>
-              </div>
-              <div v-else-if="providers.length === 0" class="rounded-lg border border-themed bg-themed-secondary p-4 text-center text-sm text-themed-muted">
-                {{ $t('wallet.noProviders') }}
-              </div>
-              <div v-else class="grid grid-cols-2 gap-3">
-                <button
-                  v-for="p in providers"
-                  :key="p.id"
-                  class="flex items-center justify-center gap-2 rounded-xl border p-4 text-sm font-medium transition-all duration-200"
-                  :class="selectedProvider === p.id
-                    ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-300'
-                    : 'border-themed text-themed hover:border-themed hover:bg-themed-hover'"
-                  @click="selectedProvider = p.id; selectedPaymentMethod = ''"
-                >
-                  {{ p.name }}
-                </button>
-              </div>
-            </div>
-
-            <!-- 支付方式选择 (仅当所选渠道支持多种方式时显示) -->
-            <div v-if="selectedProviderInfo && selectedProviderInfo.type !== 'heleket' && selectedProviderInfo.methods && selectedProviderInfo.methods.length > 1">
-              <label class="mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.paymentMethodType') }}</label>
-              <div class="grid grid-cols-2 gap-3">
-                <button
-                  v-for="method in selectedProviderInfo.methods"
-                  :key="method"
-                  class="p-3 rounded-xl border-2 text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2.5"
-                  :class="[
-                    selectedPaymentMethod === method || (!selectedPaymentMethod && selectedProviderInfo.methods[0] === method)
-                      ? (method === 'alipay' 
-                        ? 'border-blue-500 bg-blue-500/10 shadow-md shadow-blue-500/10' 
-                        : method === 'wxpay' 
-                          ? 'border-green-500 bg-green-500/10 shadow-md shadow-green-500/10'
-                          : 'border-blue-500 bg-blue-500/10 shadow-md shadow-blue-500/10')
-                      : 'border-themed hover:border-gray-400 hover:bg-themed-hover'
-                  ]"
-                  @click="selectedPaymentMethod = method"
-                >
-                  <!-- 支付宝图标 -->
-                  <svg v-if="method === 'alipay'" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" :class="selectedPaymentMethod === method || (!selectedPaymentMethod && selectedProviderInfo.methods[0] === method) ? 'text-blue-500' : 'text-blue-400'">
-                    <path d="M21.422 15.358c-3.83-1.153-6.055-1.84-7.358-2.22a15.503 15.503 0 001.07-3.122h-4.067v-1.2h4.89V7.69h-4.89V5.5H9.333v2.19H4.5v1.126h4.833v1.2H5.266v1.124h7.09a12.14 12.14 0 01-.671 1.883c-1.627-.396-3.177-.586-4.384-.513-3.407.206-5.136 2.051-5.26 3.708-.153 2.038 1.57 3.728 4.49 3.782 2.448.045 4.793-1.083 6.51-3.058.756.39 1.603.831 2.542 1.323.939.492 1.97 1.033 3.114 1.632h5.25v-3.514c-.167-.053-.324-.095-.525-.025zM7.028 18.93c-1.86-.143-2.66-1.062-2.583-1.95.076-.882.973-1.712 2.526-1.806.984-.06 2.243.13 3.685.508a7.016 7.016 0 01-3.628 3.248z" />
-                  </svg>
-                  <!-- 微信支付图标 -->
-                  <svg v-else-if="method === 'wxpay'" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" :class="selectedPaymentMethod === method || (!selectedPaymentMethod && selectedProviderInfo.methods[0] === method) ? 'text-green-500' : 'text-green-400'">
-                    <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 01.213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 00.167-.054l1.903-1.114a.864.864 0 01.717-.098 10.16 10.16 0 002.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178A1.17 1.17 0 014.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 01-1.162 1.178 1.17 1.17 0 01-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 01.598.082l1.584.926a.272.272 0 00.14.045c.133 0 .241-.108.241-.241 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 01-.023-.156.49.49 0 01.201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088l-.105-.001-.301-.033zm-2.746 2.769a.96.96 0 110 1.92.96.96 0 010-1.92zm4.93 0a.96.96 0 110 1.92.96.96 0 010-1.92z" />
-                  </svg>
-                  <!-- 其他支付方式 -->
-                  <svg v-else class="w-5 h-5 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                  <span>{{ getPaymentMethodName(method) }}</span>
-                </button>
-              </div>
-            </div>
-
-            <div v-else-if="selectedProviderInfo?.type === 'heleket'" class="rounded-lg border border-themed bg-themed-secondary px-3 py-2 text-xs text-themed-muted">
-              {{ $t('wallet.heleketSelectionHint') }}
-            </div>
-
-            <!-- 充值金额 -->
-            <div>
-              <label class="mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.amountLabel') }}</label>
-              <div class="mb-3 grid grid-cols-4 gap-2">
-                <button
-                  v-for="amt in [10, 50, 100, 200]"
-                  :key="amt"
-                  class="rounded-lg border py-2.5 font-mono text-sm font-semibold tabular-nums transition-all duration-200"
-                  :class="rechargeAmount === amt
-                    ? 'border-primary-500 bg-primary-500/10 text-primary-600 dark:text-primary-300'
-                    : 'border-themed bg-themed-surface text-themed hover:bg-themed-hover'"
-                  @click="rechargeAmount = amt"
-                >
-                  ¥{{ amt }}
-                </button>
-              </div>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 font-medium text-themed-muted">¥</span>
-                <input
-                  v-model.number="rechargeAmount"
-                  type="number"
-                  class="input w-full pl-8 font-mono text-lg font-semibold tabular-nums"
-                  :min="selectedProviderInfo?.minAmount || 1"
-                  :max="selectedProviderInfo?.maxAmount || undefined"
-                  step="0.01"
-                  placeholder="0"
-                  @blur="formatAmount"
-                />
-              </div>
-              <div v-if="selectedProviderInfo" class="mt-2 flex items-center gap-1 text-xs text-themed-muted">
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {{ $t('wallet.amountRange') }}:
-                {{ selectedProviderInfo.minAmount.toFixed(2) }} -
-                {{ selectedProviderInfo.maxAmount ? selectedProviderInfo.maxAmount.toFixed(2) : $t('common.unlimited') }}
-              </div>
-            </div>
-
-            <!-- 费用预览 -->
-            <div
-              v-if="selectedProviderInfo && selectedRechargeFee > 0"
-              class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm"
-            >
-              <div class="flex items-start gap-2 text-amber-600 dark:text-amber-400">
-                <svg class="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div class="min-w-0 space-y-1">
-                  <div>
-                    {{ $t('wallet.feeNote') }}:
-                    <span v-if="selectedFeeConfig.feeRate > 0" class="font-mono font-medium tabular-nums">{{ (selectedFeeConfig.feeRate * 100).toFixed(2) }}%</span>
-                    <span v-if="selectedFeeConfig.feeRate > 0 && selectedFeeConfig.feeFixed > 0"> + </span>
-                    <span v-if="selectedFeeConfig.feeFixed > 0" class="font-mono font-medium tabular-nums">¥{{ selectedFeeConfig.feeFixed.toFixed(2) }}</span>
-                    <span class="font-mono font-medium tabular-nums"> = ¥{{ selectedRechargeFee.toFixed(2) }}</span>
-                  </div>
-                  <div>
-                    {{ $t('wallet.payableAmount') }}:
-                    <span class="font-mono font-semibold tabular-nums">¥{{ selectedPayableAmount.toFixed(2) }}</span>
-                    <span class="text-themed-muted"> / {{ $t('wallet.actualAmount') }} <span class="font-mono tabular-nums">¥{{ selectedCreditAmount.toFixed(2) }}</span></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 确认复选框组 -->
-            <div class="space-y-2">
-              <!-- 无退款确认 -->
-              <label for="agree-no-refund" class="flex items-start gap-2 cursor-pointer">
-                <input
-                  id="agree-no-refund"
-                  v-model="agreedToNoRefund"
-                  type="checkbox"
-                  class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500 bg-transparent"
-                />
-                <span class="text-xs text-red-500 leading-relaxed">
-                  {{ $t('wallet.noRefundNotice') }}
-                </span>
-              </label>
-
-              <!-- 充值须知确认 -->
-              <label for="agree-recharge-notice" class="flex items-start gap-2 cursor-pointer">
-                <input
-                  id="agree-recharge-notice"
-                  v-model="agreedToRechargeNotice"
-                  type="checkbox"
-                  class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500 bg-transparent"
-                />
-                <span class="text-xs text-red-500 leading-relaxed">
-                  {{ $t('wallet.rechargeNotice') }}
-                </span>
-              </label>
-
-              <!-- 服务条款勾选 -->
-              <label for="agree-terms-recharge" class="flex items-start gap-2 cursor-pointer">
-                <input
-                  id="agree-terms-recharge"
-                  v-model="agreedToTerms"
-                  type="checkbox"
-                  class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500 bg-transparent"
-                />
-                <span class="text-xs text-red-500 leading-relaxed">
-                  {{ $t('auth.tos.agreePrefix') }}
-                  <button
-                    type="button"
-                    class="text-red-600 hover:text-red-500 hover:underline font-medium"
-                    @click.prevent="showTermsModal = true"
-                  >
-                    {{ $t('auth.tos.termsLink') }}
-                  </button>
-                </span>
-              </label>
             </div>
           </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showRechargeModal = false">{{ $t('common.cancel') }}</button>
-            <button
-              class="btn btn-primary min-w-[120px]"
-              :disabled="providersLoading || rechargeLoading || !selectedProvider || rechargeAmount <= 0 || !agreedToNoRefund || !agreedToRechargeNotice || !agreedToTerms"
-              @click="createRechargeOrder"
-            >
-              <svg v-if="!providersLoading && !rechargeLoading" class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <svg v-else class="w-4 h-4 mr-1.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              {{ providersLoading ? $t('common.loading') : (rechargeLoading ? $t('common.processing') : $t('wallet.pay')) }}
-            </button>
-          </div>
+        </div>
+
+        <!-- 确认复选框组 -->
+        <div class="space-y-2.5">
+          <!-- 无退款确认 -->
+          <label for="agree-no-refund" class="flex items-start gap-2.5 cursor-pointer">
+            <input
+              id="agree-no-refund"
+              v-model="agreedToNoRefund"
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-color)] text-[var(--error)] focus:ring-[var(--error)] bg-[var(--bg-surface-soft)]"
+            />
+            <span class="text-xs text-[var(--error)] leading-relaxed">
+              {{ t('wallet.noRefundNotice') }}
+            </span>
+          </label>
+
+          <!-- 充值须知确认 -->
+          <label for="agree-recharge-notice" class="flex items-start gap-2.5 cursor-pointer">
+            <input
+              id="agree-recharge-notice"
+              v-model="agreedToRechargeNotice"
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-color)] text-[var(--error)] focus:ring-[var(--error)] bg-[var(--bg-surface-soft)]"
+            />
+            <span class="text-xs text-[var(--error)] leading-relaxed">
+              {{ t('wallet.rechargeNotice') }}
+            </span>
+          </label>
+
+          <!-- 服务条款勾选 -->
+          <label for="agree-terms-recharge" class="flex items-start gap-2.5 cursor-pointer">
+            <input
+              id="agree-terms-recharge"
+              v-model="agreedToTerms"
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-color)] text-[var(--error)] focus:ring-[var(--error)] bg-[var(--bg-surface-soft)]"
+            />
+            <span class="text-xs text-[var(--error)] leading-relaxed">
+              {{ t('auth.tos.agreePrefix') }}
+              <button
+                type="button"
+                class="text-[var(--error)] hover:underline font-semibold"
+                @click.prevent="showTermsModal = true"
+              >
+                {{ t('auth.tos.termsLink') }}
+              </button>
+            </span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end gap-3">
+        <Button variant="secondary" @click="showRechargeModal = false">{{ t('common.cancel') }}</Button>
+        <Button
+          variant="primary"
+          class="min-w-[120px]"
+          :disabled="providersLoading || rechargeLoading || !selectedProvider || rechargeAmount <= 0 || !agreedToNoRefund || !agreedToRechargeNotice || !agreedToTerms"
+          :loading="rechargeLoading"
+          @click="createRechargeOrder"
+        >
+          <template #icon>
+            <CreditCard class="w-4 h-4" />
+          </template>
+          <span>{{ providersLoading ? t('common.loading') : (rechargeLoading ? t('common.processing') : t('wallet.pay')) }}</span>
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- 人工充值付款说明 -->
@@ -2098,51 +2082,53 @@ function formatAmount() {
       raw
       @close="showManualPaymentModal = false"
     >
-          <div class="modal-header">
-            <div>
-              <h3 class="modal-title">{{ $t('wallet.manualPaymentTitle') }}</h3>
-              <p class="mt-1 text-sm text-themed-muted">{{ $t('wallet.manualPaymentDesc') }}</p>
-            </div>
-            <button class="btn btn-ghost btn-sm rounded-full" @click="showManualPaymentModal = false">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('wallet.manualPaymentTitle') }}</h3>
+          <p class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('wallet.manualPaymentDesc') }}</p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showManualPaymentModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <div class="modal-body p-6 space-y-4">
+        <div class="grid gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm sm:grid-cols-2">
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.orderNo') }}</div>
+            <div class="mt-1 break-all font-mono font-semibold text-[var(--text-primary)]">{{ manualPaymentInfo.orderNo }}</div>
           </div>
-
-          <div class="modal-body space-y-4">
-            <div class="grid gap-3 rounded-xl border border-themed bg-themed-secondary p-4 text-sm sm:grid-cols-2">
-              <div>
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.orderNo') }}</div>
-                <div class="mt-1 break-all font-mono font-semibold text-themed">{{ manualPaymentInfo.orderNo }}</div>
-              </div>
-              <div>
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.payableAmount') }}</div>
-                <div class="mt-1 font-mono font-semibold text-themed tabular-nums">¥{{ manualPaymentInfo.payableAmount.toFixed(2) }}</div>
-              </div>
-              <div v-if="manualPaymentInfo.providerName">
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.paymentChannel') }}</div>
-                <div class="mt-1 font-semibold text-themed">{{ manualPaymentInfo.providerName }}</div>
-              </div>
-              <div>
-                <div class="text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('wallet.actualAmount') }}</div>
-                <div class="mt-1 font-mono font-semibold text-themed tabular-nums">¥{{ (manualPaymentInfo.actualAmount ?? manualPaymentInfo.payableAmount).toFixed(2) }}</div>
-              </div>
-            </div>
-
-            <div>
-              <div class="mb-2 text-sm font-medium text-themed">{{ $t('wallet.manualPaymentInstructions') }}</div>
-              <pre class="max-h-80 whitespace-pre-wrap break-words rounded-lg border border-themed bg-themed p-4 text-sm leading-6 text-themed">{{ manualPaymentInfo.instructions }}</pre>
-            </div>
-
-            <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-              {{ $t('wallet.manualPaymentPendingHint') }}
-            </div>
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.payableAmount') }}</div>
+            <div class="mt-1 font-mono font-semibold text-[var(--text-primary)] tabular-nums">¥{{ manualPaymentInfo.payableAmount.toFixed(2) }}</div>
           </div>
-
-          <div class="modal-footer">
-            <button class="btn btn-primary" @click="showManualPaymentModal = false">{{ $t('common.confirm') }}</button>
+          <div v-if="manualPaymentInfo.providerName">
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.paymentChannel') }}</div>
+            <div class="mt-1 font-semibold text-[var(--text-primary)]">{{ manualPaymentInfo.providerName }}</div>
           </div>
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('wallet.actualAmount') }}</div>
+            <div class="mt-1 font-mono font-semibold text-[var(--text-primary)] tabular-nums">¥{{ (manualPaymentInfo.actualAmount ?? manualPaymentInfo.payableAmount).toFixed(2) }}</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="mb-2 text-sm font-semibold text-[var(--text-primary)]">{{ t('wallet.manualPaymentInstructions') }}</div>
+          <pre class="max-h-80 whitespace-pre-wrap break-words rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 font-mono text-xs leading-relaxed text-[var(--text-primary)]">{{ manualPaymentInfo.instructions }}</pre>
+        </div>
+
+        <div class="rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] p-3.5 text-xs text-[var(--warning)] leading-relaxed">
+          {{ t('wallet.manualPaymentPendingHint') }}
+        </div>
+      </div>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end">
+        <Button variant="primary" @click="showManualPaymentModal = false">{{ t('common.confirm') }}</Button>
+      </div>
     </DrawerModal>
 
     <!-- 创建优惠码弹窗 -->
@@ -2152,117 +2138,123 @@ function formatAmount() {
       raw
       @close="showCreateCodeModal = false"
     >
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t('aff.createCode') }}</h3>
-            <button class="btn btn-ghost btn-sm rounded-full" @click="showCreateCodeModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('aff.createCode') }}</h3>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showCreateCodeModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <div class="modal-body p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">{{ t('aff.selectPlan') }}</label>
+          <p class="text-xs text-[var(--text-secondary)] mb-3">{{ t('aff.selectPlanHint') }}</p>
+
+          <div v-if="affPlansLoading" class="p-6 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+            <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+            <span>{{ t('common.loading') }}...</span>
           </div>
-          
-          <div class="modal-body space-y-4">
-            <div>
-              <label class="label text-sm mb-2">{{ $t('aff.selectPlan') }}</label>
-              <p class="text-xs text-themed-muted mb-3">{{ $t('aff.selectPlanHint') }}</p>
-              
-              <div v-if="affPlansLoading" class="p-4 text-center text-themed-muted">
-                {{ $t('common.loading') }}...
-              </div>
-              <div v-else-if="affPlans.length === 0" class="p-4 text-center text-themed-muted">
-                {{ $t('aff.noCodes') }}
-              </div>
-              <div v-else class="max-h-64 space-y-2 overflow-y-auto">
-                <!-- 全局优惠码选项 -->
-                <label
-                  class="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors"
-                  :class="[
-                    selectedPlanId === -1
-                      ? 'border-primary-500 bg-primary-500/10'
-                      : 'border-themed hover:border-themed hover:bg-themed-hover'
-                  ]"
-                >
-                  <input
-                    v-model="selectedPlanId"
-                    type="radio"
-                    :value="-1"
-                    class="h-4 w-4"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium text-themed">{{ $t('aff.globalCode') }}</span>
-                      <span class="badge badge-default text-[10px]">{{ $t('aff.globalCodeBadge') }}</span>
-                    </div>
-                    <div class="text-xs text-themed-muted">{{ $t('aff.globalCodeHint') }}</div>
-                  </div>
-                </label>
-
-                <!-- 分隔线 -->
-                <div v-if="affPlans.length > 0" class="relative py-2">
-                  <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-themed"></div>
-                  </div>
-                  <div class="relative flex justify-center text-xs">
-                    <span class="bg-themed px-2 text-themed-muted">{{ $t('aff.orSelectPlan') }}</span>
-                  </div>
-                </div>
-
-                <!-- 方案专有码选项 -->
-                <label
-                  v-for="plan in affPlans"
-                  :key="plan.id"
-                  class="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors"
-                  :class="[
-                    plan.hasCode
-                      ? 'cursor-not-allowed border-themed bg-themed-secondary opacity-50'
-                      : selectedPlanId === plan.id
-                        ? 'border-primary-500 bg-primary-500/10'
-                        : 'border-themed hover:border-themed hover:bg-themed-hover'
-                  ]"
-                >
-                  <input
-                    v-model="selectedPlanId"
-                    type="radio"
-                    :value="plan.id"
-                    :disabled="plan.hasCode"
-                    class="h-4 w-4"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium text-themed">{{ plan.name }}</span>
-                      <span v-if="plan.hasCode" class="text-xs text-themed-muted">({{ $t('aff.alreadyCreated') }})</span>
-                    </div>
-                    <div class="text-xs text-themed-muted">{{ plan.packageName }} · <span class="font-mono tabular-nums">¥{{ (parseFloat(plan.price) / 100).toFixed(2) }}</span></div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <!-- 固定折扣说明 -->
-            <div class="mt-5 border-t border-themed pt-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <label class="text-sm font-medium text-themed">{{ $t('aff.fixedRate') }}</label>
-                  <p class="mt-0.5 text-xs text-themed-muted">{{ $t('aff.fixedRateHint') }}</p>
-                </div>
-                <div class="text-right">
-                  <div class="font-mono text-2xl font-bold text-themed tabular-nums">5%</div>
-                  <div class="text-xs text-themed-muted">{{ $t('aff.discount') }} 5% / {{ $t('aff.commission') }} 5%</div>
-                </div>
-              </div>
-            </div>
+          <div v-else-if="affPlans.length === 0" class="p-6 text-center text-sm text-[var(--text-secondary)]">
+            {{ t('aff.noCodes') }}
           </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showCreateCodeModal = false">{{ $t('common.cancel') }}</button>
-            <button
-              class="btn btn-primary"
-              :disabled="createCodeLoading || selectedPlanId === null"
-              @click="createAffCode"
+          <div v-else class="max-h-64 space-y-2 overflow-y-auto pr-1">
+            <!-- 全局优惠码选项 -->
+            <label
+              class="flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition-all duration-200"
+              :class="[
+                selectedPlanId === -1
+                  ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] shadow-sm'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]'
+              ]"
             >
-              {{ createCodeLoading ? $t('common.processing') : $t('common.create') }}
-            </button>
+              <input
+                v-model="selectedPlanId"
+                type="radio"
+                :value="-1"
+                class="h-4 w-4 text-[var(--accent)] focus:ring-[var(--accent)]"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-sm text-[var(--text-primary)]">{{ t('aff.globalCode') }}</span>
+                  <Badge variant="info" size="sm">{{ t('aff.globalCodeBadge') }}</Badge>
+                </div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">{{ t('aff.globalCodeHint') }}</div>
+              </div>
+            </label>
+
+            <!-- 分隔线 -->
+            <div v-if="affPlans.length > 0" class="relative py-2">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-[var(--border-color)]"></div>
+              </div>
+              <div class="relative flex justify-center text-xs">
+                <span class="bg-[var(--bg-surface)] px-2 text-[var(--text-tertiary)]">{{ t('aff.orSelectPlan') }}</span>
+              </div>
+            </div>
+
+            <!-- 方案专有码选项 -->
+            <label
+              v-for="plan in affPlans"
+              :key="plan.id"
+              class="flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition-all duration-200"
+              :class="[
+                plan.hasCode
+                  ? 'cursor-not-allowed border-[var(--border-color)] bg-[var(--bg-surface-soft)] opacity-50'
+                  : selectedPlanId === plan.id
+                    ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] shadow-sm'
+                    : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-surface-soft)]'
+              ]"
+            >
+              <input
+                v-model="selectedPlanId"
+                type="radio"
+                :value="plan.id"
+                :disabled="plan.hasCode"
+                class="h-4 w-4 text-[var(--accent)] focus:ring-[var(--accent)]"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-sm text-[var(--text-primary)]">{{ plan.name }}</span>
+                  <span v-if="plan.hasCode" class="text-xs text-[var(--text-tertiary)]">({{ t('aff.alreadyCreated') }})</span>
+                </div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">
+                  {{ plan.packageName }} · <span class="font-mono tabular-nums">¥{{ (parseFloat(plan.price) / 100).toFixed(2) }}</span>
+                </div>
+              </div>
+            </label>
           </div>
+        </div>
+
+        <!-- 固定折扣说明 -->
+        <div class="border-t border-[var(--border-color)] pt-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold text-[var(--text-primary)]">{{ t('aff.fixedRate') }}</div>
+              <p class="mt-0.5 text-xs text-[var(--text-secondary)]">{{ t('aff.fixedRateHint') }}</p>
+            </div>
+            <div class="text-right">
+              <div class="font-mono text-2xl font-bold text-[var(--text-primary)] tabular-nums">5%</div>
+              <div class="text-xs text-[var(--text-secondary)]">{{ t('aff.discount') }} 5% / {{ t('aff.commission') }} 5%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end gap-3">
+        <Button variant="secondary" @click="showCreateCodeModal = false">{{ t('common.cancel') }}</Button>
+        <Button
+          variant="primary"
+          :disabled="createCodeLoading || selectedPlanId === null"
+          :loading="createCodeLoading"
+          @click="createAffCode"
+        >
+          {{ createCodeLoading ? t('common.processing') : t('common.create') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- 转化申请弹窗 -->
@@ -2272,57 +2264,60 @@ function formatAmount() {
       raw
       @close="showConvertModal = false"
     >
-          <div class="modal-header">
-            <h3 class="modal-title">{{ $t('aff.convertModal.title') }}</h3>
-            <button class="btn btn-ghost btn-sm rounded-full" @click="showConvertModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div class="modal-body space-y-4">
-            <div>
-              <label class="mb-1 block text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('aff.convertModal.currentBalance') }}</label>
-              <div class="font-mono text-2xl font-bold text-themed tabular-nums">¥{{ affStatus?.currentBalance.toFixed(2) || '0.00' }}</div>
-            </div>
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('aff.convertModal.title') }}</h3>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showConvertModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
 
-            <div>
-              <label class="mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-themed-muted">{{ $t('aff.convertModal.amount') }}</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 font-medium text-themed-muted">¥</span>
-                <input
-                  v-model.number="convertAmount"
-                  type="number"
-                  class="input w-full pl-8 font-mono tabular-nums"
-                  :max="affStatus?.currentBalance || 0"
-                  min="2"
-                  step="0.01"
-                />
-              </div>
-              <p class="mt-1 text-xs text-themed-muted">{{ $t('aff.convertModal.minAmount') }}</p>
-            </div>
+      <div class="modal-body p-6 space-y-4">
+        <div>
+          <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('aff.convertModal.currentBalance') }}</label>
+          <div class="font-mono text-3xl font-bold text-[var(--text-primary)] tabular-nums">
+            ¥{{ affStatus?.currentBalance.toFixed(2) || '0.00' }}
+          </div>
+        </div>
 
-            <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
-              <div class="flex items-start gap-2 text-sm text-amber-600 dark:text-amber-400">
-                <svg class="mt-0.5 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>{{ $t('aff.convertModal.hint') }}</span>
-              </div>
-            </div>
+        <div>
+          <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{{ t('aff.convertModal.amount') }}</label>
+          <Input
+            :model-value="convertAmount"
+            type="number"
+            size="lg"
+            placeholder="0.00"
+            @update:model-value="(val) => convertAmount = Number(val)"
+          >
+            <template #prefix>
+              <span class="font-semibold text-base text-[var(--text-secondary)]">¥</span>
+            </template>
+          </Input>
+          <p class="mt-1.5 text-xs text-[var(--text-secondary)]">{{ t('aff.convertModal.minAmount') }}</p>
+        </div>
+
+        <div class="rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--warning)_10%,var(--bg-surface))] p-3.5 text-xs text-[var(--warning)] leading-relaxed">
+          <div class="flex items-start gap-2">
+            <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{{ t('aff.convertModal.hint') }}</span>
           </div>
-          
-          <div class="modal-footer">
-            <button class="btn btn-ghost" @click="showConvertModal = false">{{ $t('common.cancel') }}</button>
-            <button
-              class="btn btn-primary"
-              :disabled="convertLoading || convertAmount < 0.1 || convertAmount > (affStatus?.currentBalance || 0)"
-              @click="submitConvert"
-            >
-              {{ convertLoading ? $t('common.processing') : $t('aff.convertModal.submit') }}
-            </button>
-          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4 flex items-center justify-end gap-3">
+        <Button variant="secondary" @click="showConvertModal = false">{{ t('common.cancel') }}</Button>
+        <Button
+          variant="primary"
+          :disabled="convertLoading || convertAmount < 0.1 || convertAmount > (affStatus?.currentBalance || 0)"
+          :loading="convertLoading"
+          @click="submitConvert"
+        >
+          {{ convertLoading ? t('common.processing') : t('aff.convertModal.submit') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- AFF 榜单弹窗 -->
@@ -2332,76 +2327,67 @@ function formatAmount() {
       raw
       @close="showLeaderboardModal = false"
     >
-          <div class="modal-header">
-            <div class="flex items-center gap-2">
-              <h3 class="modal-title">{{ $t('aff.leaderboard.title') }}</h3>
-            </div>
-            <button class="btn btn-ghost btn-sm rounded-full" @click="showLeaderboardModal = false">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div class="modal-body p-0">
-            <!-- 加载中 -->
-            <div v-if="leaderboardLoading" class="p-8 text-center text-themed-muted">
-              {{ $t('common.loading') }}...
-            </div>
-            
-            <!-- 空状态 -->
-            <div v-else-if="leaderboard.length === 0" class="p-8 text-center">
-              <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-themed-secondary flex items-center justify-center">
-                <svg class="w-8 h-8 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <p class="text-themed-muted">{{ $t('aff.leaderboard.empty') }}</p>
-            </div>
-            
-            <!-- 榜单列表 -->
-            <div v-else class="divide-y divide-themed">
+      <div class="modal-header border-b border-[var(--border-color)] px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Trophy class="w-5 h-5 text-[var(--warning)]" />
+          <h3 class="text-base sm:text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ t('aff.leaderboard.title') }}</h3>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] border border-[var(--border-color)] transition-all duration-200 active:scale-95"
+          @click="showLeaderboardModal = false"
+        >
+          <X class="w-4 h-4 stroke-[2]" />
+        </button>
+      </div>
+
+      <div class="modal-body p-0">
+        <div v-if="leaderboardLoading" class="p-8 text-center text-sm text-[var(--text-secondary)] flex items-center justify-center gap-2">
+          <Loader2 class="h-4 w-4 animate-spin text-[var(--accent)]" />
+          <span>{{ t('common.loading') }}...</span>
+        </div>
+        <EmptyState
+          v-else-if="leaderboard.length === 0"
+          :title="t('aff.leaderboard.empty')"
+        />
+        <div v-else class="divide-y divide-[var(--border-color)] max-h-96 overflow-y-auto">
+          <div
+            v-for="(entry, index) in leaderboard"
+            :key="entry.rank"
+            class="flex items-center justify-between px-6 py-3.5 transition-colors"
+            :class="[
+              entry.isCurrentUser ? 'bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-surface))]' : 'hover:bg-[var(--bg-surface-soft)]',
+            ]"
+            :style="{ animationDelay: `${index * 40}ms` }"
+          >
+            <div class="flex items-center gap-3">
               <div
-                v-for="(entry, index) in leaderboard"
-                :key="entry.rank"
-                class="flex items-center justify-between px-4 py-3 transition-all duration-300"
-                :class="[
-                  entry.isCurrentUser ? 'bg-primary-500/10' : 'hover:bg-themed-hover',
-                ]"
-                :style="{ animationDelay: `${index * 50}ms` }"
+                class="flex h-8 w-8 items-center justify-center rounded-full font-mono text-sm font-bold tabular-nums"
+                :class="getRankStyle(entry.rank)"
               >
-                <div class="flex items-center gap-3">
-                  <!-- 排名 -->
-                  <div
-                    class="flex h-8 w-8 items-center justify-center rounded-full font-mono text-sm font-bold tabular-nums"
-                    :class="getRankStyle(entry.rank)"
-                  >
-                    <span v-if="entry.rank <= 3">{{ getRankEmoji(entry.rank) }}</span>
-                    <span v-else>{{ entry.rank }}</span>
-                  </div>
-                  <!-- 用户信息 -->
-                  <div>
-                    <span class="text-sm font-medium text-themed">
-                      {{ entry.username }}
-                    </span>
-                    <span v-if="entry.isCurrentUser" class="text-xs text-primary-600 dark:text-primary-300">
-                      {{ $t('aff.leaderboard.you') }}
-                    </span>
-                  </div>
+                <span>{{ entry.rank }}</span>
+              </div>
+              <div>
+                <div class="text-sm font-semibold text-[var(--text-primary)]">
+                  {{ entry.username }}
                 </div>
-                <!-- 收益金额 -->
-                <div class="text-right">
-                  <span class="font-mono font-semibold text-green-600 tabular-nums dark:text-green-400">¥{{ entry.totalEarnings.toFixed(2) }}</span>
+                <div v-if="entry.isCurrentUser" class="text-xs font-medium text-[var(--accent)]">
+                  {{ t('aff.leaderboard.you') }}
                 </div>
               </div>
             </div>
+            <div class="text-right">
+              <span class="font-mono font-semibold text-[var(--success)] tabular-nums">¥{{ entry.totalEarnings.toFixed(2) }}</span>
+            </div>
           </div>
-          
-          <div class="modal-footer border-t border-themed">
-            <button class="btn btn-primary w-full" @click="showLeaderboardModal = false">
-              {{ $t('common.close') }}
-            </button>
-          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-t border-[var(--border-color)] px-6 py-4">
+        <Button variant="primary" block @click="showLeaderboardModal = false">
+          {{ t('common.close') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- 服务条款弹窗 -->
@@ -2413,12 +2399,6 @@ function formatAmount() {
 </template>
 
 <style scoped>
-/* Nimbus 下划线 Tabs */
-.nimbus-tab {
-  transition: color 0.18s ease, border-color 0.18s ease;
-}
-
-/* Linear 样板：关键 display 数字字距收紧（¥/大数字更紧凑、更“被设计过”） */
 .figure-hero {
   letter-spacing: -0.04em;
   font-feature-settings: 'tnum';
@@ -2429,31 +2409,12 @@ function formatAmount() {
   font-feature-settings: 'tnum';
 }
 
-.nimbus-tab-scroll {
+.tab-scroll-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-.nimbus-tab-scroll::-webkit-scrollbar {
+.tab-scroll-hide::-webkit-scrollbar {
   display: none;
-}
-
-/* 交互卡片的轻微上浮 */
-.nimbus-lift {
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.nimbus-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.28);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-tab,
-  .nimbus-lift,
-  .nimbus-lift:hover {
-    transform: none;
-    transition: none;
-  }
 }
 </style>

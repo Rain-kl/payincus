@@ -1,24 +1,59 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  Gift,
+  Globe,
+  Key,
+  Mail,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Server,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  UserCheck,
+  UserX,
+  X
+} from 'lucide-vue-next'
 import api from '@/api/admin'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import VipLevelRulesEditor from '@/components/admin/VipLevelRulesEditor.vue'
 import VipBenefitHallSettings from '@/components/admin/VipBenefitHallSettings.vue'
 import { useToast } from '@/stores/toast'
-import { useThemeStore } from '@/stores/theme'
 import { useAuthStore } from '@/stores/auth'
 import { normalizeCountryName } from '@/utils/countryDisplay'
 import { instancesPath } from '@/utils/app-paths'
 import { useTabQuery } from '@/composables/useTabQuery'
+import { useReveal } from '@/composables/useReveal'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Pagination,
+  Select
+} from '@/components/ui'
+
+defineOptions({ name: 'AdminUsersView' })
 
 const { t } = useI18n()
 const router = useRouter()
 const toast = useToast()
-const themeStore = useThemeStore()
 const authStore = useAuthStore()
+
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
+
 const normalizedCountryLabels = computed(() => ({
   mainlandChina: t('common.countries.cn'),
   hongKong: t('common.countries.hk'),
@@ -27,11 +62,20 @@ const normalizedCountryLabels = computed(() => ({
 }))
 
 // Tab 切换
-const activeTab = useTabQuery({
+type TabType = 'users' | 'invites' | 'linkedAccounts' | 'userVipLevels' | 'vipBenefits'
+const activeTab = useTabQuery<TabType>({
   keys: ['users', 'invites', 'linkedAccounts', 'userVipLevels', 'vipBenefits'],
   fallback: 'users',
   onExternalChange: (tab) => loadTabData(tab)
 })
+
+const tabs = computed(() => [
+  { key: 'users' as TabType, label: t('nav.users'), badge: userTotal.value },
+  { key: 'invites' as TabType, label: t('admin.users.invites'), badge: invitesTotal.value || undefined },
+  { key: 'linkedAccounts' as TabType, label: t('admin.users.linkedAccounts') },
+  { key: 'userVipLevels' as TabType, label: t('admin.users.userVipLevels') },
+  { key: 'vipBenefits' as TabType, label: t('admin.users.vipBenefits') }
+])
 
 // 用户数据
 const USER_SEARCH_FIELDS = ['username', 'id', 'email']
@@ -40,10 +84,10 @@ const USER_SEARCH_FIELD_OPTIONS = [
   { value: 'id', label: 'admin.users.searchFieldId' },
   { value: 'email', label: 'admin.users.searchFieldEmail' }
 ]
-const users = ref([])
+const users = ref<any[]>([])
 const usersLoading = ref(true)
 const userSearch = ref('')
-const userSearchFields = ref([...USER_SEARCH_FIELDS])
+const userSearchFields = ref<string[]>([...USER_SEARCH_FIELDS])
 const userSearchExact = ref(false)
 const userPage = ref(1)
 const userPageSize = ref(100)
@@ -51,14 +95,14 @@ const userTotal = ref(0)
 const userTotalPages = ref(0)
 
 // 邀请码数据
-const invites = ref([])
+const invites = ref<any[]>([])
 const invitesLoading = ref(false)
 const invitesPage = ref(1)
 const invitesPageSize = ref(100)
 const invitesTotal = ref(0)
 const invitesTotalPages = ref(1)
-const inviteStatusFilter = ref('all')
-const inviteStatusFilterOptions = computed(() => [
+const inviteStatusFilter = ref<'all' | 'unused' | 'used'>('all')
+const inviteStatusFilterOptions = computed<{ value: 'all' | 'unused' | 'used'; label: string }[]>(() => [
   { value: 'all', label: t('admin.users.inviteFilterAll') },
   { value: 'unused', label: t('admin.users.inviteFilterUnused') },
   { value: 'used', label: t('admin.users.inviteFilterUsed') }
@@ -66,35 +110,52 @@ const inviteStatusFilterOptions = computed(() => [
 
 // 生成邀请码弹窗
 const showInviteModal = ref(false)
-const showGenerateModal = ref(false)  // 生成前的配置弹窗
-const inviteExpireDays = ref(7)  // 默认7天过期
-const inviteCount = ref(1)  // 生成数量
+const showGenerateModal = ref(false)
+const inviteExpireDays = ref(7)
+const inviteCount = ref(1)
 const newInviteCode = ref('')
-const newInviteCodes = ref([])  // 批量生成的邀请码
+const newInviteCodes = ref<string[]>([])
 const newInviteExpiresAt = ref('')
 const inviteGenerating = ref(false)
 const copied = ref(false)
 
+const inviteCountOptions = computed(() => [
+  { label: `1 ${t('admin.users.countUnit')}`, value: 1 },
+  { label: `5 ${t('admin.users.countUnit')}`, value: 5 },
+  { label: `20 ${t('admin.users.countUnit')}`, value: 20 },
+  { label: `50 ${t('admin.users.countUnit')}`, value: 50 },
+  { label: `100 ${t('admin.users.countUnit')}`, value: 100 }
+])
+
+const inviteExpireDaysOptions = computed(() => [
+  { label: t('admin.users.day1'), value: 1 },
+  { label: t('admin.users.day3'), value: 3 },
+  { label: t('admin.users.day7'), value: 7 },
+  { label: t('admin.users.day14'), value: 14 },
+  { label: t('admin.users.day30'), value: 30 },
+  { label: t('admin.users.permanentValid'), value: 0 }
+])
+
 // 重置密码弹窗
 const showResetPasswordModal = ref(false)
-const resetPasswordUser = ref(null)
+const resetPasswordUser = ref<any>(null)
 const resetPasswordForm = ref({ password: '', confirmPassword: '' })
 const resetPasswordLoading = ref(false)
 
 // 取消2FA弹窗
 const showDisable2FAModal = ref(false)
-const disable2FAUser = ref(null)
+const disable2FAUser = ref<any>(null)
 const disable2FALoading = ref(false)
 
 // 解绑GitHub弹窗
 const showUnbindGitHubModal = ref(false)
-const unbindGitHubUser = ref(null)
+const unbindGitHubUser = ref<any>(null)
 const unbindGitHubLoading = ref(false)
 
 // 登录记录弹窗
 const showLoginRecordsModal = ref(false)
-const loginRecordsUser = ref(null)
-const loginRecords = ref([])
+const loginRecordsUser = ref<any>(null)
+const loginRecords = ref<any[]>([])
 const loginRecordsLoading = ref(false)
 const loginRecordsPage = ref(1)
 const loginRecordsPageSize = ref(100)
@@ -103,39 +164,46 @@ const loginRecordsTotalPages = ref(1)
 
 // 发送站内信弹窗
 const showSendMessageModal = ref(false)
-const sendMessageUser = ref(null)
+const sendMessageUser = ref<any>(null)
 const sendMessageForm = ref({ title: '', content: '' })
 const sendMessageLoading = ref(false)
 
-// 用户余额详情弹窗（包含余额、明细、充值记录、调整余额）
+// 用户余额详情弹窗
 const showBalanceModal = ref(false)
-const balanceUser = ref(null)
-const balanceTab = ref('overview')  // 'overview' | 'logs' | 'recharge' | 'adjust'
+const balanceUser = ref<any>(null)
+const balanceTab = ref('overview')
 const balanceInfo = ref({ balance: 0, totalRecharge: 0, totalConsume: 0 })
 const balanceInfoLoading = ref(false)
-const balanceLogs = ref([])
+const balanceLogs = ref<any[]>([])
 const balanceLogsLoading = ref(false)
 const balanceLogsPage = ref(1)
 const balanceLogsPageSize = ref(100)
 const balanceLogsTotal = ref(0)
 const balanceLogsTotalPages = ref(1)
-const balanceLogsShowLotteryGiftOnly = ref(false) // 抽奖赠送筛选
-const rechargeRecords = ref([])
+const balanceLogsShowLotteryGiftOnly = ref(false)
+const rechargeRecords = ref<any[]>([])
 const rechargeRecordsLoading = ref(false)
 const rechargeRecordsPage = ref(1)
 const rechargeRecordsPageSize = ref(100)
 const rechargeRecordsTotal = ref(0)
 const rechargeRecordsTotalPages = ref(1)
 const adjustBalanceForm = ref({
-  type: 'add',  // 'add' | 'deduct'
+  type: 'add',
   amount: '',
   reason: ''
 })
 const adjustBalanceLoading = ref(false)
 
+const balanceTabs = computed(() => [
+  { key: 'overview', label: t('admin.users.balanceOverview') },
+  { key: 'logs', label: t('admin.users.balanceLogs') },
+  { key: 'recharge', label: t('admin.users.rechargeRecords') },
+  { key: 'adjust', label: t('admin.users.adjustBalance') }
+])
+
 // 用户积分调整弹窗
 const showPointsModal = ref(false)
-const pointsUser = ref(null)
+const pointsUser = ref<any>(null)
 const adjustPointsForm = ref({
   amount: '',
   reason: ''
@@ -143,12 +211,20 @@ const adjustPointsForm = ref({
 const adjustPointsLoading = ref(false)
 
 // 关联账号检测
-const linkedAccountsData = ref(null)
+const linkedAccountsData = ref<any>(null)
 const linkedAccountsLoading = ref(false)
 const linkedAccountsDays = ref(90)
-const linkedAccountsExpandedIP = ref(new Set())
-const linkedAccountsExpandedEmail = ref(new Set())
-const linkedAccountsExpandedUsername = ref(new Set())
+const linkedAccountsExpandedIP = ref(new Set<string>())
+const linkedAccountsExpandedEmail = ref(new Set<string>())
+const linkedAccountsExpandedUsername = ref(new Set<string>())
+
+const linkedAccountsDaysOptions = computed(() => [
+  { label: `30 ${t('admin.users.daysUnit')}`, value: 30 },
+  { label: `60 ${t('admin.users.daysUnit')}`, value: 60 },
+  { label: `90 ${t('admin.users.daysUnit')}`, value: 90 },
+  { label: `180 ${t('admin.users.daysUnit')}`, value: 180 },
+  { label: `365 ${t('admin.users.daysUnit')}`, value: 365 }
+])
 
 const customerBaseUrl = computed(() => {
   const configuredUrl = import.meta.env.VITE_CUSTOMER_BASE_URL?.trim()
@@ -164,7 +240,7 @@ const normalizedUserSearchFields = computed(() => {
 })
 
 // 操作菜单状态
-const activeActionMenuUserId = ref(null)
+const activeActionMenuUserId = ref<number | null>(null)
 const actionMenuPosition = ref({ top: 0, right: 0 })
 
 const activeActionUser = computed(() => {
@@ -172,7 +248,7 @@ const activeActionUser = computed(() => {
   return users.value.find(u => u.id === activeActionMenuUserId.value) || null
 })
 
-function toggleActionMenu(userId, e) {
+function toggleActionMenu(userId: number, e?: MouseEvent) {
   if (e) {
     e.stopPropagation()
   }
@@ -181,7 +257,7 @@ function toggleActionMenu(userId, e) {
     return
   }
   if (e) {
-    const btn = e.currentTarget || e.target
+    const btn = (e.currentTarget || e.target) as HTMLElement
     if (btn && typeof btn.getBoundingClientRect === 'function') {
       const rect = btn.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
@@ -206,8 +282,8 @@ function closeActionMenu() {
   activeActionMenuUserId.value = null
 }
 
-function handleGlobalClick(event) {
-  const target = event.target
+function handleGlobalClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
   if (target && !target.closest('.action-menu-container') && !target.closest('.kawaii-menu-panel')) {
     activeActionMenuUserId.value = null
   }
@@ -228,12 +304,12 @@ onUnmounted(() => {
 })
 
 // 搜索防抖
-let searchTimer = null
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 watch([userSearch, userSearchExact, () => normalizedUserSearchFields.value.join(',')], () => {
-  clearTimeout(searchTimer)
+  if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     userPage.value = 1
-    loadUsers()
+    void loadUsers()
   }, 300)
 })
 
@@ -247,10 +323,10 @@ async function loadUsers() {
       searchFields: normalizedUserSearchFields.value.join(','),
       exact: userSearchExact.value
     })
-    users.value = response.users || []
+    users.value = (response as any).users || response.items || []
     userTotal.value = response.total || 0
     userTotalPages.value = response.totalPages || 1
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.loadFailed') + ': ' + err.message)
   } finally {
     usersLoading.value = false
@@ -277,16 +353,16 @@ async function loadInvites() {
   }
 }
 
-function loadTabData(tab) {
+function loadTabData(tab: string) {
   if (tab === 'invites' && invites.value.length === 0) {
-    loadInvites()
+    void loadInvites()
   }
   if (tab === 'linkedAccounts' && !linkedAccountsData.value) {
-    loadLinkedAccounts()
+    void loadLinkedAccounts()
   }
 }
 
-function switchTab(tab) {
+function switchTab(tab: TabType) {
   activeTab.value = tab
   loadTabData(tab)
 }
@@ -300,38 +376,36 @@ function openGenerateModal() {
 async function generateInvite() {
   inviteGenerating.value = true
   try {
-    // 构建请求参数
     const payload = {
       ...(inviteExpireDays.value > 0 ? { expiresInDays: inviteExpireDays.value } : {}),
       count: inviteCount.value
     }
     const response = await api.auth.generateInvite(payload)
-    
-    // 处理单个或批量返回
+
     if (response.codes) {
       newInviteCodes.value = response.codes
       newInviteCode.value = ''
     } else {
-      newInviteCode.value = response.code
+      newInviteCode.value = response.code || ''
       newInviteCodes.value = []
     }
-    newInviteExpiresAt.value = response.expiresAt
-    
+    newInviteExpiresAt.value = response.expiresAt || ''
+
     showGenerateModal.value = false
     showInviteModal.value = true
     if (activeTab.value === 'invites') {
-      loadInvites()
+      void loadInvites()
     }
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.generateFailed') + ': ' + err.message)
   } finally {
     inviteGenerating.value = false
   }
 }
 
-async function deleteInvite(invite) {
+async function deleteInvite(invite: any) {
   if (!confirm(t('admin.users.confirmDeleteInvite', { code: invite.code }))) return
-  
+
   try {
     await api.auth.deleteInvite(invite.id)
     if (invites.value.length === 1 && invitesPage.value > 1) {
@@ -339,21 +413,20 @@ async function deleteInvite(invite) {
     }
     await loadInvites()
     toast.success(t('admin.users.inviteDeleted'))
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.deleteFailed') + ': ' + err.message)
   }
 }
 
 async function copyCode() {
-  // 获取要复制的内容
-  const textToCopy = newInviteCodes.value.length > 0 
+  const textToCopy = newInviteCodes.value.length > 0
     ? newInviteCodes.value.join('\n')
     : newInviteCode.value
-  
+
   try {
     await navigator.clipboard.writeText(textToCopy)
     copied.value = true
-    setTimeout(() => copied.value = false, 2000)
+    setTimeout(() => { copied.value = false }, 2000)
   } catch {
     const input = document.createElement('textarea')
     input.value = textToCopy
@@ -362,45 +435,43 @@ async function copyCode() {
     document.execCommand('copy')
     document.body.removeChild(input)
     copied.value = true
-    setTimeout(() => copied.value = false, 2000)
+    setTimeout(() => { copied.value = false }, 2000)
   }
 }
 
 function copyLink() {
   navigator.clipboard.writeText(registerLink.value).then(() => {
     copied.value = true
-    setTimeout(() => copied.value = false, 2000)
+    setTimeout(() => { copied.value = false }, 2000)
   })
 }
 
 // 切换用户状态（封禁/解封）
-async function toggleUserStatus(user) {
+async function toggleUserStatus(user: any) {
   closeActionMenu()
   const newStatus = user.status === 'active' ? 'banned' : 'active'
-  
-  const confirmMsg = newStatus === 'banned' 
+
+  const confirmMsg = newStatus === 'banned'
     ? t('admin.users.confirmBan', { name: user.username })
     : t('admin.users.confirmUnban', { name: user.username })
-  
+
   if (!confirm(confirmMsg)) return
 
   try {
     await api.users.updateStatus(user.id, newStatus)
-    // 立即更新本地状态，提供即时反馈
     const idx = users.value.findIndex(u => u.id === user.id)
     if (idx !== -1) {
       users.value[idx] = { ...users.value[idx], status: newStatus }
     }
     toast.success(newStatus === 'banned' ? t('admin.users.userBanned') : t('admin.users.userUnbanned'))
-  } catch (err) {
+  } catch (err: any) {
     toast.error(err.message)
-    // 失败时重新加载以恢复正确状态
     await loadUsers()
   }
 }
 
 // 切换用户管理员角色
-async function toggleUserRole(user) {
+async function toggleUserRole(user: any) {
   closeActionMenu()
   const newRole = user.role === 'admin' ? 'user' : 'admin'
 
@@ -422,20 +493,20 @@ async function toggleUserRole(user) {
       users.value[idx] = { ...users.value[idx], role: newRole }
     }
     toast.success(newRole === 'admin' ? t('admin.users.userPromotedAdmin') : t('admin.users.userDemotedAdmin'))
-  } catch (err) {
+  } catch (err: any) {
     toast.error(err.details || err.message)
     await loadUsers()
   }
 }
 
 // 查看用户实例
-function viewUserInstances(user) {
+function viewUserInstances(user: any) {
   closeActionMenu()
-  router.push({ path: instancesPath(), query: { userId: user.id } })
+  void router.push({ path: instancesPath(), query: { userId: user.id } })
 }
 
 // 打开重置密码确认弹窗
-function openResetPasswordModal(user) {
+function openResetPasswordModal(user: any) {
   closeActionMenu()
   resetPasswordUser.value = user
   resetPasswordForm.value = { password: '', confirmPassword: '' }
@@ -450,13 +521,13 @@ async function resetPassword() {
   }
 
   resetPasswordLoading.value = true
-  
+
   try {
     await api.users.resetPassword(resetPasswordUser.value.id, resetPasswordForm.value.password)
     resetPasswordForm.value = { password: '', confirmPassword: '' }
     showResetPasswordModal.value = false
     toast.success(t('admin.users.passwordResetSuccess'))
-  } catch (err) {
+  } catch (err: any) {
     toast.error(err.message)
   } finally {
     resetPasswordLoading.value = false
@@ -464,7 +535,7 @@ async function resetPassword() {
 }
 
 // 打开取消2FA弹窗
-function openDisable2FAModal(user) {
+function openDisable2FAModal(user: any) {
   closeActionMenu()
   disable2FAUser.value = user
   showDisable2FAModal.value = true
@@ -473,13 +544,13 @@ function openDisable2FAModal(user) {
 // 取消2FA
 async function disable2FA() {
   disable2FALoading.value = true
-  
+
   try {
     await api.users.disable2FA(disable2FAUser.value.id)
     showDisable2FAModal.value = false
     toast.success(t('admin.users.twoFADisabled'))
     await loadUsers()
-  } catch (err) {
+  } catch (err: any) {
     toast.error(err.message)
   } finally {
     disable2FALoading.value = false
@@ -487,7 +558,7 @@ async function disable2FA() {
 }
 
 // 打开解绑GitHub弹窗
-function openUnbindGitHubModal(user) {
+function openUnbindGitHubModal(user: any) {
   closeActionMenu()
   unbindGitHubUser.value = user
   showUnbindGitHubModal.value = true
@@ -496,13 +567,13 @@ function openUnbindGitHubModal(user) {
 // 解绑GitHub
 async function unbindGitHub() {
   unbindGitHubLoading.value = true
-  
+
   try {
     await api.users.unbindOAuth(unbindGitHubUser.value.id, 'github')
     showUnbindGitHubModal.value = false
     toast.success(t('admin.users.githubUnbound'))
     await loadUsers()
-  } catch (err) {
+  } catch (err: any) {
     toast.error(err.message)
   } finally {
     unbindGitHubLoading.value = false
@@ -510,7 +581,7 @@ async function unbindGitHub() {
 }
 
 // 打开登录记录弹窗
-async function openLoginRecordsModal(user) {
+async function openLoginRecordsModal(user: any) {
   loginRecordsUser.value = user
   loginRecordsPage.value = 1
   loginRecords.value = []
@@ -521,7 +592,7 @@ async function openLoginRecordsModal(user) {
 // 加载登录记录
 async function loadLoginRecords() {
   if (!loginRecordsUser.value) return
-  
+
   loginRecordsLoading.value = true
   try {
     const response = await api.users.getLoginRecords(loginRecordsUser.value.id, {
@@ -531,7 +602,7 @@ async function loadLoginRecords() {
     loginRecords.value = response.records || []
     loginRecordsTotal.value = response.total || 0
     loginRecordsTotalPages.value = response.totalPages || 1
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.loadLoginRecordsFailed') + ': ' + err.message)
   } finally {
     loginRecordsLoading.value = false
@@ -544,11 +615,10 @@ async function loadLinkedAccounts() {
   try {
     const response = await api.users.detectLinkedAccounts(linkedAccountsDays.value)
     linkedAccountsData.value = response
-    // 重置展开状态
     linkedAccountsExpandedIP.value = new Set()
     linkedAccountsExpandedEmail.value = new Set()
     linkedAccountsExpandedUsername.value = new Set()
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.loadLinkedAccountsFailed') + ': ' + err.message)
   } finally {
     linkedAccountsLoading.value = false
@@ -556,7 +626,7 @@ async function loadLinkedAccounts() {
 }
 
 // 切换IP组展开状态
-function toggleIPGroup(ip) {
+function toggleIPGroup(ip: string) {
   if (linkedAccountsExpandedIP.value.has(ip)) {
     linkedAccountsExpandedIP.value.delete(ip)
   } else {
@@ -565,7 +635,7 @@ function toggleIPGroup(ip) {
 }
 
 // 切换邮箱组展开状态
-function toggleEmailGroup(pattern) {
+function toggleEmailGroup(pattern: string) {
   if (linkedAccountsExpandedEmail.value.has(pattern)) {
     linkedAccountsExpandedEmail.value.delete(pattern)
   } else {
@@ -574,7 +644,7 @@ function toggleEmailGroup(pattern) {
 }
 
 // 切换用户名组展开状态
-function toggleUsernameGroup(pattern) {
+function toggleUsernameGroup(pattern: string) {
   if (linkedAccountsExpandedUsername.value.has(pattern)) {
     linkedAccountsExpandedUsername.value.delete(pattern)
   } else {
@@ -583,7 +653,7 @@ function toggleUsernameGroup(pattern) {
 }
 
 // 打开发送站内信弹窗
-function openSendMessageModal(user) {
+function openSendMessageModal(user: any) {
   closeActionMenu()
   sendMessageUser.value = user
   sendMessageForm.value = { title: '', content: '' }
@@ -593,7 +663,7 @@ function openSendMessageModal(user) {
 // 发送站内信
 async function sendMessage() {
   if (!sendMessageUser.value) return
-  
+
   if (!sendMessageForm.value.title.trim()) {
     toast.error(t('admin.users.messageTitleRequired'))
     return
@@ -613,7 +683,7 @@ async function sendMessage() {
     showSendMessageModal.value = false
     sendMessageForm.value = { title: '', content: '' }
     sendMessageUser.value = null
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.messageSendFailed') + ': ' + err.message)
   } finally {
     sendMessageLoading.value = false
@@ -621,13 +691,13 @@ async function sendMessage() {
 }
 
 // 打开用户余额详情弹窗
-async function openBalanceModal(user) {
+async function openBalanceModal(user: any) {
   balanceUser.value = user
   balanceTab.value = 'overview'
   balanceInfo.value = { balance: user.balance || 0, totalRecharge: 0, totalConsume: 0 }
   balanceLogs.value = []
   balanceLogsPage.value = 1
-  balanceLogsShowLotteryGiftOnly.value = false // 重置抽奖筛选状态
+  balanceLogsShowLotteryGiftOnly.value = false
   rechargeRecords.value = []
   rechargeRecordsPage.value = 1
   adjustBalanceForm.value = { type: 'add', amount: '', reason: '' }
@@ -646,7 +716,7 @@ async function loadBalanceInfo() {
       totalRecharge: res.totalRecharge,
       totalConsume: res.totalConsume
     }
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.loadBalanceFailed') + ': ' + err.message)
   } finally {
     balanceInfoLoading.value = false
@@ -666,7 +736,7 @@ async function loadBalanceLogs() {
     balanceLogs.value = res.logs || []
     balanceLogsTotal.value = res.total || 0
     balanceLogsTotalPages.value = Math.ceil(res.total / balanceLogsPageSize.value) || 1
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.loadBalanceLogsFailed') + ': ' + err.message)
   } finally {
     balanceLogsLoading.value = false
@@ -686,7 +756,7 @@ async function loadRechargeRecords() {
     rechargeRecords.value = res.records || []
     rechargeRecordsTotal.value = res.total || 0
     rechargeRecordsTotalPages.value = Math.ceil(res.total / rechargeRecordsPageSize.value) || 1
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.loadRechargeRecordsFailed') + ': ' + err.message)
   } finally {
     rechargeRecordsLoading.value = false
@@ -694,12 +764,12 @@ async function loadRechargeRecords() {
 }
 
 // 切换余额弹窗TAB
-function switchBalanceTab(tab) {
+function switchBalanceTab(tab: string) {
   balanceTab.value = tab
   if (tab === 'logs' && balanceLogs.value.length === 0) {
-    loadBalanceLogs()
+    void loadBalanceLogs()
   } else if (tab === 'recharge' && rechargeRecords.value.length === 0) {
-    loadRechargeRecords()
+    void loadRechargeRecords()
   }
 }
 
@@ -718,7 +788,6 @@ async function submitAdjustBalance() {
     return
   }
 
-  // 根据类型计算实际金额
   const finalAmount = adjustBalanceForm.value.type === 'add' ? amount : -amount
 
   adjustBalanceLoading.value = true
@@ -730,16 +799,13 @@ async function submitAdjustBalance() {
     )
     toast.success(t('admin.users.balanceAdjusted'))
     adjustBalanceForm.value = { type: 'add', amount: '', reason: '' }
-    // 刷新余额信息和明细
     await loadBalanceInfo()
     if (balanceLogs.value.length > 0) {
       await loadBalanceLogs()
     }
-    // 刷新用户列表
     await loadUsers()
-    // 切换到概览TAB
     balanceTab.value = 'overview'
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.balanceAdjustFailed') + ': ' + err.message)
   } finally {
     adjustBalanceLoading.value = false
@@ -747,7 +813,7 @@ async function submitAdjustBalance() {
 }
 
 // 打开积分调整弹窗
-function openPointsModal(user) {
+function openPointsModal(user: any) {
   pointsUser.value = user
   adjustPointsForm.value = { amount: '', reason: '' }
   showPointsModal.value = true
@@ -777,9 +843,8 @@ async function submitAdjustPoints() {
     )
     toast.success(t('admin.users.pointsAdjusted'))
     showPointsModal.value = false
-    // 刷新用户列表
     await loadUsers()
-  } catch (err) {
+  } catch (err: any) {
     toast.error(t('admin.users.pointsAdjustFailed') + ': ' + err.message)
   } finally {
     adjustPointsLoading.value = false
@@ -787,8 +852,8 @@ async function submitAdjustPoints() {
 }
 
 // 获取余额记录类型标签
-function getBalanceLogTypeLabel(type) {
-  const labels = {
+function getBalanceLogTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
     recharge: t('admin.users.balanceType.recharge'),
     consume: t('admin.users.balanceType.consume'),
     refund: t('admin.users.balanceType.refund'),
@@ -800,19 +865,20 @@ function getBalanceLogTypeLabel(type) {
   return labels[type] || type
 }
 
-// 获取充值记录状态样式
-function getRechargeStatusStyle(status) {
-  const styles = {
-    completed: 'badge-success',
-    pending: 'badge-warning',
-    failed: 'badge-error',
-    cancelled: 'badge-default',
-    expired: 'badge-default'
+function getRechargeBadgeVariant(status: string): 'success' | 'warning' | 'error' | 'default' {
+  switch (status) {
+    case 'completed':
+      return 'success'
+    case 'pending':
+      return 'warning'
+    case 'failed':
+      return 'error'
+    default:
+      return 'default'
   }
-  return styles[status] || 'badge-default'
 }
 
-function formatLocation(record) {
+function formatLocation(record: any): string {
   const parts = [
     normalizeCountryName(record.country, normalizedCountryLabels.value),
     record.region,
@@ -821,8 +887,7 @@ function formatLocation(record) {
   return parts.length > 0 ? parts.join(', ') : '-'
 }
 
-// 解析 User-Agent 获取设备信息
-function formatDevice(userAgent) {
+function formatDevice(userAgent: string): string {
   if (!userAgent) return '-'
   if (userAgent.includes('Windows')) return 'Windows'
   if (userAgent.includes('Mac OS')) return 'macOS'
@@ -833,8 +898,7 @@ function formatDevice(userAgent) {
   return '-'
 }
 
-// 解析 User-Agent 获取浏览器信息
-function formatBrowser(userAgent) {
+function formatBrowser(userAgent: string): string {
   if (!userAgent) return '-'
   if (userAgent.includes('Edg')) return 'Edge'
   if (userAgent.includes('Chrome')) return 'Chrome'
@@ -846,41 +910,41 @@ function formatBrowser(userAgent) {
 
 function handleUserPageSizeChange() {
   userPage.value = 1
-  loadUsers()
+  void loadUsers()
 }
 
 function handleInvitesPageSizeChange() {
   invitesPage.value = 1
-  loadInvites()
+  void loadInvites()
 }
 
-function handleInviteStatusFilterChange(status) {
+function handleInviteStatusFilterChange(status: 'all' | 'unused' | 'used') {
   if (inviteStatusFilter.value === status) return
   inviteStatusFilter.value = status
   invitesPage.value = 1
-  loadInvites()
+  void loadInvites()
 }
 
-function getInviteStatus(invite) {
+function getInviteStatus(invite: any): { label: string; variant: 'success' | 'error' | 'warning' } {
   if (invite.used_by || invite.usedBy) {
-    return { label: t('admin.users.inviteUsed'), class: 'badge-success' }
+    return { label: t('admin.users.inviteUsed'), variant: 'success' }
   }
   if (invite.expires_at || invite.expiresAt) {
     const expiry = new Date(invite.expires_at || invite.expiresAt)
     if (expiry < new Date()) {
-      return { label: t('admin.users.inviteExpired'), class: 'badge-error' }
+      return { label: t('admin.users.inviteExpired'), variant: 'error' }
     }
   }
-  return { label: t('admin.users.inviteUnused'), class: 'badge-warning' }
+  return { label: t('admin.users.inviteUnused'), variant: 'warning' }
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatRegisteredAge(createdAt) {
+function formatRegisteredAge(createdAt: string | null | undefined): string {
   if (!createdAt) return '-'
   const createdDate = new Date(createdAt)
   if (Number.isNaN(createdDate.getTime())) return '-'
@@ -895,162 +959,117 @@ function formatRegisteredAge(createdAt) {
     ? t('admin.users.registeredNew')
     : t('admin.users.registeredDays', { days })
 }
-
-function _formatMemory(mb) {
-  if (!mb) return '0'
-  if (mb >= 1024) return (mb / 1024).toFixed(0) + ' GB'
-  return mb + ' MB'
-}
-
-function _getQuotaPercent(used, limit) {
-  if (!limit) return 0
-  return Math.min(100, Math.round((used / limit) * 100))
-}
 </script>
 
 <template>
-  <div class="kawaii-page nimbus-view space-y-6 animate-fade-in">
+  <div ref="revealRoot" class="space-y-6 animate-fade-in">
     <!-- 页面头部 -->
-    <div class="page-header flex-col sm:flex-row gap-4 sm:gap-0">
-      <div>
-        <h1 class="page-title">{{ t('admin.users.title') }}</h1>
-        <p class="page-description">{{ t('admin.users.description') }}</p>
-      </div>
-      <button class="btn-primary w-full sm:w-auto justify-center" @click="openGenerateModal">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        {{ t('admin.users.generateInvite') }}
+    <PageHeader
+      data-reveal
+      :title="t('admin.users.title')"
+      :description="t('admin.users.description')"
+    >
+      <template #actions>
+        <Button
+          variant="primary"
+          @click="openGenerateModal"
+        >
+          <template #icon>
+            <Plus class="w-4 h-4 stroke-[2]" />
+          </template>
+          {{ t('admin.users.generateInvite') }}
+        </Button>
+      </template>
+    </PageHeader>
+
+    <!-- Tab 切换 -->
+    <div data-reveal class="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] overflow-x-auto max-w-full">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        type="button"
+        class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap active:scale-[0.98] select-none"
+        :class="activeTab === tab.key
+          ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+        @click="switchTab(tab.key)"
+      >
+        <span>{{ tab.label }}</span>
+        <Badge
+          v-if="tab.badge !== undefined"
+          size="sm"
+          :variant="activeTab === tab.key ? 'info' : 'default'"
+        >
+          {{ tab.badge }}
+        </Badge>
       </button>
     </div>
 
-    <!-- Tab 切换 -->
-    <div class="border-b border-themed overflow-x-auto">
-      <nav class="flex flex-nowrap gap-1 sm:gap-2 min-w-max">
-        <button
-          :class="[
-            '-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'users'
-              ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
-          @click="switchTab('users')"
-        >
-          {{ t('nav.users') }}
-          <span class="ml-1.5 px-1.5 py-0.5 text-xs rounded count-badge">
-            {{ userTotal }}
-          </span>
-        </button>
-        <button
-          :class="[
-            '-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'invites'
-              ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
-          @click="switchTab('invites')"
-        >
-          {{ t('admin.users.invites') }}
-          <span v-if="invitesTotal" class="ml-1.5 px-1.5 py-0.5 text-xs rounded count-badge">
-            {{ invitesTotal }}
-          </span>
-        </button>
-        <button
-          :class="[
-            '-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'linkedAccounts'
-              ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
-          @click="switchTab('linkedAccounts')"
-        >
-          {{ t('admin.users.linkedAccounts') }}
-        </button>
-        <button
-          :class="[
-            '-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'userVipLevels'
-              ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
-          @click="switchTab('userVipLevels')"
-        >
-          {{ t('admin.users.userVipLevels') }}
-        </button>
-        <button
-          :class="[
-            '-mb-px flex-shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'vipBenefits'
-              ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-              : 'border-transparent text-themed-muted hover:text-themed'
-          ]"
-          @click="switchTab('vipBenefits')"
-        >
-          {{ t('admin.users.vipBenefits') }}
-        </button>
-      </nav>
-    </div>
-
-    <!-- 用户列表 -->
-    <div v-if="activeTab === 'users'" class="space-y-4">
-      <!-- 搜索栏 -->
-      <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div class="relative w-full xl:max-w-sm">
-          <input 
-            v-model="userSearch" 
-            type="text" 
-            :placeholder="t('admin.users.searchPlaceholder')" 
-            class="input pl-9 w-full"
-          />
-          <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 icon-themed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <div class="flex flex-wrap items-center gap-4">
-          <div class="flex flex-wrap items-center gap-3">
-            <span class="text-sm text-themed-secondary whitespace-nowrap">{{ t('admin.users.searchRange') }}</span>
-            <label
-              v-for="field in USER_SEARCH_FIELD_OPTIONS"
-              :key="field.value"
-              class="inline-flex items-center gap-2 text-sm text-themed-secondary whitespace-nowrap cursor-pointer select-none"
+    <!-- 用户管理 Tab -->
+    <div v-if="activeTab === 'users'" class="space-y-5">
+      <!-- 搜索与筛选 Card -->
+      <Card data-reveal padding="sm">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div class="w-full xl:max-w-sm">
+            <Input
+              v-model="userSearch"
+              type="text"
+              :placeholder="t('admin.users.searchPlaceholder')"
+              clearable
             >
+              <template #prefix>
+                <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+              </template>
+            </Input>
+          </div>
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="text-xs font-semibold text-[var(--text-secondary)] whitespace-nowrap">{{ t('admin.users.searchRange') }}</span>
+              <label
+                v-for="field in USER_SEARCH_FIELD_OPTIONS"
+                :key="field.value"
+                class="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] whitespace-nowrap cursor-pointer select-none transition-colors hover:text-[var(--text-primary)]"
+              >
+                <input
+                  v-model="userSearchFields"
+                  :value="field.value"
+                  type="checkbox"
+                  class="h-4 w-4 shrink-0 rounded border border-[var(--border-color)] bg-[var(--bg-surface-soft)] accent-[var(--accent)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="normalizedUserSearchFields.length === 1 && normalizedUserSearchFields.includes(field.value)"
+                />
+                <span>{{ t(field.label) }}</span>
+              </label>
+            </div>
+            <label class="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] whitespace-nowrap cursor-pointer select-none transition-colors hover:text-[var(--text-primary)]">
               <input
-                v-model="userSearchFields"
-                :value="field.value"
+                v-model="userSearchExact"
                 type="checkbox"
-                class="h-4 w-4 shrink-0 rounded border accent-accent focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
-                :class="themeStore.isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-300 bg-white'"
-                :disabled="normalizedUserSearchFields.length === 1 && normalizedUserSearchFields.includes(field.value)"
+                class="h-4 w-4 shrink-0 rounded border border-[var(--border-color)] bg-[var(--bg-surface-soft)] accent-[var(--accent)] cursor-pointer"
               />
-              <span>{{ t(field.label) }}</span>
+              <span>{{ t('admin.users.exactMatch') }}</span>
             </label>
           </div>
-          <label class="inline-flex items-center gap-2 text-sm text-themed-secondary whitespace-nowrap cursor-pointer select-none">
-            <input
-              v-model="userSearchExact"
-              type="checkbox"
-              class="h-4 w-4 shrink-0 rounded border accent-accent focus:ring-2 focus:ring-accent/20"
-              :class="themeStore.isDark ? 'border-gray-700 bg-gray-900' : 'border-gray-300 bg-white'"
-            />
-            <span>{{ t('admin.users.exactMatch') }}</span>
-          </label>
         </div>
-      </div>
+      </Card>
 
       <SkeletonLoader v-if="usersLoading" type="list" />
-      
-      <div v-else-if="users.length === 0" class="card p-8 text-center text-themed-muted text-sm">
-        {{ userSearch ? t('admin.users.noMatchingUsers') : t('admin.users.noUsers') }}
-      </div>
-      
-      <!-- 用户表格 -->
+
+      <Card v-else-if="users.length === 0" padding="none">
+        <EmptyState
+          :title="userSearch ? t('admin.users.noMatchingUsers') : t('admin.users.noUsers')"
+        />
+      </Card>
+
+      <!-- 用户列表 -->
       <template v-else>
+        <!-- 移动端卡片视图 -->
         <div class="space-y-3 lg:hidden">
-          <div
+          <Card
             v-for="user in users"
             :key="user.id"
-            class="card p-4 relative"
-            :class="{ 'z-20': activeActionMenuUserId === user.id }"
+            padding="sm"
+            class="relative transition-all duration-200"
+            :class="{ 'z-20 ring-1 ring-[var(--accent)]': activeActionMenuUserId === user.id }"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3">
@@ -1062,312 +1081,319 @@ function _getQuotaPercent(used, limit) {
                   :size="40"
                 />
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-themed">{{ user.username }}</div>
-                  <div class="truncate text-xs text-themed-muted">{{ user.email || t('admin.users.noEmail') }}</div>
-                  <div class="mt-1 font-mono tabular-nums text-xs text-themed-muted">#{{ user.id }}</div>
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ user.username }}</div>
+                  <div class="truncate text-xs text-[var(--text-secondary)]">{{ user.email || t('admin.users.noEmail') }}</div>
+                  <div class="mt-0.5 font-mono tabular-nums text-xs text-[var(--text-tertiary)]">#{{ user.id }}</div>
                 </div>
               </div>
-              <div class="flex shrink-0 flex-col items-end gap-1">
-                <span :class="['badge whitespace-nowrap', user.role === 'admin' ? 'badge-default' : 'badge-default']">
+              <div class="flex shrink-0 flex-col items-end gap-1.5">
+                <Badge size="sm" :variant="user.role === 'admin' ? 'info' : 'default'">
                   {{ user.role === 'admin' ? t('admin.users.admin') : t('admin.users.user') }}
-                </span>
-                <span :class="['badge whitespace-nowrap', user.status === 'active' ? 'badge-success' : 'badge-error']">
+                </Badge>
+                <Badge size="sm" :variant="user.status === 'active' ? 'success' : 'error'" :dot="true">
                   {{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}
-                </span>
+                </Badge>
               </div>
             </div>
 
-            <div class="mt-4 grid gap-2 text-xs text-themed-muted sm:grid-cols-2">
-              <div class="rounded-md bg-themed-tertiary p-2">
-                <div>{{ t('admin.users.balance') }}</div>
+            <div class="mt-4 grid gap-2.5 text-xs text-[var(--text-secondary)] sm:grid-cols-2">
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.balance') }}</div>
                 <button
-                  class="mt-1 text-left font-mono tabular-nums text-sm font-medium hover:text-primary"
-                  :class="user.balance > 0 ? 'text-success' : 'text-themed-muted'"
+                  class="mt-1 text-left font-mono tabular-nums text-sm font-semibold hover:text-[var(--accent)] transition-colors"
+                  :class="user.balance > 0 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'"
                   :title="t('admin.users.viewBalance')"
                   @click="openBalanceModal(user)"
                 >
                   ¥{{ (user.balance || 0).toFixed(2) }}
                 </button>
-                <div v-if="user.totalConsume > 0" class="mt-1">
+                <div v-if="user.totalConsume > 0" class="mt-1 text-[11px] text-[var(--text-tertiary)] truncate">
                   {{ t('admin.users.consumed') }} ¥{{ (user.totalConsume || 0).toFixed(2) }}
                 </div>
               </div>
-              <div class="rounded-md bg-themed-tertiary p-2">
-                <div>{{ t('admin.users.points') }}</div>
+
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.points') }}</div>
                 <button
-                  class="mt-1 text-left font-mono tabular-nums text-sm font-medium hover:text-primary"
-                  :class="user.points > 0 ? 'text-themed' : 'text-themed-muted'"
+                  class="mt-1 text-left font-mono tabular-nums text-sm font-semibold hover:text-[var(--accent)] transition-colors"
+                  :class="user.points > 0 ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'"
                   :title="t('admin.users.adjustPoints')"
                   @click="openPointsModal(user)"
                 >
                   {{ user.points || 0 }}
                 </button>
-                <div v-if="(user.totalEarnedPoints - user.points) > 0" class="mt-1">
+                <div v-if="(user.totalEarnedPoints - user.points) > 0" class="mt-1 text-[11px] text-[var(--text-tertiary)] truncate">
                   {{ t('admin.users.spent') }} {{ user.totalEarnedPoints - user.points }}
                 </div>
               </div>
-              <div class="rounded-md bg-themed-tertiary p-2">
-                <div>{{ t('admin.users.allInstances') }}</div>
-                <div class="mt-1 flex items-center gap-2 text-themed">
+
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.allInstances') }}</div>
+                <div class="mt-1 flex items-center gap-2 text-[var(--text-primary)] font-medium">
                   <span>{{ user.instanceCount || 0 }} {{ t('admin.users.instances') }}</span>
                   <button
                     v-if="user.instanceCount > 0"
                     type="button"
-                    class="text-themed-muted hover:text-themed transition-colors cursor-pointer inline-flex items-center justify-center p-0.5"
+                    class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer inline-flex items-center justify-center p-0.5"
                     :title="t('admin.users.viewInstances')"
                     @click="viewUserInstances(user)"
                   >
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                    </svg>
+                    <Server class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
+
               <button
-                class="rounded-md bg-themed-tertiary p-2 text-left sm:col-span-2"
+                class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5 text-left sm:col-span-2 transition-colors hover:border-[var(--border-hover)]"
                 :title="t('admin.users.viewLoginRecords')"
                 @click="openLoginRecordsModal(user)"
               >
-                <div>{{ t('admin.users.userActivity') }}</div>
-                <div class="mt-1 text-themed">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.userActivity') }}</div>
+                <div class="mt-1 text-[var(--text-primary)] font-medium">
                   {{ formatRegisteredAge(user.createdAt) }}
                   <template v-if="user.lastLogin"> · {{ formatDate(user.lastLogin.createdAt) }}</template>
                 </div>
-                <div class="mt-1 truncate">{{ user.lastLogin?.ip || t('admin.users.noLoginRecord') }}</div>
+                <div class="mt-1 font-mono text-[11px] text-[var(--text-tertiary)] truncate">{{ user.lastLogin?.ip || t('admin.users.noLoginRecord') }}</div>
               </button>
             </div>
 
-            <div class="mt-4 flex items-center justify-end gap-1 border-t border-themed pt-3">
-              <!-- 实例管理 -->
-              <button
-                type="button"
-                class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+            <div class="mt-3.5 flex items-center justify-end gap-1.5 border-t border-[var(--border-color)] pt-3">
+              <Button
+                size="sm"
+                variant="ghost"
+                class="!min-h-0 h-8 w-8 !p-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 :title="t('admin.users.viewInstances')"
                 @click="viewUserInstances(user)"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                </svg>
-              </button>
+                <Server class="w-4 h-4" />
+              </Button>
 
-              <!-- 封禁 / 解封 -->
-              <button
+              <Button
                 v-if="user.role !== 'admin'"
-                type="button"
-                class="p-1.5 rounded transition-colors cursor-pointer hover:bg-themed-hover"
-                :class="user.status === 'active' ? 'text-themed-muted hover:text-rose-500' : 'text-warning hover:text-success'"
+                size="sm"
+                variant="ghost"
+                class="!min-h-0 h-8 w-8 !p-0"
+                :class="user.status === 'active' ? 'text-[var(--text-secondary)] hover:text-[var(--error)]' : 'text-[var(--warning)] hover:text-[var(--success)]'"
                 :title="user.status === 'active' ? t('admin.users.ban') : t('admin.users.unban')"
                 @click="toggleUserStatus(user)"
               >
-                <svg v-if="user.status === 'active'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                </svg>
-                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
+                <UserX v-if="user.status === 'active'" class="w-4 h-4" />
+                <UserCheck v-else class="w-4 h-4" />
+              </Button>
 
-              <!-- 更多选项 -->
               <div class="relative inline-block text-left action-menu-container">
-                <button
-                  type="button"
-                  class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
-                  :class="{ 'text-themed bg-themed-hover': activeActionMenuUserId === user.id }"
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  class="!min-h-0 h-8 w-8 !p-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  :class="{ 'bg-[var(--bg-surface-soft)] text-[var(--text-primary)]': activeActionMenuUserId === user.id }"
                   :title="t('admin.users.moreActions')"
                   @click.stop="toggleActionMenu(user.id, $event)"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                  </svg>
-                </button>
+                  <MoreHorizontal class="w-4 h-4" />
+                </Button>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
 
-        <div class="card hidden overflow-x-auto lg:block">
-          <table class="w-full min-w-[1100px]">
-            <thead class="bg-themed-tertiary border-b border-themed">
+        <!-- 桌面端表格视图 -->
+        <div class="card hidden overflow-hidden lg:block">
+          <table class="w-full table-fixed">
+            <colgroup>
+              <col class="w-[6%]" />
+              <col class="w-[22%]" />
+              <col class="w-[8%]" />
+              <col class="w-[8%]" />
+              <col class="w-[12%]" />
+              <col class="w-[10%]" />
+              <col class="w-[10%]" />
+              <col class="w-[14%]" />
+              <col class="w-[10%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
               <tr>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">ID</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.userInfo') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.role') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.status') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.balance') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.points') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.allInstances') }}</th>
-                <th class="text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('admin.users.userActivity') }}</th>
-                <th class="text-right text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5 whitespace-nowrap">{{ t('common.actions') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">ID</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.userInfo') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.role') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.status') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.balance') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.points') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.allInstances') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.userActivity') }}</th>
+                <th class="text-right text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('common.actions') }}</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-themed">
-              <tr v-for="user in users" :key="user.id" class="hover:bg-themed-hover transition-colors">
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="user in users"
+                :key="user.id"
+                class="hover:bg-[var(--bg-surface-soft)] transition-colors duration-150"
+              >
                 <!-- 用户 ID -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span class="text-sm font-mono tabular-nums text-themed-muted">#{{ user.id }}</span>
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <span class="text-xs font-mono tabular-nums text-[var(--text-tertiary)]">#{{ user.id }}</span>
                 </td>
+
                 <!-- 用户信息 -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <div class="flex items-center gap-3">
-                    <UserAvatar 
-                      :username="user.username" 
+                <td class="px-4 py-3.5">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <UserAvatar
+                      :username="user.username"
                       :email="user.email"
                       :avatar-style="user.avatarStyle || ''"
                       :badge-id="user.avatarBadgeId || null"
                       :size="36"
                     />
-                    <div class="min-w-0">
-                      <div class="text-sm font-medium text-themed truncate">{{ user.username }}</div>
-                      <div class="text-xs text-themed-muted truncate">{{ user.email || t('admin.users.noEmail') }}</div>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm font-medium text-[var(--text-primary)] truncate">{{ user.username }}</div>
+                      <div class="text-xs text-[var(--text-tertiary)] truncate">{{ user.email || t('admin.users.noEmail') }}</div>
                     </div>
                   </div>
                 </td>
+
                 <!-- 角色 -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span :class="['badge whitespace-nowrap', user.role === 'admin' ? 'badge-default' : 'badge-default']">
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <Badge size="sm" :variant="user.role === 'admin' ? 'info' : 'default'">
                     {{ user.role === 'admin' ? t('admin.users.admin') : t('admin.users.user') }}
-                  </span>
+                  </Badge>
                 </td>
+
                 <!-- 状态 -->
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span :class="['badge whitespace-nowrap', user.status === 'active' ? 'badge-success' : 'badge-error']">
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <Badge size="sm" :variant="user.status === 'active' ? 'success' : 'error'" :dot="true">
                     {{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}
-                  </span>
+                  </Badge>
                 </td>
+
                 <!-- 余额 -->
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3.5 whitespace-nowrap">
                   <div class="flex flex-col gap-0.5">
-                    <button 
-                      class="text-sm font-mono tabular-nums font-medium hover:text-primary transition-colors text-left"
-                      :class="user.balance > 0 ? 'text-success' : 'text-themed-muted'"
+                    <button
+                      class="text-sm font-mono tabular-nums font-semibold hover:text-[var(--accent)] transition-colors text-left"
+                      :class="user.balance > 0 ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'"
                       :title="t('admin.users.viewBalance')"
                       @click="openBalanceModal(user)"
                     >
                       ¥{{ (user.balance || 0).toFixed(2) }}
                     </button>
-                    <span 
-                      v-if="user.totalConsume > 0" 
-                      class="text-xs text-themed-muted"
+                    <span
+                      v-if="user.totalConsume > 0"
+                      class="text-xs text-[var(--text-tertiary)] truncate"
                       :title="t('admin.users.totalConsumed')"
                     >
                       {{ t('admin.users.consumed') }} ¥{{ (user.totalConsume || 0).toFixed(2) }}
                     </span>
                   </div>
                 </td>
+
                 <!-- 积分 -->
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3.5 whitespace-nowrap">
                   <div class="flex flex-col gap-0.5">
-                    <button 
-                      class="text-sm font-mono tabular-nums font-medium hover:text-primary transition-colors text-left"
-                      :class="user.points > 0 ? 'text-themed' : 'text-themed-muted'"
+                    <button
+                      class="text-sm font-mono tabular-nums font-semibold hover:text-[var(--accent)] transition-colors text-left"
+                      :class="user.points > 0 ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'"
                       :title="t('admin.users.adjustPoints')"
                       @click="openPointsModal(user)"
                     >
                       {{ user.points || 0 }}
                     </button>
-                    <span 
-                      v-if="(user.totalEarnedPoints - user.points) > 0" 
-                      class="text-xs text-themed-muted"
+                    <span
+                      v-if="(user.totalEarnedPoints - user.points) > 0"
+                      class="text-xs text-[var(--text-tertiary)] truncate"
                       :title="t('admin.users.spentPoints')"
                     >
                       {{ t('admin.users.spent') }} {{ user.totalEarnedPoints - user.points }}
                     </span>
                   </div>
                 </td>
+
                 <!-- 所有实例 -->
-                <td class="px-4 py-3 whitespace-nowrap">
+                <td class="px-4 py-3.5 whitespace-nowrap">
                   <div v-if="user.quota" class="flex items-center gap-1.5">
-                    <span class="text-sm text-themed-secondary">{{ user.instanceCount || 0 }} {{ t('admin.users.instances') }}</span>
-                    <button 
+                    <span class="text-sm text-[var(--text-secondary)]">{{ user.instanceCount || 0 }} {{ t('admin.users.instances') }}</span>
+                    <button
                       v-if="user.instanceCount > 0"
                       type="button"
-                      class="text-themed-muted hover:text-themed transition-colors cursor-pointer inline-flex items-center justify-center p-0.5"
+                      class="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer inline-flex items-center justify-center p-0.5"
                       :title="t('admin.users.viewInstances')"
                       @click="viewUserInstances(user)"
                     >
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                      </svg>
+                      <Server class="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <span v-else class="text-sm text-themed-muted">-</span>
+                  <span v-else class="text-sm text-[var(--text-tertiary)]">-</span>
                 </td>
+
                 <!-- 用户活动 -->
-                <td class="px-4 py-3 whitespace-nowrap align-middle">
-                  <button 
+                <td class="px-4 py-3.5 align-middle">
+                  <button
                     v-if="user.lastLogin"
-                    class="-mx-1.5 -my-0.5 flex min-h-[40px] w-full flex-col justify-center rounded px-1.5 py-0.5 text-left transition-colors hover:bg-themed-hover"
+                    class="flex min-h-[38px] w-full flex-col justify-center rounded-xl px-2 py-1 text-left transition-colors hover:bg-[var(--bg-surface-soft)]"
                     :title="t('admin.users.viewLoginRecords')"
                     @click="openLoginRecordsModal(user)"
                   >
-                    <div class="flex items-center gap-1.5 text-xs leading-4 text-themed-secondary">
+                    <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] truncate">
                       <span :title="t('admin.users.createdAt') + ' ' + formatDate(user.createdAt)">
                         {{ formatRegisteredAge(user.createdAt) }}
                       </span>
-                      <span class="text-themed-muted">·</span>
-                      <span>{{ formatDate(user.lastLogin.createdAt) }}</span>
+                      <span class="text-[var(--text-tertiary)]">·</span>
+                      <span class="truncate">{{ formatDate(user.lastLogin.createdAt) }}</span>
                     </div>
-                    <div class="text-xs text-themed-muted truncate max-w-[200px]" :title="user.lastLogin.ip">
+                    <div class="text-xs font-mono text-[var(--text-tertiary)] truncate max-w-[200px]" :title="user.lastLogin.ip">
                       {{ user.lastLogin.ip }}
                     </div>
                   </button>
-                  <button 
+                  <button
                     v-else
-                    class="-mx-1.5 -my-0.5 flex min-h-[40px] w-full flex-col justify-center rounded px-1.5 py-0.5 text-left transition-colors hover:bg-themed-hover"
+                    class="flex min-h-[38px] w-full flex-col justify-center rounded-xl px-2 py-1 text-left transition-colors hover:bg-[var(--bg-surface-soft)]"
                     :title="t('admin.users.viewLoginRecords')"
                     @click="openLoginRecordsModal(user)"
                   >
-                    <span class="text-xs leading-4 text-themed-secondary" :title="t('admin.users.createdAt') + ' ' + formatDate(user.createdAt)">
+                    <span class="text-xs text-[var(--text-secondary)]" :title="t('admin.users.createdAt') + ' ' + formatDate(user.createdAt)">
                       {{ formatRegisteredAge(user.createdAt) }}
                     </span>
-                    <span class="text-xs text-themed-muted">{{ t('admin.users.noLoginRecord') }}</span>
+                    <span class="text-xs text-[var(--text-tertiary)]">{{ t('admin.users.noLoginRecord') }}</span>
                   </button>
                 </td>
+
                 <!-- 操作 -->
-                <td class="px-4 py-3 text-right whitespace-nowrap">
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
                   <div class="inline-flex items-center justify-end gap-1">
-                    <!-- 实例管理 -->
-                    <button
-                      type="button"
-                      class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      class="!min-h-0 h-8 w-8 !p-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       :title="t('admin.users.viewInstances')"
                       @click="viewUserInstances(user)"
                     >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                      </svg>
-                    </button>
+                      <Server class="w-4 h-4" />
+                    </Button>
 
-                    <!-- 封禁 / 解封 -->
-                    <button 
+                    <Button
                       v-if="user.role !== 'admin'"
-                      type="button"
-                      class="p-1.5 rounded transition-colors cursor-pointer hover:bg-themed-hover"
-                      :class="user.status === 'active' ? 'text-themed-muted hover:text-rose-500' : 'text-warning hover:text-success'"
+                      size="sm"
+                      variant="ghost"
+                      class="!min-h-0 h-8 w-8 !p-0"
+                      :class="user.status === 'active' ? 'text-[var(--text-secondary)] hover:text-[var(--error)]' : 'text-[var(--warning)] hover:text-[var(--success)]'"
                       :title="user.status === 'active' ? t('admin.users.ban') : t('admin.users.unban')"
                       @click="toggleUserStatus(user)"
                     >
-                      <svg v-if="user.status === 'active'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                      </svg>
-                      <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </button>
+                      <UserX v-if="user.status === 'active'" class="w-4 h-4" />
+                      <UserCheck v-else class="w-4 h-4" />
+                    </Button>
 
-                    <!-- 更多选项 -->
                     <div class="relative inline-block text-left action-menu-container">
-                      <button
-                        type="button"
-                        class="p-1.5 rounded text-themed-muted hover:text-themed hover:bg-themed-hover transition-colors cursor-pointer"
-                        :class="{ 'text-themed bg-themed-hover': activeActionMenuUserId === user.id }"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        class="!min-h-0 h-8 w-8 !p-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        :class="{ 'bg-[var(--bg-surface-soft)] text-[var(--text-primary)]': activeActionMenuUserId === user.id }"
                         :title="t('admin.users.moreActions')"
                         @click.stop="toggleActionMenu(user.id, $event)"
                       >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                        </svg>
-                      </button>
+                        <MoreHorizontal class="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </td>
@@ -1375,96 +1401,44 @@ function _getQuotaPercent(used, limit) {
             </tbody>
           </table>
         </div>
-      </template>
 
-      <!-- 分页 -->
-      <div 
-        v-if="userTotal > 0" 
-        class="flex items-center justify-between px-4 py-3 border-t border-themed"
-      >
-        <div class="flex items-center gap-3">
-          <span class="text-sm" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
-            {{ t('admin.users.totalRecords', { count: userTotal }) }}
-          </span>
-          <select
-            v-model="userPageSize"
-            class="text-sm rounded-md border-0 py-1 pl-2 pr-7 ring-1 ring-inset focus:ring-2 focus:ring-primary cursor-pointer"
-            :class="themeStore.isDark 
-              ? 'bg-gray-800 text-gray-300 ring-gray-700' 
-              : 'bg-gray-50 text-gray-700 ring-gray-200'"
-            @change="handleUserPageSizeChange"
-          >
-            <option :value="10">10 / {{ t('common.page') }}</option>
-            <option :value="30">30 / {{ t('common.page') }}</option>
-            <option :value="50">50 / {{ t('common.page') }}</option>
-            <option :value="100">100 / {{ t('common.page') }}</option>
-          </select>
+        <!-- 底部分页 -->
+        <div v-if="userTotal > 0" class="pt-2 px-1">
+          <Pagination
+            :page="userPage"
+            :page-size="userPageSize"
+            :total="userTotal"
+            :show-size-changer="true"
+            :page-size-options="[10, 30, 50, 100]"
+            @update:page="(p) => { userPage = p; void loadUsers() }"
+            @update:page-size="(ps) => { userPageSize = ps; handleUserPageSizeChange() }"
+          />
         </div>
-        <div v-if="userTotalPages > 1" class="flex items-center gap-1">
-          <button
-            :disabled="userPage <= 1"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-sm transition-colors"
-            :class="[
-              userPage <= 1 
-                ? 'opacity-40 cursor-not-allowed' 
-                : themeStore.isDark 
-                  ? 'hover:bg-gray-800 text-gray-400' 
-                  : 'hover:bg-gray-100 text-gray-600'
-            ]"
-            @click="userPage--; loadUsers()"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div 
-            class="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium"
-            :class="themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'"
-          >
-            <span>{{ userPage }}</span>
-            <span :class="themeStore.isDark ? 'text-gray-600' : 'text-gray-400'">/</span>
-            <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">{{ userTotalPages }}</span>
-          </div>
-          <button
-            :disabled="userPage >= userTotalPages"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-sm transition-colors"
-            :class="[
-              userPage >= userTotalPages 
-                ? 'opacity-40 cursor-not-allowed' 
-                : themeStore.isDark 
-                  ? 'hover:bg-gray-800 text-gray-400' 
-                  : 'hover:bg-gray-100 text-gray-600'
-            ]"
-            @click="userPage++; loadUsers()"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      </template>
     </div>
 
-    <!-- 邀请码列表 -->
-    <div v-if="activeTab === 'invites'" class="space-y-4">
-      <div class="flex justify-end">
-        <div
-          class="inline-flex items-center gap-1 rounded-lg p-1"
-          :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-100'"
-        >
+    <!-- 邀请码列表 Tab -->
+    <div v-if="activeTab === 'invites'" class="space-y-5">
+      <!-- 状态筛选栏 -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h3 class="text-base font-semibold text-[var(--text-primary)] tracking-tight">
+            {{ t('admin.users.invites') }}
+          </h3>
+          <p class="text-xs text-[var(--text-secondary)] mt-0.5">
+            {{ t('admin.users.description') }}
+          </p>
+        </div>
+        <div class="inline-flex items-center gap-1 rounded-full p-1 bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
           <button
             v-for="option in inviteStatusFilterOptions"
             :key="option.value"
             type="button"
             :disabled="invitesLoading"
-            class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            class="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 select-none"
             :class="inviteStatusFilter === option.value
-              ? themeStore.isDark
-                ? 'bg-gray-700 text-white shadow-sm'
-                : 'bg-white text-gray-900 shadow-sm'
-              : themeStore.isDark
-                ? 'text-gray-400 hover:text-gray-200'
-                : 'text-gray-600 hover:text-gray-900'"
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
             @click="handleInviteStatusFilterChange(option.value)"
           >
             {{ option.label }}
@@ -1473,36 +1447,46 @@ function _getQuotaPercent(used, limit) {
       </div>
 
       <SkeletonLoader v-if="invitesLoading" type="list" />
-      
-      <div v-else-if="invites.length === 0" class="card p-8 text-center text-themed-muted text-sm">
-        {{ inviteStatusFilter === 'all' ? t('admin.users.noInvites') : t('admin.users.noMatchingInvites') }}
-      </div>
+
+      <Card v-else-if="invites.length === 0" padding="none">
+        <EmptyState
+          :title="inviteStatusFilter === 'all' ? t('admin.users.noInvites') : t('admin.users.noMatchingInvites')"
+        />
+      </Card>
 
       <template v-else>
+        <!-- 移动端邀请码列表 -->
         <div class="space-y-3 lg:hidden">
-          <div
+          <Card
             v-for="invite in invites"
             :key="invite.id"
-            class="card p-4"
+            padding="sm"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <div class="font-mono tabular-nums text-sm font-medium text-themed break-all">{{ invite.code }}</div>
+                <div class="font-mono tabular-nums text-sm font-semibold text-[var(--text-primary)] break-all">{{ invite.code }}</div>
                 <div class="mt-2">
-                  <span :class="['badge whitespace-nowrap', getInviteStatus(invite).class]">{{ getInviteStatus(invite).label }}</span>
+                  <Badge size="sm" :variant="getInviteStatus(invite).variant">
+                    {{ getInviteStatus(invite).label }}
+                  </Badge>
                 </div>
               </div>
-              <button
-                class="btn-ghost btn-sm shrink-0 text-error"
+              <Button
+                size="sm"
+                variant="ghost"
+                class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] shrink-0"
                 @click="deleteInvite(invite)"
               >
+                <template #icon>
+                  <Trash2 class="w-3.5 h-3.5" />
+                </template>
                 {{ t('admin.users.deleteInvite') }}
-              </button>
+              </Button>
             </div>
 
-            <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.users.createdBy') }}</div>
+            <div class="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.createdBy') }}</div>
                 <div v-if="invite.createdByUsername" class="mt-1 flex min-w-0 items-center gap-2">
                   <UserAvatar
                     v-if="invite.createdByAvatarStyle"
@@ -1512,12 +1496,13 @@ function _getQuotaPercent(used, limit) {
                     :badge-id="invite.createdByAvatarBadgeId || null"
                     :size="24"
                   />
-                  <span class="truncate text-themed">{{ invite.createdByUsername }}</span>
+                  <span class="truncate text-[var(--text-primary)] font-medium">{{ invite.createdByUsername }}</span>
                 </div>
-                <span v-else class="mt-1 block text-themed-muted">-</span>
+                <span v-else class="mt-1 block text-[var(--text-tertiary)]">-</span>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.users.usedBy') }}</div>
+
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.usedBy') }}</div>
                 <div v-if="invite.usedByUsername" class="mt-1 flex min-w-0 items-center gap-2">
                   <UserAvatar
                     v-if="invite.usedByAvatarStyle"
@@ -1527,43 +1512,61 @@ function _getQuotaPercent(used, limit) {
                     :badge-id="invite.usedByAvatarBadgeId || null"
                     :size="24"
                   />
-                  <span class="truncate text-themed">{{ invite.usedByUsername }}</span>
+                  <span class="truncate text-[var(--text-primary)] font-medium">{{ invite.usedByUsername }}</span>
                 </div>
-                <span v-else class="mt-1 block text-themed-muted">-</span>
+                <span v-else class="mt-1 block text-[var(--text-tertiary)]">-</span>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.users.createdAt') }}</div>
-                <div class="mt-1 text-themed-secondary">{{ formatDate(invite.createdAt) }}</div>
+
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.createdAt') }}</div>
+                <div class="mt-1 text-[var(--text-secondary)] font-medium">{{ formatDate(invite.createdAt) }}</div>
               </div>
-              <div>
-                <div class="text-xs text-themed-muted">{{ t('admin.users.usedExpireAt') }}</div>
-                <div class="mt-1 text-themed-secondary">
+
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-2.5">
+                <div class="text-[11px] text-[var(--text-tertiary)] uppercase tracking-wide">{{ t('admin.users.usedExpireAt') }}</div>
+                <div class="mt-1 text-[var(--text-secondary)] font-medium">
                   <span v-if="invite.usedAt">{{ formatDate(invite.usedAt) }}</span>
                   <span v-else-if="invite.expiresAt">{{ formatDate(invite.expiresAt) }}</span>
-                  <span v-else class="text-themed-faint">{{ t('admin.users.permanent') }}</span>
+                  <span v-else class="text-[var(--text-tertiary)]">{{ t('admin.users.permanent') }}</span>
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
 
+        <!-- 桌面端邀请码表格 -->
         <div class="card hidden overflow-hidden lg:block">
           <table class="w-full table-fixed">
-            <thead class="bg-themed-tertiary border-b border-themed">
+            <colgroup>
+              <col class="w-[20%]" />
+              <col class="w-[16%]" />
+              <col class="w-[12%]" />
+              <col class="w-[16%]" />
+              <col class="w-[14%]" />
+              <col class="w-[14%]" />
+              <col class="w-[8%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)]">
               <tr>
-                <th class="w-[18%] text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('admin.users.inviteCode') }}</th>
-                <th class="w-[15%] text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('admin.users.createdBy') }}</th>
-                <th class="w-[12%] text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('admin.users.inviteStatus') }}</th>
-                <th class="w-[15%] text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('admin.users.usedBy') }}</th>
-                <th class="w-[15%] text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('admin.users.createdAt') }}</th>
-                <th class="w-[15%] text-left text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('admin.users.usedExpireAt') }}</th>
-                <th class="w-[10%] text-right text-[11px] font-mono font-medium text-themed-faint uppercase tracking-wider px-4 py-2.5">{{ t('common.actions') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.inviteCode') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.createdBy') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.inviteStatus') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.usedBy') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.createdAt') }}</th>
+                <th class="text-left text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('admin.users.usedExpireAt') }}</th>
+                <th class="text-right text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-4 py-3 select-none">{{ t('common.actions') }}</th>
               </tr>
             </thead>
-            <tbody class="divide-themed">
-              <tr v-for="invite in invites" :key="invite.id" class="hover:bg-themed-hover">
-                <td class="px-4 py-3 font-mono tabular-nums text-sm text-themed-secondary truncate" :title="invite.code">{{ invite.code }}</td>
-                <td class="px-4 py-3 text-sm">
+            <tbody class="divide-y divide-[var(--border-color)]">
+              <tr
+                v-for="invite in invites"
+                :key="invite.id"
+                class="hover:bg-[var(--bg-surface-soft)] transition-colors duration-150"
+              >
+                <td class="px-4 py-3.5 font-mono tabular-nums text-sm font-semibold text-[var(--text-primary)] truncate" :title="invite.code">
+                  {{ invite.code }}
+                </td>
+                <td class="px-4 py-3.5 text-sm">
                   <div v-if="invite.createdByUsername" class="flex items-center gap-2">
                     <UserAvatar
                       v-if="invite.createdByAvatarStyle"
@@ -1573,14 +1576,16 @@ function _getQuotaPercent(used, limit) {
                       :badge-id="invite.createdByAvatarBadgeId || null"
                       :size="24"
                     />
-                    <span class="truncate text-themed">{{ invite.createdByUsername }}</span>
+                    <span class="truncate text-[var(--text-primary)] font-medium">{{ invite.createdByUsername }}</span>
                   </div>
-                  <span v-else class="text-themed-muted">-</span>
+                  <span v-else class="text-[var(--text-tertiary)]">-</span>
                 </td>
-                <td class="px-4 py-3">
-                  <span :class="['badge whitespace-nowrap', getInviteStatus(invite).class]">{{ getInviteStatus(invite).label }}</span>
+                <td class="px-4 py-3.5 whitespace-nowrap">
+                  <Badge size="sm" :variant="getInviteStatus(invite).variant">
+                    {{ getInviteStatus(invite).label }}
+                  </Badge>
                 </td>
-                <td class="px-4 py-3 text-sm">
+                <td class="px-4 py-3.5 text-sm">
                   <div v-if="invite.usedByUsername" class="flex items-center gap-2">
                     <UserAvatar
                       v-if="invite.usedByAvatarStyle"
@@ -1590,351 +1595,308 @@ function _getQuotaPercent(used, limit) {
                       :badge-id="invite.usedByAvatarBadgeId || null"
                       :size="24"
                     />
-                    <span class="truncate text-themed">{{ invite.usedByUsername }}</span>
+                    <span class="truncate text-[var(--text-primary)] font-medium">{{ invite.usedByUsername }}</span>
                   </div>
-                  <span v-else class="text-themed-muted">-</span>
+                  <span v-else class="text-[var(--text-tertiary)]">-</span>
                 </td>
-                <td class="px-4 py-3 text-sm text-themed-muted whitespace-nowrap">{{ formatDate(invite.createdAt) }}</td>
-                <td class="px-4 py-3 text-sm text-themed-muted whitespace-nowrap">
+                <td class="px-4 py-3.5 text-xs text-[var(--text-secondary)] whitespace-nowrap">
+                  {{ formatDate(invite.createdAt) }}
+                </td>
+                <td class="px-4 py-3.5 text-xs text-[var(--text-secondary)] whitespace-nowrap">
                   <span v-if="invite.usedAt">{{ formatDate(invite.usedAt) }}</span>
                   <span v-else-if="invite.expiresAt">{{ formatDate(invite.expiresAt) }}</span>
-                  <span v-else class="text-themed-faint">{{ t('admin.users.permanent') }}</span>
+                  <span v-else class="text-[var(--text-tertiary)]">{{ t('admin.users.permanent') }}</span>
                 </td>
-                <td class="px-4 py-3 text-right whitespace-nowrap">
-                  <button 
-                    class="btn-ghost btn-sm text-error"
+                <td class="px-4 py-3.5 text-right whitespace-nowrap">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,transparent)] !min-h-0 h-8 px-2.5 text-xs"
                     @click="deleteInvite(invite)"
                   >
+                    <template #icon>
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </template>
                     {{ t('admin.users.deleteInvite') }}
-                  </button>
+                  </Button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-      </template>
 
-      <div 
-        v-if="invitesTotal > 0" 
-        class="flex items-center justify-between px-4 py-3 border-t border-themed"
-      >
-        <div class="flex items-center gap-3">
-          <span class="text-sm" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
-            {{ t('admin.users.totalRecords', { count: invitesTotal }) }}
-          </span>
-          <select
-            v-model="invitesPageSize"
-            class="text-sm rounded-md border-0 py-1 pl-2 pr-7 ring-1 ring-inset focus:ring-2 focus:ring-primary cursor-pointer"
-            :class="themeStore.isDark 
-              ? 'bg-gray-800 text-gray-300 ring-gray-700' 
-              : 'bg-gray-50 text-gray-700 ring-gray-200'"
-            @change="handleInvitesPageSizeChange"
-          >
-            <option :value="10">10 / {{ t('common.page') }}</option>
-            <option :value="30">30 / {{ t('common.page') }}</option>
-            <option :value="50">50 / {{ t('common.page') }}</option>
-            <option :value="100">100 / {{ t('common.page') }}</option>
-          </select>
+        <!-- 邀请码底部分页 -->
+        <div v-if="invitesTotal > 0" class="pt-2 px-1">
+          <Pagination
+            :page="invitesPage"
+            :page-size="invitesPageSize"
+            :total="invitesTotal"
+            :show-size-changer="true"
+            :page-size-options="[10, 30, 50, 100]"
+            @update:page="(p) => { invitesPage = p; void loadInvites() }"
+            @update:page-size="(ps) => { invitesPageSize = ps; handleInvitesPageSizeChange() }"
+          />
         </div>
-        <div v-if="invitesTotalPages > 1" class="flex items-center gap-1">
-          <button
-            :disabled="invitesPage <= 1"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-sm transition-colors"
-            :class="[
-              invitesPage <= 1 
-                ? 'opacity-40 cursor-not-allowed' 
-                : themeStore.isDark 
-                  ? 'hover:bg-gray-800 text-gray-400' 
-                  : 'hover:bg-gray-100 text-gray-600'
-            ]"
-            @click="invitesPage--; loadInvites()"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div 
-            class="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium"
-            :class="themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'"
-          >
-            <span>{{ invitesPage }}</span>
-            <span :class="themeStore.isDark ? 'text-gray-600' : 'text-gray-400'">/</span>
-            <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">{{ invitesTotalPages }}</span>
-          </div>
-          <button
-            :disabled="invitesPage >= invitesTotalPages"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-sm transition-colors"
-            :class="[
-              invitesPage >= invitesTotalPages 
-                ? 'opacity-40 cursor-not-allowed' 
-                : themeStore.isDark 
-                  ? 'hover:bg-gray-800 text-gray-400' 
-                  : 'hover:bg-gray-100 text-gray-600'
-            ]"
-            @click="invitesPage++; loadInvites()"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      </template>
     </div>
 
-    <!-- 关联账号检测 -->
-    <div v-if="activeTab === 'linkedAccounts'" class="space-y-4">
-      <!-- 操作栏 -->
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
-        <div class="flex items-center gap-3">
-          <label class="text-sm text-themed-secondary whitespace-nowrap">{{ t('admin.users.detectDays') }}</label>
-          <select v-model.number="linkedAccountsDays" class="input w-auto flex-1 sm:flex-none">
-            <option :value="30">30 {{ t('admin.users.daysUnit') }}</option>
-            <option :value="60">60 {{ t('admin.users.daysUnit') }}</option>
-            <option :value="90">90 {{ t('admin.users.daysUnit') }}</option>
-            <option :value="180">180 {{ t('admin.users.daysUnit') }}</option>
-            <option :value="365">365 {{ t('admin.users.daysUnit') }}</option>
-          </select>
+    <!-- 关联账号检测 Tab -->
+    <div v-if="activeTab === 'linkedAccounts'" class="space-y-5">
+      <!-- 控制栏 Card -->
+      <Card data-reveal padding="sm">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-semibold text-[var(--text-secondary)] whitespace-nowrap">{{ t('admin.users.detectDays') }}</span>
+            <div class="w-44">
+              <Select
+                :model-value="linkedAccountsDays"
+                :options="linkedAccountsDaysOptions"
+                size="sm"
+                @update:model-value="(val) => { linkedAccountsDays = Number(val) }"
+              />
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            :loading="linkedAccountsLoading"
+            @click="loadLinkedAccounts"
+          >
+            <template #icon>
+              <Search class="w-4 h-4" />
+            </template>
+            {{ linkedAccountsLoading ? t('admin.users.detecting') : t('admin.users.startDetect') }}
+          </Button>
         </div>
-        <button 
-          class="btn-primary w-full sm:w-auto justify-center" 
-          :disabled="linkedAccountsLoading"
-          @click="loadLinkedAccounts"
-        >
-          <svg v-if="linkedAccountsLoading" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <svg v-else class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          {{ linkedAccountsLoading ? t('admin.users.detecting') : t('admin.users.startDetect') }}
-        </button>
-      </div>
+      </Card>
 
       <!-- 加载中 -->
-      <div v-if="linkedAccountsLoading" class="card p-8 text-center">
-        <svg class="w-8 h-8 animate-spin mx-auto text-themed-muted" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="text-sm text-themed-muted mt-3">{{ t('admin.users.detectingHint') }}</p>
-      </div>
+      <Card v-if="linkedAccountsLoading" padding="lg" class="text-center">
+        <div class="animate-spin w-8 h-8 mx-auto text-[var(--accent)] mb-3">
+          <svg fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </div>
+        <p class="text-sm text-[var(--text-secondary)]">{{ t('admin.users.detectingHint') }}</p>
+      </Card>
 
       <!-- 未检测 -->
-      <div v-else-if="!linkedAccountsData" class="card p-8 text-center text-themed-muted text-sm">
-        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-        {{ t('admin.users.clickToDetect') }}
-      </div>
+      <Card v-else-if="!linkedAccountsData" padding="lg">
+        <EmptyState
+          :title="t('admin.users.clickToDetect')"
+        >
+          <template #icon>
+            <Search class="w-7 h-7 text-[var(--text-tertiary)] stroke-[1.5]" />
+          </template>
+        </EmptyState>
+      </Card>
 
       <!-- 检测结果 -->
       <template v-else>
-        <!-- 摘要信息 -->
-        <div class="card p-4">
-          <div class="flex flex-wrap items-center gap-4 text-sm">
+        <!-- 摘要信息 Card -->
+        <Card padding="sm" class="space-y-4">
+          <div class="flex flex-wrap items-center gap-6 text-xs text-[var(--text-secondary)]">
             <div class="flex items-center gap-2">
-              <span class="text-themed-muted">{{ t('admin.users.detectTime') }}:</span>
-              <span class="text-themed-secondary">{{ formatDate(linkedAccountsData.detectedAt) }}</span>
+              <span class="text-[var(--text-tertiary)]">{{ t('admin.users.detectTime') }}:</span>
+              <span class="font-medium text-[var(--text-primary)]">{{ formatDate(linkedAccountsData.detectedAt) }}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-themed-muted">{{ t('admin.users.detectDuration') }}:</span>
-              <span class="text-themed-secondary">{{ linkedAccountsData.durationMs }}ms</span>
+              <span class="text-[var(--text-tertiary)]">{{ t('admin.users.detectDuration') }}:</span>
+              <span class="font-mono font-medium text-[var(--text-primary)]">{{ linkedAccountsData.durationMs }}ms</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-themed-muted">{{ t('admin.users.detectRange') }}:</span>
-              <span class="text-themed-secondary">{{ linkedAccountsData.days }} {{ t('admin.users.daysUnit') }}</span>
-            </div>
-          </div>
-          <div class="flex flex-wrap gap-4 mt-3 pt-3 border-t border-themed">
-            <div class="flex items-center gap-2">
-              <span class="badge badge-warning">{{ linkedAccountsData.summary.ipGroups }}</span>
-              <span class="text-sm text-themed-secondary">{{ t('admin.users.ipGroupCount') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="badge badge-info">{{ linkedAccountsData.summary.emailGroups }}</span>
-              <span class="text-sm text-themed-secondary">{{ t('admin.users.emailGroupCount') }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="badge badge-default">{{ linkedAccountsData.summary.usernameGroups }}</span>
-              <span class="text-sm text-themed-secondary">{{ t('admin.users.usernameGroupCount') }}</span>
+              <span class="text-[var(--text-tertiary)]">{{ t('admin.users.detectRange') }}:</span>
+              <span class="font-medium text-[var(--text-primary)]">{{ linkedAccountsData.days }} {{ t('admin.users.daysUnit') }}</span>
             </div>
           </div>
-        </div>
+          <div class="flex flex-wrap gap-3 pt-3 border-t border-[var(--border-color)]">
+            <Badge variant="warning" size="md">
+              {{ linkedAccountsData.summary.ipGroups }} {{ t('admin.users.ipGroupCount') }}
+            </Badge>
+            <Badge variant="info" size="md">
+              {{ linkedAccountsData.summary.emailGroups }} {{ t('admin.users.emailGroupCount') }}
+            </Badge>
+            <Badge variant="default" size="md">
+              {{ linkedAccountsData.summary.usernameGroups }} {{ t('admin.users.usernameGroupCount') }}
+            </Badge>
+          </div>
+        </Card>
 
         <!-- IP 关联组 -->
-        <div v-if="linkedAccountsData.ipGroups.length > 0" class="space-y-2">
-          <h3 class="text-sm font-medium text-themed flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-            </svg>
-            {{ t('admin.users.ipLinkedGroups') }} ({{ linkedAccountsData.ipGroups.length }})
+        <div v-if="linkedAccountsData.ipGroups.length > 0" class="space-y-3">
+          <h3 class="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 tracking-tight">
+            <Globe class="w-4 h-4 text-[var(--accent)]" />
+            <span>{{ t('admin.users.ipLinkedGroups') }} ({{ linkedAccountsData.ipGroups.length }})</span>
           </h3>
-          <div class="space-y-2">
-            <div 
-              v-for="group in linkedAccountsData.ipGroups" 
-              :key="group.ip" 
-              class="card overflow-hidden"
+          <div class="space-y-2.5">
+            <Card
+              v-for="group in linkedAccountsData.ipGroups"
+              :key="group.ip"
+              padding="none"
+              class="overflow-hidden"
             >
-              <button 
-                class="w-full px-4 py-3 flex items-center justify-between hover:bg-themed-hover transition-colors text-left"
+              <button
+                type="button"
+                class="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-surface-soft)] transition-colors text-left select-none"
                 @click="toggleIPGroup(group.ip)"
               >
                 <div class="flex items-center gap-3">
-                  <span class="font-mono tabular-nums text-sm text-themed">{{ group.ip }}</span>
-                  <span class="badge badge-warning">{{ group.userCount }} {{ t('admin.users.usersCount') }}</span>
-                  <span class="text-xs text-themed-muted">{{ group.totalLogins }} {{ t('admin.users.loginsCount') }}</span>
+                  <span class="font-mono tabular-nums text-sm font-semibold text-[var(--text-primary)]">{{ group.ip }}</span>
+                  <Badge variant="warning" size="sm">{{ group.userCount }} {{ t('admin.users.usersCount') }}</Badge>
+                  <span class="text-xs text-[var(--text-tertiary)]">{{ group.totalLogins }} {{ t('admin.users.loginsCount') }}</span>
                 </div>
-                <svg 
-                  class="w-4 h-4 text-themed-muted transition-transform" 
+                <ChevronDown
+                  class="w-4 h-4 text-[var(--text-tertiary)] transition-transform duration-200"
                   :class="{ 'rotate-180': linkedAccountsExpandedIP.has(group.ip) }"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                />
               </button>
-              <div v-if="linkedAccountsExpandedIP.has(group.ip)" class="border-t border-themed">
-                <div class="divide-y divide-themed">
-                  <div 
-                    v-for="user in group.users" 
-                    :key="user.id" 
-                    class="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm hover:bg-themed-hover"
+              <div v-if="linkedAccountsExpandedIP.has(group.ip)" class="border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <div class="divide-y divide-[var(--border-color)]">
+                  <div
+                    v-for="user in group.users"
+                    :key="user.id"
+                    class="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm hover:bg-[var(--bg-surface)] transition-colors"
                   >
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span class="font-mono tabular-nums text-themed-muted">#{{ user.id }}</span>
-                      <span class="font-medium text-themed">{{ user.username }}</span>
-                      <span v-if="user.email" class="text-themed-muted truncate max-w-[200px]">{{ user.email }}</span>
-                      <span :class="['badge', user.status === 'active' ? 'badge-success' : 'badge-error']">{{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}</span>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                      <span class="font-mono tabular-nums text-xs text-[var(--text-tertiary)]">#{{ user.id }}</span>
+                      <span class="font-medium text-xs text-[var(--text-primary)]">{{ user.username }}</span>
+                      <span v-if="user.email" class="text-xs text-[var(--text-secondary)] truncate max-w-[200px]">{{ user.email }}</span>
+                      <Badge size="sm" :variant="user.status === 'active' ? 'success' : 'error'">
+                        {{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}
+                      </Badge>
                     </div>
-                    <div class="text-xs text-themed-muted whitespace-nowrap">
+                    <div class="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
                       {{ user.loginCount }} {{ t('admin.users.loginsCount') }} · {{ t('admin.users.lastLoginAt') }} {{ formatDate(user.lastLogin) }}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
           </div>
         </div>
 
         <!-- 邮箱相似组 -->
-        <div v-if="linkedAccountsData.emailGroups.length > 0" class="space-y-2">
-          <h3 class="text-sm font-medium text-themed flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            {{ t('admin.users.emailSimilarGroups') }} ({{ linkedAccountsData.emailGroups.length }})
+        <div v-if="linkedAccountsData.emailGroups.length > 0" class="space-y-3">
+          <h3 class="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 tracking-tight">
+            <Mail class="w-4 h-4 text-[var(--accent)]" />
+            <span>{{ t('admin.users.emailSimilarGroups') }} ({{ linkedAccountsData.emailGroups.length }})</span>
           </h3>
-          <div class="space-y-2">
-            <div 
-              v-for="group in linkedAccountsData.emailGroups" 
-              :key="group.pattern" 
-              class="card overflow-hidden"
+          <div class="space-y-2.5">
+            <Card
+              v-for="group in linkedAccountsData.emailGroups"
+              :key="group.pattern"
+              padding="none"
+              class="overflow-hidden"
             >
-              <button 
-                class="w-full px-4 py-3 flex items-center justify-between hover:bg-themed-hover transition-colors text-left"
+              <button
+                type="button"
+                class="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-surface-soft)] transition-colors text-left select-none"
                 @click="toggleEmailGroup(group.pattern)"
               >
                 <div class="flex items-center gap-3">
-                  <span class="font-mono text-sm text-themed">{{ group.pattern }}*</span>
-                  <span class="badge badge-info">{{ group.userCount }} {{ t('admin.users.usersCount') }}</span>
+                  <span class="font-mono text-sm font-semibold text-[var(--text-primary)]">{{ group.pattern }}*</span>
+                  <Badge variant="info" size="sm">{{ group.userCount }} {{ t('admin.users.usersCount') }}</Badge>
                 </div>
-                <svg 
-                  class="w-4 h-4 text-themed-muted transition-transform" 
+                <ChevronDown
+                  class="w-4 h-4 text-[var(--text-tertiary)] transition-transform duration-200"
                   :class="{ 'rotate-180': linkedAccountsExpandedEmail.has(group.pattern) }"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                />
               </button>
-              <div v-if="linkedAccountsExpandedEmail.has(group.pattern)" class="border-t border-themed">
-                <div class="divide-y divide-themed">
-                  <div 
-                    v-for="user in group.users" 
-                    :key="user.id" 
-                    class="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm hover:bg-themed-hover"
+              <div v-if="linkedAccountsExpandedEmail.has(group.pattern)" class="border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <div class="divide-y divide-[var(--border-color)]">
+                  <div
+                    v-for="user in group.users"
+                    :key="user.id"
+                    class="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm hover:bg-[var(--bg-surface)] transition-colors"
                   >
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span class="font-mono tabular-nums text-themed-muted">#{{ user.id }}</span>
-                      <span class="font-medium text-themed">{{ user.username }}</span>
-                      <span class="text-themed-secondary truncate max-w-[200px]">{{ user.email }}</span>
-                      <span :class="['badge', user.status === 'active' ? 'badge-success' : 'badge-error']">{{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}</span>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                      <span class="font-mono tabular-nums text-xs text-[var(--text-tertiary)]">#{{ user.id }}</span>
+                      <span class="font-medium text-xs text-[var(--text-primary)]">{{ user.username }}</span>
+                      <span class="text-xs text-[var(--text-secondary)] truncate max-w-[200px]">{{ user.email }}</span>
+                      <Badge size="sm" :variant="user.status === 'active' ? 'success' : 'error'">
+                        {{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}
+                      </Badge>
                     </div>
-                    <div class="text-xs text-themed-muted whitespace-nowrap">
+                    <div class="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
                       {{ t('admin.users.createdAt') }} {{ formatDate(user.createdAt) }}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
           </div>
         </div>
 
         <!-- 用户名相似组 -->
-        <div v-if="linkedAccountsData.usernameGroups.length > 0" class="space-y-2">
-          <h3 class="text-sm font-medium text-themed flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {{ t('admin.users.usernameSimilarGroups') }} ({{ linkedAccountsData.usernameGroups.length }})
+        <div v-if="linkedAccountsData.usernameGroups.length > 0" class="space-y-3">
+          <h3 class="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 tracking-tight">
+            <UserCheck class="w-4 h-4 text-[var(--accent)]" />
+            <span>{{ t('admin.users.usernameSimilarGroups') }} ({{ linkedAccountsData.usernameGroups.length }})</span>
           </h3>
-          <div class="space-y-2">
-            <div 
-              v-for="group in linkedAccountsData.usernameGroups" 
-              :key="group.pattern" 
-              class="card overflow-hidden"
+          <div class="space-y-2.5">
+            <Card
+              v-for="group in linkedAccountsData.usernameGroups"
+              :key="group.pattern"
+              padding="none"
+              class="overflow-hidden"
             >
-              <button 
-                class="w-full px-4 py-3 flex items-center justify-between hover:bg-themed-hover transition-colors text-left"
+              <button
+                type="button"
+                class="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-surface-soft)] transition-colors text-left select-none"
                 @click="toggleUsernameGroup(group.pattern)"
               >
                 <div class="flex items-center gap-3">
-                  <span class="font-mono text-sm text-themed">{{ group.pattern }}*</span>
-                  <span class="badge badge-default">{{ group.userCount }} {{ t('admin.users.usersCount') }}</span>
+                  <span class="font-mono text-sm font-semibold text-[var(--text-primary)]">{{ group.pattern }}*</span>
+                  <Badge variant="default" size="sm">{{ group.userCount }} {{ t('admin.users.usersCount') }}</Badge>
                 </div>
-                <svg 
-                  class="w-4 h-4 text-themed-muted transition-transform" 
+                <ChevronDown
+                  class="w-4 h-4 text-[var(--text-tertiary)] transition-transform duration-200"
                   :class="{ 'rotate-180': linkedAccountsExpandedUsername.has(group.pattern) }"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                />
               </button>
-              <div v-if="linkedAccountsExpandedUsername.has(group.pattern)" class="border-t border-themed">
-                <div class="divide-y divide-themed">
-                  <div 
-                    v-for="user in group.users" 
-                    :key="user.id" 
-                    class="px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm hover:bg-themed-hover"
+              <div v-if="linkedAccountsExpandedUsername.has(group.pattern)" class="border-t border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <div class="divide-y divide-[var(--border-color)]">
+                  <div
+                    v-for="user in group.users"
+                    :key="user.id"
+                    class="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm hover:bg-[var(--bg-surface)] transition-colors"
                   >
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span class="font-mono tabular-nums text-themed-muted">#{{ user.id }}</span>
-                      <span class="font-medium text-themed">{{ user.username }}</span>
-                      <span v-if="user.email" class="text-themed-muted truncate max-w-[200px]">{{ user.email }}</span>
-                      <span :class="['badge', user.status === 'active' ? 'badge-success' : 'badge-error']">{{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}</span>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                      <span class="font-mono tabular-nums text-xs text-[var(--text-tertiary)]">#{{ user.id }}</span>
+                      <span class="font-medium text-xs text-[var(--text-primary)]">{{ user.username }}</span>
+                      <span v-if="user.email" class="text-xs text-[var(--text-secondary)] truncate max-w-[200px]">{{ user.email }}</span>
+                      <Badge size="sm" :variant="user.status === 'active' ? 'success' : 'error'">
+                        {{ user.status === 'active' ? t('admin.users.active') : t('admin.users.banned') }}
+                      </Badge>
                     </div>
-                    <div class="text-xs text-themed-muted whitespace-nowrap">
+                    <div class="text-xs text-[var(--text-tertiary)] whitespace-nowrap">
                       {{ t('admin.users.createdAt') }} {{ formatDate(user.createdAt) }}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
           </div>
         </div>
 
         <!-- 无检测结果 -->
-        <div 
-          v-if="linkedAccountsData.ipGroups.length === 0 && linkedAccountsData.emailGroups.length === 0 && linkedAccountsData.usernameGroups.length === 0" 
-          class="card p-8 text-center text-themed-muted text-sm"
+        <Card
+          v-if="linkedAccountsData.ipGroups.length === 0 && linkedAccountsData.emailGroups.length === 0 && linkedAccountsData.usernameGroups.length === 0"
+          padding="lg"
         >
-          <svg class="w-12 h-12 mx-auto mb-3 text-success opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {{ t('admin.users.noLinkedAccounts') }}
-        </div>
+          <EmptyState
+            :title="t('admin.users.noLinkedAccounts')"
+          >
+            <template #icon>
+              <Check class="w-7 h-7 text-[var(--success)] stroke-[2]" />
+            </template>
+          </EmptyState>
+        </Card>
       </template>
     </div>
 
+    <!-- VIP 等级与权益设置 -->
     <VipLevelRulesEditor v-if="activeTab === 'userVipLevels'" type="user" />
     <VipBenefitHallSettings v-if="activeTab === 'vipBenefits'" />
 
@@ -1946,45 +1908,42 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.generateInviteTitle') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showGenerateModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showGenerateModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
             <div class="modal-body space-y-4">
               <div>
-                <label class="block text-sm text-themed-secondary mb-2">{{ t('admin.users.inviteCount') }}</label>
-                <select v-model.number="inviteCount" class="input">
-                  <option :value="1">1 {{ t('admin.users.countUnit') }}</option>
-                  <option :value="5">5 {{ t('admin.users.countUnit') }}</option>
-                  <option :value="20">20 {{ t('admin.users.countUnit') }}</option>
-                  <option :value="50">50 {{ t('admin.users.countUnit') }}</option>
-                  <option :value="100">100 {{ t('admin.users.countUnit') }}</option>
-                </select>
+                <Select
+                  v-model.number="inviteCount"
+                  :options="inviteCountOptions"
+                  :label="t('admin.users.inviteCount')"
+                />
               </div>
               <div>
-                <label class="block text-sm text-themed-secondary mb-2">{{ t('admin.users.expireDays') }}</label>
-                <select v-model.number="inviteExpireDays" class="input">
-                  <option :value="1">{{ t('admin.users.day1') }}</option>
-                  <option :value="3">{{ t('admin.users.day3') }}</option>
-                  <option :value="7">{{ t('admin.users.day7') }}</option>
-                  <option :value="14">{{ t('admin.users.day14') }}</option>
-                  <option :value="30">{{ t('admin.users.day30') }}</option>
-                  <option :value="0">{{ t('admin.users.permanentValid') }}</option>
-                </select>
-                <p class="text-xs text-themed-muted mt-1.5">{{ t('admin.users.expireHint') }}</p>
+                <Select
+                  v-model.number="inviteExpireDays"
+                  :options="inviteExpireDaysOptions"
+                  :label="t('admin.users.expireDays')"
+                  :hint="t('admin.users.expireHint')"
+                />
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showGenerateModal = false">{{ t('common.cancel') }}</button>
-              <button :disabled="inviteGenerating" class="btn-primary" @click="generateInvite">
-                <svg v-if="inviteGenerating" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              <Button variant="secondary" @click="showGenerateModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="primary"
+                :loading="inviteGenerating"
+                @click="generateInvite"
+              >
                 {{ inviteGenerating ? t('admin.users.generating') : t('admin.users.generate') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2000,40 +1959,62 @@ function _getQuotaPercent(used, limit) {
             <div class="modal-header">
               <h3 class="modal-title">
                 {{ t('admin.users.inviteGenerated') }}
-                <span v-if="newInviteCodes.length > 0" class="text-themed-muted font-normal text-sm ml-2">
+                <span v-if="newInviteCodes.length > 0" class="text-[var(--text-secondary)] font-normal text-xs ml-2">
                   ({{ newInviteCodes.length }} {{ t('admin.users.countUnit') }})
                 </span>
               </h3>
-              <button class="text-themed-muted hover:text-themed" @click="showInviteModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showInviteModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body space-y-4">
               <!-- 单个邀请码 -->
               <template v-if="newInviteCode">
-                <div class="bg-themed-tertiary rounded-lg p-4 font-mono tabular-nums text-lg text-center text-themed tracking-wider mb-3">
+                <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 font-mono tabular-nums text-lg text-center text-[var(--text-primary)] tracking-wider">
                   {{ newInviteCode }}
                 </div>
               </template>
               <!-- 批量邀请码 -->
               <template v-else-if="newInviteCodes.length > 0">
-                <div class="bg-themed-tertiary rounded-lg p-3 font-mono tabular-nums text-sm text-themed max-h-64 overflow-y-auto mb-3">
-                  <div v-for="(code, index) in newInviteCodes" :key="code" class="py-1 px-2 hover:bg-themed-hover rounded flex items-center justify-between">
+                <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 font-mono tabular-nums text-xs text-[var(--text-primary)] max-h-64 overflow-y-auto space-y-1">
+                  <div
+                    v-for="(code, index) in newInviteCodes"
+                    :key="code"
+                    class="py-1.5 px-2.5 hover:bg-[var(--bg-surface)] rounded-lg flex items-center justify-between"
+                  >
                     <span>{{ index + 1 }}. {{ code }}</span>
                   </div>
                 </div>
               </template>
-              <div v-if="newInviteExpiresAt" class="text-center text-sm text-themed-muted mb-4">
-                {{ t('admin.users.validUntil') }}: {{ formatDate(newInviteExpiresAt) }}
+
+              <div class="text-center text-xs text-[var(--text-secondary)]">
+                <span v-if="newInviteExpiresAt">{{ t('admin.users.validUntil') }}: {{ formatDate(newInviteExpiresAt) }}</span>
+                <span v-else>{{ t('admin.users.permanentValid') }}</span>
               </div>
-              <div v-else class="text-center text-sm text-themed-muted mb-4">{{ t('admin.users.permanentValid') }}</div>
-              <div class="flex gap-2">
-                <button class="btn-primary flex-1" @click="copyCode">
+
+              <div class="flex gap-2.5">
+                <Button
+                  variant="primary"
+                  class="flex-1"
+                  @click="copyCode"
+                >
+                  <template #icon>
+                    <Copy class="w-4 h-4" />
+                  </template>
                   {{ copied ? t('admin.users.copied') : (newInviteCodes.length > 0 ? t('admin.users.copyAllCodes') : t('admin.users.copyCode')) }}
-                </button>
-                <button v-if="newInviteCode" class="btn-secondary flex-1" @click="copyLink">{{ t('admin.users.copyLink') }}</button>
+                </Button>
+                <Button
+                  v-if="newInviteCode"
+                  variant="secondary"
+                  class="flex-1"
+                  @click="copyLink"
+                >
+                  {{ t('admin.users.copyLink') }}
+                </Button>
               </div>
             </div>
           </div>
@@ -2049,47 +2030,49 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.resetPassword') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showResetPasswordModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showResetPasswordModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
-            <div class="modal-body">
-              <p class="text-themed-secondary">
+            <div class="modal-body space-y-4">
+              <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
                 {{ t('admin.users.resetPasswordConfirm', { name: resetPasswordUser?.username }) }}
               </p>
-              <p class="text-sm text-themed-muted mt-2">{{ t('admin.users.resetPasswordHint') }}</p>
-              <div class="mt-4 space-y-3">
+              <p class="text-xs text-[var(--text-tertiary)]">{{ t('admin.users.resetPasswordHint') }}</p>
+              <div class="space-y-3 pt-1">
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ t('auth.newPassword') }}</label>
-                  <input
+                  <Input
                     v-model="resetPasswordForm.password"
                     type="password"
-                    class="form-input w-full"
                     autocomplete="new-password"
+                    :label="t('auth.newPassword')"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-themed mb-1">{{ t('auth.confirmPassword') }}</label>
-                  <input
+                  <Input
                     v-model="resetPasswordForm.confirmPassword"
                     type="password"
-                    class="form-input w-full"
                     autocomplete="new-password"
+                    :label="t('auth.confirmPassword')"
                   />
                 </div>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showResetPasswordModal = false">{{ t('common.cancel') }}</button>
-              <button :disabled="resetPasswordLoading" class="btn-primary" @click="resetPassword">
-                <svg v-if="resetPasswordLoading" class="w-4 h-4 animate-spin mr-1" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              <Button variant="secondary" @click="showResetPasswordModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="primary"
+                :loading="resetPasswordLoading"
+                @click="resetPassword"
+              >
                 {{ resetPasswordLoading ? t('admin.users.resetting') : t('admin.users.confirmResetPassword') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2104,23 +2087,31 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.disable2FA') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showDisable2FAModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showDisable2FAModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
-            <div class="modal-body">
-              <p class="text-themed-secondary">
+            <div class="modal-body space-y-3">
+              <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
                 {{ t('admin.users.disable2FAConfirm', { name: disable2FAUser?.username }) }}
               </p>
-              <p class="text-sm text-themed-muted mt-2">{{ t('admin.users.disable2FAWarning') }}</p>
+              <p class="text-xs text-[var(--error)]">{{ t('admin.users.disable2FAWarning') }}</p>
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showDisable2FAModal = false">{{ t('common.cancel') }}</button>
-              <button :disabled="disable2FALoading" class="btn-danger" @click="disable2FA">
+              <Button variant="secondary" @click="showDisable2FAModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="danger"
+                :loading="disable2FALoading"
+                @click="disable2FA"
+              >
                 {{ disable2FALoading ? t('admin.system.saving') : t('common.confirm') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2135,23 +2126,31 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.unbindGitHub') }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showUnbindGitHubModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showUnbindGitHubModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
-            <div class="modal-body">
-              <p class="text-themed-secondary">
+            <div class="modal-body space-y-3">
+              <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
                 {{ t('admin.users.unbindGitHubConfirm', { name: unbindGitHubUser?.username }) }}
               </p>
-              <p class="text-sm text-themed-muted mt-2">{{ t('admin.users.unbindGitHubWarning') }}</p>
+              <p class="text-xs text-[var(--error)]">{{ t('admin.users.unbindGitHubWarning') }}</p>
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showUnbindGitHubModal = false">{{ t('common.cancel') }}</button>
-              <button :disabled="unbindGitHubLoading" class="btn-danger" @click="unbindGitHub">
+              <Button variant="secondary" @click="showUnbindGitHubModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="danger"
+                :loading="unbindGitHubLoading"
+                @click="unbindGitHub"
+              >
                 {{ unbindGitHubLoading ? t('admin.system.saving') : t('common.confirm') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2166,76 +2165,79 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content max-w-2xl">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.loginRecords') }} - {{ loginRecordsUser?.username }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showLoginRecordsModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showLoginRecordsModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
             <div class="modal-body">
-              <!-- 加载中 -->
-              <div v-if="loginRecordsLoading" class="flex items-center justify-center py-8">
-                <svg class="w-6 h-6 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+              <div v-if="loginRecordsLoading" class="flex items-center justify-center py-12">
+                <div class="animate-spin w-6 h-6 text-[var(--accent)]">
+                  <svg fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </div>
               </div>
-              <!-- 无记录 -->
-              <div v-else-if="loginRecords.length === 0" class="text-center py-8 text-themed-muted text-sm">
-                {{ t('admin.users.noLoginRecords') }}
+              <div v-else-if="loginRecords.length === 0" class="py-8">
+                <EmptyState :title="t('admin.users.noLoginRecords')" />
               </div>
-              <!-- 记录列表 -->
-              <div v-else class="space-y-2 max-h-96 overflow-y-auto">
-                <div 
-                  v-for="record in loginRecords" 
-                  :key="record.id" 
-                  class="bg-themed-tertiary rounded-lg p-3 text-sm"
+              <div v-else class="space-y-2 max-h-96 overflow-y-auto pr-1">
+                <div
+                  v-for="record in loginRecords"
+                  :key="record.id"
+                  class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-xs"
                 >
                   <div class="flex items-start justify-between gap-4">
                     <div class="min-w-0 flex-1 space-y-1">
-                      <!-- IP 地址 -->
-                      <div class="font-mono tabular-nums text-themed">{{ record.ip }}</div>
-                      <!-- 地理位置 -->
-                      <div v-if="record.country" class="text-xs text-themed-muted">
+                      <div class="font-mono tabular-nums font-semibold text-[var(--text-primary)]">{{ record.ip }}</div>
+                      <div v-if="record.country" class="text-[11px] text-[var(--text-secondary)]">
                         {{ formatLocation(record) }}
-                        <span v-if="record.isp" class="text-themed-faint"> · {{ record.isp }}</span>
+                        <span v-if="record.isp" class="text-[var(--text-tertiary)]"> · {{ record.isp }}</span>
                       </div>
-                      <div v-else-if="record.isp" class="text-xs text-themed-muted">{{ record.isp }}</div>
-                      <!-- 设备和浏览器 -->
-                      <div v-if="record.userAgent" class="text-xs text-themed-faint">
+                      <div v-else-if="record.isp" class="text-[11px] text-[var(--text-secondary)]">{{ record.isp }}</div>
+                      <div v-if="record.userAgent" class="text-[11px] text-[var(--text-tertiary)]">
                         {{ formatDevice(record.userAgent) }} · {{ formatBrowser(record.userAgent) }}
                       </div>
                     </div>
-                    <div class="text-xs text-themed-muted whitespace-nowrap flex-shrink-0">
+                    <div class="text-[11px] text-[var(--text-tertiary)] whitespace-nowrap flex-shrink-0">
                       {{ formatDate(record.createdAt) }}
                     </div>
                   </div>
                 </div>
               </div>
-              <!-- 分页/记录数 -->
-              <div v-if="loginRecords.length > 0" class="flex items-center justify-between text-sm text-themed-muted mt-4 pt-4 border-t border-themed">
+
+              <!-- 分页 -->
+              <div v-if="loginRecords.length > 0" class="flex items-center justify-between text-xs text-[var(--text-secondary)] mt-4 pt-4 border-t border-[var(--border-color)]">
                 <span>{{ t('admin.users.totalRecords', { count: loginRecordsTotal }) }}</span>
                 <div v-if="loginRecordsTotalPages > 1" class="flex items-center gap-2">
-                  <button 
-                    :disabled="loginRecordsPage <= 1" 
-                    class="btn-ghost btn-sm"
-                    @click="loginRecordsPage--; loadLoginRecords()"
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    :disabled="loginRecordsPage <= 1"
+                    @click="loginRecordsPage--; void loadLoginRecords()"
                   >
                     {{ t('admin.users.prevPage') }}
-                  </button>
-                  <span>{{ loginRecordsPage }} / {{ loginRecordsTotalPages }}</span>
-                  <button 
-                    :disabled="loginRecordsPage >= loginRecordsTotalPages" 
-                    class="btn-ghost btn-sm"
-                    @click="loginRecordsPage++; loadLoginRecords()"
+                  </Button>
+                  <span class="font-mono tabular-nums">{{ loginRecordsPage }} / {{ loginRecordsTotalPages }}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    :disabled="loginRecordsPage >= loginRecordsTotalPages"
+                    @click="loginRecordsPage++; void loadLoginRecords()"
                   >
                     {{ t('admin.users.nextPage') }}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showLoginRecordsModal = false">{{ t('common.close') }}</button>
+              <Button variant="secondary" @click="showLoginRecordsModal = false">
+                {{ t('common.close') }}
+              </Button>
             </div>
           </div>
         </div>
@@ -2250,44 +2252,51 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content max-w-lg">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.sendMessageTo', { username: sendMessageUser?.username }) }}</h3>
-              <button class="modal-close" @click="showSendMessageModal = false">&times;</button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showSendMessageModal = false"
+              >
+                <X class="w-4 h-4" />
+              </button>
             </div>
             <div class="modal-body space-y-4">
               <div>
-                <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.messageTitle') }}</label>
-                <input 
-                  v-model="sendMessageForm.title" 
-                  type="text" 
-                  class="input" 
+                <Input
+                  v-model="sendMessageForm.title"
+                  type="text"
+                  :label="t('admin.users.messageTitle')"
                   :placeholder="t('admin.users.messageTitlePlaceholder')"
-                  maxlength="200"
+                  :maxlength="200"
+                  :hint="`${sendMessageForm.title.length}/200`"
                 />
-                <p class="mt-1 text-xs text-themed-muted">{{ sendMessageForm.title.length }}/200</p>
               </div>
-              <div>
-                <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.messageContent') }}</label>
-                <textarea 
-                  v-model="sendMessageForm.content" 
-                  class="input min-h-[120px]" 
-                  :placeholder="t('admin.users.messageContentPlaceholder')"
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
+                  {{ t('admin.users.messageContent') }}
+                </label>
+                <textarea
+                  v-model="sendMessageForm.content"
+                  rows="4"
                   maxlength="5000"
+                  :placeholder="t('admin.users.messageContentPlaceholder')"
+                  class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all duration-200"
                 ></textarea>
-                <p class="mt-1 text-xs text-themed-muted">{{ sendMessageForm.content.length }}/5000</p>
+                <p class="text-xs text-[var(--text-tertiary)] mt-0.5">{{ sendMessageForm.content.length }}/5000</p>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showSendMessageModal = false">{{ t('common.cancel') }}</button>
-              <button 
-                class="btn-primary" 
-                :disabled="sendMessageLoading || !sendMessageForm.title.trim() || !sendMessageForm.content.trim()"
+              <Button variant="secondary" @click="showSendMessageModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="primary"
+                :loading="sendMessageLoading"
+                :disabled="!sendMessageForm.title.trim() || !sendMessageForm.content.trim()"
                 @click="sendMessage"
               >
-                <svg v-if="sendMessageLoading" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
                 {{ sendMessageLoading ? t('common.sending') : t('common.send') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -2302,138 +2311,137 @@ function _getQuotaPercent(used, limit) {
           <div class="modal-content max-w-2xl">
             <div class="modal-header">
               <h3 class="modal-title">{{ t('admin.users.balanceDetails') }} - {{ balanceUser?.username }}</h3>
-              <button class="text-themed-muted hover:text-themed" @click="showBalanceModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showBalanceModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
+
             <!-- TAB 切换 -->
-            <div class="flex gap-1 border-b border-themed px-4">
+            <div class="flex items-center gap-1 border-b border-[var(--border-color)] px-4 py-2 bg-[var(--bg-surface-soft)] overflow-x-auto">
               <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="balanceTab === 'overview' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchBalanceTab('overview')"
+                v-for="bt in balanceTabs"
+                :key="bt.key"
+                type="button"
+                class="px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 active:scale-95 whitespace-nowrap select-none"
+                :class="balanceTab === bt.key
+                  ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+                @click="switchBalanceTab(bt.key)"
               >
-                {{ t('admin.users.balanceOverview') }}
-              </button>
-              <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="balanceTab === 'logs' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchBalanceTab('logs')"
-              >
-                {{ t('admin.users.balanceLogs') }}
-              </button>
-              <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="balanceTab === 'recharge' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchBalanceTab('recharge')"
-              >
-                {{ t('admin.users.rechargeRecords') }}
-              </button>
-              <button
-                class="px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px"
-                :class="balanceTab === 'adjust' ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400' : 'border-transparent text-themed-muted hover:text-themed'"
-                @click="switchBalanceTab('adjust')"
-              >
-                {{ t('admin.users.adjustBalance') }}
+                {{ bt.label }}
               </button>
             </div>
+
             <div class="modal-body">
               <!-- 余额概览 TAB -->
               <div v-if="balanceTab === 'overview'">
-                <div v-if="balanceInfoLoading" class="flex items-center justify-center py-8">
-                  <svg class="w-6 h-6 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                <div v-if="balanceInfoLoading" class="flex items-center justify-center py-12">
+                  <div class="animate-spin w-6 h-6 text-[var(--accent)]">
+                    <svg fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
                 </div>
-                <div v-else class="grid grid-cols-3 gap-4">
-                  <div class="bg-themed-tertiary rounded-lg p-4 text-center">
-                    <div class="font-mono text-2xl font-semibold tabular-nums" :class="balanceInfo.balance > 0 ? 'text-success' : 'text-themed'">
+                <div v-else class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-center">
+                    <div class="font-mono text-2xl font-semibold tabular-nums text-[var(--success)]">
                       ¥{{ balanceInfo.balance.toFixed(2) }}
                     </div>
-                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ t('admin.users.currentBalance') }}</div>
+                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">
+                      {{ t('admin.users.currentBalance') }}
+                    </div>
                   </div>
-                  <div class="bg-themed-tertiary rounded-lg p-4 text-center">
-                    <div class="font-mono text-2xl font-semibold tabular-nums text-themed">
+                  <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-center">
+                    <div class="font-mono text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
                       ¥{{ balanceInfo.totalRecharge.toFixed(2) }}
                     </div>
-                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ t('admin.users.totalRecharge') }}</div>
+                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">
+                      {{ t('admin.users.totalRecharge') }}
+                    </div>
                   </div>
-                  <div class="bg-themed-tertiary rounded-lg p-4 text-center">
-                    <div class="font-mono text-2xl font-semibold tabular-nums text-warning">
+                  <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-center">
+                    <div class="font-mono text-2xl font-semibold tabular-nums text-[var(--warning)]">
                       ¥{{ balanceInfo.totalConsume.toFixed(2) }}
                     </div>
-                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-themed-faint">{{ t('admin.users.totalConsume') }}</div>
+                    <div class="mt-2 text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">
+                      {{ t('admin.users.totalConsume') }}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <!-- 余额明细 TAB -->
               <div v-if="balanceTab === 'logs'">
-                <!-- 抽奖筛选按钮 -->
                 <div class="flex justify-end mb-3">
-                  <button
-                    class="btn btn-xs"
-                    :class="balanceLogsShowLotteryGiftOnly ? 'btn-primary' : 'btn-ghost'"
-                    @click="balanceLogsShowLotteryGiftOnly = !balanceLogsShowLotteryGiftOnly; balanceLogsPage = 1; loadBalanceLogs()"
+                  <Button
+                    size="sm"
+                    :variant="balanceLogsShowLotteryGiftOnly ? 'primary' : 'secondary'"
+                    @click="balanceLogsShowLotteryGiftOnly = !balanceLogsShowLotteryGiftOnly; balanceLogsPage = 1; void loadBalanceLogs()"
                   >
-                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                    <template #icon>
+                      <Gift class="w-3.5 h-3.5" />
+                    </template>
                     {{ balanceLogsShowLotteryGiftOnly ? t('wallet.showingLotteryGift') : t('wallet.showLotteryGift') }}
-                  </button>
+                  </Button>
                 </div>
-                <div v-if="balanceLogsLoading" class="flex items-center justify-center py-8">
-                  <svg class="w-6 h-6 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                <div v-if="balanceLogsLoading" class="flex items-center justify-center py-12">
+                  <div class="animate-spin w-6 h-6 text-[var(--accent)]">
+                    <svg fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
                 </div>
-                <div v-else-if="balanceLogs.length === 0" class="text-center py-8 text-themed-muted text-sm">
-                  {{ t('admin.users.noBalanceLogs') }}
+                <div v-else-if="balanceLogs.length === 0" class="py-8">
+                  <EmptyState :title="t('admin.users.noBalanceLogs')" />
                 </div>
                 <div v-else>
-                  <div class="space-y-2 max-h-80 overflow-y-auto">
-                    <div 
-                      v-for="log in balanceLogs" 
-                      :key="log.id" 
-                      class="bg-themed-tertiary rounded-lg p-3 text-sm flex items-center justify-between"
+                  <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    <div
+                      v-for="log in balanceLogs"
+                      :key="log.id"
+                      class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-xs flex items-center justify-between"
                     >
                       <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                          <span class="badge" :class="log.amount > 0 ? 'badge-success' : 'badge-error'">
+                          <Badge size="sm" :variant="log.amount > 0 ? 'success' : 'error'">
                             {{ getBalanceLogTypeLabel(log.type) }}
-                          </span>
-                          <span class="font-mono tabular-nums font-medium" :class="log.amount > 0 ? 'text-success' : 'text-error'">
+                          </Badge>
+                          <span class="font-mono tabular-nums font-semibold" :class="log.amount > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]'">
                             {{ log.amount > 0 ? '+' : '' }}¥{{ log.amount.toFixed(2) }}
                           </span>
                         </div>
-                        <div v-if="log.remark" class="text-xs text-themed-muted mt-1 truncate">{{ log.remark }}</div>
+                        <div v-if="log.remark" class="text-xs text-[var(--text-secondary)] mt-1 truncate">{{ log.remark }}</div>
                       </div>
-                      <div class="text-xs text-themed-muted whitespace-nowrap ml-4">{{ formatDate(log.createdAt) }}</div>
+                      <div class="text-xs text-[var(--text-tertiary)] whitespace-nowrap ml-4">{{ formatDate(log.createdAt) }}</div>
                     </div>
                   </div>
                   <!-- 分页 -->
-                  <div v-if="balanceLogsTotalPages > 1" class="flex items-center justify-between text-sm text-themed-muted mt-4 pt-4 border-t border-themed">
+                  <div v-if="balanceLogsTotalPages > 1" class="flex items-center justify-between text-xs text-[var(--text-secondary)] mt-4 pt-4 border-t border-[var(--border-color)]">
                     <span>{{ t('admin.users.totalRecords', { count: balanceLogsTotal }) }}</span>
                     <div class="flex items-center gap-2">
-                      <button 
-                        :disabled="balanceLogsPage <= 1" 
-                        class="btn-ghost btn-sm"
-                        @click="balanceLogsPage--; loadBalanceLogs()"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :disabled="balanceLogsPage <= 1"
+                        @click="balanceLogsPage--; void loadBalanceLogs()"
                       >
                         {{ t('admin.users.prevPage') }}
-                      </button>
-                      <span>{{ balanceLogsPage }} / {{ balanceLogsTotalPages }}</span>
-                      <button 
-                        :disabled="balanceLogsPage >= balanceLogsTotalPages" 
-                        class="btn-ghost btn-sm"
-                        @click="balanceLogsPage++; loadBalanceLogs()"
+                      </Button>
+                      <span class="font-mono tabular-nums">{{ balanceLogsPage }} / {{ balanceLogsTotalPages }}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :disabled="balanceLogsPage >= balanceLogsTotalPages"
+                        @click="balanceLogsPage++; void loadBalanceLogs()"
                       >
                         {{ t('admin.users.nextPage') }}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -2441,56 +2449,60 @@ function _getQuotaPercent(used, limit) {
 
               <!-- 充值记录 TAB -->
               <div v-if="balanceTab === 'recharge'">
-                <div v-if="rechargeRecordsLoading" class="flex items-center justify-center py-8">
-                  <svg class="w-6 h-6 animate-spin text-themed-muted" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                <div v-if="rechargeRecordsLoading" class="flex items-center justify-center py-12">
+                  <div class="animate-spin w-6 h-6 text-[var(--accent)]">
+                    <svg fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
                 </div>
-                <div v-else-if="rechargeRecords.length === 0" class="text-center py-8 text-themed-muted text-sm">
-                  {{ t('admin.users.noRechargeRecords') }}
+                <div v-else-if="rechargeRecords.length === 0" class="py-8">
+                  <EmptyState :title="t('admin.users.noRechargeRecords')" />
                 </div>
                 <div v-else>
-                  <div class="space-y-2 max-h-80 overflow-y-auto">
-                    <div 
-                      v-for="record in rechargeRecords" 
-                      :key="record.id" 
-                      class="bg-themed-tertiary rounded-lg p-3 text-sm flex items-center justify-between"
+                  <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    <div
+                      v-for="record in rechargeRecords"
+                      :key="record.id"
+                      class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-xs flex items-center justify-between"
                     >
                       <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                          <span class="font-mono tabular-nums font-medium text-themed">¥{{ record.amount.toFixed(2) }}</span>
-                          <span :class="['badge', getRechargeStatusStyle(record.status)]">
+                          <span class="font-mono tabular-nums font-semibold text-[var(--text-primary)]">¥{{ record.amount.toFixed(2) }}</span>
+                          <Badge size="sm" :variant="getRechargeBadgeVariant(record.status)">
                             {{ t('wallet.status.' + record.status) }}
-                          </span>
+                          </Badge>
                         </div>
-                        <div class="text-xs text-themed-muted mt-1">
+                        <div class="text-xs text-[var(--text-secondary)] mt-1 truncate">
                           {{ record.orderNo }}
                           <span v-if="record.provider"> · {{ record.provider.name }}</span>
                         </div>
                       </div>
-                      <div class="text-xs text-themed-muted whitespace-nowrap ml-4">{{ formatDate(record.createdAt) }}</div>
+                      <div class="text-xs text-[var(--text-tertiary)] whitespace-nowrap ml-4">{{ formatDate(record.createdAt) }}</div>
                     </div>
                   </div>
                   <!-- 分页 -->
-                  <div v-if="rechargeRecordsTotalPages > 1" class="flex items-center justify-between text-sm text-themed-muted mt-4 pt-4 border-t border-themed">
+                  <div v-if="rechargeRecordsTotalPages > 1" class="flex items-center justify-between text-xs text-[var(--text-secondary)] mt-4 pt-4 border-t border-[var(--border-color)]">
                     <span>{{ t('admin.users.totalRecords', { count: rechargeRecordsTotal }) }}</span>
                     <div class="flex items-center gap-2">
-                      <button 
-                        :disabled="rechargeRecordsPage <= 1" 
-                        class="btn-ghost btn-sm"
-                        @click="rechargeRecordsPage--; loadRechargeRecords()"
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :disabled="rechargeRecordsPage <= 1"
+                        @click="rechargeRecordsPage--; void loadRechargeRecords()"
                       >
                         {{ t('admin.users.prevPage') }}
-                      </button>
-                      <span>{{ rechargeRecordsPage }} / {{ rechargeRecordsTotalPages }}</span>
-                      <button 
-                        :disabled="rechargeRecordsPage >= rechargeRecordsTotalPages" 
-                        class="btn-ghost btn-sm"
-                        @click="rechargeRecordsPage++; loadRechargeRecords()"
+                      </Button>
+                      <span class="font-mono tabular-nums">{{ rechargeRecordsPage }} / {{ rechargeRecordsTotalPages }}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        :disabled="rechargeRecordsPage >= rechargeRecordsTotalPages"
+                        @click="rechargeRecordsPage++; void loadRechargeRecords()"
                       >
                         {{ t('admin.users.nextPage') }}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -2500,236 +2512,243 @@ function _getQuotaPercent(used, limit) {
               <div v-if="balanceTab === 'adjust'" class="space-y-4">
                 <!-- 调整类型 -->
                 <div>
-                  <label class="block text-sm text-themed-secondary mb-2">{{ t('admin.users.adjustType') }}</label>
-                  <div class="flex gap-3">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        v-model="adjustBalanceForm.type" 
-                        type="radio" 
-                        value="add" 
-                        class="w-4 h-4 text-primary"
+                  <label class="block text-xs font-semibold text-[var(--text-secondary)] mb-2">{{ t('admin.users.adjustType') }}</label>
+                  <div class="grid grid-cols-2 gap-3">
+                    <label
+                      class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.98]"
+                      :class="adjustBalanceForm.type === 'add'
+                        ? 'border-[var(--accent)] bg-[var(--bg-surface)] ring-1 ring-[var(--accent)] shadow-sm'
+                        : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:border-[var(--border-hover)]'"
+                    >
+                      <input
+                        v-model="adjustBalanceForm.type"
+                        type="radio"
+                        value="add"
+                        class="sr-only"
                       />
-                      <span class="text-sm text-success">{{ t('admin.users.addBalance') }}</span>
+                      <div
+                        class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
+                        :class="adjustBalanceForm.type === 'add' ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-[var(--border-color)]'"
+                      >
+                        <div v-if="adjustBalanceForm.type === 'add'" class="w-1.5 h-1.5 rounded-full bg-white" />
+                      </div>
+                      <span class="text-xs font-medium text-[var(--success)]">{{ t('admin.users.addBalance') }}</span>
                     </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        v-model="adjustBalanceForm.type" 
-                        type="radio" 
-                        value="deduct" 
-                        class="w-4 h-4 text-primary"
+
+                    <label
+                      class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.98]"
+                      :class="adjustBalanceForm.type === 'deduct'
+                        ? 'border-[var(--error)] bg-[var(--bg-surface)] ring-1 ring-[var(--error)] shadow-sm'
+                        : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:border-[var(--border-hover)]'"
+                    >
+                      <input
+                        v-model="adjustBalanceForm.type"
+                        type="radio"
+                        value="deduct"
+                        class="sr-only"
                       />
-                      <span class="text-sm text-error">{{ t('admin.users.deductBalance') }}</span>
+                      <div
+                        class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors"
+                        :class="adjustBalanceForm.type === 'deduct' ? 'border-[var(--error)] bg-[var(--error)]' : 'border-[var(--border-color)]'"
+                      >
+                        <div v-if="adjustBalanceForm.type === 'deduct'" class="w-1.5 h-1.5 rounded-full bg-white" />
+                      </div>
+                      <span class="text-xs font-medium text-[var(--error)]">{{ t('admin.users.deductBalance') }}</span>
                     </label>
                   </div>
                 </div>
+
                 <!-- 金额 -->
                 <div>
-                  <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.amount') }}</label>
-                  <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-themed-muted">¥</span>
-                    <input 
-                      v-model="adjustBalanceForm.amount" 
-                      type="number" 
-                      step="0.01"
-                      min="0.01"
-                      class="input pl-8" 
-                      :placeholder="t('admin.users.amountPlaceholder')"
-                    />
-                  </div>
+                  <Input
+                    v-model="adjustBalanceForm.amount"
+                    type="number"
+                    :label="t('admin.users.amount')"
+                    :placeholder="t('admin.users.amountPlaceholder')"
+                  >
+                    <template #prefix>
+                      <span class="font-mono text-xs text-[var(--text-tertiary)]">¥</span>
+                    </template>
+                  </Input>
                 </div>
+
                 <!-- 理由 -->
-                <div>
-                  <label class="block text-sm text-themed-secondary mb-1.5">{{ t('admin.users.adjustReason') }} <span class="text-error">*</span></label>
-                  <textarea 
-                    v-model="adjustBalanceForm.reason" 
-                    class="input min-h-[80px]" 
-                    :placeholder="t('admin.users.adjustReasonPlaceholder')"
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
+                    {{ t('admin.users.adjustReason') }} <span class="text-[var(--error)]">*</span>
+                  </label>
+                  <textarea
+                    v-model="adjustBalanceForm.reason"
+                    rows="3"
                     maxlength="500"
+                    :placeholder="t('admin.users.adjustReasonPlaceholder')"
+                    class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all duration-200"
                   ></textarea>
-                  <p class="mt-1 text-xs text-themed-muted">{{ adjustBalanceForm.reason.length }}/500</p>
+                  <p class="text-xs text-[var(--text-tertiary)] mt-0.5">{{ adjustBalanceForm.reason.length }}/500</p>
                 </div>
+
                 <!-- 提交按钮 -->
                 <div class="pt-2">
-                  <button 
-                    class="btn-primary w-full" 
-                    :disabled="adjustBalanceLoading || !adjustBalanceForm.amount || !adjustBalanceForm.reason.trim()"
+                  <Button
+                    variant="primary"
+                    block
+                    :loading="adjustBalanceLoading"
+                    :disabled="!adjustBalanceForm.amount || !adjustBalanceForm.reason.trim()"
                     @click="submitAdjustBalance"
                   >
-                    <svg v-if="adjustBalanceLoading" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
                     {{ adjustBalanceLoading ? t('common.submitting') : t('common.confirm') }}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
+
             <div class="modal-footer">
-              <button class="btn-secondary" @click="showBalanceModal = false">{{ t('common.close') }}</button>
+              <Button variant="secondary" @click="showBalanceModal = false">
+                {{ t('common.close') }}
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
-    
+
     <!-- 积分调整弹窗 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div 
-          v-if="showPointsModal" 
-          class="modal-overlay"
-          @click.self="showPointsModal = false"
-        >
+        <div v-if="showPointsModal" class="modal-overlay">
           <div class="modal-backdrop" @click="showPointsModal = false"></div>
           <div class="modal-content max-w-lg">
             <div class="modal-header">
               <h3 class="modal-title">
                 {{ t('admin.users.adjustPoints') }} - {{ pointsUser?.username }}
               </h3>
-              <button class="btn-ghost btn-sm -mr-2 p-1.5" @click="showPointsModal = false">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors"
+                @click="showPointsModal = false"
+              >
+                <X class="w-4 h-4" />
               </button>
             </div>
             <div class="modal-body space-y-4">
               <!-- 当前积分 -->
-              <div class="flex items-center justify-between py-2 px-3 bg-themed-tertiary rounded-lg">
-                <span class="text-sm text-themed-muted">{{ t('admin.users.currentPoints') }}</span>
-                <span class="font-mono tabular-nums text-lg font-semibold text-themed">{{ pointsUser?.points || 0 }}</span>
+              <div class="flex items-center justify-between p-3.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)]">
+                <span class="text-xs text-[var(--text-secondary)] font-medium">{{ t('admin.users.currentPoints') }}</span>
+                <span class="font-mono tabular-nums text-lg font-semibold text-[var(--text-primary)]">{{ pointsUser?.points || 0 }}</span>
               </div>
               <!-- 调整数量 -->
               <div>
-                <label class="block text-sm text-themed-secondary mb-1.5">
-                  {{ t('admin.users.pointsAmount') }}
-                  <span class="text-themed-muted text-xs">({{ t('admin.users.pointsAmountHint') }})</span>
-                </label>
-                <input 
-                  v-model="adjustPointsForm.amount" 
-                  type="number" 
-                  class="input" 
+                <Input
+                  v-model="adjustPointsForm.amount"
+                  type="number"
+                  :label="t('admin.users.pointsAmount')"
+                  :hint="t('admin.users.pointsAmountHint')"
                   :placeholder="t('admin.users.pointsAmountPlaceholder')"
                 />
               </div>
               <!-- 理由 -->
-              <div>
-                <label class="block text-sm text-themed-secondary mb-1.5">
-                  {{ t('admin.users.adjustReason') }}
-                  <span class="text-error">*</span>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-semibold tracking-wide text-[var(--text-secondary)]">
+                  {{ t('admin.users.adjustReason') }} <span class="text-[var(--error)]">*</span>
                 </label>
-                <textarea 
-                  v-model="adjustPointsForm.reason" 
-                  class="input min-h-[80px]" 
-                  :placeholder="t('admin.users.adjustReasonPlaceholder')"
+                <textarea
+                  v-model="adjustPointsForm.reason"
                   rows="3"
+                  :placeholder="t('admin.users.adjustReasonPlaceholder')"
+                  class="w-full rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all duration-200"
                 ></textarea>
               </div>
             </div>
-            <!-- 按钮 -->
             <div class="modal-footer">
-              <button class="btn btn-ghost" @click="showPointsModal = false">{{ t('common.cancel') }}</button>
-              <button 
-                class="btn btn-primary" 
-                :disabled="adjustPointsLoading || !adjustPointsForm.amount || !adjustPointsForm.reason.trim()"
+              <Button variant="secondary" @click="showPointsModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                variant="primary"
+                :loading="adjustPointsLoading"
+                :disabled="!adjustPointsForm.amount || !adjustPointsForm.reason.trim()"
                 @click="submitAdjustPoints"
               >
-                <svg v-if="adjustPointsLoading" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
                 {{ adjustPointsLoading ? t('common.submitting') : t('common.confirm') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- 统一操作下拉菜单 (Teleport 挂载到 body，避免被表格 overflow-x-auto 或卡片截断) -->
+    <!-- 统一操作下拉菜单 (Teleport 挂载到 body) -->
     <Teleport to="body">
-      <div 
-        v-if="activeActionUser" 
-        class="fixed inset-0 z-40" 
+      <div
+        v-if="activeActionUser"
+        class="fixed inset-0 z-40"
         @click.stop="closeActionMenu"
       ></div>
       <div
         v-if="activeActionUser"
-        class="kawaii-menu-panel fixed z-50 min-w-[9.5rem] rounded py-1 border shadow-lg"
+        class="kawaii-menu-panel fixed z-50 min-w-[10.5rem] rounded-2xl p-1.5 border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-lg backdrop-blur-md"
         :style="{ top: `${actionMenuPosition.top}px`, right: `${actionMenuPosition.right}px` }"
         @click.stop
       >
         <!-- 发送站内信 -->
-        <button 
+        <button
           v-if="activeActionUser.id !== authStore.user?.id"
           type="button"
-          class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
-          :title="t('admin.users.sendMessage')" 
+          class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left rounded-xl transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
+          :title="t('admin.users.sendMessage')"
           @click="closeActionMenu(); openSendMessageModal(activeActionUser)"
         >
-          <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          <span class="truncate">{{ t('admin.users.sendMessage') }}</span>
+          <Mail class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+          <span class="truncate font-medium">{{ t('admin.users.sendMessage') }}</span>
         </button>
 
         <!-- 重置密码 -->
         <button
           type="button"
-          class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
+          class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left rounded-xl transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
           :title="t('admin.users.resetPassword')"
           @click="closeActionMenu(); openResetPasswordModal(activeActionUser)"
         >
-          <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-          <span class="truncate">{{ t('admin.users.resetPassword') }}</span>
+          <Key class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+          <span class="truncate font-medium">{{ t('admin.users.resetPassword') }}</span>
         </button>
 
         <!-- 管理员角色 -->
         <button
           v-if="activeActionUser.id !== authStore.user?.id"
           type="button"
-          class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
-          :class="activeActionUser.role === 'admin' ? 'text-warning' : ''"
+          class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left rounded-xl transition-all cursor-pointer hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
+          :class="activeActionUser.role === 'admin' ? 'text-[var(--warning)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
           :title="activeActionUser.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin')"
           @click="closeActionMenu(); toggleUserRole(activeActionUser)"
         >
-          <svg v-if="activeActionUser.role === 'admin'" class="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
-          </svg>
-          <svg v-else class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3.75l7.5 3v5.25c0 4.35-2.94 8.4-7.5 9.75-4.56-1.35-7.5-5.4-7.5-9.75V6.75l7.5-3z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 12.25l1.5 1.5 3.5-3.75" />
-          </svg>
-          <span class="truncate">{{ activeActionUser.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin') }}</span>
+          <ShieldOff v-if="activeActionUser.role === 'admin'" class="w-3.5 h-3.5 text-[var(--warning)] shrink-0" />
+          <ShieldCheck v-else class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+          <span class="truncate font-medium">{{ activeActionUser.role === 'admin' ? t('admin.users.demoteAdmin') : t('admin.users.promoteAdmin') }}</span>
         </button>
 
         <!-- 取消2FA -->
-        <button 
+        <button
           v-if="activeActionUser.twoFAEnabled"
           type="button"
-          class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-warning transition-colors cursor-pointer"
-          :title="t('admin.users.disable2FA')" 
+          class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-[var(--warning)] rounded-xl transition-all cursor-pointer hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
+          :title="t('admin.users.disable2FA')"
           @click="closeActionMenu(); openDisable2FAModal(activeActionUser)"
         >
-          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <span class="truncate">{{ t('admin.users.disable2FA') }}</span>
+          <ShieldAlert class="w-3.5 h-3.5 shrink-0" />
+          <span class="truncate font-medium">{{ t('admin.users.disable2FA') }}</span>
         </button>
 
         <!-- 解绑GitHub -->
-        <button 
+        <button
           v-if="activeActionUser.hasGithubBinding"
           type="button"
-          class="kawaii-menu-item w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer"
-          :title="t('admin.users.unbindGitHub')" 
+          class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left rounded-xl transition-all cursor-pointer text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] active:scale-[0.98]"
+          :title="t('admin.users.unbindGitHub')"
           @click="closeActionMenu(); openUnbindGitHubModal(activeActionUser)"
         >
-          <svg class="w-3.5 h-3.5 text-themed-muted shrink-0" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-          </svg>
-          <span class="truncate">{{ t('admin.users.unbindGitHub') }}</span>
+          <Globe class="w-3.5 h-3.5 text-[var(--text-tertiary)] shrink-0" />
+          <span class="truncate font-medium">{{ t('admin.users.unbindGitHub') }}</span>
         </button>
       </div>
     </Teleport>

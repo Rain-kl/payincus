@@ -1,18 +1,30 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Ban, Check, Send, X } from 'lucide-vue-next'
+import {
+  ArrowRightLeft,
+  Ban,
+  Check,
+  Info,
+  RefreshCw,
+  Search,
+  Send,
+  X
+} from 'lucide-vue-next'
 import api from '@/api'
-import IconButton from '@/components/IconButton.vue'
-import { useThemeStore } from '@/stores/theme'
-import { useToast } from '@/stores/toast'
+import { useReveal } from '@/composables/useReveal'
+import { Badge, Button, Card, EmptyState, Input, PageHeader, Pagination } from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import FlagIcon from '@/components/FlagIcon.vue'
+import { useToast } from '@/stores/toast'
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
 const toast = useToast()
+
+const revealRoot = ref<HTMLElement | null>(null)
+useReveal(revealRoot)
 
 // Tab state
 type TabType = 'sent' | 'received'
@@ -69,7 +81,7 @@ const searchQuery = ref('')
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 
 // Reject modal
 const showRejectModal = ref(false)
@@ -121,6 +133,7 @@ async function loadPendingCount() {
 }
 
 async function switchTab(tab: TabType) {
+  if (activeTab.value === tab) return
   activeTab.value = tab
   page.value = 1
   // 使用静默刷新，避免 Tab 切换时内容闪烁
@@ -131,12 +144,10 @@ let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 function handleSearch() {
   page.value = 1
-  // 清除之前的定时器
   if (searchTimeout) {
     clearTimeout(searchTimeout)
     searchTimeout = null
   }
-  // 防抖：延迟300ms执行搜索
   searchTimeout = setTimeout(() => {
     loadTransfers(true)
     searchTimeout = null
@@ -162,14 +173,13 @@ function handleSearchEnter() {
   loadTransfers(true)
 }
 
-// 监听搜索框变化，自动触发搜索
 watch(searchQuery, () => {
   handleSearch()
 })
 
 async function handleAccept(transfer: Transfer) {
   if (!confirm(t('transfer.actions.accept') + '?')) return
-  
+
   actionLoading.value = transfer.id
   try {
     await api.transfers.accept(transfer.id)
@@ -190,7 +200,7 @@ function openRejectModal(transfer: Transfer) {
 
 async function handleReject() {
   if (!rejectingTransferId.value) return
-  
+
   rejectLoading.value = true
   try {
     await api.transfers.reject(rejectingTransferId.value, rejectReason.value || undefined)
@@ -206,7 +216,7 @@ async function handleReject() {
 
 async function handleCancel(transfer: Transfer) {
   if (!confirm(t('transfer.actions.cancel') + '?')) return
-  
+
   actionLoading.value = transfer.id
   try {
     await api.transfers.cancel(transfer.id)
@@ -221,7 +231,7 @@ async function handleCancel(transfer: Transfer) {
 
 async function handlePush(transfer: Transfer) {
   if (!confirm(t('transfer.actions.push') + '?')) return
-  
+
   pushLoading.value = transfer.id
   try {
     await api.transfers.push(transfer.id)
@@ -234,14 +244,19 @@ async function handlePush(transfer: Transfer) {
   }
 }
 
-function getStatusClass(status: string) {
+function getStatusBadgeVariant(status: string): BadgeVariant {
   switch (status) {
-    case 'pending': return 'badge-warning'
-    case 'processing': return 'badge-info'
-    case 'accepted': return 'badge-success'
-    case 'rejected': return 'badge-error'
-    case 'cancelled': return 'badge-default'
-    default: return 'badge-default'
+    case 'pending':
+      return 'warning'
+    case 'processing':
+      return 'info'
+    case 'accepted':
+      return 'success'
+    case 'rejected':
+      return 'error'
+    case 'cancelled':
+    default:
+      return 'default'
   }
 }
 
@@ -260,13 +275,11 @@ function formatDisk(mb: number) {
   return `${mb} MB`
 }
 
-// 打开配置详情弹窗
 function openConfigModal(transfer: Transfer) {
   selectedTransfer.value = transfer
   showConfigModal.value = true
 }
 
-// 切换备注展开状态
 function toggleRemark(transferId: number) {
   if (expandedRemarks.value.has(transferId)) {
     expandedRemarks.value.delete(transferId)
@@ -275,7 +288,6 @@ function toggleRemark(transferId: number) {
   }
 }
 
-// 获取网络模式显示文本
 function getNetworkModeText(mode: string | null | undefined) {
   if (!mode) return '-'
   return mode === 'nat' ? 'NAT' : (mode === 'routed' ? t('instance.networkMode.routed') : mode)
@@ -283,99 +295,116 @@ function getNetworkModeText(mode: string | null | undefined) {
 </script>
 
 <template>
-  <div class="kawaii-page space-y-6 animate-fade-in">
+  <div ref="revealRoot" class="space-y-6 animate-fade-in">
     <!-- Header -->
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">{{ $t('transfer.title') }}</h1>
-      </div>
-    </div>
-
-    <!-- Tabs + Search -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <!-- In-page underline tabs -->
-      <div class="nimbus-tabs border-b border-themed">
-        <button
-          class="nimbus-tab"
-          :class="activeTab === 'sent'
-            ? 'text-primary-600 dark:text-primary-400 border-primary-500'
-            : 'text-themed-muted border-transparent hover:text-themed'"
-          @click="switchTab('sent')"
+    <PageHeader
+      data-reveal
+      :title="$t('transfer.title')"
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          size="sm"
+          :loading="refreshing"
+          @click="loadTransfers(true)"
         >
-          {{ $t('transfer.sentTab') }}
-        </button>
-        <button
-          class="nimbus-tab"
-          :class="activeTab === 'received'
-            ? 'text-primary-600 dark:text-primary-400 border-primary-500'
-            : 'text-themed-muted border-transparent hover:text-themed'"
-          @click="switchTab('received')"
-        >
-          {{ $t('transfer.receivedTab') }}
-          <span
-            v-if="pendingCount > 0"
-            class="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary-500 px-1.5 text-[11px] font-semibold tabular-nums text-white"
-          >
-            {{ pendingCount > 9 ? '9+' : pendingCount }}
-          </span>
-        </button>
-      </div>
+          <template #icon>
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': refreshing }" />
+          </template>
+          {{ $t('common.refresh') }}
+        </Button>
+      </template>
+    </PageHeader>
 
-      <!-- Search -->
-      <div class="w-full sm:w-72">
-        <div class="relative">
-          <input
-            v-model="searchQuery"
-            type="text"
-            class="input w-full rounded-lg border-themed pl-10 pr-10"
-            :placeholder="$t('transfer.searchPlaceholder')"
-            @keyup.enter="handleSearchEnter"
-          />
-          <svg
-            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-themed-muted"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+    <!-- Tabs + Search Card -->
+    <Card data-reveal padding="sm">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <!-- Segmented Tab switcher -->
+        <div class="inline-flex items-center rounded-xl bg-[var(--bg-surface-soft)] p-1 border border-[var(--border-color)]">
           <button
-            v-if="searchQuery"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-themed-muted transition-colors hover:text-themed"
-            @click="clearSearch"
+            type="button"
+            class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+            :class="activeTab === 'sent'
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+            @click="switchTab('sent')"
           >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            {{ $t('transfer.sentTab') }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-[0.98] gap-1.5"
+            :class="activeTab === 'received'
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm font-semibold'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+            @click="switchTab('received')"
+          >
+            <span>{{ $t('transfer.receivedTab') }}</span>
+            <Badge
+              v-if="pendingCount > 0"
+              variant="warning"
+              size="sm"
+            >
+              {{ pendingCount > 9 ? '9+' : pendingCount }}
+            </Badge>
           </button>
         </div>
+
+        <!-- Search input using UI Input -->
+        <div class="w-full sm:w-72">
+          <Input
+            v-model="searchQuery"
+            size="sm"
+            clearable
+            :placeholder="$t('transfer.searchPlaceholder')"
+            @enter="handleSearchEnter"
+            @clear="clearSearch"
+          >
+            <template #prefix>
+              <Search class="w-4 h-4 text-[var(--text-tertiary)]" />
+            </template>
+          </Input>
+        </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Loading -->
     <div v-if="loading">
       <SkeletonLoader type="table" />
     </div>
 
+    <!-- Empty State -->
+    <Card v-else-if="transfers.length === 0" data-reveal padding="none">
+      <EmptyState
+        :title="activeTab === 'sent' ? $t('transfer.noTransfers') : $t('transfer.noPendingTransfers')"
+      >
+        <template #icon>
+          <ArrowRightLeft class="w-7 h-7 stroke-[1.5]" />
+        </template>
+      </EmptyState>
+    </Card>
+
     <!-- Transfer List -->
-    <template v-else-if="transfers.length > 0">
+    <template v-else>
+      <!-- Mobile Cards (Locked container: class="space-y-3 lg:hidden") -->
       <div class="space-y-3 lg:hidden">
-        <div
+        <Card
           v-for="transfer in transfers"
           :key="transfer.id"
-          class="nimbus-lift rounded-xl border border-themed bg-themed-surface p-4 shadow-sm"
+          padding="sm"
+          class="transition-all duration-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <div class="truncate text-sm font-semibold text-themed">{{ transfer.instanceName }}</div>
-              <div class="mt-1 text-xs font-mono text-themed-muted tabular-nums">ID: {{ transfer.instanceId }}</div>
+              <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ transfer.instanceName }}</div>
+              <div class="mt-1 text-xs font-mono text-[var(--text-tertiary)] tabular-nums">ID: {{ transfer.instanceId }}</div>
             </div>
-            <span :class="['badge shrink-0 whitespace-nowrap', getStatusClass(transfer.status)]">
+            <Badge :variant="getStatusBadgeVariant(transfer.status)">
               {{ $t(`transfer.status.${transfer.status}`) }}
-            </span>
+            </Badge>
           </div>
 
-          <div class="mt-4 flex items-center gap-2">
+          <div class="mt-4 flex items-center gap-2.5">
             <UserAvatar
               :username="activeTab === 'sent' ? (transfer.toUser?.username || '') : (transfer.fromUser?.username || '')"
               :email="activeTab === 'sent' ? (transfer.toUser?.email || null) : (transfer.fromUser?.email || null)"
@@ -384,10 +413,10 @@ function getNetworkModeText(mode: string | null | undefined) {
               :size="28"
             />
             <div class="min-w-0">
-              <div class="text-[11px] font-medium uppercase tracking-wide text-themed-muted">
+              <div class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
                 {{ activeTab === 'sent' ? $t('transfer.detail.toUser') : $t('transfer.detail.fromUser') }}
               </div>
-              <div class="truncate text-sm text-themed">
+              <div class="truncate text-sm font-medium text-[var(--text-primary)]">
                 {{ activeTab === 'sent' ? transfer.toUser?.username : transfer.fromUser?.username }}
               </div>
             </div>
@@ -397,43 +426,43 @@ function getNetworkModeText(mode: string | null | undefined) {
             <button
               v-if="transfer.snapshot"
               type="button"
-              class="rounded-lg bg-themed-secondary px-3 py-2 text-left"
+              class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 text-left border border-[var(--border-color)] hover:border-[var(--border-hover)] transition-all duration-200 active:scale-[0.98]"
               @click="openConfigModal(transfer)"
             >
-              <div class="text-[11px] font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.detail.snapshot') }}</div>
-              <div class="mt-1 flex min-w-0 items-center gap-2 font-medium text-themed">
+              <div class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.detail.snapshot') }}</div>
+              <div class="mt-1 flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)]">
                 <FlagIcon :code="transfer.snapshot.hostCountryCode || 'us'" size="xs" />
                 <span class="truncate">{{ (transfer.snapshot.hostName || '-').toUpperCase() }}</span>
               </div>
             </button>
-            <div v-else class="rounded-lg bg-themed-secondary px-3 py-2">
-              <div class="text-[11px] font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.detail.snapshot') }}</div>
-              <div class="mt-1 text-themed-muted">-</div>
+            <div v-else class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+              <div class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.detail.snapshot') }}</div>
+              <div class="mt-1 text-[var(--text-tertiary)]">-</div>
             </div>
 
-            <div class="rounded-lg bg-themed-secondary px-3 py-2">
-              <div class="text-[11px] font-medium uppercase tracking-wide text-themed-muted">{{ $t('common.createdAt') }}</div>
-              <div class="mt-1 text-xs text-themed">{{ formatDate(transfer.createdAt) }}</div>
+            <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)]">
+              <div class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('common.createdAt') }}</div>
+              <div class="mt-1 text-xs font-mono text-[var(--text-primary)] tabular-nums">{{ formatDate(transfer.createdAt) }}</div>
             </div>
           </div>
 
-          <div v-if="transfer.remark" class="mt-3 rounded-lg bg-themed-secondary px-3 py-2 text-sm">
-            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.modal.remark') }}</div>
-            <div v-if="!expandedRemarks.has(transfer.id)" class="flex items-center gap-2">
-              <span class="text-themed-muted">{{ $t('transfer.hasRemark') }}</span>
+          <div v-if="transfer.remark" class="mt-3 rounded-xl bg-[var(--bg-surface-soft)] p-2.5 border border-[var(--border-color)] text-sm">
+            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.modal.remark') }}</div>
+            <div v-if="!expandedRemarks.has(transfer.id)" class="flex items-center gap-1.5">
+              <span class="text-[var(--text-secondary)] text-xs">{{ $t('transfer.hasRemark') }}</span>
               <button
                 type="button"
-                class="text-xs text-themed-secondary hover:underline"
+                class="text-xs text-[var(--accent)] hover:underline font-medium"
                 @click="toggleRemark(transfer.id)"
               >
                 {{ $t('common.expand') }}
               </button>
             </div>
             <div v-else>
-              <div class="break-words text-themed">{{ transfer.remark }}</div>
+              <div class="break-words text-xs text-[var(--text-primary)] leading-relaxed">{{ transfer.remark }}</div>
               <button
                 type="button"
-                class="mt-1 text-xs text-themed-secondary hover:underline"
+                class="mt-1 text-xs text-[var(--accent)] hover:underline font-medium"
                 @click="toggleRemark(transfer.id)"
               >
                 {{ $t('common.collapse') }}
@@ -444,257 +473,282 @@ function getNetworkModeText(mode: string | null | undefined) {
           <div class="mt-4 flex flex-wrap items-center justify-end gap-2">
             <template v-if="activeTab === 'sent'">
               <template v-if="transfer.status === 'pending'">
-                <button
+                <Button
                   v-if="transfer.canPush"
-                  type="button"
-                  class="btn btn-sm btn-secondary"
-                  :disabled="pushLoading === transfer.id || actionLoading === transfer.id"
+                  size="sm"
+                  variant="secondary"
+                  :loading="pushLoading === transfer.id"
+                  :disabled="actionLoading === transfer.id"
                   @click="handlePush(transfer)"
                 >
+                  <template #icon>
+                    <Send class="w-3.5 h-3.5" />
+                  </template>
                   {{ pushLoading === transfer.id ? $t('common.processing') : $t('transfer.actions.push') }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-ghost text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
                   :disabled="actionLoading === transfer.id || pushLoading === transfer.id"
                   @click="handleCancel(transfer)"
                 >
+                  <template #icon>
+                    <Ban class="w-3.5 h-3.5" />
+                  </template>
                   {{ $t('transfer.actions.cancel') }}
-                </button>
+                </Button>
               </template>
-              <div v-else-if="transfer.status === 'accepted'" class="text-sm text-themed-muted">
+              <div v-else-if="transfer.status === 'accepted'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                 {{ $t('transfer.completedAt') }}: {{ formatDate(transfer.acceptedAt) }}
               </div>
-              <div v-else-if="transfer.status === 'rejected'" class="min-w-0 text-right text-sm text-themed-muted">
+              <div v-else-if="transfer.status === 'rejected'" class="min-w-0 text-right text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                 <div>{{ $t('transfer.rejectedAt') }}: {{ formatDate(transfer.rejectedAt) }}</div>
-                <div v-if="transfer.rejectReason" class="mt-1 truncate text-xs text-themed-muted" :title="transfer.rejectReason">
+                <div v-if="transfer.rejectReason" class="mt-0.5 truncate text-[11px] text-[var(--text-tertiary)]" :title="transfer.rejectReason">
                   {{ transfer.rejectReason }}
                 </div>
               </div>
-              <div v-else-if="transfer.status === 'cancelled'" class="text-sm text-themed-muted">
+              <div v-else-if="transfer.status === 'cancelled'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                 {{ $t('transfer.cancelledAt') }}: {{ formatDate(transfer.cancelledAt) }}
               </div>
             </template>
             <template v-else>
               <template v-if="transfer.status === 'pending'">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-primary"
-                  :disabled="actionLoading === transfer.id"
+                <Button
+                  size="sm"
+                  variant="primary"
+                  :loading="actionLoading === transfer.id"
                   @click="handleAccept(transfer)"
                 >
+                  <template #icon>
+                    <Check class="w-3.5 h-3.5" />
+                  </template>
                   {{ $t('transfer.actions.accept') }}
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-ghost text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
                   :disabled="actionLoading === transfer.id"
                   @click="openRejectModal(transfer)"
                 >
+                  <template #icon>
+                    <X class="w-3.5 h-3.5" />
+                  </template>
                   {{ $t('transfer.actions.reject') }}
-                </button>
+                </Button>
               </template>
-              <div v-else-if="transfer.status === 'accepted'" class="text-sm text-themed-muted">
+              <div v-else-if="transfer.status === 'accepted'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                 {{ $t('transfer.completedAt') }}: {{ formatDate(transfer.acceptedAt) }}
               </div>
-              <div v-else-if="transfer.status === 'rejected'" class="min-w-0 text-right text-sm text-themed-muted">
+              <div v-else-if="transfer.status === 'rejected'" class="min-w-0 text-right text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                 <div>{{ $t('transfer.rejectedAt') }}: {{ formatDate(transfer.rejectedAt) }}</div>
-                <div v-if="transfer.rejectReason" class="mt-1 truncate text-xs text-themed-muted" :title="transfer.rejectReason">
+                <div v-if="transfer.rejectReason" class="mt-0.5 truncate text-[11px] text-[var(--text-tertiary)]" :title="transfer.rejectReason">
                   {{ transfer.rejectReason }}
                 </div>
               </div>
-              <div v-else-if="transfer.status === 'cancelled'" class="text-sm text-themed-muted">
+              <div v-else-if="transfer.status === 'cancelled'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                 {{ $t('transfer.cancelledAt') }}: {{ formatDate(transfer.cancelledAt) }}
               </div>
             </template>
           </div>
-        </div>
+        </Card>
 
-        <div
-          v-if="totalPages > 1"
-          class="flex items-center justify-between rounded-lg border border-themed bg-themed-surface px-4 py-3"
-        >
-          <div class="text-sm text-themed-muted">
-            {{ total }} {{ $t('common.total') }}
-          </div>
-          <div class="flex gap-2">
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="page <= 1 || refreshing"
-              @click="page--; loadTransfers(true)"
-            >
-              {{ $t('instance.prevPage') }}
-            </button>
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="page >= totalPages || refreshing"
-              @click="page++; loadTransfers(true)"
-            >
-              {{ $t('instance.nextPage') }}
-            </button>
-          </div>
-        </div>
+        <!-- Mobile Pagination -->
+        <Card v-if="totalPages > 1" padding="sm">
+          <Pagination
+            :page="page"
+            :page-size="pageSize"
+            :total="total"
+            @update:page="newPage => { page = newPage; loadTransfers(true) }"
+          >
+            <template #total="{ total: tTotal, page: cPage, totalPages: tPages }">
+              <span>{{ tTotal }} {{ $t('common.total') }} · {{ cPage }} / {{ tPages }}</span>
+            </template>
+          </Pagination>
+        </Card>
       </div>
 
+      <!-- Desktop Table (Locked container: class="card hidden overflow-hidden lg:block") -->
       <div class="card hidden overflow-hidden lg:block">
         <table class="w-full table-fixed">
-          <thead :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">{{ $t('transfer.detail.instance') }}</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">
+          <thead>
+            <tr class="bg-[var(--bg-surface-soft)] border-b border-[var(--border-color)] text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
+              <th class="w-[20%] px-4 py-3 whitespace-nowrap">{{ $t('transfer.detail.instance') }}</th>
+              <th class="w-[16%] px-4 py-3 whitespace-nowrap">
                 {{ activeTab === 'sent' ? $t('transfer.detail.toUser') : $t('transfer.detail.fromUser') }}
               </th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">{{ $t('transfer.detail.snapshot') }}</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">{{ $t('transfer.modal.remark') }}</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">{{ $t('common.status') }}</th>
-              <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">{{ $t('common.createdAt') }}</th>
-              <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-themed-muted whitespace-nowrap">{{ $t('common.actions') }}</th>
+              <th class="w-[16%] px-4 py-3 whitespace-nowrap">{{ $t('transfer.detail.snapshot') }}</th>
+              <th class="w-[15%] px-4 py-3 whitespace-nowrap">{{ $t('transfer.modal.remark') }}</th>
+              <th class="w-[11%] px-4 py-3 whitespace-nowrap">{{ $t('common.status') }}</th>
+              <th class="w-[12%] px-4 py-3 whitespace-nowrap">{{ $t('common.createdAt') }}</th>
+              <th class="w-[10%] px-4 py-3 text-right whitespace-nowrap">{{ $t('common.actions') }}</th>
             </tr>
           </thead>
-          <tbody class="divide-y" :class="themeStore.isDark ? 'divide-gray-800' : 'divide-gray-100'">
+          <tbody class="divide-y divide-[var(--border-color)]">
             <tr
               v-for="transfer in transfers"
               :key="transfer.id"
-              class="transition-colors hover:bg-themed-hover"
+              class="transition-colors hover:bg-[var(--bg-surface-soft)]/50"
             >
-              <!-- 实例列：名称 + ID -->
-              <td class="px-4 py-3">
+              <!-- 实例列：名称 + ID (Locked: class="truncate font-medium") -->
+              <td class="px-4 py-3.5">
                 <div class="truncate font-medium" :title="transfer.instanceName">{{ transfer.instanceName }}</div>
-                <div class="truncate text-xs font-mono text-themed-muted tabular-nums" :title="String(transfer.instanceId)">
+                <div class="truncate text-xs font-mono text-[var(--text-tertiary)] tabular-nums" :title="String(transfer.instanceId)">
                   ID: {{ transfer.instanceId }}
                 </div>
               </td>
               <!-- 发起方/接收方 -->
-              <td class="px-4 py-3">
+              <td class="px-4 py-3.5">
                 <div class="flex min-w-0 items-center gap-2">
-                  <UserAvatar 
-                    :username="activeTab === 'sent' ? (transfer.toUser?.username || '') : (transfer.fromUser?.username || '')" 
+                  <UserAvatar
+                    :username="activeTab === 'sent' ? (transfer.toUser?.username || '') : (transfer.fromUser?.username || '')"
                     :email="activeTab === 'sent' ? (transfer.toUser?.email || null) : (transfer.fromUser?.email || null)"
                     :avatar-style="activeTab === 'sent' ? (transfer.toUser?.avatarStyle || '') : (transfer.fromUser?.avatarStyle || '')"
                     :badge-id="activeTab === 'sent' ? (transfer.toUser?.avatarBadgeId || null) : (transfer.fromUser?.avatarBadgeId || null)"
-                    :size="28"
+                    :size="26"
                   />
-                  <span class="min-w-0 truncate" :title="activeTab === 'sent' ? transfer.toUser?.username : transfer.fromUser?.username">
+                  <span class="min-w-0 truncate text-sm text-[var(--text-primary)]" :title="activeTab === 'sent' ? transfer.toUser?.username : transfer.fromUser?.username">
                     {{ activeTab === 'sent' ? transfer.toUser?.username : transfer.fromUser?.username }}
                   </span>
                 </div>
               </td>
               <!-- 转移时配置：可点击查看详情 -->
-              <td class="px-4 py-3 text-sm">
+              <td class="px-4 py-3.5 text-sm">
                 <button
                   v-if="transfer.snapshot"
-                  class="flex min-w-0 items-center gap-2 font-medium text-themed-secondary transition-colors hover:text-primary-600 dark:hover:text-primary-400"
+                  type="button"
+                  class="flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors group cursor-pointer"
                   @click="openConfigModal(transfer)"
                 >
                   <FlagIcon :code="transfer.snapshot.hostCountryCode || 'us'" size="xs" />
                   <span class="truncate" :title="(transfer.snapshot.hostName || '-').toUpperCase()">
                     {{ (transfer.snapshot.hostName || '-').toUpperCase() }}
                   </span>
-                  <svg class="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <Info class="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--accent)] shrink-0 transition-colors" />
                 </button>
-                <span v-else class="text-themed-muted">-</span>
+                <span v-else class="text-[var(--text-tertiary)]">-</span>
               </td>
               <!-- 备注：可展开 -->
-              <td class="px-4 py-3 text-sm">
+              <td class="px-4 py-3.5 text-sm">
                 <template v-if="transfer.remark">
-                  <div v-if="!expandedRemarks.has(transfer.id)" class="flex items-center gap-1">
-                    <span class="text-themed-muted">{{ $t('transfer.hasRemark') }}</span>
+                  <div v-if="!expandedRemarks.has(transfer.id)" class="flex items-center gap-1.5">
+                    <span class="text-[var(--text-secondary)] text-xs">{{ $t('transfer.hasRemark') }}</span>
                     <button
-                      class="text-xs text-themed-secondary hover:underline"
+                      type="button"
+                      class="text-xs text-[var(--accent)] hover:underline font-medium"
                       @click="toggleRemark(transfer.id)"
                     >
                       {{ $t('common.expand') }}
                     </button>
                   </div>
-                  <div v-else class="max-w-full">
-                    <div class="break-words text-themed">
+                  <div v-else class="max-w-full text-xs">
+                    <div class="break-words text-[var(--text-primary)] leading-relaxed">
                       {{ transfer.remark }}
                     </div>
                     <button
-                      class="mt-1 text-xs text-themed-secondary hover:underline"
+                      type="button"
+                      class="mt-1 text-xs text-[var(--accent)] hover:underline font-medium"
                       @click="toggleRemark(transfer.id)"
                     >
                       {{ $t('common.collapse') }}
                     </button>
                   </div>
                 </template>
-                <span v-else class="text-themed-muted">-</span>
+                <span v-else class="text-[var(--text-tertiary)] text-xs">-</span>
               </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <span :class="['badge whitespace-nowrap', getStatusClass(transfer.status)]">
+              <!-- 状态 -->
+              <td class="px-4 py-3.5 whitespace-nowrap">
+                <Badge :variant="getStatusBadgeVariant(transfer.status)">
                   {{ $t(`transfer.status.${transfer.status}`) }}
-                </span>
+                </Badge>
               </td>
-              <td class="px-4 py-3 text-sm text-themed-muted whitespace-nowrap tabular-nums">
+              <!-- 创建时间 -->
+              <td class="px-4 py-3.5 text-xs text-[var(--text-secondary)] whitespace-nowrap font-mono tabular-nums">
                 {{ formatDate(transfer.createdAt) }}
               </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap">
+              <!-- 操作 (Locked: class="flex flex-wrap items-center justify-end gap-2") -->
+              <td class="px-4 py-3.5 text-right whitespace-nowrap">
                 <div class="flex flex-wrap items-center justify-end gap-2">
                   <!-- Sent tab actions -->
                   <template v-if="activeTab === 'sent'">
                     <template v-if="transfer.status === 'pending'">
-                      <!-- 直接推送按钮（仅当发起方是宿主机所有者时显示） -->
-                      <IconButton
+                      <Button
                         v-if="transfer.canPush"
-                        :label="pushLoading === transfer.id ? $t('common.processing') : $t('transfer.actions.push')"
-                        :disabled="pushLoading === transfer.id || actionLoading === transfer.id"
+                        size="sm"
+                        variant="secondary"
+                        :loading="pushLoading === transfer.id"
+                        :disabled="actionLoading === transfer.id"
                         @click="handlePush(transfer)"
                       >
-                        <Send />
-                      </IconButton>
-                      <IconButton
-                        :label="$t('transfer.actions.cancel')"
-                        variant="danger"
+                        <template #icon>
+                          <Send class="w-3.5 h-3.5" />
+                        </template>
+                        {{ pushLoading === transfer.id ? $t('common.processing') : $t('transfer.actions.push') }}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
                         :disabled="actionLoading === transfer.id || pushLoading === transfer.id"
                         @click="handleCancel(transfer)"
                       >
-                        <Ban />
-                      </IconButton>
+                        <template #icon>
+                          <Ban class="w-3.5 h-3.5" />
+                        </template>
+                        {{ $t('transfer.actions.cancel') }}
+                      </Button>
                     </template>
-                    <div v-else-if="transfer.status === 'accepted'" class="text-sm text-themed-muted tabular-nums">
+                    <div v-else-if="transfer.status === 'accepted'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                       {{ $t('transfer.completedAt') }}: {{ formatDate(transfer.acceptedAt) }}
                     </div>
-                    <div v-else-if="transfer.status === 'rejected'" class="text-sm text-themed-muted text-right max-w-xs tabular-nums">
+                    <div v-else-if="transfer.status === 'rejected'" class="text-xs text-[var(--text-secondary)] text-right font-mono tabular-nums max-w-xs">
                       <div>{{ $t('transfer.rejectedAt') }}: {{ formatDate(transfer.rejectedAt) }}</div>
-                      <div v-if="transfer.rejectReason" class="text-xs text-themed-muted mt-1 truncate" :title="transfer.rejectReason">
+                      <div v-if="transfer.rejectReason" class="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate" :title="transfer.rejectReason">
                         {{ transfer.rejectReason }}
                       </div>
                     </div>
-                    <div v-else-if="transfer.status === 'cancelled'" class="text-sm text-themed-muted tabular-nums">
+                    <div v-else-if="transfer.status === 'cancelled'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                       {{ $t('transfer.cancelledAt') }}: {{ formatDate(transfer.cancelledAt) }}
                     </div>
                   </template>
                   <!-- Received tab actions -->
                   <template v-else>
                     <template v-if="transfer.status === 'pending'">
-                      <IconButton
-                        :label="$t('transfer.actions.accept')"
-                        :disabled="actionLoading === transfer.id"
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        :loading="actionLoading === transfer.id"
                         @click="handleAccept(transfer)"
                       >
-                        <Check />
-                      </IconButton>
-                      <IconButton
-                        :label="$t('transfer.actions.reject')"
-                        variant="danger"
+                        <template #icon>
+                          <Check class="w-3.5 h-3.5" />
+                        </template>
+                        {{ $t('transfer.actions.accept') }}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        class="text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))]"
                         :disabled="actionLoading === transfer.id"
                         @click="openRejectModal(transfer)"
                       >
-                        <X />
-                      </IconButton>
+                        <template #icon>
+                          <X class="w-3.5 h-3.5" />
+                        </template>
+                        {{ $t('transfer.actions.reject') }}
+                      </Button>
                     </template>
-                    <div v-else-if="transfer.status === 'accepted'" class="text-sm text-themed-muted tabular-nums">
+                    <div v-else-if="transfer.status === 'accepted'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                       {{ $t('transfer.completedAt') }}: {{ formatDate(transfer.acceptedAt) }}
                     </div>
-                    <div v-else-if="transfer.status === 'rejected'" class="text-sm text-themed-muted text-right max-w-xs tabular-nums">
+                    <div v-else-if="transfer.status === 'rejected'" class="text-xs text-[var(--text-secondary)] text-right font-mono tabular-nums max-w-xs">
                       <div>{{ $t('transfer.rejectedAt') }}: {{ formatDate(transfer.rejectedAt) }}</div>
-                      <div v-if="transfer.rejectReason" class="text-xs text-themed-muted mt-1 truncate" :title="transfer.rejectReason">
+                      <div v-if="transfer.rejectReason" class="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate" :title="transfer.rejectReason">
                         {{ transfer.rejectReason }}
                       </div>
                     </div>
-                    <div v-else-if="transfer.status === 'cancelled'" class="text-sm text-themed-muted tabular-nums">
+                    <div v-else-if="transfer.status === 'cancelled'" class="text-xs text-[var(--text-secondary)] font-mono tabular-nums">
                       {{ $t('transfer.cancelledAt') }}: {{ formatDate(transfer.cancelledAt) }}
                     </div>
                   </template>
@@ -704,46 +758,24 @@ function getNetworkModeText(mode: string | null | undefined) {
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div 
+        <!-- Desktop Pagination -->
+        <div
           v-if="totalPages > 1"
-          class="flex items-center justify-between px-4 py-3 border-t"
-          :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"
+          class="border-t border-[var(--border-color)] px-4 py-3"
         >
-          <div class="text-sm text-themed-muted tabular-nums">
-            {{ total }} {{ $t('common.total') }}
-          </div>
-          <div class="flex gap-2">
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="page <= 1 || refreshing"
-              @click="page--; loadTransfers(true)"
-            >
-              {{ $t('instance.prevPage') }}
-            </button>
-            <button
-              class="btn btn-sm btn-ghost"
-              :disabled="page >= totalPages || refreshing"
-              @click="page++; loadTransfers(true)"
-            >
-              {{ $t('instance.nextPage') }}
-            </button>
-          </div>
+          <Pagination
+            :page="page"
+            :page-size="pageSize"
+            :total="total"
+            @update:page="newPage => { page = newPage; loadTransfers(true) }"
+          >
+            <template #total="{ total: tTotal, page: cPage, totalPages: tPages }">
+              <span>{{ tTotal }} {{ $t('common.total') }} · {{ cPage }} / {{ tPages }}</span>
+            </template>
+          </Pagination>
+        </div>
       </div>
-    </div>
     </template>
-
-    <!-- Empty State -->
-    <div v-else-if="!loading && transfers.length === 0" class="card flex flex-col items-center justify-center gap-3 p-12 text-center">
-      <div class="flex h-12 w-12 items-center justify-center rounded-full bg-themed-secondary text-themed-muted">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m4 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-      </div>
-      <div class="text-sm text-themed-muted">
-        {{ activeTab === 'sent' ? $t('transfer.noTransfers') : $t('transfer.noPendingTransfers') }}
-      </div>
-    </div>
 
     <!-- Reject Modal -->
     <DrawerModal
@@ -752,36 +784,34 @@ function getNetworkModeText(mode: string | null | undefined) {
       raw
       @close="showRejectModal = false"
     >
-        <div class="modal-header">
-          <h3 class="modal-title">{{ $t('transfer.rejectModal.title') }}</h3>
-          <button class="btn btn-sm btn-ghost" @click="showRejectModal = false">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div class="modal-header flex items-center justify-between border-b border-[var(--border-color)] p-4 md:p-6">
+        <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('transfer.rejectModal.title') }}</h3>
+        <Button size="sm" variant="ghost" class="w-8 h-8 !p-0 rounded-full" @click="showRejectModal = false">
+          <X class="w-4 h-4" />
+        </Button>
+      </div>
+      <div class="modal-body p-4 md:p-6 space-y-4">
+        <div>
+          <label class="mb-1.5 block text-xs font-semibold tracking-wide text-[var(--text-secondary)]">{{ $t('transfer.rejectModal.reason') }}</label>
+          <textarea
+            v-model="rejectReason"
+            class="w-full h-24 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none transition-all"
+            :placeholder="$t('transfer.rejectModal.reasonPlaceholder')"
+          ></textarea>
         </div>
-        <div class="modal-body">
-          <div>
-            <label class="mb-1 block text-sm font-medium text-themed">{{ $t('transfer.rejectModal.reason') }}</label>
-            <textarea
-              v-model="rejectReason"
-              class="input h-24 w-full resize-none"
-              :placeholder="$t('transfer.rejectModal.reasonPlaceholder')"
-            ></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showRejectModal = false">
-            {{ $t('common.cancel') }}
-          </button>
-          <button
-            class="btn btn-danger"
-            :disabled="rejectLoading"
-            @click="handleReject"
-          >
-            {{ rejectLoading ? $t('common.loading') : $t('transfer.actions.reject') }}
-          </button>
-        </div>
+      </div>
+      <div class="modal-footer flex items-center justify-end gap-2 border-t border-[var(--border-color)] p-4 md:p-6 bg-[var(--bg-surface-soft)]">
+        <Button variant="secondary" @click="showRejectModal = false">
+          {{ $t('common.cancel') }}
+        </Button>
+        <Button
+          variant="danger"
+          :loading="rejectLoading"
+          @click="handleReject"
+        >
+          {{ $t('transfer.actions.reject') }}
+        </Button>
+      </div>
     </DrawerModal>
 
     <!-- Config Detail Modal -->
@@ -792,127 +822,84 @@ function getNetworkModeText(mode: string | null | undefined) {
       raw
       @close="showConfigModal = false"
     >
-        <div class="modal-header">
-          <h3 class="modal-title">{{ $t('transfer.configModal.title') }}</h3>
-          <button class="btn btn-sm btn-ghost" @click="showConfigModal = false">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+      <div class="modal-header flex items-center justify-between border-b border-[var(--border-color)] p-4 md:p-6">
+        <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">{{ $t('transfer.configModal.title') }}</h3>
+        <Button size="sm" variant="ghost" class="w-8 h-8 !p-0 rounded-full" @click="showConfigModal = false">
+          <X class="w-4 h-4" />
+        </Button>
+      </div>
 
-        <div class="modal-body">
-          <!-- 实例信息 -->
-          <div class="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.configModal.instanceName') }}</div>
-              <div class="font-medium text-themed">{{ selectedTransfer.snapshot?.originalName || selectedTransfer.instanceName }}</div>
-            </div>
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('instance.detail.info.instanceId') }}</div>
-              <div class="font-mono text-themed">{{ selectedTransfer.instanceId }}</div>
-            </div>
+      <div class="modal-body p-4 md:p-6 space-y-4">
+        <!-- 实例信息 -->
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.configModal.instanceName') }}</div>
+            <div class="font-medium text-[var(--text-primary)] truncate">{{ selectedTransfer.snapshot?.originalName || selectedTransfer.instanceName }}</div>
           </div>
-
-          <!-- 宿主机信息 -->
-          <div class="rounded-lg border border-themed bg-themed-secondary p-3">
-            <div class="mb-2 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.configModal.hostInfo') }}</div>
-            <div class="flex items-center gap-2">
-              <FlagIcon :code="selectedTransfer.snapshot?.hostCountryCode || 'us'" size="sm" />
-              <span class="font-medium text-themed">{{ (selectedTransfer.snapshot?.hostName || '-').toUpperCase() }}</span>
-              <span v-if="selectedTransfer.snapshot?.hostLocation" class="text-themed-muted">
-                ({{ selectedTransfer.snapshot.hostLocation }})
-              </span>
-            </div>
-          </div>
-
-          <!-- 配置信息 -->
-          <div class="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">CPU</div>
-              <div class="font-mono text-themed">{{ selectedTransfer.snapshot?.cpu ?? '-' }}%</div>
-            </div>
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('instance.detail.info.memory') }}</div>
-              <div class="font-mono text-themed">{{ selectedTransfer.snapshot?.memory ? formatMemory(selectedTransfer.snapshot.memory) : '-' }}</div>
-            </div>
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('instance.detail.info.disk') }}</div>
-              <div class="font-mono text-themed">{{ selectedTransfer.snapshot?.disk ? formatDisk(selectedTransfer.snapshot.disk) : '-' }}</div>
-            </div>
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.configModal.networkMode') }}</div>
-              <div class="text-themed">{{ getNetworkModeText(selectedTransfer.snapshot?.networkMode) }}</div>
-            </div>
-          </div>
-
-          <!-- 网络信息 -->
-          <div class="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">IPv4</div>
-              <div class="font-mono text-xs text-themed">{{ selectedTransfer.snapshot?.ipv4 || '-' }}</div>
-            </div>
-            <div>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">IPv6</div>
-              <div class="truncate font-mono text-xs text-themed" :title="selectedTransfer.snapshot?.ipv6 || ''">
-                {{ selectedTransfer.snapshot?.ipv6 || '-' }}
-              </div>
-            </div>
-          </div>
-
-          <!-- 套餐信息 -->
-          <div v-if="selectedTransfer.snapshot?.packageName" class="text-sm">
-            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-themed-muted">{{ $t('transfer.configModal.package') }}</div>
-            <div class="text-themed">{{ selectedTransfer.snapshot.packageName }}</div>
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('instance.detail.info.instanceId') }}</div>
+            <div class="font-mono text-[var(--text-primary)] truncate">{{ selectedTransfer.instanceId }}</div>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="showConfigModal = false">
-            {{ $t('common.close') }}
-          </button>
+        <!-- 宿主机信息 -->
+        <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
+          <div class="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.configModal.hostInfo') }}</div>
+          <div class="flex items-center gap-2">
+            <FlagIcon :code="selectedTransfer.snapshot?.hostCountryCode || 'us'" size="sm" />
+            <span class="font-medium text-[var(--text-primary)]">{{ (selectedTransfer.snapshot?.hostName || '-').toUpperCase() }}</span>
+            <span v-if="selectedTransfer.snapshot?.hostLocation" class="text-[var(--text-secondary)] text-sm">
+              ({{ selectedTransfer.snapshot.hostLocation }})
+            </span>
+          </div>
         </div>
+
+        <!-- 配置信息 -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-sm">
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">CPU</div>
+            <div class="font-mono font-semibold text-[var(--text-primary)]">{{ selectedTransfer.snapshot?.cpu ?? '-' }}%</div>
+          </div>
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('instance.detail.info.memory') }}</div>
+            <div class="font-mono font-semibold text-[var(--text-primary)]">{{ selectedTransfer.snapshot?.memory ? formatMemory(selectedTransfer.snapshot.memory) : '-' }}</div>
+          </div>
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('instance.detail.info.disk') }}</div>
+            <div class="font-mono font-semibold text-[var(--text-primary)]">{{ selectedTransfer.snapshot?.disk ? formatDisk(selectedTransfer.snapshot.disk) : '-' }}</div>
+          </div>
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.configModal.networkMode') }}</div>
+            <div class="font-medium text-[var(--text-primary)]">{{ getNetworkModeText(selectedTransfer.snapshot?.networkMode) }}</div>
+          </div>
+        </div>
+
+        <!-- 网络信息 -->
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">IPv4</div>
+            <div class="font-mono text-xs text-[var(--text-primary)]">{{ selectedTransfer.snapshot?.ipv4 || '-' }}</div>
+          </div>
+          <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
+            <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">IPv6</div>
+            <div class="truncate font-mono text-xs text-[var(--text-primary)]" :title="selectedTransfer.snapshot?.ipv6 || ''">
+              {{ selectedTransfer.snapshot?.ipv6 || '-' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 套餐信息 -->
+        <div v-if="selectedTransfer.snapshot?.packageName" class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)] text-sm">
+          <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('transfer.configModal.package') }}</div>
+          <div class="text-[var(--text-primary)] font-medium">{{ selectedTransfer.snapshot.packageName }}</div>
+        </div>
+      </div>
+
+      <div class="modal-footer flex items-center justify-end border-t border-[var(--border-color)] p-4 md:p-6 bg-[var(--bg-surface-soft)]">
+        <Button variant="secondary" @click="showConfigModal = false">
+          {{ $t('common.close') }}
+        </Button>
+      </div>
     </DrawerModal>
   </div>
 </template>
-
-<style scoped>
-/* Nimbus in-page tabs: indigo underline with smooth colour/underline transition */
-.nimbus-tabs {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.nimbus-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  margin-bottom: -1px;
-  padding: 0.625rem 0.125rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-  border-bottom-width: 2px;
-  border-bottom-style: solid;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-/* Subtle lift on interactive cards */
-.nimbus-lift {
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.nimbus-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.28);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nimbus-tab,
-  .nimbus-lift,
-  .nimbus-lift:hover {
-    transform: none;
-    transition: none;
-  }
-}
-</style>
