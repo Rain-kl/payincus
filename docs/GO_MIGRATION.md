@@ -48,8 +48,19 @@
 | requests-verification-redeem | 59/59 |
 | requests-help-orders | 96/96 |
 | requests-friends-gift-cards | 92/92 |
+| requests-logs-custom-init | 72/80（8 skipped：限流分歧 + CSV 导出无法比对 body） |
+| requests-user-invites-oauth-apps | 69/69 |
+| requests-tickets | 42/43（1 skipped：`POST /api/tickets` 为 5/min） |
+| requests-telegram | 24/24 |
+| requests-promo-codes | 57/57 |
+| requests-admin-tasks | 27/27 |
+| requests-admin-statistics | 4/4 |
+| requests-entertainment | 33/33 |
 
-**全部 487 例零 FAIL**。跑了 9 组后临时库与进程已清理，dev 库未被触碰。
+**全部 625 例零 FAIL**（19 例为已记录的限流分歧 skip）。临时库 `payincus_goparity` 与 Node/Go 进程按需重建，dev 库未被触碰。
+
+> 对拍必须**每组前重启 Go**：限流是进程内固定窗口，连续跑多组会把窗口打满导致假 429（真实踩过，`/tmp/runp2.sh` 就是为此写的）。
+> 同一窗口内对 Node 重复跑同一组也会触发它自己的 300/min 上限，所以复跑前要等窗口过期。
 
 > 注意：对拍必须在**每组前重启 Go**。限流是进程内固定窗口，连续跑多组会把窗口打满导致假 429（真实踩过）。
 
