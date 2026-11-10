@@ -1907,25 +1907,35 @@ func GetSimilarUsernameGroups(ctx context.Context, groupLimit, maxUsersPerGroup 
 }
 
 // HasOAuthBinding mirrors hasOAuthBinding from db/oauth.ts.
+//
+// The provider column is a PostgreSQL enum ("OAuthProvider"): comparing it with a
+// bare text placeholder fails at runtime with
+//
+//	ERROR: operator does not exist: "OAuthProvider" = text
+//
+// (there is no implicit text→enum cast for `=`). The parameter is therefore cast to
+// the enum, which also reproduces Prisma's client-side enum validation: an unknown
+// provider raises an error (500) instead of silently answering "not bound".
 func HasOAuthBinding(ctx context.Context, userID int32, provider string) (bool, error) {
 	if err := usersRequireDB(); err != nil {
 		return false, err
 	}
 	var exists bool
 	err := DB.WithContext(ctx).Raw(
-		"SELECT EXISTS (SELECT 1 FROM user_oauth_bindings WHERE user_id = ? AND provider = ?::text)",
+		`SELECT EXISTS (SELECT 1 FROM user_oauth_bindings WHERE user_id = ? AND provider = ?::"OAuthProvider")`,
 		userID, provider,
 	).Scan(&exists).Error
 	return exists, err
 }
 
-// DeleteOAuthBinding mirrors deleteOAuthBinding from db/oauth.ts.
+// DeleteOAuthBinding mirrors deleteOAuthBinding from db/oauth.ts. See
+// HasOAuthBinding for the enum cast.
 func DeleteOAuthBinding(ctx context.Context, userID int32, provider string) error {
 	if err := usersRequireDB(); err != nil {
 		return err
 	}
 	return DB.WithContext(ctx).Exec(
-		"DELETE FROM user_oauth_bindings WHERE user_id = ? AND provider = ?::text", userID, provider,
+		`DELETE FROM user_oauth_bindings WHERE user_id = ? AND provider = ?::"OAuthProvider"`, userID, provider,
 	).Error
 }
 

@@ -1,0 +1,50 @@
+[
+  { "name": "oauth-configs-anon", "method": "GET", "path": "/api/oauth/configs" },
+  { "name": "oauth-configs-non-admin", "method": "GET", "path": "/api/oauth/configs", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "oauth-put-config-anon", "method": "PUT", "path": "/api/oauth/configs/github", "body": { "clientId": "parity-fake-github-client-id" } },
+  { "name": "oauth-put-config-non-admin", "method": "PUT", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN", "body": { "clientId": "parity-fake-github-client-id" } },
+  { "name": "oauth-put-config-invalid-provider", "method": "PUT", "path": "/api/oauth/configs/facebook", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": "parity-fake-facebook-client-id" } },
+  { "name": "oauth-put-config-provider-case-sensitive", "method": "PUT", "path": "/api/oauth/configs/GitHub", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": "parity-fake-github-client-id" } },
+  { "name": "oauth-put-config-missing-client-id", "method": "PUT", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {} },
+  { "name": "oauth-put-config-empty-client-id", "method": "PUT", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": "" } },
+  { "name": "oauth-put-config-wrong-client-id-type", "method": "PUT", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": {} } },
+  { "name": "oauth-put-config-no-body", "method": "PUT", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "oauth-put-config-github-unchanged-secret", "method": "PUT", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": "parity-fake-github-client-id", "clientSecret": "UNCHANGED", "enabled": true } },
+  { "name": "oauth-put-config-google-omitted-secret", "method": "PUT", "path": "/api/oauth/configs/google", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": "parity-fake-google-client-id", "enabled": false } },
+  { "name": "oauth-put-config-google-empty-secret", "method": "PUT", "path": "/api/oauth/configs/google", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": { "clientId": "parity-fake-google-client-id", "clientSecret": "", "enabled": false } },
+
+  { "name": "oauth-delete-config-anon", "method": "DELETE", "path": "/api/oauth/configs/github" },
+  { "name": "oauth-delete-config-non-admin", "method": "DELETE", "path": "/api/oauth/configs/github", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+  { "name": "oauth-delete-config-invalid-provider", "method": "DELETE", "path": "/api/oauth/configs/facebook", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN", "body": {}, "skipBody": true },
+
+  { "name": "oauth-configs-admin", "method": "GET", "path": "/api/oauth/configs", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "oauth-providers-public", "method": "GET", "path": "/api/oauth/providers" },
+
+  { "name": "oauth-bind-ticket-anon", "method": "POST", "path": "/api/oauth/bind-ticket" },
+
+  { "name": "oauth-authorize-invalid-provider", "method": "GET", "path": "/api/oauth/authorize/facebook" },
+  { "name": "oauth-authorize-provider-case-sensitive", "method": "GET", "path": "/api/oauth/authorize/GitHub" },
+  { "name": "oauth-authorize-google-disabled", "method": "GET", "path": "/api/oauth/authorize/google" },
+
+  { "name": "oauth-callback-no-state", "method": "GET", "path": "/api/oauth/callback/github" },
+  { "name": "oauth-callback-empty-state", "method": "GET", "path": "/api/oauth/callback/github?state=" },
+  { "name": "oauth-callback-bad-state", "method": "GET", "path": "/api/oauth/callback/github?state=bogus-state" },
+  { "name": "oauth-callback-provider-error", "method": "GET", "path": "/api/oauth/callback/github?error=access_denied" },
+  { "name": "oauth-callback-invalid-provider", "method": "GET", "path": "/api/oauth/callback/facebook" },
+  { "name": "oauth-callback-valid-state-missing-code", "method": "GET", "path": "/api/oauth/callback/github?state=eyJtb2RlIjoibG9naW4iLCJyZWRpcmVjdCI6Ii9wcm9maWxlIiwidGltZXN0YW1wIjo0MTAyNDQ0ODAwMDAwLCJub25jZSI6IjUwN2NmN2U2MDg2MTgwMjgzYmIzYmViNzBkOWMwNThjIn0.Xk_S2aQTsMMJ2icBnjN-A6mJsR5s9p1GYxF-j-onUyc" },
+  { "name": "oauth-callback-state-replay", "method": "GET", "path": "/api/oauth/callback/github?state=eyJtb2RlIjoibG9naW4iLCJyZWRpcmVjdCI6Ii9wcm9maWxlIiwidGltZXN0YW1wIjo0MTAyNDQ0ODAwMDAwLCJub25jZSI6IjUwN2NmN2U2MDg2MTgwMjgzYmIzYmViNzBkOWMwNThjIn0.Xk_S2aQTsMMJ2icBnjN-A6mJsR5s9p1GYxF-j-onUyc" },
+  { "name": "oauth-callback-bind-state-missing-code", "method": "GET", "path": "/api/oauth/callback/github?state=eyJtb2RlIjoiYmluZCIsInJlZGlyZWN0IjoiL3Byb2ZpbGUiLCJ0aW1lc3RhbXAiOjQxMDI0NDQ4MDAwMDAsIm5vbmNlIjoiZjM0YTFlZjIyNmI2NmRjYzgyYTRhNTI1ZjUzZWFlMDIifQ.g7yxgFS6moZONVQcooffQ7i9qQ16iL4fo0Fzhu5MVPM" },
+  { "name": "oauth-callback-bind-state-replay", "method": "GET", "path": "/api/oauth/callback/github?state=eyJtb2RlIjoiYmluZCIsInJlZGlyZWN0IjoiL3Byb2ZpbGUiLCJ0aW1lc3RhbXAiOjQxMDI0NDQ4MDAwMDAsIm5vbmNlIjoiZjM0YTFlZjIyNmI2NmRjYzgyYTRhNTI1ZjUzZWFlMDIifQ.g7yxgFS6moZONVQcooffQ7i9qQ16iL4fo0Fzhu5MVPM" },
+
+  { "name": "oauth-bindings-anon", "method": "GET", "path": "/api/oauth/bindings" },
+  { "name": "oauth-bindings-user", "method": "GET", "path": "/api/oauth/bindings", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "oauth-delete-binding-anon", "method": "DELETE", "path": "/api/oauth/bindings/github" },
+  { "name": "oauth-delete-binding-invalid-provider", "method": "DELETE", "path": "/api/oauth/bindings/facebook", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN", "body": {}, "skipBody": true },
+  { "name": "oauth-delete-binding-not-bound", "method": "DELETE", "path": "/api/oauth/bindings/github", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN", "body": {} },
+
+  { "name": "oauth-exchange-code-missing-code", "method": "POST", "path": "/api/oauth/exchange-code", "body": {} },
+  { "name": "oauth-exchange-code-invalid", "method": "POST", "path": "/api/oauth/exchange-code", "body": { "code": "definitely-not-a-login-code" } }
+]

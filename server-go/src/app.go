@@ -76,8 +76,14 @@ func NewRouter() *gin.Engine {
 			return
 		}
 
+		// Fastify renders `Route <method>:<url> not found` where `<url>` is the raw
+		// request URL **including the query string**, e.g.
+		//   Route GET:/login?error=invalid_state not found
+		// (measured against fastify 5; the OAuth callback/authorize redirects land on
+		// frontend paths, so a query-carrying 404 is a real, reachable shape).
+		// `URL.Path` alone drops the query and diverges from Node.
 		c.JSON(http.StatusNotFound, gin.H{
-			"message":    "Route " + c.Request.Method + ":" + c.Request.URL.Path + " not found",
+			"message":    "Route " + c.Request.Method + ":" + c.Request.URL.RequestURI() + " not found",
 			"error":      "Not Found",
 			"statusCode": http.StatusNotFound,
 		})

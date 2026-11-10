@@ -1249,25 +1249,27 @@ func newNonceStore() *nonceStore {
 	return &nonceStore{entries: make(map[string]int64)}
 }
 
-func (s *nonceStore) has(nonce string) bool {
+// consumeIfAbsent atomically checks and marks a nonce under ONE lock.
+//
+// This is the security-critical primitive behind both replay defences. A separate
+// has()-then-mark() API (what this file used to expose) leaves a window in which
+// two concurrent requests both observe "unused" and both succeed — a replayed
+// OAuth state or a twice-redeemed login code. The single-instance mutex only helps
+// if the check and the write are the same critical section, so the split helpers
+// were removed rather than left available.
+//
+// Expired entries are treated as absent and overwritten.
+func (s *nonceStore) consumeIfAbsent(nonce string, expiresAt int64) bool {
+	now := securityNowMs()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	expiresAt, ok := s.entries[nonce]
-	if !ok {
+	if existing, ok := s.entries[nonce]; ok && existing > now {
 		return false
 	}
-	if expiresAt <= securityNowMs() {
-		delete(s.entries, nonce)
-		return false
-	}
-	return true
-}
-
-func (s *nonceStore) mark(nonce string, expiresAt int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.entries[nonce] = expiresAt
+	return true
 }
 
 func (s *nonceStore) cleanup() int {
@@ -1363,10 +1365,10 @@ func VerifyAndConsumeOAuthState(stateToken string) *OAuthStateData {
 	if securityNowMs()-data.Timestamp > oauthStateTTLMs {
 		return nil
 	}
-	if usedOAuthStateNonces.has(data.Nonce) {
+	// Atomic check-and-mark: a concurrent replay of the same state must lose.
+	if !usedOAuthStateNonces.consumeIfAbsent(data.Nonce, data.Timestamp+oauthStateTTLMs) {
 		return nil
 	}
-	usedOAuthStateNonces.mark(data.Nonce, data.Timestamp+oauthStateTTLMs)
 	return &data
 }
 
@@ -1649,10 +1651,11 @@ func VerifyAndConsumeOAuthLoginCode(code string) *OAuthLoginCodeData {
 	if securityNowMs()-data.Timestamp > oauthLoginCodeTTLMs {
 		return nil
 	}
-	if usedOAuthLoginCodeNonces.has(data.Nonce) {
+	// Atomic check-and-mark: two concurrent exchanges of one login code must not
+	// both mint a session.
+	if !usedOAuthLoginCodeNonces.consumeIfAbsent(data.Nonce, data.Timestamp+oauthLoginCodeTTLMs) {
 		return nil
 	}
-	usedOAuthLoginCodeNonces.mark(data.Nonce, data.Timestamp+oauthLoginCodeTTLMs)
 	return &data
 }
 
