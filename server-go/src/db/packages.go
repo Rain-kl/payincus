@@ -1267,10 +1267,7 @@ func packageEgressAdvisoryLock(tx *gorm.DB) error {
 // the transaction that performs the chain validation, otherwise PostgreSQL
 // releases it at the end of the implicit single-statement transaction.
 func packagePrerequisiteLock(tx *gorm.DB) error {
-	return tx.Exec(
-		"WITH acquired_lock AS (SELECT pg_advisory_xact_lock(?, 1)) SELECT true AS locked FROM acquired_lock",
-		PackagePrerequisiteLockNamespace,
-	).Error
+	return AdvisoryTransactionLockTx(tx, PackagePrerequisiteLockNamespace, 1)
 }
 
 // ==================== prerequisite validation ====================

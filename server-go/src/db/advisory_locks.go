@@ -10,6 +10,7 @@ package db
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"
@@ -89,4 +90,30 @@ func AdvisoryTransactionLockStringTx(tx *gorm.DB, namespace int32, key string) e
 		"WITH acquired_lock AS (SELECT pg_advisory_xact_lock(?, hashtext(?))) SELECT true AS locked FROM acquired_lock",
 		namespace, key,
 	).Error
+}
+
+// AdvisoryTransactionLockTx is the GORM-transaction flavour of
+// AdvisoryTransactionLock (two-int namespace form). Same warning as above: tx must
+// be the transaction that performs the guarded work.
+func AdvisoryTransactionLockTx(tx *gorm.DB, namespace, key int32) error {
+	if tx == nil {
+		return errors.New("advisory lock: requires a transaction")
+	}
+	return tx.Exec(
+		"WITH acquired_lock AS (SELECT pg_advisory_xact_lock(?, ?)) SELECT true AS locked FROM acquired_lock",
+		namespace, key,
+	).Error
+}
+
+// TryAdvisoryTransactionLockTx is the GORM-transaction flavour of
+// TryAdvisoryTransactionLock: non-blocking, reports whether the lock was taken.
+func TryAdvisoryTransactionLockTx(tx *gorm.DB, namespace, key int32) (bool, error) {
+	if tx == nil {
+		return false, errors.New("advisory lock: requires a transaction")
+	}
+	var locked bool
+	if err := tx.Raw("SELECT pg_try_advisory_xact_lock(?, ?) AS locked", namespace, key).Scan(&locked).Error; err != nil {
+		return false, err
+	}
+	return locked, nil
 }

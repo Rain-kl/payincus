@@ -88,17 +88,7 @@ type InstanceBillingBalanceResult struct {
 // A transaction-scoped lock is released when the transaction ends, so tx MUST be
 // the same transaction that performs the guarded work.
 func TryInstanceBillingAdvisoryLock(ctx context.Context, tx *gorm.DB, namespace, key int32) (bool, error) {
-	if tx == nil {
-		return false, errors.New("instance billing: advisory lock requires a transaction")
-	}
-	var locked bool
-	err := tx.WithContext(ctx).
-		Raw("SELECT pg_try_advisory_xact_lock(?, ?) AS locked", namespace, key).
-		Scan(&locked).Error
-	if err != nil {
-		return false, err
-	}
-	return locked, nil
+	return TryAdvisoryTransactionLockTx(tx.WithContext(ctx), namespace, key)
 }
 
 // InstanceBillingApplyBalanceTx mirrors the consume/refund half of
