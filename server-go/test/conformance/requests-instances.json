@@ -1,0 +1,920 @@
+[
+  {
+    "name": "instances-list-anon",
+    "method": "GET",
+    "path": "/api/instances"
+  },
+  {
+    "name": "instances-list-user",
+    "method": "GET",
+    "path": "/api/instances",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-user-page2",
+    "method": "GET",
+    "path": "/api/instances?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-user-search",
+    "method": "GET",
+    "path": "/api/instances?search=parity-instances",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-user-country",
+    "method": "GET",
+    "path": "/api/instances?countryCode=US",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-user-status",
+    "method": "GET",
+    "path": "/api/instances?status=stopped",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-user-status-running",
+    "method": "GET",
+    "path": "/api/instances?status=running",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-user-status-invalid",
+    "method": "GET",
+    "path": "/api/instances?status=nope",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-invalid-page",
+    "method": "GET",
+    "path": "/api/instances?page=0",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-invalid-pagesize",
+    "method": "GET",
+    "path": "/api/instances?pageSize=abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-pagesize-cap",
+    "method": "GET",
+    "path": "/api/instances?pageSize=1000",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-invalid-userid",
+    "method": "GET",
+    "path": "/api/instances?userId=01",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-sort-created",
+    "method": "GET",
+    "path": "/api/instances?sortBy=createdAt&sortOrder=asc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-list-admin",
+    "method": "GET",
+    "path": "/api/instances",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-order-anon",
+    "method": "PATCH",
+    "path": "/api/instances/960001/order",
+    "body": {
+      "action": "up"
+    }
+  },
+  {
+    "name": "instances-order-invalid-id",
+    "method": "PATCH",
+    "path": "/api/instances/abc/order",
+    "body": {
+      "action": "up"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-order-missing-action",
+    "method": "PATCH",
+    "path": "/api/instances/960001/order",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-order-invalid-action",
+    "method": "PATCH",
+    "path": "/api/instances/960001/order",
+    "body": {
+      "action": "sideways"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-order-not-owned",
+    "method": "PATCH",
+    "path": "/api/instances/960002/order",
+    "body": {
+      "action": "up"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-order-noop",
+    "method": "PATCH",
+    "path": "/api/instances/960001/order",
+    "body": {
+      "action": "up"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-anon",
+    "method": "GET",
+    "path": "/api/instances/available-hosts"
+  },
+  {
+    "name": "instances-hosts-no-package",
+    "method": "GET",
+    "path": "/api/instances/available-hosts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-invalid-package",
+    "method": "GET",
+    "path": "/api/instances/available-hosts?packageId=abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-missing-package",
+    "method": "GET",
+    "path": "/api/instances/available-hosts?packageId=999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-invalid-plan",
+    "method": "GET",
+    "path": "/api/instances/available-hosts?packageId=960001&planId=0",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-own-package",
+    "method": "GET",
+    "path": "/api/instances/available-hosts?packageId=960001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-forbidden-package",
+    "method": "GET",
+    "path": "/api/instances/available-hosts?packageId=960002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-hosts-admin-package",
+    "method": "GET",
+    "path": "/api/instances/available-hosts?packageId=960002",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-anon",
+    "method": "GET",
+    "path": "/api/instances/960001"
+  },
+  {
+    "name": "instances-detail-invalid",
+    "method": "GET",
+    "path": "/api/instances/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-zero",
+    "method": "GET",
+    "path": "/api/instances/0",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-missing",
+    "method": "GET",
+    "path": "/api/instances/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-owner",
+    "method": "GET",
+    "path": "/api/instances/960001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-admin-host-owner",
+    "method": "GET",
+    "path": "/api/instances/960001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-non-owner",
+    "method": "GET",
+    "path": "/api/instances/960002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-detail-paid",
+    "method": "GET",
+    "path": "/api/instances/960007",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-password-owner",
+    "method": "GET",
+    "path": "/api/instances/960001/password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-password-admin",
+    "method": "GET",
+    "path": "/api/instances/960001/password",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-password-non-owner",
+    "method": "GET",
+    "path": "/api/instances/960002/password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-password-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-password-invalid",
+    "method": "GET",
+    "path": "/api/instances/abc/password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-stats-invalid",
+    "method": "GET",
+    "path": "/api/instances/abc/stats",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-stats-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/stats",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-get-owner",
+    "method": "GET",
+    "path": "/api/instances/960001/config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-get-non-owner",
+    "method": "GET",
+    "path": "/api/instances/960002/config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-get-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-get-invalid",
+    "method": "GET",
+    "path": "/api/instances/0/config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-patch-empty",
+    "method": "PATCH",
+    "path": "/api/instances/960001/config",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-patch-invalid-body",
+    "method": "PATCH",
+    "path": "/api/instances/960001/config",
+    "body": {
+      "cpu": 14
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-config-patch-not-owner",
+    "method": "PATCH",
+    "path": "/api/instances/960002/config",
+    "body": {
+      "cpu": 100
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-quota-invalid-body",
+    "method": "PATCH",
+    "path": "/api/instances/960001/quota",
+    "body": {
+      "portLimit": 0
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-quota-fractional",
+    "method": "PATCH",
+    "path": "/api/instances/960001/quota",
+    "body": {
+      "backupLimit": 1.5
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-quota-not-owner",
+    "method": "PATCH",
+    "path": "/api/instances/960001/quota",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-quota-admin-noop",
+    "method": "PATCH",
+    "path": "/api/instances/960001/quota",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-quota-missing",
+    "method": "PATCH",
+    "path": "/api/instances/999999/quota",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rename-missing-name",
+    "method": "PATCH",
+    "path": "/api/instances/960001/rename",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rename-non-owner",
+    "method": "PATCH",
+    "path": "/api/instances/960002/rename",
+    "body": {
+      "name": "nope"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rename-to",
+    "method": "PATCH",
+    "path": "/api/instances/960001/rename",
+    "body": {
+      "name": "parity-instances-free-renamed"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rename-back",
+    "method": "PATCH",
+    "path": "/api/instances/960001/rename",
+    "body": {
+      "name": "parity-instances-free"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rename-suspended",
+    "method": "PATCH",
+    "path": "/api/instances/960003/rename",
+    "body": {
+      "name": "x"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-start-invalid",
+    "method": "POST",
+    "path": "/api/instances/abc/start",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-start-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/start",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-start-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/start",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-start-already-running",
+    "method": "POST",
+    "path": "/api/instances/960008/start",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-start-suspended",
+    "method": "POST",
+    "path": "/api/instances/960003/start",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-stop-already-stopped",
+    "method": "POST",
+    "path": "/api/instances/960001/stop",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-stop-suspended-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960003/stop",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-restart-suspended",
+    "method": "POST",
+    "path": "/api/instances/960003/restart",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-suspend-forbidden",
+    "method": "POST",
+    "path": "/api/instances/960001/suspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-suspend-already",
+    "method": "POST",
+    "path": "/api/instances/960003/suspend",
+    "body": {
+      "reason": "dup"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-suspend-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/suspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-unsuspend-not-suspended",
+    "method": "POST",
+    "path": "/api/instances/960001/unsuspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-unsuspend-forbidden",
+    "method": "POST",
+    "path": "/api/instances/960003/unsuspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-unsuspend-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/unsuspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-sync-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/sync-status",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-sync-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/sync-status",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-sync-invalid",
+    "method": "POST",
+    "path": "/api/instances/abc/sync-status",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-host-options-non-owner",
+    "method": "GET",
+    "path": "/api/instances/960002/change-host-options",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-host-options-owner",
+    "method": "GET",
+    "path": "/api/instances/960001/change-host-options",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-host-options-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/change-host-options",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-change-host-invalid-body",
+    "method": "POST",
+    "path": "/api/instances/960001/change-host",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-change-host-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/change-host",
+    "body": {
+      "targetHostId": 960001,
+      "sshKeyId": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rebuild-no-image",
+    "method": "POST",
+    "path": "/api/instances/960001/rebuild",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rebuild-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/rebuild",
+    "body": {
+      "image": "images:debian/12"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rebuild-not-stopped",
+    "method": "POST",
+    "path": "/api/instances/960008/rebuild",
+    "body": {
+      "image": "images:debian/12"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-rebuild-invalid-image",
+    "method": "POST",
+    "path": "/api/instances/960001/rebuild",
+    "body": {
+      "image": "nope"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-recreate-no-image",
+    "method": "POST",
+    "path": "/api/instances/960001/recreate",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-recreate-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/recreate",
+    "body": {
+      "image": "images:debian/12"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-delete-invalid",
+    "method": "DELETE",
+    "path": "/api/instances/abc",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-delete-missing",
+    "method": "DELETE",
+    "path": "/api/instances/999999",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-delete-non-owner",
+    "method": "DELETE",
+    "path": "/api/instances/960002",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-delete-paid",
+    "method": "DELETE",
+    "path": "/api/instances/960007",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-delete-package-forbids",
+    "method": "DELETE",
+    "path": "/api/instances/960010",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-clone-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/clone",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-clone-not-stopped",
+    "method": "POST",
+    "path": "/api/instances/960008/clone",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-clone-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/clone",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-add-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/ports",
+    "body": {
+      "protocol": "tcp",
+      "privatePort": 22
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-add-bad-protocol",
+    "method": "POST",
+    "path": "/api/instances/960001/ports",
+    "body": {
+      "protocol": "sctp",
+      "privatePort": 22
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-add-missing-private",
+    "method": "POST",
+    "path": "/api/instances/960001/ports",
+    "body": {
+      "protocol": "tcp"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-add-ipv6-only",
+    "method": "POST",
+    "path": "/api/instances/960009/ports",
+    "body": {
+      "protocol": "tcp",
+      "privatePort": 22
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-delete-invalid",
+    "method": "DELETE",
+    "path": "/api/instances/960001/ports/abc",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-delete-missing",
+    "method": "DELETE",
+    "path": "/api/instances/960001/ports/999999",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-ports-delete-non-owner",
+    "method": "DELETE",
+    "path": "/api/instances/960002/ports/960001",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-swap-enable-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/swap/enable",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-swap-enable-suspended",
+    "method": "POST",
+    "path": "/api/instances/960003/swap/enable",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-swap-disable-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/swap/disable",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-boost-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/boost-processes",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-boost-invalid",
+    "method": "POST",
+    "path": "/api/instances/abc/boost-processes",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-none",
+    "method": "GET",
+    "path": "/api/instances/960001/task",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-pending",
+    "method": "GET",
+    "path": "/api/instances/960006/task",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-non-owner",
+    "method": "GET",
+    "path": "/api/instances/960002/task",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-invalid",
+    "method": "GET",
+    "path": "/api/instances/0/task",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/task",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-detail",
+    "method": "GET",
+    "path": "/api/instances/tasks/960001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-detail-completed",
+    "method": "GET",
+    "path": "/api/instances/tasks/960002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-detail-admin",
+    "method": "GET",
+    "path": "/api/instances/tasks/960002",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-detail-invalid",
+    "method": "GET",
+    "path": "/api/instances/tasks/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-detail-missing",
+    "method": "GET",
+    "path": "/api/instances/tasks/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-cancel-completed",
+    "method": "DELETE",
+    "path": "/api/instances/tasks/960002",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-cancel-not-owner",
+    "method": "DELETE",
+    "path": "/api/instances/tasks/960001",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-task-cancel-invalid",
+    "method": "DELETE",
+    "path": "/api/instances/tasks/abc",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-cloud-init-not-running",
+    "method": "GET",
+    "path": "/api/instances/960001/cloud-init-status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-cloud-init-non-owner",
+    "method": "GET",
+    "path": "/api/instances/960002/cloud-init-status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-cloud-init-invalid",
+    "method": "GET",
+    "path": "/api/instances/abc/cloud-init-status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-cloud-init-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/cloud-init-status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-cloud-init-manual-not-running",
+    "method": "POST",
+    "path": "/api/instances/960001/cloud-init-status/manual-complete",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-cloud-init-manual-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/cloud-init-status/manual-complete",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-reassign-non-owner",
+    "method": "POST",
+    "path": "/api/instances/960002/reassign-ipv6",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-reassign-not-stopped",
+    "method": "POST",
+    "path": "/api/instances/960008/reassign-ipv6",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-reassign-wrong-mode",
+    "method": "POST",
+    "path": "/api/instances/960001/reassign-ipv6",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-reassign-suspended",
+    "method": "POST",
+    "path": "/api/instances/960003/reassign-ipv6",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-reassign-invalid",
+    "method": "POST",
+    "path": "/api/instances/abc/reassign-ipv6",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instances-unknown-subroute",
+    "method": "GET",
+    "path": "/api/instances/960001/nope",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  }
+]
