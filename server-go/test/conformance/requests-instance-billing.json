@@ -1,0 +1,484 @@
+[
+  {
+    "name": "instance-billing-anon",
+    "method": "GET",
+    "path": "/api/instances/920001/billing"
+  },
+  {
+    "name": "instance-billing-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/abc/billing",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-not-found",
+    "method": "GET",
+    "path": "/api/instances/920999/billing",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-owner",
+    "method": "GET",
+    "path": "/api/instances/920001/billing",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-host-owner",
+    "method": "GET",
+    "path": "/api/instances/920001/billing",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-stranger",
+    "method": "GET",
+    "path": "/api/instances/920003/billing",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-free-instance",
+    "method": "GET",
+    "path": "/api/instances/920002/billing",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-owner",
+    "method": "GET",
+    "path": "/api/instances/920001/billing/records",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-host-owner",
+    "method": "GET",
+    "path": "/api/instances/920001/billing/records",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-type-filter",
+    "method": "GET",
+    "path": "/api/instances/920001/billing/records?type=renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-unknown-type-ignored",
+    "method": "GET",
+    "path": "/api/instances/920001/billing/records?type=bogus",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-paged",
+    "method": "GET",
+    "path": "/api/instances/920001/billing/records?page=2&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/abc/billing/records",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-not-found",
+    "method": "GET",
+    "path": "/api/instances/920999/billing/records",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-records-stranger",
+    "method": "GET",
+    "path": "/api/instances/920003/billing/records",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-apply-aff-retired",
+    "method": "POST",
+    "path": "/api/instances/920001/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "affCode": "AFF10"
+    }
+  },
+  {
+    "name": "instance-billing-apply-aff-missing-code",
+    "method": "POST",
+    "path": "/api/instances/920001/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-billing-apply-aff-admin",
+    "method": "POST",
+    "path": "/api/instances/920001/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "affCode": "AFF10"
+    }
+  },
+  {
+    "name": "instance-billing-renew-anon",
+    "method": "POST",
+    "path": "/api/instances/920001/renew",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-renew-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/abc/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-renew-months-zero",
+    "method": "POST",
+    "path": "/api/instances/920001/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 0
+    }
+  },
+  {
+    "name": "instance-billing-renew-not-found",
+    "method": "POST",
+    "path": "/api/instances/920999/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-renew-stranger",
+    "method": "POST",
+    "path": "/api/instances/920003/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-renew-free-instance",
+    "method": "POST",
+    "path": "/api/instances/920002/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-renew-deleted-instance",
+    "method": "POST",
+    "path": "/api/instances/920007/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-renew-admin",
+    "method": "POST",
+    "path": "/api/instances/920001/renew",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-batch-preview-one",
+    "method": "POST",
+    "path": "/api/instances/batch/renew-preview",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001
+      ]
+    }
+  },
+  {
+    "name": "instance-billing-batch-preview-hidden",
+    "method": "POST",
+    "path": "/api/instances/batch/renew-preview",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920999
+      ]
+    }
+  },
+  {
+    "name": "instance-billing-batch-preview-mixed",
+    "method": "POST",
+    "path": "/api/instances/batch/renew-preview",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001,
+        920002,
+        920001
+      ]
+    }
+  },
+  {
+    "name": "instance-billing-batch-preview-empty",
+    "method": "POST",
+    "path": "/api/instances/batch/renew-preview",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": []
+    }
+  },
+  {
+    "name": "instance-billing-batch-preview-admin",
+    "method": "POST",
+    "path": "/api/instances/batch/renew-preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001
+      ]
+    }
+  },
+  {
+    "name": "instance-billing-batch-renew-invalid-months",
+    "method": "POST",
+    "path": "/api/instances/batch/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001
+      ],
+      "months": 0
+    }
+  },
+  {
+    "name": "instance-billing-batch-renew-admin",
+    "method": "POST",
+    "path": "/api/instances/batch/renew",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001
+      ],
+      "months": 1
+    }
+  },
+  {
+    "name": "instance-billing-preview-invalid-plan-id",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-not-found",
+    "method": "GET",
+    "path": "/api/instances/920999/change-plan/preview?newPlanId=920002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-stranger",
+    "method": "GET",
+    "path": "/api/instances/920003/change-plan/preview?newPlanId=920002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-free-instance",
+    "method": "GET",
+    "path": "/api/instances/920002/change-plan/preview?newPlanId=920002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-plan-not-found",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-plan-not-in-package",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920005",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-same-plan",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-inactive-plan",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-sold-out-plan",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920004",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-downgrade",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920006",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-billing-preview-upgrade",
+    "method": "GET",
+    "path": "/api/instances/920001/change-plan/preview?newPlanId=920002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "instance-billing-preview-short-expiry",
+    "method": "GET",
+    "path": "/api/instances/920005/change-plan/preview?newPlanId=920002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "instance-billing-change-plan-missing-body",
+    "method": "POST",
+    "path": "/api/instances/920001/change-plan",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-billing-change-plan-stranger",
+    "method": "POST",
+    "path": "/api/instances/920003/change-plan",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "newPlanId": 920002
+    }
+  },
+  {
+    "name": "instance-billing-change-plan-same-plan",
+    "method": "POST",
+    "path": "/api/instances/920001/change-plan",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "newPlanId": 920001
+    }
+  },
+  {
+    "name": "instance-billing-change-plan-status-invalid",
+    "method": "POST",
+    "path": "/api/instances/920006/change-plan",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "newPlanId": 920002
+    }
+  },
+  {
+    "name": "instance-billing-auto-renew-invalid-id",
+    "method": "PATCH",
+    "path": "/api/instances/abc/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-auto-renew-missing-flag",
+    "method": "PATCH",
+    "path": "/api/instances/920001/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-billing-auto-renew-not-found",
+    "method": "PATCH",
+    "path": "/api/instances/920999/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-auto-renew-stranger",
+    "method": "PATCH",
+    "path": "/api/instances/920003/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-auto-renew-free-instance",
+    "method": "PATCH",
+    "path": "/api/instances/920002/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-auto-renew-toggle",
+    "method": "PATCH",
+    "path": "/api/instances/920004/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-batch-auto-renew-empty",
+    "method": "PATCH",
+    "path": "/api/instances/batch/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [],
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-batch-auto-renew-hidden",
+    "method": "PATCH",
+    "path": "/api/instances/batch/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920999
+      ],
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-batch-auto-renew-free-instance",
+    "method": "PATCH",
+    "path": "/api/instances/batch/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920002
+      ],
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "instance-billing-batch-auto-renew-noop",
+    "method": "PATCH",
+    "path": "/api/instances/batch/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001
+      ],
+      "autoRenew": false
+    }
+  },
+  {
+    "name": "instance-billing-batch-auto-renew-admin",
+    "method": "PATCH",
+    "path": "/api/instances/batch/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        920001
+      ],
+      "autoRenew": true
+    }
+  }
+]
