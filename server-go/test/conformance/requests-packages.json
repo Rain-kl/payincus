@@ -1,0 +1,657 @@
+[
+  {
+    "name": "packages-public-list",
+    "method": "GET",
+    "path": "/api/packages/public"
+  },
+  {
+    "name": "packages-public-list-official",
+    "method": "GET",
+    "path": "/api/packages/public?source=official"
+  },
+  {
+    "name": "packages-public-list-bogus-source",
+    "method": "GET",
+    "path": "/api/packages/public?source=bogus"
+  },
+  {
+    "name": "packages-public-regions",
+    "method": "GET",
+    "path": "/api/packages/public/regions"
+  },
+  {
+    "name": "packages-public-regions-official",
+    "method": "GET",
+    "path": "/api/packages/public/regions?source=official"
+  },
+  {
+    "name": "packages-list-unauth",
+    "method": "GET",
+    "path": "/api/packages"
+  },
+  {
+    "name": "packages-detail-unauth",
+    "method": "GET",
+    "path": "/api/packages/930002"
+  },
+  {
+    "name": "packages-create-unauth",
+    "method": "POST",
+    "path": "/api/packages",
+    "body": {
+      "name": "Parity Unauth"
+    }
+  },
+  {
+    "name": "packages-update-unauth",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "body": {}
+  },
+  {
+    "name": "packages-share-create-unauth",
+    "method": "POST",
+    "path": "/api/packages/930003/share",
+    "body": {
+      "friendId": 1
+    }
+  },
+  {
+    "name": "packages-list-nonadmin",
+    "method": "GET",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-nonadmin-slash",
+    "method": "GET",
+    "path": "/api/packages/",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-admin",
+    "method": "GET",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-admin-all",
+    "method": "GET",
+    "path": "/api/packages?all=true",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-source-official",
+    "method": "GET",
+    "path": "/api/packages?source=official",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-source-friends",
+    "method": "GET",
+    "path": "/api/packages?source=friends",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-scope-mine",
+    "method": "GET",
+    "path": "/api/packages?scope=mine",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-scope-official",
+    "method": "GET",
+    "path": "/api/packages?scope=official",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-list-scope-mine-nonadmin",
+    "method": "GET",
+    "path": "/api/packages?scope=mine",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-invalid-id",
+    "method": "GET",
+    "path": "/api/packages/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-zero-id",
+    "method": "GET",
+    "path": "/api/packages/0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-not-found",
+    "method": "GET",
+    "path": "/api/packages/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-public-nonowner",
+    "method": "GET",
+    "path": "/api/packages/930001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-public-owner",
+    "method": "GET",
+    "path": "/api/packages/930001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-private-nonowner",
+    "method": "GET",
+    "path": "/api/packages/930002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-private-admin",
+    "method": "GET",
+    "path": "/api/packages/930002",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-own",
+    "method": "GET",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-detail-own-as-admin",
+    "method": "GET",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-regions",
+    "method": "GET",
+    "path": "/api/packages/regions",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-regions-friends",
+    "method": "GET",
+    "path": "/api/packages/regions?source=friends",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-create-missing-required",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Create Missing"
+    }
+  },
+  {
+    "name": "packages-create-name-exists",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity User Package",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        930001
+      ]
+    }
+  },
+  {
+    "name": "packages-create-missing-hosts",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity No Hosts",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240
+    }
+  },
+  {
+    "name": "packages-create-host-unavailable",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Host Unavailable",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        999999
+      ]
+    }
+  },
+  {
+    "name": "packages-create-global-without-max",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Global Missing Max",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        930001
+      ],
+      "globalShared": true
+    }
+  },
+  {
+    "name": "packages-create-illegal-name",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity <Illegal>",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        930001
+      ]
+    }
+  },
+  {
+    "name": "packages-create-duplicate-hosts",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Duplicate Hosts",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        930001,
+        930001
+      ]
+    }
+  },
+  {
+    "name": "packages-create-bad-network-mode",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Bad Network",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        930001
+      ],
+      "networkMode": "bogus"
+    }
+  },
+  {
+    "name": "packages-create-bad-host-pool",
+    "method": "POST",
+    "path": "/api/packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Bad Pool",
+      "cpuMax": 100,
+      "memoryMax": 1024,
+      "diskMax": 10240,
+      "hostIds": [
+        930001
+      ],
+      "hostStoragePools": {
+        "930001": "missing-pool"
+      }
+    }
+  },
+  {
+    "name": "packages-update-nonowner",
+    "method": "PATCH",
+    "path": "/api/packages/930002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-update-not-found",
+    "method": "PATCH",
+    "path": "/api/packages/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-update-empty",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-update-bad-port-limit",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "portLimit": 0
+    }
+  },
+  {
+    "name": "packages-update-global-state",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "globalMaxInstances": 3
+    }
+  },
+  {
+    "name": "packages-update-monthly-invalid",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "monthlyTrafficLimit": "abc"
+    }
+  },
+  {
+    "name": "packages-update-limits-invalid",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "limitsRead": "bad|value"
+    }
+  },
+  {
+    "name": "packages-update-unknown-host",
+    "method": "PATCH",
+    "path": "/api/packages/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "hostIds": [
+        999999
+      ]
+    }
+  },
+  {
+    "name": "packages-delete-nonowner",
+    "method": "DELETE",
+    "path": "/api/packages/930002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-delete-has-instances",
+    "method": "DELETE",
+    "path": "/api/packages/930001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/packages/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-myshares-nonadmin",
+    "method": "GET",
+    "path": "/api/packages/my-shares",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-myshares-admin",
+    "method": "GET",
+    "path": "/api/packages/my-shares",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-shares-list-nonowner",
+    "method": "GET",
+    "path": "/api/packages/930001/shares",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-shares-list-owner",
+    "method": "GET",
+    "path": "/api/packages/930003/shares",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-share-create-admin",
+    "method": "POST",
+    "path": "/api/packages/930003/share",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "friendId": 1
+    }
+  },
+  {
+    "name": "packages-share-create-nonowner",
+    "method": "POST",
+    "path": "/api/packages/930001/share",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "friendId": 1
+    }
+  },
+  {
+    "name": "packages-share-create-missing-friend",
+    "method": "POST",
+    "path": "/api/packages/930003/share",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-share-create-not-friends",
+    "method": "POST",
+    "path": "/api/packages/930003/share",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "friendId": 999999
+    }
+  },
+  {
+    "name": "packages-share-delete-nonowner",
+    "method": "DELETE",
+    "path": "/api/packages/930001/share/1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-share-delete-noop",
+    "method": "DELETE",
+    "path": "/api/packages/930003/share/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-share-update-nonowner",
+    "method": "PATCH",
+    "path": "/api/packages/930001/shares/1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "quotaMultiplier": 1.5
+    }
+  },
+  {
+    "name": "packages-share-update-not-found",
+    "method": "PATCH",
+    "path": "/api/packages/930003/shares/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "quotaMultiplier": 1.5
+    }
+  },
+  {
+    "name": "packages-share-update-friendid",
+    "method": "PATCH",
+    "path": "/api/packages/930003/shares/1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "friendId": 1
+    }
+  },
+  {
+    "name": "packages-hosts-detail-owner",
+    "method": "GET",
+    "path": "/api/packages/930001/hosts-detail",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-hosts-detail-nonowner",
+    "method": "GET",
+    "path": "/api/packages/930001/hosts-detail",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-hosts-detail-own-empty",
+    "method": "GET",
+    "path": "/api/packages/930003/hosts-detail",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-hosts-detail-not-found",
+    "method": "GET",
+    "path": "/api/packages/999999/hosts-detail",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-release-quota-zero",
+    "method": "POST",
+    "path": "/api/packages/930003/release-quota",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "hostIds": [
+        930001
+      ],
+      "cpuAdd": 0,
+      "memoryAdd": 0
+    }
+  },
+  {
+    "name": "packages-release-quota-unbound-host",
+    "method": "POST",
+    "path": "/api/packages/930001/release-quota",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "hostIds": [
+        930002
+      ],
+      "cpuAdd": 10,
+      "memoryAdd": 0
+    }
+  },
+  {
+    "name": "packages-release-quota-nonowner",
+    "method": "POST",
+    "path": "/api/packages/930001/release-quota",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "hostIds": [
+        930001
+      ],
+      "cpuAdd": 10,
+      "memoryAdd": 0
+    }
+  },
+  {
+    "name": "packages-release-quota-schema",
+    "method": "POST",
+    "path": "/api/packages/930003/release-quota",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "hostIds": [],
+      "cpuAdd": 10,
+      "memoryAdd": 0
+    }
+  },
+  {
+    "name": "packages-plans-list",
+    "method": "GET",
+    "path": "/api/packages/930001/plans",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-plans-list-active",
+    "method": "GET",
+    "path": "/api/packages/930001/plans?activeOnly=true",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-plans-list-forbidden",
+    "method": "GET",
+    "path": "/api/packages/930002/plans",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-plans-list-own-empty",
+    "method": "GET",
+    "path": "/api/packages/930003/plans",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-plans-list-not-found",
+    "method": "GET",
+    "path": "/api/packages/999999/plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "packages-plans-create-invalid",
+    "method": "POST",
+    "path": "/api/packages/930003/plans",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-plans-create-nonowner",
+    "method": "POST",
+    "path": "/api/packages/930002/plans",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Plan",
+      "cpu": 100,
+      "memory": 1024,
+      "disk": 10240,
+      "portLimit": 20,
+      "snapshotLimit": 5,
+      "backupLimit": 3,
+      "siteLimit": 10,
+      "swapSize": 0,
+      "trafficLimit": "1073741824",
+      "price": 1000
+    }
+  },
+  {
+    "name": "packages-plans-update-not-found",
+    "method": "PUT",
+    "path": "/api/packages/930001/plans/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-plans-update-nonowner",
+    "method": "PUT",
+    "path": "/api/packages/930002/plans/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-plans-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/packages/930001/plans/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "packages-plans-delete-nonowner",
+    "method": "DELETE",
+    "path": "/api/packages/930002/plans/930003",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  }
+]
