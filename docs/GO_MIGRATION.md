@@ -87,7 +87,12 @@
 - **404 形态（已实测）**：`setNotFoundHandler` 只在 `NODE_ENV=production && SERVE_STATIC_CLIENT!=false` 时注册，而**生产部署固定 `SERVE_STATIC_CLIENT=false`**（`scripts/init-env.sh`、`install-panel.sh`、`verify-production-readiness.sh` 都强制该值）。所以线上 404 是 Fastify 内置形态：
   `{"message":"Route GET:/api/nope not found","error":"Not Found","statusCode":404}`
   Go 侧已按此实现（`app.go` 的 `NoRoute`）。
-- **Node 的每路由限流实际未生效（已实测，Node 侧既有缺陷）**：`@fastify/rate-limit` 在 `app.ts:308` 注册，而 `addHook('onRoute')` 在 `:341` 才添加；插件注册时的封装上下文导致该 hook 不作用于后续业务路由。实测 `/api/auth/login`（规则 5/min）与 `/api/ssh-keys`（30/min）返回的 `x-ratelimit-limit` 均为 **300**（全局值）。
+- **Node 的每路由限流只对"内联 `config.rateLimit`"生效（2026-11-10 修正，此前记录过度概括）**：
+  - `app.ts:341` 的 `addHook('onRoute')` 把 `config/rate-limit.ts` 规则表注入 `routeOptions.config.rateLimit`，但 `@fastify/rate-limit` 自己的 onRoute hook 在 `:308` 注册、**先执行**，此时 `config.rateLimit` 还没被写入 → **规则表注入形同虚设**。
+  - 直接写在路由定义里的 `config: { rateLimit: { max, timeWindow } }` 在注册时已存在 → **真实生效**。
+  - 实测对照（同一台 Node，parity 库）：`/api/auth/login`（无内联，规则表 5/min）**7 次全是 401/全局 300**，第 6 次 429 是**登录失败锁**（"Too many login attempts ... 15 minutes"），不是限流；`POST /api/instances/:id/change-plan`（内联 5/min）第 6 次返回 **429 `{"error":"Too many requests, please try again later"}` + `retry-after: 60`**。
+  - 内联限流的模块：`admin-billing`(13)、`recharge`(12)、`gift-cards`(12)、`public-api`(9)、`packages`(9)、`vip-benefits`(7)、`instance-billing`(7)、`aff`(7)、`balance`(5)、`instance-destroy`(4)、`vip-levels`(3)、`instances`(2)、`admin-tasks`(2)、`user-invites`(1)、`system-config`(1)。
+  - **对拍含义**：只有"规则表有、但不内联"的路由才允许 `ignoreRateLimit`；**内联路由出现 429 分歧就是真 bug**。
   **后果**：登录暴力破解防护实际只有 300/min。Go 侧按生成的规则表正确执行（5/min），因此**此处 Go 与 Node 行为不同**。这是 Go 更正确的一处，需要 owner 决策：修 Node 还是让 Go 对齐现状。
   **对拍处理**：对拍用例可设 `"ignoreRateLimit": true`，当且仅当两侧只有一侧返回 429 时记为 `skip`（不计失败）。已经用在 `requests-inbox-balance.json` 的 `/api/inbox/hosts/:hostId/notify`（5/min）上。
 - **Gin 默认信任所有代理（已修）**：需显式 `router.SetTrustedProxies(nil)`，否则 `c.ClientIP()` 会采信任何调用方伪造的 `X-Forwarded-For`——而客户端 IP 是限流键和 Turnstile 送验值。现统一走 `middleware.ClientIP`（复刻 fastify 的 `TRUST_PROXY` 语义）。

@@ -37,10 +37,12 @@ type requestCase struct {
 	// SkipBody compares only the status code (useful for volatile payloads).
 	SkipBody bool `json:"skipBody,omitempty"`
 	// IgnoreRateLimit treats a 429 from either side as inconclusive instead of a
-	// failure. Node's @fastify/rate-limit per-route hook is dead code (registered
-	// on the plugin context before the app-level onRoute hook), so Node never
-	// enforces per-route limits while Go does. Cases hitting a limited route must
-	// set this so the difference does not mask real parity failures.
+	// failure. It exists for ONE narrow case: a limit that lives only in
+	// config/rate-limit.ts. Node's app-level onRoute hook that injects those rules
+	// runs after @fastify/rate-limit's own hook, so the injection is dead and Node
+	// answers with the global 300/min instead. Limits declared inline on the route
+	// (`config: { rateLimit: ... }`) ARE enforced by Node, so a 429 divergence on
+	// those routes is a real bug and must not be skipped.
 	IgnoreRateLimit bool `json:"ignoreRateLimit,omitempty"`
 	// CompareCookieAttrs diffs the Set-Cookie *attributes* (name, path, domain,
 	// httpOnly, secure, sameSite, maxAge) while ignoring the value, which is a
