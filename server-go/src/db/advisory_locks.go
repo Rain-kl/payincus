@@ -40,6 +40,13 @@ const (
 	IPAddressAllocationLockNamespace          = 4119
 	GiftCardLockNamespace                     = 4120
 	InstanceTrafficResetLockNamespace         = 4121
+	// PackagePrerequisiteLockNamespace serialises package prerequisite checks
+	// (mirrors PACKAGE_PREREQUISITE_LOCK_NAMESPACE); the key is always 1.
+	PackagePrerequisiteLockNamespace = 4201
+	// Ipv6SubnetAllocationLockNamespace is declared in ipv6_subnets.go (4202,
+	// key 1) and EgressAdvisoryLockNamespace in egress.go (74201, single-argument
+	// form, a different lock space entirely). They are intentionally not repeated
+	// here; see those files for the measured details.
 )
 
 // TryAdvisoryTransactionLock mirrors tryAdvisoryTransactionLock: it tries to take
