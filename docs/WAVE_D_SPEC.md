@@ -144,6 +144,31 @@ instances  ← 创建/销毁/迁移，全部资源交付动作
 ### 4.3 Spec 先行要求
 动工前必须确认：**生产环境是否允许 Go 版做一次真实的实例创建**（真机验证是 DoD 第 4 条）。若不允许，则 Wave D 的 `instances` 只能做到「对拍通过 + 单测覆盖」，并在报告里显式标注「未真机验证」，不得声称完成。
 
+> 默认按**不碰生产**执行：实例创建/销毁的真实 Incus 验证不做，只做双跑对拍 + 单测，报告必须写「未真机验证」。
+
+### 4.4 `hosts` 施工切分（实测数据，2026-11-10）
+
+`routes/hosts.ts` 共 **63 条路由**。按关注点分为 6 组，便于分批移植与审阅：
+
+| 组 | 路由 | 行区间 | 说明 |
+|---|---|---|---|
+| A 安装与 CRUD | `GET /`、`POST /`、`GET /install.sh`、`GET /install.sh/:token`、`GET /cert/:token`、`POST /:id/verify`、`POST /:id/regenerate-install`、`POST /:id/test`、`GET /:id`、`GET|PUT /:id/images`、`PATCH /:id`、`DELETE /:id` | 679–1785, 2879 | 安装脚本/证书是**公开**端点，不做 JWT 鉴权但靠一次性 token |
+| B 维护与批量 | `POST /:id/maintenance`、`POST /:id/sync`、`POST /:id/instances/batch-delete-preview`、`DELETE /:id/instances/batch` | 2280–2449 | 批量删除是资源释放路径，必须幂等 |
+| C 存储池 | `/:id/storage-pools`（GET/POST/DELETE/PATCH） | 2930–3278 | 与 `lib/storage/*` 和 `instance-advanced-config` 共享语义 |
+| D 公网 IPv4 + Caddy + agent 日志 | `/:id/public-ipv4/*`、`/:id/caddy/*`、`/:id/agent/logs/ticket`、`/:id/agent/logs/stream` | 3370–3897 | `agent/logs/stream` 是 **public**（一次性 ticket 授权）；Caddy 走 `lib/caddy_client.go` |
+| E 容量与实例运维 | `/:id/instances/sync-status`、`/:id/recalculate-resources`、`/:id/instances/suspend|unsuspend`、`/:id/extend-all`、`/:id/plans`、`/:id/instances/migrate`、`/:id/users/lookup`、`/:id/instances/create-for-user`、`/:id/instances/gift-days`、`/:id/instances/:instanceId/renewal-price` | 3897–4676, 5303–6135 | `migrate`/`create-for-user` 是**资源交付**，走 §4.1 的占位-执行-确认 |
+| F ops 与审计 | `/:id/ops/discover|optimize-port-mappings|baseline-sync|network-repair`、`/:id/ops/instances/*`、`/:id/ops/audit/*` | 6261–7847 | 20 条；`audit/scan`、`kill-process`、`dangerous-action` 属高危执行路径 |
+
+`db/hosts.ts`（**1238 行、20 个导出函数**）是 22 个路由模块的共同依赖（`instances` 32 处、`ip-addresses` 10 处、`traffic` 8 处、`admin-billing` 7 处……），因此**必须先落地并稳定**，再动 `routes/hosts.go`。
+
+已核实的关键事实：
+- `db/hosts.ts` **不使用 advisory lock**。`selectAndReserveHostWithLock` 用的是 SQL 行锁 `FOR UPDATE SKIP LOCKED`（`lockQuery`，约 1057 行），选宿主机后在同一事务里预占资源。Go 侧必须保留同一段 SQL 语义（同一筛选条件、同一 SKIP LOCKED、同一事务边界），**不要替换成 advisory lock**——两者并发语义不同。
+- `reservePlanUpgradeCapacityWithLock` 是另一条独立的锁路径（套餐升级容量预占），同样必须在事务内完成。
+- `lib/incus/tunnel-manager.ts`（544 行）是隧道控制面，和 `lib/incus_client.go` 的拨号分支耦合；移植时先确认 `incus_client.go` 现有 seam（指纹固定传输层已在 `lib/node_security_transport.go`）。
+- 公开端点（A 组的 install.sh/cert、D 组的 logs/stream）**没有 JWT**，对拍时不要塞 token；它们的安全性来自一次性 token/ticket，反向测试要覆盖「token 已用过 → 401/403」。
+
+**交付顺序（不可颠倒）**：`db/hosts.go` → `lib/tunnel_manager.go` → `routes/hosts.go`（可分 6 组提交，但同一时间只允许一个 agent 写 `routes/hosts.go`）。
+
 ---
 
 ## 5. 支付类（`recharge` / `admin-billing`）
