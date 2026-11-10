@@ -1,0 +1,537 @@
+[
+  {
+    "name": "recharge-providers-unauth",
+    "method": "GET",
+    "path": "/api/recharge/providers"
+  },
+  {
+    "name": "recharge-orders-unauth",
+    "method": "GET",
+    "path": "/api/recharge/orders"
+  },
+  {
+    "name": "recharge-order-detail-unauth",
+    "method": "GET",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-PENDING-1"
+  },
+  {
+    "name": "recharge-order-cancel-unauth",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-PENDING-1/cancel",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-repay-unauth",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-MANUAL-1/repay",
+    "body": {}
+  },
+  {
+    "name": "recharge-stats-unauth",
+    "method": "GET",
+    "path": "/api/recharge/stats"
+  },
+  {
+    "name": "recharge-order-verify-unauth",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-PENDING-1/verify",
+    "body": {}
+  },
+  {
+    "name": "admin-providers-unauth",
+    "method": "GET",
+    "path": "/api/admin/payment-providers"
+  },
+  {
+    "name": "admin-recharge-orders-unauth",
+    "method": "GET",
+    "path": "/api/admin/recharge/orders"
+  },
+  {
+    "name": "admin-recharge-stats-unauth",
+    "method": "GET",
+    "path": "/api/admin/recharge/stats"
+  },
+  {
+    "name": "recharge-providers-list",
+    "method": "GET",
+    "path": "/api/recharge/providers",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-orders-list",
+    "method": "GET",
+    "path": "/api/recharge/orders",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-orders-list-pagination-fallback",
+    "method": "GET",
+    "path": "/api/recharge/orders?page=abc&pageSize=0&status=bogus",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-orders-list-status-completed",
+    "method": "GET",
+    "path": "/api/recharge/orders?status=completed",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-orders-list-status-weird",
+    "method": "GET",
+    "path": "/api/recharge/orders?status=nope",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-order-detail",
+    "method": "GET",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-PENDING-1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-order-detail-not-found",
+    "method": "GET",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-MISSING",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-order-detail-not-owner",
+    "method": "GET",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-ADMIN-1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-order-cancel-completed",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-COMPLETED-1/cancel",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-cancel-not-owner",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-ADMIN-1/cancel",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-cancel-cancelled",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-CANCELLED-1/cancel",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-repay-cancelled",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-CANCELLED-1/repay",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-repay-not-owner",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-ADMIN-1/repay",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-repay-not-found",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-MISSING/repay",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-order-repay-manual",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-MANUAL-1/repay",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-stats",
+    "method": "GET",
+    "path": "/api/recharge/stats",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "recharge-verify-completed",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-COMPLETED-1/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-verify-cancelled",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-CANCELLED-1/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-verify-failed",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-FAILED-1/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-verify-pending-yipay-v2",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-PENDING-1/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-verify-pending-manual",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-MANUAL-1/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-verify-not-owner",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-ADMIN-1/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-verify-not-found",
+    "method": "POST",
+    "path": "/api/recharge/orders/PARITY-RECHARGE-MISSING/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-providers-list",
+    "method": "GET",
+    "path": "/api/admin/payment-providers",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-providers-list-non-admin",
+    "method": "GET",
+    "path": "/api/admin/payment-providers",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-providers-create-non-admin",
+    "method": "POST",
+    "path": "/api/admin/payment-providers",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "nope",
+      "type": "manual",
+      "config": {
+        "instructions": "x"
+      }
+    }
+  },
+  {
+    "name": "admin-providers-create-missing-name",
+    "method": "POST",
+    "path": "/api/admin/payment-providers",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "type": "manual",
+      "config": {
+        "instructions": "x"
+      }
+    }
+  },
+  {
+    "name": "admin-providers-create-manual-missing-instructions",
+    "method": "POST",
+    "path": "/api/admin/payment-providers",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Parity Missing Instructions",
+      "type": "manual"
+    }
+  },
+  {
+    "name": "admin-providers-update-invalid-id",
+    "method": "PUT",
+    "path": "/api/admin/payment-providers/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-providers-update-not-found",
+    "method": "PUT",
+    "path": "/api/admin/payment-providers/979999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-providers-update-status-invalid",
+    "method": "PATCH",
+    "path": "/api/admin/payment-providers/970001/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "status": "bogus"
+    }
+  },
+  {
+    "name": "admin-providers-update-status-not-found",
+    "method": "PATCH",
+    "path": "/api/admin/payment-providers/979999/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "status": "disabled"
+    }
+  },
+  {
+    "name": "admin-providers-update-status-non-admin",
+    "method": "PATCH",
+    "path": "/api/admin/payment-providers/970001/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "status": "disabled"
+    }
+  },
+  {
+    "name": "admin-providers-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/admin/payment-providers/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-providers-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/admin/payment-providers/979999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-recharge-orders-list",
+    "method": "GET",
+    "path": "/api/admin/recharge/orders",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-orders-list-filtered",
+    "method": "GET",
+    "path": "/api/admin/recharge/orders?status=completed&page=1&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-orders-list-user-filter",
+    "method": "GET",
+    "path": "/api/admin/recharge/orders?userId=999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-orders-list-non-admin",
+    "method": "GET",
+    "path": "/api/admin/recharge/orders",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-stats",
+    "method": "GET",
+    "path": "/api/admin/recharge/stats",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-stats-range",
+    "method": "GET",
+    "path": "/api/admin/recharge/stats?start=2026-01-01&end=2026-12-31",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-stats-invalid-range",
+    "method": "GET",
+    "path": "/api/admin/recharge/stats?start=not-a-date&end=2026-12-31",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-recharge-complete-completed",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-COMPLETED-1/complete",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-recharge-complete-cancelled",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-CANCELLED-1/complete",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-recharge-complete-not-found",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-MISSING/complete",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-recharge-complete-trade-no-too-long",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-PENDING-1/complete",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "tradeNo": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  {
+    "name": "admin-recharge-complete-invalid-amount",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-PENDING-1/complete",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "actualAmount": 0
+    }
+  },
+  {
+    "name": "admin-recharge-complete-non-admin",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-PENDING-1/complete",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-recharge-fail-completed",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-COMPLETED-1/fail",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-recharge-fail-reason-too-long",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-PENDING-1/fail",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "reason": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  {
+    "name": "admin-recharge-fail-not-found",
+    "method": "POST",
+    "path": "/api/admin/recharge/orders/PARITY-RECHARGE-MISSING/fail",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "recharge-callback-invalid-id",
+    "method": "POST",
+    "path": "/api/recharge/callback/0",
+    "body": {
+      "out_trade_no": "x"
+    }
+  },
+  {
+    "name": "recharge-callback-non-numeric-id",
+    "method": "POST",
+    "path": "/api/recharge/callback/abc",
+    "body": {
+      "out_trade_no": "x"
+    }
+  },
+  {
+    "name": "recharge-callback-not-found",
+    "method": "POST",
+    "path": "/api/recharge/callback/979999",
+    "body": {
+      "out_trade_no": "x"
+    }
+  },
+  {
+    "name": "recharge-callback-v1-bad-sign",
+    "method": "POST",
+    "path": "/api/recharge/callback/970001",
+    "body": {
+      "out_trade_no": "PARITY-RECHARGE-PENDING-1",
+      "money": "10.00",
+      "trade_status": "TRADE_SUCCESS",
+      "sign": "deadbeef"
+    }
+  },
+  {
+    "name": "recharge-callback-v1-missing-sign",
+    "method": "POST",
+    "path": "/api/recharge/callback/970001",
+    "body": {
+      "out_trade_no": "PARITY-RECHARGE-PENDING-1",
+      "money": "10.00",
+      "trade_status": "TRADE_SUCCESS"
+    }
+  },
+  {
+    "name": "recharge-callback-v2-bad-sign",
+    "method": "POST",
+    "path": "/api/recharge/callback/970002",
+    "body": {
+      "out_trade_no": "PARITY-RECHARGE-PENDING-1",
+      "money": "10.00",
+      "trade_status": "TRADE_SUCCESS",
+      "sign": "deadbeef"
+    }
+  },
+  {
+    "name": "recharge-callback-v1-get-bad-sign",
+    "method": "GET",
+    "path": "/api/recharge/callback/970001?out_trade_no=PARITY-RECHARGE-PENDING-1&money=10.00&trade_status=TRADE_SUCCESS&sign=deadbeef"
+  },
+  {
+    "name": "recharge-callback-manual-no-signkey",
+    "method": "POST",
+    "path": "/api/recharge/callback/970003",
+    "body": {
+      "out_trade_no": "PARITY-RECHARGE-MANUAL-1",
+      "sign": "x"
+    }
+  },
+  {
+    "name": "recharge-callback-heleket-ip-not-allowed",
+    "method": "POST",
+    "path": "/api/recharge/callback/970004",
+    "body": {
+      "order_id": "PARITY-RECHARGE-PENDING-1",
+      "sign": "deadbeef"
+    }
+  },
+  {
+    "name": "recharge-callback-array-body",
+    "method": "POST",
+    "path": "/api/recharge/callback/970001",
+    "body": []
+  },
+  {
+    "name": "recharge-callback-v1-amount-mismatch-valid-sign",
+    "method": "POST",
+    "path": "/api/recharge/callback/970001",
+    "body": {
+      "pid": "PARITY_FAKE_PID",
+      "trade_no": "T-PARITY-MISMATCH",
+      "out_trade_no": "PARITY-RECHARGE-PENDING-1",
+      "type": "alipay",
+      "name": "账户充值",
+      "money": "12.00",
+      "trade_status": "TRADE_SUCCESS",
+      "sign": "38f998b72208a88c0631ba54cc0e72ff",
+      "sign_type": "MD5"
+    }
+  },
+  {
+    "name": "recharge-callback-v1-trade-not-success-valid-sign",
+    "method": "POST",
+    "path": "/api/recharge/callback/970001",
+    "body": {
+      "pid": "PARITY_FAKE_PID",
+      "trade_no": "T-PARITY-PENDING",
+      "out_trade_no": "PARITY-RECHARGE-PENDING-1",
+      "type": "alipay",
+      "name": "账户充值",
+      "money": "10.00",
+      "trade_status": "WAIT_BUYER_PAY",
+      "sign": "9e7bc19955fcaeb99e084e2c898d4c74",
+      "sign_type": "MD5"
+    }
+  }
+]
