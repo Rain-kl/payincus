@@ -674,7 +674,7 @@ func usersUpdateUserRole(ctx context.Context, userID int32, role models.UserRole
 		return usersRoleUpdateResult{}, err
 	}
 
-	invalidatedAt := int32(time.Now().Unix())
+	invalidatedAt := int32(time.Now().UTC().Unix())
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO token_invalidations (user_id, session_id, invalidated_at, created_at)
 		 VALUES ($1, $2, $3, NOW())
@@ -2435,7 +2435,7 @@ func usersDetectLinkedAccounts(c *gin.Context) {
 	ctx := c.Request.Context()
 	claims := middleware.CurrentUser(c)
 
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 
 	daysRaw := ""
 	if value := usersQueryValue(c, "days"); value != nil {
@@ -2526,7 +2526,7 @@ func usersDetectLinkedAccounts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"detectedAt":       usersISOTime(time.Now()),
+		"detectedAt":       usersISOTime(time.Now().UTC()),
 		"durationMs":       durationMs,
 		"days":             days,
 		"limit":            limit,

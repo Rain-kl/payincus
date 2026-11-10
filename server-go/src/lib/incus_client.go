@@ -416,9 +416,9 @@ func (c *IncusClient) WaitForOperation(ctx context.Context, operationURL string,
 	if timeout <= 0 {
 		timeout = incusDefaultOperationWait
 	}
-	deadline := time.Now().Add(timeout)
+	deadline := time.Now().UTC().Add(timeout)
 
-	for time.Now().Before(deadline) {
+	for time.Now().UTC().Before(deadline) {
 		raw, err := c.Request(ctx, http.MethodGet, operationURL+"/wait?timeout=10", nil, timeout, errorBody)
 		if err != nil {
 			if aborted, ok := IsNodeOperationAborted(err); ok {
@@ -580,7 +580,7 @@ func GetIncusClient(ctx context.Context, options IncusClientOptions) (*IncusClie
 		}
 
 		if pooled, ok := incusPool[key]; ok {
-			pooled.lastUsed = time.Now()
+			pooled.lastUsed = time.Now().UTC()
 			if pooled.client.Connected() {
 				incusPoolMu.Unlock()
 				return pooled.client, nil
@@ -616,7 +616,7 @@ func connectIncusPooled(ctx context.Context, key string, options IncusClientOpti
 	}
 
 	incusPoolMu.Lock()
-	incusPool[key] = &incusPooledClient{client: client, lastUsed: time.Now()}
+	incusPool[key] = &incusPooledClient{client: client, lastUsed: time.Now().UTC()}
 	incusPoolMu.Unlock()
 
 	call.client = client
@@ -628,7 +628,7 @@ func UpdateIncusClientResponseTime(hostID int64, responseTime time.Duration) {
 	incusPoolMu.Lock()
 	if pooled, ok := incusPool[key]; ok {
 		pooled.lastResponseTime = responseTime
-		pooled.lastUsed = time.Now()
+		pooled.lastUsed = time.Now().UTC()
 		pooled.errorCount = 0
 	}
 	incusPoolMu.Unlock()

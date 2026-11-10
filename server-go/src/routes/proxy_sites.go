@@ -1257,7 +1257,7 @@ func proxySitesProbeCertificate(ctx context.Context, domain string) (proxySitesC
 		// 允许自签名证书
 		InsecureSkipVerify: true,
 	})
-	_ = tlsConnection.SetDeadline(time.Now().Add(proxySitesCertificateTimeout))
+	_ = tlsConnection.SetDeadline(time.Now().UTC().Add(proxySitesCertificateTimeout))
 	handshakeErr := tlsConnection.HandshakeContext(ctx)
 	if handshakeErr != nil {
 		_ = connection.Close()
@@ -1271,7 +1271,7 @@ func proxySitesProbeCertificate(ctx context.Context, domain string) (proxySitesC
 	}
 	leaf := state.PeerCertificates[0]
 
-	now := time.Now()
+	now := time.Now().UTC()
 	valid := !now.Before(leaf.NotBefore) && !now.After(leaf.NotAfter)
 	daysRemaining := int(math.Floor(leaf.NotAfter.Sub(now).Hours() / 24))
 

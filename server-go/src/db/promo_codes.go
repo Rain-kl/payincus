@@ -286,7 +286,7 @@ func PromoIncrementUsageWithLock(ctx context.Context, tx *gorm.DB, promoCodeID i
 	if !promo.Enabled {
 		return models.PromoCode{}, ErrPromoDisabled
 	}
-	now := time.Now()
+	now := time.Now().UTC()
 	if promo.StartsAt != nil && promo.StartsAt.After(now) {
 		return models.PromoCode{}, ErrPromoNotStarted
 	}
@@ -335,7 +335,7 @@ func PromoIncrementUsageWithLock(ctx context.Context, tx *gorm.DB, promoCodeID i
 // it untouched).
 func PromoBindToInstance(ctx context.Context, tx *gorm.DB, params PromoBindParams) (models.InstancePromoBinding, error) {
 	client := promoClient(ctx, tx)
-	now := time.Now()
+	now := time.Now().UTC()
 
 	var binding models.InstancePromoBinding
 	err := client.Raw(
@@ -380,7 +380,7 @@ func PromoUpdateBindingCycles(ctx context.Context, tx *gorm.DB, instanceID int32
 		  RETURNING `+promoBindingReturning,
 		cycles.ConsumedCycles,
 		cycles.NewRemainingCycles,
-		time.Now(),
+		time.Now().UTC(),
 		instanceID,
 	).Scan(&binding).Error
 	if err != nil {

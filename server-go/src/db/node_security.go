@@ -343,7 +343,7 @@ func RecordNodeSecurityReport(ctx context.Context, hostID int32, report NodeSecu
 	// 30-day retention for CLI events.
 	if _, err := tx.Exec(ctx,
 		"DELETE FROM node_cli_events WHERE host_id = $1 AND received_at < $2",
-		hostID, time.Now().Add(-nodeCliEventRetentionDays*24*time.Hour),
+		hostID, time.Now().UTC().Add(-nodeCliEventRetentionDays*24*time.Hour),
 	); err != nil {
 		return 0, err
 	}

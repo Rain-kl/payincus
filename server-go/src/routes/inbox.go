@@ -477,7 +477,7 @@ func inboxGetInstance(ctx context.Context, id int32) (*models.Instance, error) {
 // default (now()), so it is set explicitly — GORM would otherwise insert the zero
 // timestamp.
 func inboxCreateAnnouncement(ctx context.Context, announcement models.Announcement) error {
-	announcement.CreatedAt = time.Now()
+	announcement.CreatedAt = time.Now().UTC()
 	return db.DB.WithContext(ctx).Create(&announcement).Error
 }
 
@@ -553,7 +553,7 @@ func inboxTryEnqueue(ctx context.Context, tasks []inboxHostNotificationEmailTask
 		return 0, false, nil
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	baseTime := now
 	var latestQueued time.Time

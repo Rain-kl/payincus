@@ -817,7 +817,7 @@ func ticketsMapListDetail(row ticketsTicketRow, now time.Time, needsReply bool) 
 // TicketsCreateTicket mirrors createTicket().
 func TicketsCreateTicket(ctx context.Context, data TicketsCreateTicketData) (ticketID int32, messageID int32, err error) {
 	err = DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		createdAt := time.Now()
+		createdAt := time.Now().UTC()
 		priority := string(models.TicketPriorityNormal)
 		if data.Priority != nil && *data.Priority != "" {
 			priority = string(*data.Priority)
@@ -959,7 +959,7 @@ func TicketsGetTicketByID(ctx context.Context, ticketID int32) (*TicketsTicketDe
 		ResolutionDueAt:    ticketsISO(row.ResolutionDueAt),
 		FirstRespondedAt:   ticketsISO(row.FirstRespondedAt),
 		SlaBreachedAt:      ticketsISO(row.SlaBreachedAt),
-		SLAStatus:          ticketsSLAFromRow(row, time.Now()),
+		SLAStatus:          ticketsSLAFromRow(row, time.Now().UTC()),
 		User:               ticketsUserRef(row),
 		Host:               ticketsHostRef(row),
 		Instance:           instance,
@@ -1018,7 +1018,7 @@ func TicketsGetUserTickets(ctx context.Context, userID int32, options TicketsLis
 		return TicketsTicketPage{}, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	tickets := make([]TicketsTicketWithDetailsExtended, 0, len(rows))
 	for _, row := range rows {
 		// 用户视角：最后一条消息来自宿主机主人 → 需要用户回复。
@@ -1132,7 +1132,7 @@ func TicketsGetHostTickets(ctx context.Context, hostID int32, options TicketsLis
 		return TicketsTicketPage{}, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	tickets := make([]TicketsTicketWithDetailsExtended, 0, len(rows))
 	for _, row := range rows {
 		tickets = append(tickets, ticketsMapListDetail(row, now, ticketsOwnerNeedsReply(row)))
@@ -1216,7 +1216,7 @@ func TicketsGetOwnerAllTickets(ctx context.Context, ownerID *int32, options Tick
 		return TicketsTicketPage{}, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	tickets := make([]TicketsTicketWithDetailsExtended, 0, len(rows))
 	for _, row := range rows {
 		tickets = append(tickets, ticketsMapListDetail(row, now, ticketsOwnerNeedsReply(row)))
@@ -1403,7 +1403,7 @@ func TicketsAddTicketMessage(ctx context.Context, ticketID, senderID int32, cont
 	var messageID int32
 
 	err := DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		repliedAt := time.Now()
+		repliedAt := time.Now().UTC()
 
 		update := tx.Exec(
 			"UPDATE tickets SET updated_at = ? WHERE id = ? AND status <> 'closed'",
@@ -1545,7 +1545,7 @@ func TicketsUpdateTicketStatus(ctx context.Context, ticketID int32, status model
 			return fmt.Errorf("ticket %d not found", ticketID)
 		}
 
-		resolvedAt := time.Now()
+		resolvedAt := time.Now().UTC()
 		columns = append(columns, "resolved_at = ?")
 		args = append(args, resolvedAt)
 		if rows[0].ResolutionDueAt != nil && resolvedAt.After(*rows[0].ResolutionDueAt) && rows[0].SlaBreachedAt == nil {
@@ -1555,14 +1555,14 @@ func TicketsUpdateTicketStatus(ctx context.Context, ticketID int32, status model
 
 	case models.TicketStatusClosed:
 		columns = append(columns, "closed_at = ?")
-		args = append(args, time.Now())
+		args = append(args, time.Now().UTC())
 
 	case models.TicketStatusOpen, models.TicketStatusInProgress:
 		columns = append(columns, "resolved_at = NULL", "closed_at = NULL")
 	}
 
 	columns = append(columns, "status = ?", "updated_at = ?")
-	args = append(args, string(status), time.Now())
+	args = append(args, string(status), time.Now().UTC())
 
 	sql := "UPDATE tickets SET " + strings.Join(columns, ", ") + " WHERE id = ?"
 	args = append(args, ticketID)
@@ -1647,7 +1647,7 @@ func TicketsGetUserOpenTicketCount(ctx context.Context, userID int32) (int64, er
 
 // TicketsGetTicketsForAutoClose mirrors getTicketsForAutoClose().
 func TicketsGetTicketsForAutoClose(ctx context.Context, timeoutMs int64) ([]TicketsAutoCloseCandidate, error) {
-	cutoffTime := time.Now().Add(-time.Duration(timeoutMs) * time.Millisecond)
+	cutoffTime := time.Now().UTC().Add(-time.Duration(timeoutMs) * time.Millisecond)
 
 	var rows []ticketsTicketRow
 	if err := DB.WithContext(ctx).Raw(
@@ -1693,7 +1693,7 @@ func TicketsAutoCloseTickets(ctx context.Context, ticketIDs []int32, timeoutMs i
 		uniqueIDs = append(uniqueIDs, id)
 	}
 
-	cutoffTime := time.Now().Add(-time.Duration(timeoutMs) * time.Millisecond)
+	cutoffTime := time.Now().UTC().Add(-time.Duration(timeoutMs) * time.Millisecond)
 	closed := make([]TicketsAutoClosedTicket, 0, len(uniqueIDs))
 
 	for _, ticketID := range uniqueIDs {
@@ -1736,7 +1736,7 @@ func TicketsAutoCloseTickets(ctx context.Context, ticketIDs []int32, timeoutMs i
 			update := tx.Exec(
 				`UPDATE tickets SET status = ?, closed_at = ?, updated_at = ?
 				  WHERE id = ? AND status = ? AND updated_at = ?`,
-				string(models.TicketStatusClosed), time.Now(), time.Now(),
+				string(models.TicketStatusClosed), time.Now().UTC(), time.Now().UTC(),
 				latest.ID, string(models.TicketStatusResolved), latest.UpdatedAt,
 			)
 			if update.Error != nil {
@@ -2263,7 +2263,7 @@ func TicketsCreateTicketInternalNote(ctx context.Context, ticketID, actorUserID 
 		`INSERT INTO ticket_internal_notes (ticket_id, actor_user_id, actor_username, content, created_at)
 		 VALUES (?, ?, ?, ?, ?)
 		 RETURNING id, ticket_id, actor_user_id, actor_username, content, created_at`,
-		ticketID, actorUserID, actorUsername, content, time.Now(),
+		ticketID, actorUserID, actorUsername, content, time.Now().UTC(),
 	).Scan(&row).Error; err != nil {
 		return TicketsTicketInternalNote{}, err
 	}
@@ -2488,7 +2488,7 @@ func TicketsCreateTicketObjectLink(ctx context.Context, ticketID int32, objectTy
 		 DO UPDATE SET object_label = EXCLUDED.object_label
 		 RETURNING id, ticket_id, object_type::text AS object_type, object_id, object_label,
 		           created_by_user_id, created_by_username, created_at`,
-		ticketID, objectType, objectID, *objectLabel, createdByUserID, createdByUsername, time.Now(),
+		ticketID, objectType, objectID, *objectLabel, createdByUserID, createdByUsername, time.Now().UTC(),
 	).Scan(&row).Error; err != nil {
 		return nil, err
 	}

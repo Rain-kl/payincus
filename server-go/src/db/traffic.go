@@ -349,7 +349,7 @@ func trafficGetResetSample(ctx context.Context, instanceID int32) (trafficResetS
 			RxPacketsRaw: rxPacketsRaw,
 			TxPacketsRaw: txPacketsRaw,
 			CPUUsageRaw:  cpuUsageRaw,
-			SampledAt:    time.Now(),
+			SampledAt:    time.Now().UTC(),
 			Source:       "active-collector",
 		},
 	}, nil
@@ -455,7 +455,7 @@ func trafficLockOwnerID() string {
 	const alphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict"
 	buffer := make([]byte, 8)
 	if _, err := rand.Read(buffer); err != nil {
-		return strconv.Itoa(os.Getpid()) + "-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+		return strconv.Itoa(os.Getpid()) + "-" + strconv.FormatInt(time.Now().UTC().UnixNano(), 36)
 	}
 	for index, value := range buffer {
 		buffer[index] = alphabet[int(value)%len(alphabet)]
@@ -472,13 +472,13 @@ func trafficAcquireLock(ctx context.Context, lockKey string, options trafficLock
 	}
 
 	ownerID := trafficLockOwnerID()
-	deadline := time.Now().Add(time.Duration(options.waitTimeoutMs) * time.Millisecond)
-	for time.Now().Before(deadline) {
+	deadline := time.Now().UTC().Add(time.Duration(options.waitTimeoutMs) * time.Millisecond)
+	for time.Now().UTC().Before(deadline) {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
 
-		now := time.Now()
+		now := time.Now().UTC()
 		expiresAt := now.Add(time.Duration(options.expireMs) * time.Millisecond)
 
 		var id int64
@@ -849,7 +849,7 @@ func BulkUpsertDailyTraffic(ctx context.Context, updates []TrafficDailyUpsert) e
 // calendar day `days` ago, oldest first. The TypeScript's `days = 30` default only
 // applies to an `undefined` argument, so callers here pass it explicitly.
 func GetDailyTraffic(ctx context.Context, instanceID int32, days int) ([]models.DailyTraffic, error) {
-	startDate := ShanghaiDateOnly(time.Now(), -days)
+	startDate := ShanghaiDateOnly(time.Now().UTC(), -days)
 	return trafficDailyRowsBetween(ctx, instanceID, &startDate)
 }
 
@@ -924,7 +924,7 @@ func GetHostDailyTraffic(ctx context.Context, hostID int32, trafficResetDay int)
 		day = 28
 	}
 
-	year, month, currentDay := ShanghaiDateParts(time.Now())
+	year, month, currentDay := ShanghaiDateParts(time.Now().UTC())
 	var periodStart time.Time
 	if currentDay >= day {
 		periodStart = time.Date(year, time.Month(month+1), day, 0, 0, 0, 0, time.UTC)
@@ -993,7 +993,7 @@ func CleanOldDailyTraffic(ctx context.Context, retentionDays int) (int64, error)
 	if Pool() == nil {
 		return 0, errors.New("database not initialized")
 	}
-	cutoffDate := ShanghaiDateOnly(time.Now(), -retentionDays)
+	cutoffDate := ShanghaiDateOnly(time.Now().UTC(), -retentionDays)
 	tag, err := Pool().Exec(ctx, `DELETE FROM daily_traffic WHERE date < $1::date`, cutoffDate)
 	if err != nil {
 		return 0, err

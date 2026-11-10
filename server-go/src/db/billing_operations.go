@@ -69,7 +69,7 @@ func addMonths31(date time.Time, months int) time.Time {
 // route to the data layer, which is the direction the rest of the codebase uses.
 func init() {
 	RegisterCreateBillingQuote(func(plan models.PackagePlan) (float64, error) {
-		return CalculateCreateBilling(plan, time.Now()).TotalPrice, nil
+		return CalculateCreateBilling(plan, time.Now().UTC()).TotalPrice, nil
 	})
 }
 

@@ -981,7 +981,7 @@ func telegramCreateGroupInviteLink(ctx context.Context, botToken string, group t
 		return telegramGroupInviteResult{Error: &message}, nil
 	}
 
-	expireDate := time.Now().Unix() + int64(group.InviteExpireMinutes)*60
+	expireDate := time.Now().UTC().Unix() + int64(group.InviteExpireMinutes)*60
 	response := telegramCallAPI(ctx, botToken, "createChatInviteLink", map[string]any{
 		"chat_id":      *group.ChatID,
 		"expire_date":  expireDate,
@@ -1518,7 +1518,7 @@ func RegisterTelegram(r *gin.Engine) {
 			return
 		}
 		token := base64.RawURLEncoding.EncodeToString(raw)
-		expiresAt := time.Now().Add(telegramBindTokenTTL)
+		expiresAt := time.Now().UTC().Add(telegramBindTokenTTL)
 
 		if err := db.TelegramCreateBindToken(ctx, currentUser.ID, telegramHashToken(token), expiresAt); err != nil {
 			telegramRespondInternalError(c)
@@ -1624,7 +1624,7 @@ func telegramWebhookHandler(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	tokenHash := telegramHashToken(match[1])
 	bindToken, err := db.TelegramFindBindToken(ctx, tokenHash, now)
 	if err != nil {

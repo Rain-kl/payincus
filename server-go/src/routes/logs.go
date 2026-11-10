@@ -399,7 +399,7 @@ func logsAuditExportHandler(c *gin.Context) {
 
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", `attachment; filename="payincus-audit-logs-`+
-		formatTerminalCommandNumber(float64(time.Now().UnixMilli()))+`.csv"`)
+		formatTerminalCommandNumber(float64(time.Now().UTC().UnixMilli()))+`.csv"`)
 	c.Header("Cache-Control", "no-store")
 	c.String(http.StatusOK, "\uFEFF"+logsBuildAuditCSV(rows))
 }

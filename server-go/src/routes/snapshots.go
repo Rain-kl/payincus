@@ -435,7 +435,7 @@ func snapshotsCreateHandler(c *gin.Context) {
 		return
 	}
 
-	incusName := snapshotsIncusName(name, time.Now().UnixMilli())
+	incusName := snapshotsIncusName(name, time.Now().UTC().UnixMilli())
 	lockKey := snapshotsCreateLockKey(instanceID)
 	lockResult, lockErr := lib.AcquireLock(ctx, lockKey, lib.LockOptions{
 		ExpireMs:        snapshotsIntPtr(snapshotsCreateLockExpireMs),

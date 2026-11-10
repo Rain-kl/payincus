@@ -652,7 +652,7 @@ func affValidateHandler(c *gin.Context) {
 	}
 
 	if validation.Valid && validation.PromoCode != nil {
-		billing := db.CalculateCreateBilling(*plan, time.Now())
+		billing := db.CalculateCreateBilling(*plan, time.Now().UTC())
 		quote := services.PromoQuoteCreation(billing.TotalPrice, services.PromoQuotePromo{
 			DiscountType:  validation.PromoCode.DiscountType,
 			DiscountValue: validation.PromoCode.DiscountValue,

@@ -41,7 +41,7 @@ func SignAccessToken(claims AccessTokenClaims) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	now := time.Now()
+	now := time.Now().UTC()
 	claims.IssuedAt = now.Unix()
 	claims.Expires = now.Add(AccessTokenTTL).Unix()
 

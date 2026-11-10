@@ -627,7 +627,7 @@ func CreateSystemImage(ctx context.Context, data SystemImageCreateData) (models.
 // written, and architecture is normalized. The @updatedAt column is always
 // bumped, exactly like Prisma.
 func UpdateSystemImage(ctx context.Context, id int32, data SystemImageUpdateData) (models.SystemImage, error) {
-	updates := map[string]any{"updated_at": time.Now()}
+	updates := map[string]any{"updated_at": time.Now().UTC()}
 	if data.Name != nil {
 		updates["name"] = *data.Name
 	}

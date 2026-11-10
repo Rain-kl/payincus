@@ -39,7 +39,7 @@ var (
 
 // hostHealthNow is Date.now(). It is a variable so tests can move the clock
 // without touching the cache internals.
-var hostHealthNow = func() int64 { return time.Now().UnixMilli() }
+var hostHealthNow = func() int64 { return time.Now().UTC().UnixMilli() }
 
 // IsHostHealthy mirrors isHostHealthy(hostId).
 //

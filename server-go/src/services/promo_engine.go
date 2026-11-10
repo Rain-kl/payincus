@@ -205,7 +205,7 @@ func PromoValidate(ctx context.Context, params PromoValidateParams) (PromoValida
 		}, nil
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	if promo.StartsAt != nil && now.Before(*promo.StartsAt) {
 		return PromoValidationResult{
 			Valid:     false,
@@ -506,7 +506,7 @@ func PromoSettleOnRenew(ctx context.Context, tx *gorm.DB, params PromoSettleRene
 			`UPDATE promo_codes
 			    SET total_discount_amount = total_discount_amount + ?, updated_at = ?
 			  WHERE id = ?`,
-			promoDecimalFromFixed2(quote.DiscountAmount), time.Now(), binding.PromoCodeID)
+			promoDecimalFromFixed2(quote.DiscountAmount), time.Now().UTC(), binding.PromoCodeID)
 		if result.Error != nil {
 			return PromoSettleRenewResult{}, result.Error
 		}

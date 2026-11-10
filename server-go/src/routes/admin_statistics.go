@@ -339,7 +339,7 @@ func adminStatisticsDailyWindowAt(days int, now time.Time) adminStatisticsWindow
 
 // adminStatisticsDailyWindow mirrors getDailyWindow with new Date() as the clock.
 func adminStatisticsDailyWindow(days int) adminStatisticsWindow {
-	return adminStatisticsDailyWindowAt(days, time.Now())
+	return adminStatisticsDailyWindowAt(days, time.Now().UTC())
 }
 
 // adminStatisticsMonthlyWindowAt mirrors getMonthlyWindow.
@@ -361,7 +361,7 @@ func adminStatisticsMonthlyWindowAt(months int, now time.Time) adminStatisticsWi
 
 // adminStatisticsMonthlyWindow mirrors getMonthlyWindow with new Date() as the clock.
 func adminStatisticsMonthlyWindow(months int) adminStatisticsWindow {
-	return adminStatisticsMonthlyWindowAt(months, time.Now())
+	return adminStatisticsMonthlyWindowAt(months, time.Now().UTC())
 }
 
 // adminStatisticsBusinessDayRangeAt mirrors getBusinessDayRange.
@@ -373,7 +373,7 @@ func adminStatisticsBusinessDayRangeAt(offsetDays int, now time.Time) adminStati
 
 // adminStatisticsBusinessDayRange mirrors getBusinessDayRange(offsetDays).
 func adminStatisticsBusinessDayRange(offsetDays int) adminStatisticsDateRange {
-	return adminStatisticsBusinessDayRangeAt(offsetDays, time.Now())
+	return adminStatisticsBusinessDayRangeAt(offsetDays, time.Now().UTC())
 }
 
 // adminStatisticsBusinessRollingRangeAt mirrors getBusinessRollingRange.
@@ -387,7 +387,7 @@ func adminStatisticsBusinessRollingRangeAt(days int, now time.Time) adminStatist
 
 // adminStatisticsBusinessRollingRange mirrors getBusinessRollingRange(days).
 func adminStatisticsBusinessRollingRange(days int) adminStatisticsDateRange {
-	return adminStatisticsBusinessRollingRangeAt(days, time.Now())
+	return adminStatisticsBusinessRollingRangeAt(days, time.Now().UTC())
 }
 
 // ==================== numeric helpers ====================

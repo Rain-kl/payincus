@@ -513,7 +513,7 @@ func OAuthProviderExchangeAuthorizationCode(ctx context.Context, input OAuthProv
 		if code.UsedAt != nil {
 			return errors.New("Authorization code has already been used")
 		}
-		if !code.ExpiresAt.After(time.Now()) {
+		if !code.ExpiresAt.After(time.Now().UTC()) {
 			return errors.New("Authorization code has expired")
 		}
 		if code.RedirectURI != input.RedirectURI {
@@ -595,7 +595,7 @@ func OAuthProviderExchangeRefreshToken(ctx context.Context, input OAuthProviderR
 		if refresh.RevokedAt != nil {
 			return errors.New("Refresh token has been revoked")
 		}
-		if !refresh.ExpiresAt.After(time.Now()) {
+		if !refresh.ExpiresAt.After(time.Now().UTC()) {
 			return errors.New("Refresh token has expired")
 		}
 

@@ -668,7 +668,7 @@ func promoCodesRenewPreviewHandler(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	active := promoCodesIsPromoActive(binding, now)
 
 	c.JSON(http.StatusOK, gin.H{

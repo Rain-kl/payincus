@@ -311,7 +311,7 @@ func CheckinGetStatus(ctx context.Context, userID int32) (CheckinStatus, error) 
 		return CheckinStatus{}, errors.New("checkin: database not initialized")
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	dateKey := CheckinDateKeyInBeijing(now)
 	monthKey := ""
 	if len(dateKey) >= 7 {
@@ -483,7 +483,7 @@ func CheckinPerformDailyPointsCheckin(ctx context.Context, userID int32, meta Ch
 		}
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	dateKey := CheckinDateKeyInBeijing(now)
 	yesterdayKey := checkinYesterdayDateKey(dateKey)
 	points := checkinRandomizePoints(settings.MinPoints, settings.MaxPoints)

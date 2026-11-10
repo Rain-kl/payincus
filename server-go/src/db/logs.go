@@ -622,7 +622,7 @@ func GetLogModules(ctx context.Context) ([]string, error) {
 // CleanOldLogs mirrors cleanOldLogs(); it deletes logs older than `days` days and
 // returns the number of removed rows.
 func CleanOldLogs(ctx context.Context, days int) (int64, error) {
-	cutoffDate := time.Now().AddDate(0, 0, -days)
+	cutoffDate := time.Now().UTC().AddDate(0, 0, -days)
 
 	tx := DB.WithContext(ctx).Exec("DELETE FROM logs WHERE created_at < ?", cutoffDate)
 	if tx.Error != nil {

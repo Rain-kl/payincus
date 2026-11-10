@@ -58,12 +58,12 @@ func upsertInvalidation(ctx context.Context, userID int32, sessionID string, inv
 
 // InvalidateUserAccessTokens invalidates every access token for a user.
 func InvalidateUserAccessTokens(ctx context.Context, userID int32) {
-	now := int32(time.Now().Unix())
+	now := int32(time.Now().UTC().Unix())
 	_ = upsertInvalidation(ctx, userID, UserLevelSessionID, now)
 }
 
 // InvalidateSessionAccessToken invalidates access tokens for a single session.
 func InvalidateSessionAccessToken(ctx context.Context, userID int32, sessionID string) {
-	now := int32(time.Now().Unix())
+	now := int32(time.Now().UTC().Unix())
 	_ = upsertInvalidation(ctx, userID, sessionID, now)
 }

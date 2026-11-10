@@ -374,7 +374,7 @@ func trafficGetInstanceTraffic(c *gin.Context) {
 	}
 
 	trafficResetDay := trafficResetDayOrDefault(host)
-	periodStart, periodEnd := lib.GetTrafficPeriod(int(trafficResetDay), time.Now())
+	periodStart, periodEnd := lib.GetTrafficPeriod(int(trafficResetDay), time.Now().UTC())
 
 	vipExtraTrafficQuota, err := trafficVipExtraTrafficQuota(ctx, instance.UserID, instance.MonthlyTrafficLimit)
 	if err != nil {
@@ -419,7 +419,7 @@ func trafficGetInstanceTrafficHistory(c *gin.Context) {
 	}
 
 	trafficResetDay := trafficResetDayOrDefault(host)
-	periodStart, periodEnd := lib.GetTrafficPeriod(int(trafficResetDay), time.Now())
+	periodStart, periodEnd := lib.GetTrafficPeriod(int(trafficResetDay), time.Now().UTC())
 
 	// `const days = request.query.days ? parsePositiveId(request.query.days) : null`.
 	// A repeated parameter is an array in Fastify and fails the digit test, so it
@@ -641,7 +641,7 @@ func trafficGetHostTrafficHistory(c *gin.Context) {
 	}
 
 	trafficResetDay := trafficResetDayOrDefault(host)
-	periodStart, periodEnd := lib.GetTrafficPeriod(int(trafficResetDay), time.Now())
+	periodStart, periodEnd := lib.GetTrafficPeriod(int(trafficResetDay), time.Now().UTC())
 
 	history, err := db.GetHostDailyTraffic(ctx, hostID, int(trafficResetDay))
 	if err != nil {

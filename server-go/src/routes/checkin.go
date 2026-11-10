@@ -176,7 +176,7 @@ func checkinWithRedeemLocks[T any](
 }
 
 // timeNow is a seam for tests (the TypeScript compares against `new Date()`).
-var timeNow = func() time.Time { return time.Now() }
+var timeNow = func() time.Time { return time.Now().UTC() }
 
 // checkinRedeemTypeLabel mirrors `CODE_TYPE_NAMES[codeType]?.en || codeType` and
 // `CODE_TYPE_UNITS[codeType] || ”`.

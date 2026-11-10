@@ -486,7 +486,7 @@ func AffIsActivated(_ context.Context, _ int32) bool {
 func AffActivate(ctx context.Context, userID int32) error {
 	return DB.WithContext(ctx).Model(&models.User{}).
 		Where("id = ?", userID).
-		Update("aff_activated_at", time.Now()).Error
+		Update("aff_activated_at", time.Now().UTC()).Error
 }
 
 // affLogInsert is the createAffLog payload.

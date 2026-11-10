@@ -685,7 +685,7 @@ func balanceSendAdjustedEmail(ctx context.Context, email, username string, amoun
 		Amount:     amount,
 		Remark:     remark,
 		NewBalance: newBalance,
-		Time:       time.Now(),
+		Time:       time.Now().UTC(),
 	})
 	if !result.Success {
 		log.Printf("%s 发送邮件失败: %s", logPrefix, result.Error)

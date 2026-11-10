@@ -91,6 +91,14 @@ func Init(ctx context.Context) error {
 	}), &gorm.Config{
 		Logger:                 gormlogger.Default.LogMode(gormlogger.Error),
 		SkipDefaultTransaction: true,
+		// Prisma writes UTC into the `timestamp(3) without time zone` columns
+		// (measured: a row created by the Node backend is within milliseconds
+		// of `now() at time zone 'utc'`). pgx encodes time.Time by its wall
+		// clock, so a bare time.Now() in a UTC+8 process would persist a value
+		// eight hours in the future. Pinning GORM's clock to UTC fixes every
+		// autoCreateTime/autoUpdateTime column at once; explicit writes still
+		// have to use time.Now().UTC() themselves.
+		NowFunc: func() time.Time { return time.Now().UTC() },
 	})
 	if err != nil {
 		return fmt.Errorf("open gorm: %w", err)

@@ -139,7 +139,7 @@ func nanoid(size int) string {
 	if _, err := rand.Read(out); err != nil {
 		// crypto/rand failing is not recoverable; degrade to a time-seeded suffix so
 		// the caller still gets a non-empty, most-likely-unique owner id.
-		seed := strconv.FormatInt(time.Now().UnixNano(), 36)
+		seed := strconv.FormatInt(time.Now().UTC().UnixNano(), 36)
 		for i := range out {
 			out[i] = nanoidAlphabet[int(seed[i%len(seed)])%len(nanoidAlphabet)]
 		}
@@ -162,13 +162,13 @@ func AcquireLock(ctx context.Context, lockKey string, options LockOptions) (Lock
 		return LockResult{}, errDistributedLockNoDatabase
 	}
 
-	deadline := time.Now().Add(opts.waitTimeout)
-	for time.Now().Before(deadline) {
+	deadline := time.Now().UTC().Add(opts.waitTimeout)
+	for time.Now().UTC().Before(deadline) {
 		if err := ctx.Err(); err != nil {
 			return LockResult{}, err
 		}
 
-		now := time.Now()
+		now := time.Now().UTC()
 		expiresAt := now.Add(opts.expireMs)
 
 		var id int64
@@ -222,7 +222,7 @@ func ExtendLock(ctx context.Context, lockKey, ownerID string, extendMs *int) boo
 		extend = *extendMs
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	expiresAt := now.Add(time.Duration(extend) * time.Millisecond)
 
 	tag, err := pool.Exec(ctx,
@@ -268,7 +268,7 @@ func CleanupExpiredLocks(ctx context.Context) (int64, error) {
 		return 0, errDistributedLockNoDatabase
 	}
 
-	tag, err := pool.Exec(ctx, `DELETE FROM "distributed_locks" WHERE "expires_at" < $1`, time.Now())
+	tag, err := pool.Exec(ctx, `DELETE FROM "distributed_locks" WHERE "expires_at" < $1`, time.Now().UTC())
 	if err != nil {
 		return 0, err
 	}
@@ -302,7 +302,7 @@ func GetLockStatus(ctx context.Context, lockKey string) (LockStatus, error) {
 
 	return LockStatus{
 		Exists:     true,
-		IsExpired:  expiresAt.Before(time.Now()),
+		IsExpired:  expiresAt.Before(time.Now().UTC()),
 		OwnerID:    &ownerID,
 		ExpiresAt:  &expiresAt,
 		AcquiredAt: &acquiredAt,

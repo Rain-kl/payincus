@@ -640,14 +640,14 @@ LIMIT 1`
 }
 
 func touchPublicAPITokenLastUsed(ctx context.Context, id int32) error {
-	now := time.Now()
+	now := time.Now().UTC()
 	return db.DB.WithContext(ctx).
 		Exec("UPDATE public_api_tokens SET last_used_at = ?, updated_at = ? WHERE id = ?", now, now, id).
 		Error
 }
 
 func touchOAuthAccessTokenLastUsed(ctx context.Context, id int32) error {
-	now := time.Now()
+	now := time.Now().UTC()
 	return db.DB.WithContext(ctx).
 		Exec("UPDATE oauth_access_tokens SET last_used_at = ?, updated_at = ? WHERE id = ?", now, now, id).
 		Error
@@ -749,7 +749,7 @@ func authenticateOAuthAccessToken(c *gin.Context, ctx context.Context, rawToken 
 		return nil
 	}
 
-	if !token.ExpiresAt.After(time.Now()) {
+	if !token.ExpiresAt.After(time.Now().UTC()) {
 		respondPublicAPIError(c, http.StatusUnauthorized, ErrPublicAPITokenExpired, "Token expired")
 		return nil
 	}
@@ -800,7 +800,7 @@ func authenticateStoredAPIToken(c *gin.Context, ctx context.Context, rawToken st
 		return nil
 	}
 
-	if token.ExpiresAt != nil && !token.ExpiresAt.After(time.Now()) {
+	if token.ExpiresAt != nil && !token.ExpiresAt.After(time.Now().UTC()) {
 		respondPublicAPIError(c, http.StatusUnauthorized, ErrPublicAPITokenExpired, "Token expired")
 		return nil
 	}

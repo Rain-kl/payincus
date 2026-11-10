@@ -694,7 +694,7 @@ func RegisterAPITokens(r *gin.Engine) {
 
 		name := lib.NormalizePublicAPITokenName(apiTokenField(body, "name"))
 		scopes := lib.NormalizePublicAPIScopes(apiTokenField(body, "scopes"))
-		expiresAt, expiresValid := normalizeAPITokenExpiresAt(apiTokenField(body, "expiresAt"), time.Now())
+		expiresAt, expiresValid := normalizeAPITokenExpiresAt(apiTokenField(body, "expiresAt"), time.Now().UTC())
 
 		// The validation order is part of the contract: name, then scopes, then expiry.
 		if name == nil {

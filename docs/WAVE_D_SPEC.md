@@ -32,6 +32,22 @@
 
 **红线**：三者不得互相回退。Web token 不能访问 Public API，Agent 签名不能访问 `/api/*`。每条都要有反向测试（用 A 面凭据打 B 面，断言 401）。
 
+### 0.2b 时间写入必须是 UTC（已实证，2026-11-10）
+
+Prisma 往 `timestamp(3) without time zone` 列写的是 **UTC 墙上时间**（实测：Node 刚写入的 `login_records.created_at` 与 `now() at time zone 'utc'` 相差不到 1 秒；容器时钟本身是 UTC）。
+
+而 **pgx 按 time.Time 的墙上时间编码**：在 UTC+8 的机器上把裸 `time.Now()` 写进 timestamp 列，会存成 8 小时之后的值（已用 `$1::timestamp` 实测：`time.Now()` → `20:00:18`，`time.Now().UTC()` → `12:00:18`）。
+
+后果按路径不同：
+- **写入错误**：过期时间/创建时间整体后移 8 小时 → 验证码、refresh session、订阅到期窗口全部失准（安全影响：过期判断失效）。
+- **SQL 参数同样错误**：`WHERE expires_at < ?` / `WHERE created_at >= ?` 里的 `?` 也按本地墙上时间编码，比较基准比真实时间晚 8 小时 —— 清理任务会多删、限流窗口会算错。这类"只读比较"并不安全。
+- **纯 Go 侧比较无害**：`expiresAt.After(time.Now())` 是绝对时刻比较，不受时区影响（但读回来的值本身若是被写歪的，比较结果依旧错）。
+
+规则：
+1. `db.Init` 已给 GORM 配 `NowFunc: time.Now().UTC`，所有 `autoCreateTime`/`autoUpdateTime` 列自动正确。
+2. **任何会进入 SQL 的 `time.Now()` 必须写成 `time.Now().UTC()`**（写入值、`WHERE` 参数、手写 SQL 参数）。
+3. 纯计时（`time.Since`、`SetDeadline`、进程内 map 的 TTL）不受影响，统一 `.UTC()` 也不改变语义。
+
 ### 0.3 金额路径
 
 - 所有余额变动必须在**同一事务**内完成，并先取 advisory lock（命名空间见下表）。

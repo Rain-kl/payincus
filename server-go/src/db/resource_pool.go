@@ -585,7 +585,7 @@ func resourcePoolGetStorageCapacity(
 		return nil, err
 	}
 	// Node availability is checked before pool health and capacity.
-	if host.Status != "online" || !resourcePoolHostServiceAvailable(host, time.Now()) {
+	if host.Status != "online" || !resourcePoolHostServiceAvailable(host, time.Now().UTC()) {
 		return resourcePoolStorageCapacityEmpty(ResourcePoolStorageUnavailable), nil
 	}
 
@@ -609,7 +609,7 @@ func resourcePoolGetStorageCapacity(
 	}
 
 	maxAge := resourcePoolStorageReportMaxAgeMs(host.AgentReport)
-	now := time.Now()
+	now := time.Now().UTC()
 
 	var unassigned int64
 	{

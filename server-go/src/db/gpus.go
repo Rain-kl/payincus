@@ -295,7 +295,7 @@ func GpusFindAvailable(ctx context.Context, client *gorm.DB, hostID int32, polic
 		return nil, nil
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	for _, device := range devices {
 		if !device.SharingEnabled || !gpusIsFresh(device.Available, device.RuntimeReady, device.LastSeenAt, now) {
 			return nil, nil
@@ -404,7 +404,7 @@ func GpusGetInstancePCIs(ctx context.Context, instanceID, hostID int32) ([]strin
 		if err := tx.Where("id IN ?", ids).Order("id ASC").Find(&devices).Error; err != nil {
 			return err
 		}
-		now := time.Now()
+		now := time.Now().UTC()
 		if len(devices) != len(ids) {
 			return &GpusError{Message: "绑定的 GPU 组已离线或不在目标宿主机上，请检查宿主 GPU 状态"}
 		}
@@ -450,7 +450,7 @@ func GpusGetInstancePCIs(ctx context.Context, instanceID, hostID int32) ([]strin
 func GpusReleaseFailed(ctx context.Context, instanceID int32) error {
 	return DB.WithContext(ctx).Model(&models.Instance{}).
 		Where("id = ? AND status IN ? AND gpu_released_at IS NULL", instanceID, []string{"error", "deleted"}).
-		Update("gpu_released_at", time.Now()).Error
+		Update("gpu_released_at", time.Now().UTC()).Error
 }
 
 // GpusAssertPlanChange mirrors assertGpuPlanChange.
@@ -671,7 +671,7 @@ func GpusSyncHostReport(ctx context.Context, hostID int32, input any) error {
 	}
 	cards := gpusNormalizeReportCards(report)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	return DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.HostGpu{}).Where("host_id = ?", hostID).
 			Updates(map[string]any{"available": false, "runtime_ready": false}).Error; err != nil {
@@ -724,7 +724,7 @@ func GpusListHostGpus(ctx context.Context, hostID int32) ([]GpusHostGpu, error) 
 		return nil, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	result := make([]GpusHostGpu, 0, len(devices))
 	for _, device := range devices {
 		used, err := GpusCountReservations(ctx, nil, device.ID, nil)

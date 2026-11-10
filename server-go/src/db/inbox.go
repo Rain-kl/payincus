@@ -274,7 +274,7 @@ func CleanupOldMessages(ctx context.Context, daysToKeep int) (int64, error) {
 	if daysToKeep == 0 {
 		daysToKeep = 30
 	}
-	cutoffDate := time.Now().AddDate(0, 0, -daysToKeep)
+	cutoffDate := time.Now().UTC().AddDate(0, 0, -daysToKeep)
 
 	result := DB.WithContext(ctx).Exec("DELETE FROM inbox_messages WHERE created_at < ?", cutoffDate)
 	if result.Error != nil {

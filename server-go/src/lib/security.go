@@ -62,7 +62,7 @@ import (
 // securityNowMs is swappable in tests so time-dependent behaviour (login lock,
 // OAuth TTLs, export-task TTL) can be exercised deterministically. Production
 // code must leave it as time.Now().UnixMilli.
-var securityNowMs = func() int64 { return time.Now().UnixMilli() }
+var securityNowMs = func() int64 { return time.Now().UTC().UnixMilli() }
 
 // ==================== 安全事件类型 ====================
 
@@ -586,7 +586,7 @@ func CleanupExpiredRefreshTokens(ctx context.Context) (int64, error) {
 		return 0, nil
 	}
 	result := db.DB.WithContext(ctx).
-		Where("expires_at < ?", time.Now()).
+		Where("expires_at < ?", time.Now().UTC()).
 		Delete(&models.RefreshToken{})
 	return result.RowsAffected, result.Error
 }
@@ -597,7 +597,7 @@ func CleanupExpiredTokenInvalidations(ctx context.Context) (int64, error) {
 	if db.DB == nil {
 		return 0, nil
 	}
-	thirtyDaysAgo := time.Now().Unix() - 30*24*60*60
+	thirtyDaysAgo := time.Now().UTC().Unix() - 30*24*60*60
 	result := db.DB.WithContext(ctx).
 		Where("invalidated_at < ?", thirtyDaysAgo).
 		Delete(&models.TokenInvalidation{})
@@ -614,7 +614,7 @@ func GenerateRefreshToken(ctx context.Context, userID int32, username string, ro
 	token := "rt_" + base64.RawURLEncoding.EncodeToString(buf)
 	tokenHash := GetRefreshTokenStorageKey(token)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	expiresAt := now.Add(time.Duration(refreshTokenExpiresInSeconds) * time.Second)
 	if ip == "" {
 		ip = "unknown"
@@ -728,7 +728,7 @@ func GetUserSessions(ctx context.Context, userID int32, currentToken string) ([]
 
 	var tokens []models.RefreshToken
 	if err := db.DB.WithContext(ctx).
-		Where("user_id = ? AND expires_at > ?", userID, time.Now()).
+		Where("user_id = ? AND expires_at > ?", userID, time.Now().UTC()).
 		Order("last_active_at DESC").
 		Find(&tokens).Error; err != nil {
 		return nil, err
@@ -796,7 +796,7 @@ func UpdateSessionActivity(ctx context.Context, token string) (*time.Time, error
 	if db.DB == nil {
 		return nil, nil
 	}
-	now := time.Now()
+	now := time.Now().UTC()
 	newExpiresAt := now.Add(time.Duration(refreshTokenExpiresInSeconds) * time.Second)
 
 	result := db.DB.WithContext(ctx).
@@ -1535,7 +1535,7 @@ func DetectNewLoginLocation(ctx context.Context, userID int32, currentIP, curren
 		return NewLoginLocation{}
 	}
 
-	thirtyDaysAgo := time.Now().Add(-30 * 24 * time.Hour)
+	thirtyDaysAgo := time.Now().UTC().Add(-30 * 24 * time.Hour)
 	var records []models.LoginRecord
 	err := db.DB.WithContext(ctx).
 		Select("ip", "user_agent").

@@ -397,7 +397,7 @@ func RegisterAdminTasks(r *gin.Engine) {
 			flusher.Flush()
 		}
 
-		deadline := time.Now().Add(adminTasksStreamDeadline)
+		deadline := time.Now().UTC().Add(adminTasksStreamDeadline)
 		closed := false
 
 		// send mirrors the TS `send`: it reports false once the socket is gone or
@@ -486,7 +486,7 @@ func RegisterAdminTasks(r *gin.Engine) {
 			// Drain all historical pages before completing; never truncate a
 			// finished task's logs.
 			finished := current.Status != lib.OperationTaskStatusRunning
-			if (finished && len(logs) < adminTasksStreamPageSize) || time.Now().After(deadline) {
+			if (finished && len(logs) < adminTasksStreamPageSize) || time.Now().UTC().After(deadline) {
 				event := "end"
 				if !finished {
 					event = "reconnect"

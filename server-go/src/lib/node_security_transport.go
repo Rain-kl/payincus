@@ -124,7 +124,7 @@ func DialNodePinned(
 	}
 
 	// The header/body timeouts the TypeScript configures on the undici Agent.
-	_ = connection.SetDeadline(time.Now().Add(nodePinnedDialTimeout))
+	_ = connection.SetDeadline(time.Now().UTC().Add(nodePinnedDialTimeout))
 	_ = connection.SetDeadline(time.Time{})
 	return connection, nil
 }

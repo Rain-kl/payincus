@@ -846,7 +846,7 @@ func RedeemGiftCard(ctx context.Context, code string, userID int32) (GiftCardBal
 	if ownerID != nil && *ownerID == userID {
 		return GiftCardBalanceResult{}, ErrGiftCardSelfRedeem
 	}
-	if expiresAt != nil && expiresAt.Before(time.Now()) {
+	if expiresAt != nil && expiresAt.Before(time.Now().UTC()) {
 		expired, err := tx.Exec(ctx,
 			"UPDATE gift_cards SET status = 'expired' WHERE id = $1 AND status = 'active'", cardID)
 		if err != nil {

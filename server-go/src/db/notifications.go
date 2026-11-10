@@ -434,7 +434,7 @@ func CleanOldNotificationLogs(ctx context.Context, days int) (int64, error) {
 	if days == 0 {
 		days = 30
 	}
-	cutoffDate := time.Now().AddDate(0, 0, -days)
+	cutoffDate := time.Now().UTC().AddDate(0, 0, -days)
 
 	result := DB.WithContext(ctx).Exec("DELETE FROM notification_logs WHERE created_at < ?", cutoffDate)
 	if result.Error != nil {

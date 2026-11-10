@@ -729,7 +729,7 @@ func nodeSecurityRecoveryAllowList(ctx context.Context, hostID int32) func(lib.R
 		if !knownStatus {
 			return false, nil
 		}
-		if instance.ExpiresAt != nil && !instance.ExpiresAt.After(time.Now()) {
+		if instance.ExpiresAt != nil && !instance.ExpiresAt.After(time.Now().UTC()) {
 			return false, nil
 		}
 		return true, nil

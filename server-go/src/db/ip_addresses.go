@@ -752,7 +752,7 @@ func IpAddressesAllocateAndReserveNatIpv4(ctx context.Context, hostID int32, ins
 		return nil, err
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	// Clear expired reservations: a failed delivery must not hold an address forever.
 	if _, err := tx.Exec(ctx, `DELETE FROM nat_ipv4_reservations WHERE expires_at < $1`, now); err != nil {
 		return nil, err

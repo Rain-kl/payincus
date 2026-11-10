@@ -374,7 +374,7 @@ func snapshotsAddMinutesLocal(from time.Time, minutes int32) time.Time {
 // payload only carries enabled/intervalMinutes). Existing policies therefore keep
 // their old next_run_at until the scheduler recomputes it.
 func SnapshotsUpsertPolicy(ctx context.Context, instanceID int32, enabled bool, intervalMinutes int32) error {
-	now := time.Now()
+	now := time.Now().UTC()
 	nextRunAt := snapshotsAddMinutesLocal(now, intervalMinutes)
 	// Prisma stores DateTime as UTC wall-clock in a `timestamp(3)` column, and pgx
 	// discards the zone (it writes the time's own wall-clock fields). Converting
@@ -403,7 +403,7 @@ func SnapshotsUpdatePolicyLastRun(ctx context.Context, instanceID int32) error {
 		return nil
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	nextRunAt := snapshotsAddMinutesLocal(now, policy.IntervalMinutes)
 	// Same UTC normalization as SnapshotsUpsertPolicy.
 	now = now.UTC()
