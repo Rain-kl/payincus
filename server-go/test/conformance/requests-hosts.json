@@ -1,0 +1,1063 @@
+[
+  {
+    "name": "hosts-install-sh-public",
+    "method": "GET",
+    "path": "/api/hosts/install.sh",
+    "skipBody": true
+  },
+  {
+    "name": "hosts-install-sh-token-too-short",
+    "method": "GET",
+    "path": "/api/hosts/install.sh/short"
+  },
+  {
+    "name": "hosts-install-sh-token-unknown",
+    "method": "GET",
+    "path": "/api/hosts/install.sh/parity-install-token-unknown"
+  },
+  {
+    "name": "hosts-install-sh-token-used",
+    "method": "GET",
+    "path": "/api/hosts/install.sh/parity-install-token-used-900004"
+  },
+  {
+    "name": "hosts-install-sh-token-expired",
+    "method": "GET",
+    "path": "/api/hosts/install.sh/parity-install-token-expired-900005"
+  },
+  {
+    "name": "hosts-install-sh-token-fresh",
+    "method": "GET",
+    "path": "/api/hosts/install.sh/parity-install-token-fresh-900006",
+    "skipBody": true
+  },
+  {
+    "name": "hosts-cert-token-too-short",
+    "method": "GET",
+    "path": "/api/hosts/cert/short"
+  },
+  {
+    "name": "hosts-cert-token-unknown",
+    "method": "GET",
+    "path": "/api/hosts/cert/parity-install-token-unknown"
+  },
+  {
+    "name": "hosts-cert-token-used",
+    "method": "GET",
+    "path": "/api/hosts/cert/parity-install-token-used-900004"
+  },
+  {
+    "name": "hosts-cert-token-expired",
+    "method": "GET",
+    "path": "/api/hosts/cert/parity-install-token-expired-900005"
+  },
+  {
+    "name": "hosts-agent-log-stream-no-ticket",
+    "method": "GET",
+    "path": "/api/hosts/900001/agent/logs/stream"
+  },
+  {
+    "name": "hosts-agent-log-stream-bad-ticket",
+    "method": "GET",
+    "path": "/api/hosts/900001/agent/logs/stream?ticket=not-a-ticket"
+  },
+  {
+    "name": "hosts-agent-log-stream-invalid-id",
+    "method": "GET",
+    "path": "/api/hosts/abc/agent/logs/stream?ticket=not-a-ticket"
+  },
+  {
+    "name": "hosts-list-anon",
+    "method": "GET",
+    "path": "/api/hosts",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-trailing-slash-anon",
+    "method": "GET",
+    "path": "/api/hosts/",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-nonadmin-without-mine",
+    "method": "GET",
+    "path": "/api/hosts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-nonadmin-mine",
+    "method": "GET",
+    "path": "/api/hosts?mine=true",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-admin-scope-official",
+    "method": "GET",
+    "path": "/api/hosts?scope=official",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-admin-scope-mine",
+    "method": "GET",
+    "path": "/api/hosts?scope=mine",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-search",
+    "method": "GET",
+    "path": "/api/hosts?search=parity-host",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-search-no-match",
+    "method": "GET",
+    "path": "/api/hosts?search=zzz-no-such-host",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-invalid-page",
+    "method": "GET",
+    "path": "/api/hosts?page=abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-invalid-page-size",
+    "method": "GET",
+    "path": "/api/hosts?pageSize=0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-page-size-clamped",
+    "method": "GET",
+    "path": "/api/hosts?pageSize=500",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-list-page-two",
+    "method": "GET",
+    "path": "/api/hosts?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-detail-anon",
+    "method": "GET",
+    "path": "/api/hosts/900001"
+  },
+  {
+    "name": "hosts-detail-invalid-id",
+    "method": "GET",
+    "path": "/api/hosts/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-detail-zero-id",
+    "method": "GET",
+    "path": "/api/hosts/0",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-detail-not-found",
+    "method": "GET",
+    "path": "/api/hosts/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-detail-online",
+    "method": "GET",
+    "path": "/api/hosts/900001",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-detail-maintenance",
+    "method": "GET",
+    "path": "/api/hosts/900003",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-detail-nonadmin",
+    "method": "GET",
+    "path": "/api/hosts/900001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-anon",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {
+      "location": "x"
+    }
+  },
+  {
+    "name": "hosts-update-empty-body",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-invalid-country",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {
+      "countryCode": "usa"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-invalid-traffic-reset-day",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {
+      "trafficResetDay": 29
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-announcement-too-long",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {
+      "announcement": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-name-too-short",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {
+      "name": "x"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-invalid-instance-type",
+    "method": "PATCH",
+    "path": "/api/hosts/900001",
+    "body": {
+      "instanceType": "docker"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-not-found",
+    "method": "PATCH",
+    "path": "/api/hosts/999999",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-update-invalid-id",
+    "method": "PATCH",
+    "path": "/api/hosts/abc",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-maintenance-missing-enabled",
+    "method": "POST",
+    "path": "/api/hosts/900001/maintenance",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-maintenance-bad-type",
+    "method": "POST",
+    "path": "/api/hosts/900001/maintenance",
+    "body": {
+      "enabled": "yes"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-maintenance-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/maintenance",
+    "body": {
+      "enabled": true
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-sync-anon",
+    "method": "POST",
+    "path": "/api/hosts/900001/sync",
+    "body": {}
+  },
+  {
+    "name": "hosts-sync-no-tunnel",
+    "method": "POST",
+    "path": "/api/hosts/900001/sync",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-sync-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/sync",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-verify-no-tunnel",
+    "method": "POST",
+    "path": "/api/hosts/900001/verify",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-verify-invalid-id",
+    "method": "POST",
+    "path": "/api/hosts/-1/verify",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-test-no-tunnel",
+    "method": "POST",
+    "path": "/api/hosts/900001/test",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-test-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/test",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-regenerate-install-anon",
+    "method": "POST",
+    "path": "/api/hosts/900001/regenerate-install",
+    "body": {}
+  },
+  {
+    "name": "hosts-regenerate-install-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/regenerate-install",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-images-get",
+    "method": "GET",
+    "path": "/api/hosts/900001/images",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-images-get-not-found",
+    "method": "GET",
+    "path": "/api/hosts/999999/images",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-images-put-missing-use-default",
+    "method": "PUT",
+    "path": "/api/hosts/900001/images",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-images-put-bad-type",
+    "method": "PUT",
+    "path": "/api/hosts/900001/images",
+    "body": {
+      "useDefault": "yes"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-images-put-bad-image-id",
+    "method": "PUT",
+    "path": "/api/hosts/900001/images",
+    "body": {
+      "useDefault": true,
+      "imageIds": [
+        "abc"
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-plans",
+    "method": "GET",
+    "path": "/api/hosts/900001/plans",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-plans-not-found",
+    "method": "GET",
+    "path": "/api/hosts/999999/plans",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-plans-nonadmin",
+    "method": "GET",
+    "path": "/api/hosts/900001/plans",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-users-lookup-missing-username",
+    "method": "GET",
+    "path": "/api/hosts/900001/users/lookup",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-users-lookup-unknown",
+    "method": "GET",
+    "path": "/api/hosts/900001/users/lookup?username=no-such-user",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-users-lookup-ok",
+    "method": "GET",
+    "path": "/api/hosts/900001/users/lookup?username=admin",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-extend-all-anon",
+    "method": "POST",
+    "path": "/api/hosts/900001/extend-all",
+    "body": {
+      "days": 1
+    }
+  },
+  {
+    "name": "hosts-extend-all-nonadmin",
+    "method": "POST",
+    "path": "/api/hosts/900001/extend-all",
+    "body": {
+      "days": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-extend-all-invalid-days",
+    "method": "POST",
+    "path": "/api/hosts/900001/extend-all",
+    "body": {
+      "days": 0
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-extend-all-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/extend-all",
+    "body": {
+      "days": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-gift-days-invalid-days",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/gift-days",
+    "body": {
+      "instanceIds": [
+        999999
+      ],
+      "days": 0
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-gift-days-empty-ids",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/gift-days",
+    "body": {
+      "instanceIds": [],
+      "days": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-gift-days-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/instances/gift-days",
+    "body": {
+      "instanceIds": [
+        999999
+      ],
+      "days": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-renewal-price-missing",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/instances/999999/renewal-price",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-renewal-price-not-number",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/instances/999999/renewal-price",
+    "body": {
+      "newPrice": "abc"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-renewal-price-invalid-id",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/instances/abc/renewal-price",
+    "body": {
+      "newPrice": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-batch-delete-preview-missing-ids",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/batch-delete-preview",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-batch-delete-preview-empty-ids",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/batch-delete-preview",
+    "body": {
+      "instanceIds": []
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-batch-delete-preview-bad-ids",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/batch-delete-preview",
+    "body": {
+      "instanceIds": [
+        "x"
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-batch-delete-preview-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/instances/batch-delete-preview",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-batch-delete-anon",
+    "method": "DELETE",
+    "path": "/api/hosts/900001/instances/batch",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    }
+  },
+  {
+    "name": "hosts-batch-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/hosts/abc/instances/batch",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-suspend-invalid-body",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/suspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-suspend-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/instances/suspend",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-unsuspend-invalid-body",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/unsuspend",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-unsuspend-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/instances/unsuspend",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-sync-status-invalid-body",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/sync-status",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-sync-status-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/instances/sync-status",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-sync-status-no-instances",
+    "method": "POST",
+    "path": "/api/hosts/900001/instances/sync-status",
+    "body": {
+      "instanceIds": [
+        999999
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-recalculate-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/recalculate-resources",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-recalculate-ok",
+    "method": "POST",
+    "path": "/api/hosts/900001/recalculate-resources",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-public-ipv4-pools",
+    "method": "GET",
+    "path": "/api/hosts/900001/public-ipv4/pools",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-public-ipv4-pools-not-found",
+    "method": "GET",
+    "path": "/api/hosts/999999/public-ipv4/pools",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-public-ipv4-pool-create-missing",
+    "method": "POST",
+    "path": "/api/hosts/900001/public-ipv4/pools",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-public-ipv4-addresses-bad-pool",
+    "method": "POST",
+    "path": "/api/hosts/900001/public-ipv4/pools/abc/addresses",
+    "body": {
+      "addresses": [
+        "203.0.113.50"
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-public-ipv4-address-status-invalid",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/public-ipv4/addresses/1",
+    "body": {
+      "status": "assigned"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-public-ipv4-address-delete-unknown",
+    "method": "DELETE",
+    "path": "/api/hosts/900001/public-ipv4/addresses/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-caddy-status",
+    "method": "GET",
+    "path": "/api/hosts/900001/caddy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-caddy-status-not-found",
+    "method": "GET",
+    "path": "/api/hosts/999999/caddy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-caddy-sites",
+    "method": "GET",
+    "path": "/api/hosts/900001/caddy/sites",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-caddy-sites-paged",
+    "method": "GET",
+    "path": "/api/hosts/900001/caddy/sites?page=2&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-caddy-install-agent-offline",
+    "method": "POST",
+    "path": "/api/hosts/900001/caddy/install",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-caddy-uninstall-not-installed",
+    "method": "POST",
+    "path": "/api/hosts/900001/caddy/uninstall",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-agent-ticket-anon",
+    "method": "POST",
+    "path": "/api/hosts/900001/agent/logs/ticket",
+    "body": {}
+  },
+  {
+    "name": "hosts-agent-ticket-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/agent/logs/ticket",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-agent-ticket-ok",
+    "method": "POST",
+    "path": "/api/hosts/900001/agent/logs/ticket",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "hosts-audit-rules",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/audit/rules",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-rules-not-found",
+    "method": "GET",
+    "path": "/api/hosts/999999/ops/audit/rules",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-ignores",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/audit/ignores",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-ignores-invalid-instance",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/audit/ignores?instanceId=abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-history",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/audit/history",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-history-bad-page-size",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/audit/history?pageSize=abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-rules-create-missing-pattern",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/audit/rules",
+    "body": {
+      "name": "parity rule"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-rules-create-name-too-short",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/audit/rules",
+    "body": {
+      "name": "x",
+      "pattern": "abc"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-builtin-unknown",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/ops/audit/builtin-rules/no-such-rule",
+    "body": {
+      "severity": "low"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-builtin-bad-severity",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/ops/audit/builtin-rules/miner",
+    "body": {
+      "severity": "critical"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-builtin-reset-unknown",
+    "method": "DELETE",
+    "path": "/api/hosts/900001/ops/audit/builtin-rules/no-such-rule",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-ignore-create-missing",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/audit/ignores",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-audit-ignore-delete-unknown",
+    "method": "DELETE",
+    "path": "/api/hosts/900001/ops/audit/ignores/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-preview-not-found",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/preview",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-preview-invalid-id",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/abc/preview",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-ssh-keys-not-found",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/instances/999999/ssh-keys",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-init-commands-not-found",
+    "method": "GET",
+    "path": "/api/hosts/900001/ops/instances/999999/init-commands",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-sync-not-found",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/sync",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-restart-not-found",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/restart",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-restart-bad-force",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/restart",
+    "body": {
+      "force": "yes"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-dangerous-missing",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/dangerous-action",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-dangerous-not-found",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/dangerous-action",
+    "body": {
+      "action": "rebuild",
+      "imageAlias": "debian",
+      "confirmationText": "x",
+      "riskConfirmed": true
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-audit-scan-invalid-id",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/abc/audit/scan",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-audit-scan-not-found",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/audit/scan",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-kill-process-missing",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/audit/kill-process",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-kill-process-bad-pid",
+    "method": "POST",
+    "path": "/api/hosts/900001/ops/instances/999999/audit/kill-process",
+    "body": {
+      "pid": 1,
+      "reason": "parity",
+      "confirmationText": "x"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-discover-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/ops/discover",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-baseline-sync-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/ops/baseline-sync",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-network-repair-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/ops/network-repair",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-ops-optimize-port-mappings-not-found",
+    "method": "POST",
+    "path": "/api/hosts/999999/ops/optimize-port-mappings",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-delete-anon",
+    "method": "DELETE",
+    "path": "/api/hosts/900002"
+  },
+  {
+    "name": "hosts-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/hosts/abc",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/hosts/999999",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "hosts-delete-nonadmin",
+    "method": "DELETE",
+    "path": "/api/hosts/900002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "hosts-create-anon",
+    "method": "POST",
+    "path": "/api/hosts",
+    "body": {
+      "name": "parity-created",
+      "url": "https://127.0.0.1:1"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-create-missing-name",
+    "method": "POST",
+    "path": "/api/hosts",
+    "body": {
+      "url": "https://127.0.0.1:1"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-create-name-too-short",
+    "method": "POST",
+    "path": "/api/hosts",
+    "body": {
+      "name": "x",
+      "url": "https://127.0.0.1:1"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-create-bad-country",
+    "method": "POST",
+    "path": "/api/hosts",
+    "body": {
+      "name": "parity-created",
+      "url": "https://127.0.0.1:1",
+      "countryCode": "usa"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-create-nonadmin-prefix",
+    "method": "POST",
+    "path": "/api/hosts",
+    "body": {
+      "name": "parity-created",
+      "url": "https://127.0.0.1:1"
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  }
+]
