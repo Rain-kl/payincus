@@ -256,15 +256,11 @@ func (c *IncusClient) wrapConnectError(err error) error {
 	return fmt.Errorf("无法连接到 Incus: %s", message)
 }
 
-// buildTransport mirrors the three branches of connect() minus the tunnel one.
+// buildTransport mirrors the three branches of connect(): pinned, tunnelled and
+// direct mTLS (in that order).
 func (c *IncusClient) buildTransport() (*http.Transport, error) {
 	if c.certPath == "" || c.keyPath == "" {
 		return nil, errors.New("Certificate or key path is missing")
-	}
-
-	// The tunnel branch depends on hostTunnelManager (WebSocket wave).
-	if c.options.TunnelEnabled && c.options.HostID != 0 {
-		return nil, errors.New("宿主机内网穿透通道未移植，请等待节点隧道模块")
 	}
 
 	certificate, err := tls.LoadX509KeyPair(c.certPath, c.keyPath)
@@ -290,6 +286,9 @@ func (c *IncusClient) buildTransport() (*http.Transport, error) {
 	// wired through DialNodePinned (lib/node_security_transport.go), which validates
 	// the pin before dialling, refuses https-less URLs and compares the leaf
 	// certificate's sha256 in constant time.
+	//
+	// Branch order mirrors connect() in incus-client.ts: the pin wins over the
+	// tunnel, so a pinned node is never reached through an unpinned path.
 	if fingerprint := strings.TrimSpace(c.options.ServerFingerprint); fingerprint != "" {
 		if !nodePinnedFingerprintPattern.MatchString(fingerprint) {
 			return nil, ErrNodeInvalidIdentity
@@ -299,15 +298,50 @@ func (c *IncusClient) buildTransport() (*http.Transport, error) {
 			return nil, ErrNodeTLSRequired
 		}
 		expected := fingerprint
+		credentials := NodePinnedCredentials{Certificate: certificate}
+		// tls.connect({ socket: createDuplexStream(...) }) in the TypeScript: a
+		// pinned node that is only reachable through the agent tunnel. The pin is
+		// still verified on top of the tunnelled stream.
+		if c.options.TunnelEnabled && c.options.HostID > 0 {
+			credentials.Dial = c.tunnelDialer()
+		}
 
 		transport.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return DialNodePinned(ctx, c.baseURL, expected, NodePinnedCredentials{Certificate: certificate})
+			return DialNodePinned(ctx, c.baseURL, expected, credentials)
 		}
 		// The pin replaces the PKI, so the dial target is derived from baseURL inside
 		// DialNodePinned rather than from the transport's address argument.
+		return transport, nil
+	}
+
+	// Tunnel branch: the node is only reachable through its agent's WebSocket
+	// tunnel, so the TCP dial is replaced by a duplex stream to the node's local
+	// Incus endpoint. TLS runs on top via the transport's TLSClientConfig, which is
+	// what tls.connect({ socket, cert, key }) does in the TypeScript.
+	if c.options.TunnelEnabled && c.options.HostID != 0 {
+		hostID := int32(c.options.HostID)
+		manager := TunnelManagerInstance()
+		if !manager.IsTunnelOnline(hostID) {
+			return nil, errors.New("宿主机内网穿透通道未连接（Agent 离线），无法连接到 Incus API")
+		}
+		transport.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return manager.CreateDuplexStream(hostID, c.options.TargetHost, c.options.TargetPort)
+		}
 	}
 
 	return transport, nil
+}
+
+// tunnelDialer returns a dial function that opens a duplex stream through the host
+// agent tunnel. It is used by both the pinned and the plain tunnel branches.
+func (c *IncusClient) tunnelDialer() func(ctx context.Context) (net.Conn, error) {
+	hostID := int32(c.options.HostID)
+	targetHost := c.options.TargetHost
+	targetPort := c.options.TargetPort
+	manager := TunnelManagerInstance()
+	return func(ctx context.Context) (net.Conn, error) {
+		return manager.CreateDuplexStream(hostID, targetHost, targetPort)
+	}
 }
 
 // Request mirrors `request(method, path, body, timeout, signal, errorBody)`.

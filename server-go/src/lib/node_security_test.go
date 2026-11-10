@@ -1,10 +1,22 @@
 package lib
 
 import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
+	"errors"
+	"fmt"
+	"math/big"
+	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 // testVaultSecret is a >=32 char secret so nodeStorageMaster accepts it.
@@ -219,5 +231,92 @@ func TestConstantTimeHexEqual(t *testing.T) {
 	}
 	if constantTimeHexEqual(left, strings.Repeat("ab", 31)) {
 		t.Fatal("length mismatch must not compare equal")
+	}
+}
+
+// testSelfSignedCertificate builds a throwaway leaf certificate for the TLS
+// tests below. It returns the certificate (usable as both the server and the
+// client half) together with its sha256 fingerprint.
+func testSelfSignedCertificate(t *testing.T) (tls.Certificate, string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "example.test"},
+		DNSNames:     []string{"example.test"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("create certificate: %v", err)
+	}
+	sum := sha256.Sum256(der)
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}, fmt.Sprintf("%x", sum)
+}
+
+// TestDialNodePinnedOverCustomDial covers the tunnel path: a pinned node whose
+// byte stream comes from a caller-supplied dialer (the host agent tunnel) must
+// still complete TLS and verify the pin before the connection is handed back.
+func TestDialNodePinnedOverCustomDial(t *testing.T) {
+	certificate, fingerprint := testSelfSignedCertificate(t)
+	serverConfig := &tls.Config{Certificates: []tls.Certificate{certificate}}
+
+	clientConn, serverConn := net.Pipe()
+	defer func() { _ = clientConn.Close() }()
+	go func() {
+		server := tls.Server(serverConn, serverConfig)
+		_ = server.Handshake()
+	}()
+
+	dial := func(context.Context) (net.Conn, error) { return clientConn, nil }
+	_, err := DialNodePinned(t.Context(), "https://example.test:8443", fingerprint,
+		NodePinnedCredentials{Certificate: certificate, Dial: dial})
+	if err != nil {
+		t.Fatalf("tunnelled pinned dial failed: %v", err)
+	}
+	// Close the raw pipe, not the tls.Conn: tls.Conn.Close writes close_notify,
+	// which would block on an unread net.Pipe until the deadline.
+	_ = clientConn.Close()
+}
+
+// TestDialNodePinnedOverCustomDialRejectsMismatch proves the pin is still checked
+// on the tunnel path: a different certificate must not be accepted.
+func TestDialNodePinnedOverCustomDialRejectsMismatch(t *testing.T) {
+	certificate, _ := testSelfSignedCertificate(t)
+	_, otherFingerprint := testSelfSignedCertificate(t)
+	serverConfig := &tls.Config{Certificates: []tls.Certificate{certificate}}
+
+	clientConn, serverConn := net.Pipe()
+	defer func() { _ = clientConn.Close() }()
+	go func() {
+		server := tls.Server(serverConn, serverConfig)
+		_ = server.Handshake()
+	}()
+
+	_, err := DialNodePinned(t.Context(), "https://example.test:8443", otherFingerprint,
+		NodePinnedCredentials{Certificate: certificate, Dial: func(context.Context) (net.Conn, error) {
+			return clientConn, nil
+		}})
+	if !errors.Is(err, ErrNodeIdentityMismatch) {
+		t.Fatalf("expected ErrNodeIdentityMismatch, got %v", err)
+	}
+}
+
+// TestDialNodePinnedReportsDialFailure proves a failing tunnel dial surfaces as a
+// connection failure, never as an accepted connection.
+func TestDialNodePinnedReportsDialFailure(t *testing.T) {
+	_, fingerprint := testSelfSignedCertificate(t)
+	_, err := DialNodePinned(t.Context(), "https://example.test:8443", fingerprint,
+		NodePinnedCredentials{Dial: func(context.Context) (net.Conn, error) {
+			return nil, errors.New("tunnel offline")
+		}})
+	if !errors.Is(err, ErrNodeConnectFailed) {
+		t.Fatalf("expected ErrNodeConnectFailed, got %v", err)
 	}
 }

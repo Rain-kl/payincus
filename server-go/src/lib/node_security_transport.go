@@ -48,9 +48,17 @@ var (
 	ErrNodeIdentityMismatch = errors.New("Node identity mismatch")
 )
 
-// NodePinnedCredentials is a loaded client certificate pair.
+// NodePinnedCredentials is a loaded client certificate pair, optionally paired
+// with a custom byte stream to the node.
 type NodePinnedCredentials struct {
 	Certificate tls.Certificate
+	// Dial, when set, supplies the pre-TLS connection to the node. It exists for
+	// hosts reached through the agent tunnel: the TypeScript passes
+	// `{ socket: hostTunnelManager.createDuplexStream(...) }` to tls.connect, so a
+	// pinned node can be tunnelled too. The fingerprint is still verified before
+	// the connection is returned, so a tunnelled node is never trusted more than a
+	// directly dialled one.
+	Dial func(ctx context.Context) (net.Conn, error)
 }
 
 // DialNodePinned opens a TLS connection to the node and verifies its leaf
@@ -101,12 +109,38 @@ func DialNodePinned(
 	}
 
 	dialer := &net.Dialer{Timeout: nodePinnedDialTimeout}
-	connection, err := tls.DialWithDialer(dialer, "tcp", net.JoinHostPort(host, port), tlsConfig)
-	if err != nil {
-		if isTimeout(err) {
-			return nil, ErrNodeConnectTimeout
+
+	var connection *tls.Conn
+	if credentials.Dial != nil {
+		// Tunnelled node: the byte stream comes from the host agent, then TLS and
+		// the pin run on top exactly as for a direct dial.
+		raw, err := credentials.Dial(ctx)
+		if err != nil {
+			if isTimeout(err) {
+				return nil, ErrNodeConnectTimeout
+			}
+			return nil, ErrNodeConnectFailed
 		}
-		return nil, ErrNodeConnectFailed
+		connection = tls.Client(raw, tlsConfig)
+		// tls.connect() in the TypeScript is bounded by socket.setTimeout(10s).
+		_ = raw.SetDeadline(time.Now().UTC().Add(nodePinnedDialTimeout))
+		if err := connection.HandshakeContext(ctx); err != nil {
+			_ = connection.Close()
+			if isTimeout(err) {
+				return nil, ErrNodeConnectTimeout
+			}
+			return nil, ErrNodeConnectFailed
+		}
+		_ = connection.SetDeadline(time.Time{})
+	} else {
+		var err error
+		connection, err = tls.DialWithDialer(dialer, "tcp", net.JoinHostPort(host, port), tlsConfig)
+		if err != nil {
+			if isTimeout(err) {
+				return nil, ErrNodeConnectTimeout
+			}
+			return nil, ErrNodeConnectFailed
+		}
 	}
 
 	state := connection.ConnectionState()
