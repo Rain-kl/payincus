@@ -467,7 +467,7 @@ func prepareRedeemCodeBatchDelete(decoded any) (ids []int64, validationMessage, 
 // neither its owner nor an admin. It returns the host name and whether the handler
 // may continue.
 func redeemCodeHostAccess(c *gin.Context, hostID int64, userID int32, role string) (string, bool) {
-	host, err := db.GetRedeemCodeHostByID(c.Request.Context(), hostID)
+	host, err := db.HostsGetByID(c.Request.Context(), int32(hostID))
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return "", false

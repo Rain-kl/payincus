@@ -1506,4 +1506,12 @@ func init() {
 	StorageCapacityTunnelIsOnline = func(hostID int32) bool {
 		return TunnelManagerInstance().IsTunnelOnline(hostID)
 	}
+
+	// Instance creation validates package egress inside its own pgx transaction
+	// (db cannot import lib), so db exposes the capability check as a variable.
+	// Until it is set, a non-'host' egress mode is refused rather than bound
+	// without a node that can enforce it.
+	db.InstanceEgressHostSupportsControl = func(hostID int32, capability string) bool {
+		return EgressPackageTunnelSupportsControl(hostID, capability)
+	}
 }

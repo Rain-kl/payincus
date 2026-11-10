@@ -1094,25 +1094,6 @@ func IsInstanceBelongsToHost(ctx context.Context, instanceID, hostID int64) (boo
 	return count > 0, nil
 }
 
-// GetRedeemCodeHostByID is the stand-in for db/hosts.ts' getHostById (that module
-// is not ported yet). Only the three columns the redeem-code routes need are
-// selected. It is deliberately named after this module so it cannot collide with a
-// future db.GetHostByID.
-func GetRedeemCodeHostByID(ctx context.Context, hostID int64) (*models.Host, error) {
-	var hosts []models.Host
-	if err := DB.WithContext(ctx).
-		Select("id", "name", "user_id").
-		Where("id = ?", hostID).
-		Limit(1).
-		Find(&hosts).Error; err != nil {
-		return nil, err
-	}
-	if len(hosts) == 0 {
-		return nil, nil
-	}
-	return &hosts[0], nil
-}
-
 // ==================== helpers ====================
 
 // redeemCodeISOTime mirrors Date.prototype.toISOString().
