@@ -288,7 +288,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 2. [x] `mail`（2361）— 97/97 对拍（含全新库复现），域名验证失败不落 verified、4109 订阅锁、上游失败不扣额度均有 DB 级测试；发现 Node 的 `throw apiError(...)` 在 handler 里实际返回 500 而非 400，已按真实行为复刻
 3. [x] `auth`（1436）— 49/49 对拍；四条反向测试齐备；挖出并修掉两个运行时 bug（注册漏写 `updated_at`、GORM 的 `sql.ErrNoRows` 被当成 error）
 4. [x] `system-config`（941）— 49/49 对拍，脱敏/缓存失效/AJV 语义均有单测；挖出 `UpdateSystemConfigs` 的 RowsAffected 分歧（见「已知待办」）
-5. [ ] `hosts`（7987）— 最大单体；含节点健康、隧道控制面
+5. [x] `hosts`（7987）— 65 条声明 + 2 个别名，143/143 对拍；通配符必须是 `:hostId`（同位置已有别模块占用）；Incus 触达路径**故意不进对拍**（两端错误文案必然不同，见「已知待办」）
 6. [ ] `packages`（2873）— 依赖 hosts
 7. [ ] `instances`（6894）— 依赖 hosts + packages + 计费
 8. [ ] `instance-billing`（1080）
@@ -315,6 +315,10 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 - [x] `db.GetRedeemCodeHostByID` 已删除，`routes/redeem_codes.go` 改用 `db.HostsGetByID`（verification-redeem 59/59 复验）
 - [ ] 存储适配器（`StorageFactory` + 4 provider）→ `routes.StorageConnectionTester` 钩子仍在显式失败
 - [ ] **包出站绑定有两份等价实现**：`db.instancesBindPackageEgress`（pgx.Tx，实例创建同事务必需）与 `lib.BindPackageEgress`（*gorm.DB，packages 路由用）。逐行语义已核对一致，但两份会漂移；后续按 advisory-lock 的做法收敛为一份内核 + 两个适配器。
+- [ ] **hosts 路由的 11 个显式 501 seam**（`SEAM_UNAVAILABLE`，绝不伪装成功）：存储池 CRUD（`lib/storage/*`）、agent 安装令牌（`lib/host-agent-credentials`）、托管实例开通（`lib/managed-instance-provision`）、迁移执行器、批量删除、退款计算（等 instance-billing 接线）、审计执行器（`lib/instance-audit`）、`lib/incus#stopInstance`、Caddy 安装标志（`routes/agent.ts` 的两个 Set）、agent 日志 SSE、网络同步应用器。Wave E 接线后逐个替换。
+- [ ] **incus 触达路径的两端错误文案天然不同**（Node axios `connect ECONNREFUSED` vs Go `dial tcp …: connection refused`），因此这类用例**不得**进对拍；若要验证，只能在真机或统一错误归一化后做。
+- [ ] **host 地址注册表未移植**（`services/host-address-monitor.ts`）：同 IP 被两台宿主占用目前不会被拒绝（别名/冲突表 inert）。
+- [ ] hosts 的 SSE 票据是**进程内有状态单次票据**，Node 是无状态 HMAC action-ticket；可观察语义一致（单次/60s/绑 host），但格式不同，对拍只能比状态码。
 - [x] 隧道能力 seam 已接线：`db.InstanceEgressHostSupportsControl` 指向 `lib.EgressPackageTunnelSupportsControl`（此前 nil = 非 host 模式直接 fail closed）。
 - [ ] **`db.UpdateSystemConfigs` 忽略 `RowsAffected`（真实分歧，由 system-config 对拍挖出）**：Node 的 `prisma.systemConfig.update` 在行不存在时抛 P2025 → 500 且整事务回滚；Go 版静默返回成功。可达路径是白名单里从未 seed 的 `aff_commission_rate` / `aff_discount_rate`。修法二选一：函数返回"行不存在"错误，或写前 upsert 建行（需先确认 Node 期望值是 500）。
 - [ ] `routes.SystemConfigAvailableMailOffering` seam → mail 模块落地后指向 `db.MailHasAvailableOffering`（system-config 目前用同一条 SQL 的本地副本）。
