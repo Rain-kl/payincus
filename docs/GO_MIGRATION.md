@@ -299,11 +299,14 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 8. [ ] `instance-billing`（1080）
 9. [ ] `instance-destroy`（1337）
 10. [ ] `backups`（1467）
-11. [ ] `recharge`（3027）— 支付
-12. [ ] `admin-billing`（4786）— 支付/退款/对账
-13. [ ] `public-api`（2396）— `pat_`/`poa_` 鉴权面
-14. [ ] `agent`（1042）— host agent HMAC 鉴权面
+11. [x] `recharge`（3027）— 支付；73/73 对拍，三种回调验签/幂等/金额校验有 DB 级测试
+12. [ ] `admin-billing`（4786）— 支付/退款/对账（进行中）
+13. [x] `public-api`（2396）— `pat_`/`poa_` 鉴权面；131/131 对拍，scope 矩阵双向测试
+14. [ ] `agent`（1042）— host agent HMAC 鉴权面（进行中）
 15. [ ] `system-update`（275）— OTA
+16. [ ] `oauth`（748）— `/api/oauth` 10 条路由 + **一次性 OAuth state nonce 与登录码**（spec §3.5 的实际归属，auth.ts 不涉及）
+
+> **机械核对（2026-11-11）**：用「TS 路由文件名 → Go 路由文件名」逐文件比对，当前 **57 个已存在 / 8 个缺失**：`admin-billing`、`admin-incus-ui`、`agent`、`oauth`、`spice`、`system-update`、`terminal`、`transfers`。此前的手工清单漏掉了 `oauth`，已补入。后续每次收尾都用这条脚本复核，避免"以为做完了"。
 
 ### Wave E — 长连接与运行时（Phase 7）
 
