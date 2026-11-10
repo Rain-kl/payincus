@@ -14,12 +14,12 @@
 //     ipAddress. Go marshals struct fields in declaration order, so the structs
 //     here are declared in exactly that order; do not "tidy" them.
 //
-// The VM generator (server/src/lib/incus-config-vm.ts, 656 lines) is NOT ported:
-// it depends on lib/vm-network-identifiers.ts for the deterministic MAC derivation,
-// which is a separate module. The router still routes, but the VM branch fails
-// loudly instead of silently returning a container payload. Note that the
-// TypeScript router also drops `instanceIdSeed` when building the VM params; the
-// seam signature mirrors the router's params, not the VM module's.
+// The VM generator lives in incus_config_vm.go and installs itself into
+// IncusConfigGenerateVMFunc from init(), so the VM branch is real. The variable is
+// kept so tests can force the seam back to a failing stub — a VM must never
+// silently receive a container payload. Note that the TypeScript router drops
+// `instanceIdSeed` when building the VM params; the seam signature mirrors the
+// router's params, not the VM module's.
 package lib
 
 import (
@@ -139,10 +139,11 @@ var (
 	ErrIncusConfigMissingParams = errors.New("Missing params")
 	// ErrIncusConfigInvalidSSHKey mirrors `throw new Error('Invalid SSH Key')`.
 	ErrIncusConfigInvalidSSHKey = errors.New("Invalid SSH Key")
-	// ErrIncusConfigVMGeneratorMissing is returned by the VM branch until
-	// server/src/lib/incus-config-vm.ts (and vm-network-identifiers.ts) is ported.
-	// It is deliberately loud: a VM must never receive a container payload.
-	ErrIncusConfigVMGeneratorMissing = errors.New("lib/incus-config-vm.ts 尚未移植：generateVmConfig 依赖 vm-network-identifiers.ts 的确定性 MAC 派生")
+	// ErrIncusConfigVMGeneratorMissing is what the VM branch answers when the
+	// generator seam is nil (tests do this on purpose; production wires it in
+	// incus_config_vm.go's init). It is deliberately loud: a VM must never receive
+	// a container payload.
+	ErrIncusConfigVMGeneratorMissing = errors.New("VM 配置生成器未接线：IncusConfigGenerateVMFunc 为 nil")
 )
 
 // IncusConfigGenerateVMFunc is the VM generator seam. It is a variable so a future
