@@ -1,0 +1,735 @@
+[
+  {
+    "name": "backups-list-anon",
+    "method": "GET",
+    "path": "/api/instances/940001/backups"
+  },
+  {
+    "name": "backups-policy-get-anon",
+    "method": "GET",
+    "path": "/api/instances/940001/backup-policy"
+  },
+  {
+    "name": "backups-delete-anon",
+    "method": "DELETE",
+    "path": "/api/instances/940001/backups/940001"
+  },
+  {
+    "name": "backups-restore-create-anon",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/940001",
+    "body": {},
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  {
+    "name": "backups-restore-get-anon",
+    "method": "GET",
+    "path": "/api/instances/940001/restore/940001"
+  },
+  {
+    "name": "backups-restore-cancel-anon",
+    "method": "DELETE",
+    "path": "/api/instances/940001/restore/940001"
+  },
+  {
+    "name": "backups-upload-remote-anon",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940001/upload-remote",
+    "body": {},
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  {
+    "name": "backups-upload-task-get-anon",
+    "method": "GET",
+    "path": "/api/instances/940001/upload-tasks/940001"
+  },
+  {
+    "name": "backups-upload-active-anon",
+    "method": "GET",
+    "path": "/api/instances/940001/upload-tasks/active"
+  },
+  {
+    "name": "backups-export-status-anon",
+    "method": "GET",
+    "path": "/api/instances/940001/backups/export/unknown/status"
+  },
+  {
+    "name": "backups-download-token-anon",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/export/unknown/download-token",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-list-invalid-id-zero",
+    "method": "GET",
+    "path": "/api/instances/0/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-invalid-id-leading-zero",
+    "method": "GET",
+    "path": "/api/instances/094001/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-invalid-id-text",
+    "method": "GET",
+    "path": "/api/instances/abc/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-invalid-id-negative",
+    "method": "GET",
+    "path": "/api/instances/-1/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-instance-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-owner",
+    "method": "GET",
+    "path": "/api/instances/940001/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-suspended-owner-empty",
+    "method": "GET",
+    "path": "/api/instances/940003/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-non-owner",
+    "method": "GET",
+    "path": "/api/instances/940002/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-list-admin-user-only",
+    "method": "GET",
+    "path": "/api/instances/940001/backups",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-create-suspended-expired",
+    "method": "POST",
+    "path": "/api/instances/940003/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "conformance"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-create-quota-full",
+    "method": "POST",
+    "path": "/api/instances/940001/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "conformance"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-create-quota-not-allocated",
+    "method": "POST",
+    "path": "/api/instances/940004/backups",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "conformance"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-delete-invalid-instance-id",
+    "method": "DELETE",
+    "path": "/api/instances/0/backups/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-delete-invalid-backup-id",
+    "method": "DELETE",
+    "path": "/api/instances/940001/backups/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-delete-instance-missing",
+    "method": "DELETE",
+    "path": "/api/instances/999999/backups/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-delete-non-owner",
+    "method": "DELETE",
+    "path": "/api/instances/940002/backups/940004",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-delete-backup-missing",
+    "method": "DELETE",
+    "path": "/api/instances/940001/backups/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-delete-backup-of-other-instance",
+    "method": "DELETE",
+    "path": "/api/instances/940001/backups/940004",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-delete-admin-user-only",
+    "method": "DELETE",
+    "path": "/api/instances/940001/backups/940001",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-get-seeded",
+    "method": "GET",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-get-non-owner",
+    "method": "GET",
+    "path": "/api/instances/940002/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-get-admin-user-only",
+    "method": "GET",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-get-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/0/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-get-instance-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-put-create-default",
+    "method": "PUT",
+    "path": "/api/instances/940004/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": false
+    }
+  },
+  {
+    "name": "backups-policy-get-created-default",
+    "method": "GET",
+    "path": "/api/instances/940004/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-policy-put-existing",
+    "method": "PUT",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": true,
+      "intervalMinutes": 360
+    }
+  },
+  {
+    "name": "backups-policy-put-enabled-without-quota",
+    "method": "PUT",
+    "path": "/api/instances/940004/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": true
+    }
+  },
+  {
+    "name": "backups-policy-put-missing-enabled",
+    "method": "PUT",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "intervalMinutes": 360
+    }
+  },
+  {
+    "name": "backups-policy-put-bad-enabled",
+    "method": "PUT",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": "yes"
+    }
+  },
+  {
+    "name": "backups-policy-put-bad-interval-enum",
+    "method": "PUT",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": true,
+      "intervalMinutes": 5
+    }
+  },
+  {
+    "name": "backups-policy-put-bad-interval-type",
+    "method": "PUT",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": true,
+      "intervalMinutes": 10.5
+    }
+  },
+  {
+    "name": "backups-policy-put-non-object-body",
+    "method": "PUT",
+    "path": "/api/instances/940001/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "backups-policy-put-invalid-id",
+    "method": "PUT",
+    "path": "/api/instances/0/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": false
+    }
+  },
+  {
+    "name": "backups-policy-put-instance-missing",
+    "method": "PUT",
+    "path": "/api/instances/999999/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": false
+    }
+  },
+  {
+    "name": "backups-policy-put-non-owner",
+    "method": "PUT",
+    "path": "/api/instances/940002/backup-policy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "enabled": false
+    }
+  },
+  {
+    "name": "backups-export-invalid-ids",
+    "method": "POST",
+    "path": "/api/instances/0/backups/940001/export",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-export-instance-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/backups/940001/export",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-export-non-owner",
+    "method": "POST",
+    "path": "/api/instances/940002/backups/940004/export",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-export-backup-missing",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/999999/export",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-export-not-ready",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940005/export",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-export-status-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/0/backups/export/unknown/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-export-status-instance-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/backups/export/unknown/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-export-status-non-owner",
+    "method": "GET",
+    "path": "/api/instances/940002/backups/export/unknown/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-export-status-task-missing",
+    "method": "GET",
+    "path": "/api/instances/940001/backups/export/unknown/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-export-status-admin-user-only",
+    "method": "GET",
+    "path": "/api/instances/940001/backups/export/unknown/status",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-download-token-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/0/backups/export/unknown/download-token",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-token-instance-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/backups/export/unknown/download-token",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-token-non-owner",
+    "method": "POST",
+    "path": "/api/instances/940002/backups/export/unknown/download-token",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-token-task-missing",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/export/unknown/download-token",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-token-admin-not-owner",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/export/unknown/download-token",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-token-required",
+    "method": "GET",
+    "path": "/api/instances/940001/backups/export/unknown/download",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-token-invalid",
+    "method": "GET",
+    "path": "/api/instances/940001/backups/export/unknown/download?dt=bogus",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-download-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/0/backups/export/unknown/download?dt=bogus",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "backups-restore-create-invalid-ids",
+    "method": "POST",
+    "path": "/api/instances/0/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-restore-create-bad-backup-id",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-restore-create-instance-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-restore-create-non-owner",
+    "method": "POST",
+    "path": "/api/instances/940002/restore/940004",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-restore-create-backup-missing",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-restore-create-not-ready",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/940005",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-restore-create-non-object-body",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "backups-restore-get-completed",
+    "method": "GET",
+    "path": "/api/instances/940001/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-get-failed",
+    "method": "GET",
+    "path": "/api/instances/940001/restore/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-get-task-missing",
+    "method": "GET",
+    "path": "/api/instances/940001/restore/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-get-wrong-instance",
+    "method": "GET",
+    "path": "/api/instances/940004/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-get-invalid-task-id",
+    "method": "GET",
+    "path": "/api/instances/940001/restore/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-get-admin-user-only",
+    "method": "GET",
+    "path": "/api/instances/940001/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-rollback-not-allowed",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/940001/rollback",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-rollback-task-missing",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/999999/rollback",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-rollback-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/940001/restore/abc/rollback",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-rollback-non-owner",
+    "method": "POST",
+    "path": "/api/instances/940002/restore/940001/rollback",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-cancel-completed",
+    "method": "DELETE",
+    "path": "/api/instances/940001/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-cancel-failed",
+    "method": "DELETE",
+    "path": "/api/instances/940001/restore/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-cancel-task-missing",
+    "method": "DELETE",
+    "path": "/api/instances/940001/restore/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-cancel-invalid-id",
+    "method": "DELETE",
+    "path": "/api/instances/940001/restore/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-restore-cancel-non-owner",
+    "method": "DELETE",
+    "path": "/api/instances/940002/restore/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-remote-invalid-ids",
+    "method": "POST",
+    "path": "/api/instances/0/backups/940001/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-upload-remote-instance-missing",
+    "method": "POST",
+    "path": "/api/instances/999999/backups/940001/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-upload-remote-non-owner",
+    "method": "POST",
+    "path": "/api/instances/940002/backups/940004/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-upload-remote-backup-missing",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940004/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-upload-remote-not-ready",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940005/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-upload-remote-storage-missing",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940001/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "storageConfigId": 999999
+    }
+  },
+  {
+    "name": "backups-upload-remote-bad-storage-id",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940001/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "storageConfigId": 1.5
+    }
+  },
+  {
+    "name": "backups-upload-remote-non-object-body",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940001/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": []
+  },
+  {
+    "name": "backups-upload-remote-admin-user-only",
+    "method": "POST",
+    "path": "/api/instances/940001/backups/940001/upload-remote",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "backups-upload-task-get-completed",
+    "method": "GET",
+    "path": "/api/instances/940001/upload-tasks/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-task-get-missing",
+    "method": "GET",
+    "path": "/api/instances/940001/upload-tasks/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-task-get-wrong-instance",
+    "method": "GET",
+    "path": "/api/instances/940004/upload-tasks/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-task-get-non-owner",
+    "method": "GET",
+    "path": "/api/instances/940002/upload-tasks/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-task-get-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/940001/upload-tasks/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-task-get-admin-user-only",
+    "method": "GET",
+    "path": "/api/instances/940001/upload-tasks/940001",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-cancel-completed",
+    "method": "DELETE",
+    "path": "/api/instances/940001/upload-tasks/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-cancel-missing",
+    "method": "DELETE",
+    "path": "/api/instances/940001/upload-tasks/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-cancel-non-owner",
+    "method": "DELETE",
+    "path": "/api/instances/940002/upload-tasks/940002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-cancel-invalid-id",
+    "method": "DELETE",
+    "path": "/api/instances/0/upload-tasks/940001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-active-none",
+    "method": "GET",
+    "path": "/api/instances/940004/upload-tasks/active",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-active-non-owner",
+    "method": "GET",
+    "path": "/api/instances/940002/upload-tasks/active",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "backups-upload-active-instance-missing",
+    "method": "GET",
+    "path": "/api/instances/999999/upload-tasks/active",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  }
+]
