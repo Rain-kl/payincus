@@ -314,6 +314,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 - [x] `lib/operation_verification.go` 内的私有 advisory-lock 副本与 `db.AdvisoryTransactionLockString` 归一 —— 已改为调用 `db.AdvisoryTransactionLockStringTx`（GORM 事务 flavor），SQL 只保留一份
 - [x] `db.GetRedeemCodeHostByID` 已删除，`routes/redeem_codes.go` 改用 `db.HostsGetByID`（verification-redeem 59/59 复验）
 - [ ] 存储适配器（`StorageFactory` + 4 provider）→ `routes.StorageConnectionTester` 钩子仍在显式失败
+- [ ] **`packages.go` 的两处临时实现待收编**：`packagesDecrementUserQuotaUsed`（等 `db/quota-operations.go` 落地后删除，backups 正在移植）、`normalizePlanTrafficLimitSpeed`（等 `services/traffic-bandwidth.go` 落地后共用）。
 - [ ] **包出站绑定有两份等价实现**：`db.instancesBindPackageEgress`（pgx.Tx，实例创建同事务必需）与 `lib.BindPackageEgress`（*gorm.DB，packages 路由用）。逐行语义已核对一致，但两份会漂移；后续按 advisory-lock 的做法收敛为一份内核 + 两个适配器。
 - [ ] **hosts 路由的 11 个显式 501 seam**（`SEAM_UNAVAILABLE`，绝不伪装成功）：存储池 CRUD（`lib/storage/*`）、agent 安装令牌（`lib/host-agent-credentials`）、托管实例开通（`lib/managed-instance-provision`）、迁移执行器、批量删除、退款计算（等 instance-billing 接线）、审计执行器（`lib/instance-audit`）、`lib/incus#stopInstance`、Caddy 安装标志（`routes/agent.ts` 的两个 Set）、agent 日志 SSE、网络同步应用器。Wave E 接线后逐个替换。
 - [ ] **incus 触达路径的两端错误文案天然不同**（Node axios `connect ECONNREFUSED` vs Go `dial tcp …: connection refused`），因此这类用例**不得**进对拍；若要验证，只能在真机或统一错误归一化后做。
