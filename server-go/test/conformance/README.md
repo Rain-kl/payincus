@@ -22,6 +22,18 @@ user (`PARITY_USER_USER`, default `parityuser`, `role=user`) so admin-only 403
 paths are exercised for real instead of collapsing into 401-vs-401. Credentials
 come from the environment only — never commit them.
 
+`parity.sh` runs `test/conformance/seed` first, so the two identities exist even
+on a freshly migrated database (it only inserts missing rows; existing rows are
+never rewritten). For write-heavy modules, reset the database to a known state
+before a comparison run:
+
+```bash
+PARITY_DATABASE_URL=... ./test/conformance/reset-parity-db.sh
+```
+
+That drops and re-migrates the parity database, so both runs see identical
+tables. It refuses to run unless the database name contains `goparity`.
+
 The manual steps below are what the script automates; keep them for debugging a
 single case.
 

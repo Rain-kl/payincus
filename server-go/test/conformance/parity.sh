@@ -84,6 +84,14 @@ except Exception:
     print("")'
 }
 
+# --- Make sure both identities exist (a reset parity DB has none) ---
+( cd "$GODIR" && go run ./test/conformance/seed -dsn "$PARITY_DATABASE_URL" \
+    -admin-user "$ADMIN_USER" -admin-password "$ADMIN_PASS" \
+    -user-user "$USER_USER" -user-password "$USER_PASS" ) || {
+  echo "FATAL: could not seed the parity database; see the error above" >&2
+  exit 7
+}
+
 # --- Node reference server ---
 lsof -ti:$NODE_PORT | xargs -r kill -9 2>/dev/null
 ( cd "$REPO" && env "${common_env[@]}" PORT=$NODE_PORT \
