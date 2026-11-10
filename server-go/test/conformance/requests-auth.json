@@ -116,7 +116,8 @@
     "method": "POST",
     "path": "/api/auth/logout",
     "ignoreRateLimit": true,
-    "body": {}
+    "body": {},
+    "compareCookieAttrs": true
   },
   {
     "name": "auth-2fa-status-anon",

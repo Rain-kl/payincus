@@ -42,12 +42,19 @@ type requestCase struct {
 	// enforces per-route limits while Go does. Cases hitting a limited route must
 	// set this so the difference does not mask real parity failures.
 	IgnoreRateLimit bool `json:"ignoreRateLimit,omitempty"`
+	// CompareCookieAttrs diffs the Set-Cookie *attributes* (name, path, domain,
+	// httpOnly, secure, sameSite, maxAge) while ignoring the value, which is a
+	// fresh random token on every request. Use it for login/logout/refresh: those
+	// responses are usually body-skipped, so without this the cookie flags — the
+	// security-relevant part — are never compared at all.
+	CompareCookieAttrs bool `json:"compareCookieAttrs,omitempty"`
 }
 
 type response struct {
 	Status      int
 	ContentType string
 	Body        []byte
+	SetCookies  []string
 }
 
 func main() {
@@ -112,6 +119,13 @@ func main() {
 		}
 
 		if tc.SkipBody {
+			if tc.CompareCookieAttrs {
+				if diff := diffCookieAttrs(nodeResp.SetCookies, goResp.SetCookies); diff != "" {
+					fmt.Printf("FAIL %-40s cookie attributes differ: %s\n", tc.Name, diff)
+					failures++
+					continue
+				}
+			}
 			fmt.Printf("ok   %-40s status=%d (body skipped)\n", tc.Name, nodeResp.Status)
 			continue
 		}
@@ -171,7 +185,44 @@ func do(client *http.Client, base string, tc requestCase) (response, error) {
 		Status:      resp.StatusCode,
 		ContentType: resp.Header.Get("Content-Type"),
 		Body:        payload,
+		SetCookies:  resp.Header.Values("Set-Cookie"),
 	}, nil
+}
+
+// cookieAttrs renders every Set-Cookie header as "name;attr=value;..." with the
+// cookie *value* removed (it is a fresh random token on each request, so it can
+// never match) and Expires removed (absolute time, same reason). Max-Age stays:
+// it is a relative lifetime and must agree between the two implementations.
+func cookieAttrs(setCookies []string) []string {
+	fake := &http.Response{Header: http.Header{"Set-Cookie": setCookies}}
+	cookies := fake.Cookies()
+
+	out := make([]string, 0, len(cookies))
+	for _, cookie := range cookies {
+		parts := []string{
+			cookie.Name,
+			"path=" + cookie.Path,
+			"domain=" + cookie.Domain,
+			fmt.Sprintf("httpOnly=%t", cookie.HttpOnly),
+			fmt.Sprintf("secure=%t", cookie.Secure),
+			fmt.Sprintf("sameSite=%d", cookie.SameSite),
+			fmt.Sprintf("maxAge=%d", cookie.MaxAge),
+		}
+		out = append(out, strings.Join(parts, ";"))
+	}
+	sort.Strings(out)
+	return out
+}
+
+// diffCookieAttrs reports the first difference between the two cookie sets, or ""
+// when the attributes match.
+func diffCookieAttrs(nodeSet, goSet []string) string {
+	node := cookieAttrs(nodeSet)
+	goAttrs := cookieAttrs(goSet)
+	if reflect.DeepEqual(node, goAttrs) {
+		return ""
+	}
+	return fmt.Sprintf("node=%v go=%v", node, goAttrs)
 }
 
 // normalizeJSON decodes a JSON body into a comparable value, dropping ignored keys.

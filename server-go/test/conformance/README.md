@@ -53,6 +53,19 @@ backends reject the literal string with 401, so the case "matches" while the
 handler was never executed. Always run through `parity.sh`, and when adding a
 group by hand check that no case still contains `REPLACE_WITH`.
 
+### Cookie attributes
+
+`skipBody` cases (login, logout, refresh) otherwise compare nothing but the
+status code, leaving `httpOnly` / `secure` / `sameSite` / `maxAge` unverified.
+Set `"compareCookieAttrs": true` to diff the `Set-Cookie` attributes as well. The
+cookie value is ignored — it is a fresh random token on every request — and so is
+`Expires`, which is absolute time.
+
+```json
+{ "name": "auth-logout-no-credentials", "method": "POST", "path": "/api/auth/logout",
+  "skipBody": true, "compareCookieAttrs": true }
+```
+
 ## How to run
 
 1. Start PostgreSQL and apply migrations (Prisma owns the schema):
