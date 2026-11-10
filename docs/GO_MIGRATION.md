@@ -312,8 +312,10 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 - [ ] `lib/invite_pricing.go` → 已在 `db/user_invites.go` 落地，若有用例需要 lib 侧再加
 - [x] `lib/operation_verification.go` 内的私有 advisory-lock 副本与 `db.AdvisoryTransactionLockString` 归一 —— 已改为调用 `db.AdvisoryTransactionLockStringTx`（GORM 事务 flavor），SQL 只保留一份
-- [ ] `db.GetRedeemCodeHostByID` 在真实 `db/hosts.go` 落地后删除
+- [x] `db.GetRedeemCodeHostByID` 已删除，`routes/redeem_codes.go` 改用 `db.HostsGetByID`（verification-redeem 59/59 复验）
 - [ ] 存储适配器（`StorageFactory` + 4 provider）→ `routes.StorageConnectionTester` 钩子仍在显式失败
+- [ ] **包出站绑定有两份等价实现**：`db.instancesBindPackageEgress`（pgx.Tx，实例创建同事务必需）与 `lib.BindPackageEgress`（*gorm.DB，packages 路由用）。逐行语义已核对一致，但两份会漂移；后续按 advisory-lock 的做法收敛为一份内核 + 两个适配器。
+- [x] 隧道能力 seam 已接线：`db.InstanceEgressHostSupportsControl` 指向 `lib.EgressPackageTunnelSupportsControl`（此前 nil = 非 host 模式直接 fail closed）。
 - [ ] **`db.UpdateSystemConfigs` 忽略 `RowsAffected`（真实分歧，由 system-config 对拍挖出）**：Node 的 `prisma.systemConfig.update` 在行不存在时抛 P2025 → 500 且整事务回滚；Go 版静默返回成功。可达路径是白名单里从未 seed 的 `aff_commission_rate` / `aff_discount_rate`。修法二选一：函数返回"行不存在"错误，或写前 upsert 建行（需先确认 Node 期望值是 500）。
 - [ ] `routes.SystemConfigAvailableMailOffering` seam → mail 模块落地后指向 `db.MailHasAvailableOffering`（system-config 目前用同一条 SQL 的本地副本）。
 - [ ] **对拍脚本只能有一份**：`/tmp/parity.sh` 已改为 `test/conformance/parity.sh` 的 wrapper（共用 `/tmp/payincus-parity.lock`）。历史上两套脚本用不同锁文件，导致两个 parity 集群同时抢 3101/3102 并互相 kill，产生"随机失败"的假象。
