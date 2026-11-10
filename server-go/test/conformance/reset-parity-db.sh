@@ -24,10 +24,22 @@ GODIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 REPO=$(cd "$GODIR/.." && pwd)
 
 echo "resetting parity database..."
+# Prisma 7's reset only accepts --force/--schema/--config; --skip-seed and
+# --skip-generate were removed.
 ( cd "$REPO/server" && DATABASE_URL="$PARITY_DATABASE_URL" \
-    pnpm exec prisma migrate reset --force --skip-seed --skip-generate )
+    pnpm exec prisma migrate reset --force )
 
 echo "seeding conformance identities..."
 ( cd "$GODIR" && go run ./test/conformance/seed -dsn "$PARITY_DATABASE_URL" )
+
+if command -v psql >/dev/null 2>&1; then
+  for fixture in "$GODIR"/test/conformance/seed-*.sql; do
+    [ -e "$fixture" ] || continue
+    echo "applying fixture $(basename "$fixture")..."
+    psql "$PARITY_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$fixture" >/dev/null
+  done
+else
+  echo "WARNING: psql not found; seed-*.sql fixtures were not applied" >&2
+fi
 
 echo "done."

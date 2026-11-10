@@ -1,0 +1,735 @@
+[
+  {
+    "name": "mail-admin-sources-anon",
+    "method": "GET",
+    "path": "/api/mail/admin/sources"
+  },
+  {
+    "name": "mail-admin-sources-non-admin",
+    "method": "GET",
+    "path": "/api/mail/admin/sources",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-sources",
+    "method": "GET",
+    "path": "/api/mail/admin/sources",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-plans",
+    "method": "GET",
+    "path": "/api/mail/admin/plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-active",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?status=active",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-search",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?search=parity&page=1&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-search-user-id",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?search=2",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-source",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?sourceId=900001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-bogus-status",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?status=bogus",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-page2",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-subscriptions-pagesize-clamp",
+    "method": "GET",
+    "path": "/api/mail/admin/subscriptions?page=1&pageSize=500",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-domains",
+    "method": "GET",
+    "path": "/api/mail/admin/domains",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-domains-verified",
+    "method": "GET",
+    "path": "/api/mail/admin/domains?status=verified",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-domains-search",
+    "method": "GET",
+    "path": "/api/mail/admin/domains?search=parity",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-domains-source-empty",
+    "method": "GET",
+    "path": "/api/mail/admin/domains?sourceId=900002",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-domains-page-size-1",
+    "method": "GET",
+    "path": "/api/mail/admin/domains?page=1&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-sources-anon",
+    "method": "GET",
+    "path": "/api/mail/sources"
+  },
+  {
+    "name": "mail-sources-user",
+    "method": "GET",
+    "path": "/api/mail/sources",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-subscription-anon",
+    "method": "GET",
+    "path": "/api/mail/subscription"
+  },
+  {
+    "name": "mail-subscription-user",
+    "method": "GET",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-subscription-admin",
+    "method": "GET",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domains-user",
+    "method": "GET",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domains-admin",
+    "method": "GET",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-detail",
+    "method": "GET",
+    "path": "/api/mail/domains/900001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-detail-not-owner",
+    "method": "GET",
+    "path": "/api/mail/domains/900001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-detail-missing",
+    "method": "GET",
+    "path": "/api/mail/domains/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-admin-password",
+    "method": "GET",
+    "path": "/api/mail/domains/900001/admin-password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-admin-password-not-owner",
+    "method": "GET",
+    "path": "/api/mail/domains/900001/admin-password",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-accounts-empty",
+    "method": "GET",
+    "path": "/api/mail/domains/900001/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-accounts-verified",
+    "method": "GET",
+    "path": "/api/mail/domains/900002/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-accounts-not-owner",
+    "method": "GET",
+    "path": "/api/mail/domains/900002/accounts",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-detail-bad-id",
+    "method": "GET",
+    "path": "/api/mail/domains/abc",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-detail-zero-id",
+    "method": "GET",
+    "path": "/api/mail/domains/0",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-validate-aff-empty-body",
+    "method": "POST",
+    "path": "/api/mail/validate-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-validate-aff-blank",
+    "method": "POST",
+    "path": "/api/mail/validate-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "code": "   "
+    }
+  },
+  {
+    "name": "mail-validate-aff-zero",
+    "method": "POST",
+    "path": "/api/mail/validate-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "code": 0
+    }
+  },
+  {
+    "name": "mail-validate-aff-number",
+    "method": "POST",
+    "path": "/api/mail/validate-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "code": 12
+    }
+  },
+  {
+    "name": "mail-validate-aff-unknown",
+    "method": "POST",
+    "path": "/api/mail/validate-aff",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "code": "NOPE"
+    }
+  },
+  {
+    "name": "mail-auto-renew-invalid",
+    "method": "PATCH",
+    "path": "/api/mail/subscription/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-auto-renew-non-bool",
+    "method": "PATCH",
+    "path": "/api/mail/subscription/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": "yes"
+    }
+  },
+  {
+    "name": "mail-purchase-empty",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-purchase-string-plan",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": "1"
+    }
+  },
+  {
+    "name": "mail-purchase-zero-plan",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 0
+    }
+  },
+  {
+    "name": "mail-purchase-missing-plan",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 999999
+    }
+  },
+  {
+    "name": "mail-purchase-disabled-plan",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 900005
+    }
+  },
+  {
+    "name": "mail-purchase-disabled-source",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 900003
+    }
+  },
+  {
+    "name": "mail-purchase-existing-active",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 900001
+    }
+  },
+  {
+    "name": "mail-purchase-insufficient-balance",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 900004
+    }
+  },
+  {
+    "name": "mail-purchase-affcode-invalid-type",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 900004,
+      "affCode": 123
+    }
+  },
+  {
+    "name": "mail-purchase-affcode-blank",
+    "method": "POST",
+    "path": "/api/mail/subscription",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "planId": 900004,
+      "affCode": "   "
+    }
+  },
+  {
+    "name": "mail-renew-empty",
+    "method": "POST",
+    "path": "/api/mail/subscription/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-renew-string-months",
+    "method": "POST",
+    "path": "/api/mail/subscription/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": "1"
+    }
+  },
+  {
+    "name": "mail-renew-zero",
+    "method": "POST",
+    "path": "/api/mail/subscription/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 0
+    }
+  },
+  {
+    "name": "mail-renew-thirteen",
+    "method": "POST",
+    "path": "/api/mail/subscription/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 13
+    }
+  },
+  {
+    "name": "mail-renew-insufficient-balance",
+    "method": "POST",
+    "path": "/api/mail/subscription/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 1
+    }
+  },
+  {
+    "name": "mail-renew-twelve-insufficient-balance",
+    "method": "POST",
+    "path": "/api/mail/subscription/renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "months": 12
+    }
+  },
+  {
+    "name": "mail-domain-create-invalid",
+    "method": "POST",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "domain": "nope"
+    }
+  },
+  {
+    "name": "mail-domain-create-empty-body",
+    "method": "POST",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-domain-create-non-string",
+    "method": "POST",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "domain": 12
+    }
+  },
+  {
+    "name": "mail-domain-create-quota-exceeded",
+    "method": "POST",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "domain": "parity-new.example.com"
+    }
+  },
+  {
+    "name": "mail-domain-create-upstream-failure",
+    "method": "POST",
+    "path": "/api/mail/domains",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "domain": "parity-admin-new.example.com"
+    }
+  },
+  {
+    "name": "mail-domain-verify-upstream-failure",
+    "method": "POST",
+    "path": "/api/mail/domains/900001/verify",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-domain-detail-after-failed-verify",
+    "method": "GET",
+    "path": "/api/mail/domains/900001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-dns-upstream-failure",
+    "method": "GET",
+    "path": "/api/mail/domains/900001/dns",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-domain-delete-upstream-failure",
+    "method": "DELETE",
+    "path": "/api/mail/domains/900001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-account-create-unverified-domain",
+    "method": "POST",
+    "path": "/api/mail/domains/900001/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "bob",
+      "password": "12345678"
+    }
+  },
+  {
+    "name": "mail-account-create-missing-password",
+    "method": "POST",
+    "path": "/api/mail/domains/900002/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "bob"
+    }
+  },
+  {
+    "name": "mail-account-create-short-password",
+    "method": "POST",
+    "path": "/api/mail/domains/900002/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "bob",
+      "password": "short"
+    }
+  },
+  {
+    "name": "mail-account-create-existing",
+    "method": "POST",
+    "path": "/api/mail/domains/900002/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "alice",
+      "password": "12345678"
+    }
+  },
+  {
+    "name": "mail-account-create-upstream-failure",
+    "method": "POST",
+    "path": "/api/mail/domains/900002/accounts",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "bob",
+      "password": "12345678"
+    }
+  },
+  {
+    "name": "mail-account-update-missing",
+    "method": "PUT",
+    "path": "/api/mail/domains/900002/accounts/999999",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-account-update-disk-invalid",
+    "method": "PUT",
+    "path": "/api/mail/domains/900002/accounts/900002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "diskLimitMb": 99999
+    }
+  },
+  {
+    "name": "mail-account-update-upstream-failure",
+    "method": "PUT",
+    "path": "/api/mail/domains/900002/accounts/900001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "displayName": "New Name"
+    }
+  },
+  {
+    "name": "mail-account-update-empty-upstream-failure",
+    "method": "PUT",
+    "path": "/api/mail/domains/900002/accounts/900002",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-account-reset-short-password",
+    "method": "POST",
+    "path": "/api/mail/domains/900002/accounts/900002/reset-password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "password": "short"
+    }
+  },
+  {
+    "name": "mail-account-reset-upstream-failure",
+    "method": "POST",
+    "path": "/api/mail/domains/900002/accounts/900002/reset-password",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "password": "newpassword123"
+    }
+  },
+  {
+    "name": "mail-account-delete-upstream-failure",
+    "method": "DELETE",
+    "path": "/api/mail/domains/900002/accounts/900001",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-source-create-invalid",
+    "method": "POST",
+    "path": "/api/mail/admin/sources",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "x"
+    }
+  },
+  {
+    "name": "mail-admin-source-create-duplicate-code",
+    "method": "POST",
+    "path": "/api/mail/admin/sources",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Dup",
+      "code": "pmus",
+      "apiUrl": "https://a.example.com",
+      "apiKey": "k",
+      "smarterMailUrl": "https://b.example.com"
+    }
+  },
+  {
+    "name": "mail-admin-source-create-private-url",
+    "method": "POST",
+    "path": "/api/mail/admin/sources",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "name": "Private",
+      "code": "priv",
+      "apiUrl": "http://127.0.0.1",
+      "apiKey": "k",
+      "smarterMailUrl": "https://b.example.com"
+    }
+  },
+  {
+    "name": "mail-admin-source-update-bad-id",
+    "method": "PUT",
+    "path": "/api/mail/admin/sources/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-admin-source-update-missing",
+    "method": "PUT",
+    "path": "/api/mail/admin/sources/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-admin-source-update-empty",
+    "method": "PUT",
+    "path": "/api/mail/admin/sources/900001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-admin-source-delete-has-children",
+    "method": "DELETE",
+    "path": "/api/mail/admin/sources/900001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-source-delete-missing",
+    "method": "DELETE",
+    "path": "/api/mail/admin/sources/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-plan-create-empty",
+    "method": "POST",
+    "path": "/api/mail/admin/plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-admin-plan-update-empty",
+    "method": "PUT",
+    "path": "/api/mail/admin/plans/900001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-admin-plan-update-missing",
+    "method": "PUT",
+    "path": "/api/mail/admin/plans/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "mail-admin-plan-delete-has-subscriptions",
+    "method": "DELETE",
+    "path": "/api/mail/admin/plans/900001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "mail-admin-cancel-bad-id",
+    "method": "POST",
+    "path": "/api/mail/admin/subscriptions/abc/cancel",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "refundType": "none"
+    }
+  },
+  {
+    "name": "mail-admin-cancel-missing",
+    "method": "POST",
+    "path": "/api/mail/admin/subscriptions/999999/cancel",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "refundType": "none"
+    }
+  },
+  {
+    "name": "mail-admin-cancel-bad-refund-type",
+    "method": "POST",
+    "path": "/api/mail/admin/subscriptions/900001/cancel",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "refundType": "bogus"
+    }
+  },
+  {
+    "name": "mail-admin-cancel-refund-without-reason",
+    "method": "POST",
+    "path": "/api/mail/admin/subscriptions/900001/cancel",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "refundType": "full"
+    }
+  },
+  {
+    "name": "mail-admin-cancel-upstream-failure",
+    "method": "POST",
+    "path": "/api/mail/admin/subscriptions/900001/cancel",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "refundType": "none"
+    }
+  },
+  {
+    "name": "mail-auto-renew-set-true",
+    "method": "PATCH",
+    "path": "/api/mail/subscription/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": true
+    }
+  },
+  {
+    "name": "mail-auto-renew-set-false",
+    "method": "PATCH",
+    "path": "/api/mail/subscription/auto-renew",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "autoRenew": false
+    }
+  }
+]

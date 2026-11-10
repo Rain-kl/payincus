@@ -285,7 +285,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 > 这一批是线上主流程，**先出 spec 再实现**，每完成一个跑该模块对拍 + 真机流程。
 
 1. [x] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
-2. [ ] `mail`（2361）— auth 的重置密码/验证邮件依赖它
+2. [x] `mail`（2361）— 97/97 对拍（含全新库复现），域名验证失败不落 verified、4109 订阅锁、上游失败不扣额度均有 DB 级测试；发现 Node 的 `throw apiError(...)` 在 handler 里实际返回 500 而非 400，已按真实行为复刻
 3. [ ] `auth`（1436）— 三套鉴权面 + 2FA + OAuth state
 4. [x] `system-config`（941）— 49/49 对拍，脱敏/缓存失效/AJV 语义均有单测；挖出 `UpdateSystemConfigs` 的 RowsAffected 分歧（见「已知待办」）
 5. [ ] `hosts`（7987）— 最大单体；含节点健康、隧道控制面
@@ -317,3 +317,6 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 - [ ] **`db.UpdateSystemConfigs` 忽略 `RowsAffected`（真实分歧，由 system-config 对拍挖出）**：Node 的 `prisma.systemConfig.update` 在行不存在时抛 P2025 → 500 且整事务回滚；Go 版静默返回成功。可达路径是白名单里从未 seed 的 `aff_commission_rate` / `aff_discount_rate`。修法二选一：函数返回"行不存在"错误，或写前 upsert 建行（需先确认 Node 期望值是 500）。
 - [ ] `routes.SystemConfigAvailableMailOffering` seam → mail 模块落地后指向 `db.MailHasAvailableOffering`（system-config 目前用同一条 SQL 的本地副本）。
 - [ ] **对拍脚本只能有一份**：`/tmp/parity.sh` 已改为 `test/conformance/parity.sh` 的 wrapper（共用 `/tmp/payincus-parity.lock`）。历史上两套脚本用不同锁文件，导致两个 parity 集群同时抢 3101/3102 并互相 kill，产生"随机失败"的假象。
+- [x] `parity.sh` 的失败退出码曾被管道吞掉（`| tail` 让 `PIPESTATUS` 永远看到 tail 的状态）→ 已改为先落日志再 tail，失败组会返回非 0 并打印日志路径。
+- [x] `prisma migrate reset --skip-seed --skip-generate` 在 Prisma 7 非法 → 已改为只传 `--force`。
+- [x] `seed-*.sql` 夹具（目前是 `seed-mail.sql`）现在由 `parity.sh` 与 `reset-parity-db.sh` **自动应用**（幂等），reset 后不需要手工灌数据。

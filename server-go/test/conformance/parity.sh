@@ -92,6 +92,20 @@ except Exception:
   exit 7
 }
 
+# --- Apply the SQL fixtures some groups depend on (idempotent by design) ---
+if command -v psql >/dev/null 2>&1; then
+  for fixture in "$GODIR"/test/conformance/seed-*.sql; do
+    [ -e "$fixture" ] || continue
+    echo "fixture: $(basename "$fixture")"
+    psql "$PARITY_DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$fixture" >/dev/null || {
+      echo "FATAL: fixture $(basename "$fixture") failed" >&2
+      exit 8
+    }
+  done
+else
+  echo "WARNING: psql not found; seed-*.sql fixtures were not applied" >&2
+fi
+
 # --- Node reference server ---
 lsof -ti:$NODE_PORT | xargs -r kill -9 2>/dev/null
 ( cd "$REPO" && env "${common_env[@]}" PORT=$NODE_PORT \
@@ -133,10 +147,17 @@ wait_health $GO_PORT /tmp/parity-go.log "Go server" || exit 5
 rc=0
 for dst in "${filled[@]}"; do
   echo "### $(basename "$dst")"
+  log="$FILLED/$(basename "$dst").log"
   ( cd "$GODIR" && go run ./test/conformance \
       -node "http://127.0.0.1:$NODE_PORT" \
       -go   "http://127.0.0.1:$GO_PORT" \
-      -file "$dst" 2>&1 | tail -40 )
-  [ "${PIPESTATUS[0]}" -ne 0 ] && rc=1
+      -file "$dst" >"$log" 2>&1 )
+  status=$?
+  # Show the tail either way, but never let the pipe hide the real exit status.
+  tail -60 "$log"
+  if [ $status -ne 0 ]; then
+    rc=1
+    echo "FAIL: $(basename "$dst") exited $status; full output kept at $log" >&2
+  fi
 done
 exit $rc
