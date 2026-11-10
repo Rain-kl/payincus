@@ -1,0 +1,404 @@
+[
+  {
+    "name": "auth-unknown-route",
+    "method": "GET",
+    "path": "/api/auth/nope",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-me-anon",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-me-admin",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-me-non-admin",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-public-api-token-on-web-face",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "token": "pat_FAKE_TOKEN_FOR_REVERSE_TEST_ONLY",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-check-2fa-unknown-user",
+    "method": "POST",
+    "path": "/api/auth/check-2fa",
+    "body": {
+      "username": "nonexistent-parity-user"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-check-2fa-missing-username",
+    "method": "POST",
+    "path": "/api/auth/check-2fa",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-check-2fa-short-username",
+    "method": "POST",
+    "path": "/api/auth/check-2fa",
+    "body": {
+      "username": "ab"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-missing-username",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-missing-password",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "body": {
+      "username": "admin"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-totp-too-short",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "body": {
+      "username": "admin",
+      "password": "wrong-password",
+      "totpCode": "123"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-unknown-user",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "body": {
+      "username": "nonexistent-parity-user",
+      "password": "whatever1"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-wrong-password",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "body": {
+      "username": "admin",
+      "password": "wrong-password"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-refresh-no-cookie",
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "ignoreRateLimit": true,
+    "body": {}
+  },
+  {
+    "name": "auth-logout-no-credentials",
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "ignoreRateLimit": true,
+    "body": {}
+  },
+  {
+    "name": "auth-2fa-status-anon",
+    "method": "GET",
+    "path": "/api/auth/2fa/status",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-2fa-setup-anon",
+    "method": "POST",
+    "path": "/api/auth/2fa/setup",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-2fa-status-admin",
+    "method": "GET",
+    "path": "/api/auth/2fa/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-2fa-recovery-codes-admin",
+    "method": "GET",
+    "path": "/api/auth/2fa/recovery-codes",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-2fa-enable-missing-code",
+    "method": "POST",
+    "path": "/api/auth/2fa/enable",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-2fa-disable-missing-password",
+    "method": "POST",
+    "path": "/api/auth/2fa/disable",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "code": "123456"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-2fa-regenerate-missing-code",
+    "method": "POST",
+    "path": "/api/auth/2fa/regenerate-recovery-codes",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "password": "admin123"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-anon",
+    "method": "POST",
+    "path": "/api/auth/invite",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-non-admin",
+    "method": "POST",
+    "path": "/api/auth/invite",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-non-admin-null-body",
+    "method": "POST",
+    "path": "/api/auth/invite",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": null,
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-admin-count-too-high",
+    "method": "POST",
+    "path": "/api/auth/invite",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "count": 101
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-admin-expires-in-days-zero",
+    "method": "POST",
+    "path": "/api/auth/invite",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "expiresInDays": 0
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invites-anon",
+    "method": "GET",
+    "path": "/api/auth/invites",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invites-non-admin",
+    "method": "GET",
+    "path": "/api/auth/invites",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invites-admin",
+    "method": "GET",
+    "path": "/api/auth/invites",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invites-admin-clamped-pagination",
+    "method": "GET",
+    "path": "/api/auth/invites?page=0&pageSize=abc&status=bogus",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invites-admin-status-used",
+    "method": "GET",
+    "path": "/api/auth/invites?status=used&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/auth/invites/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true,
+    "body": {}
+  },
+  {
+    "name": "auth-invite-delete-zero-id",
+    "method": "DELETE",
+    "path": "/api/auth/invites/0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true,
+    "body": {}
+  },
+  {
+    "name": "auth-invite-delete-negative-id",
+    "method": "DELETE",
+    "path": "/api/auth/invites/-1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-delete-leading-zero-id",
+    "method": "DELETE",
+    "path": "/api/auth/invites/01",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-invite-delete-missing-id",
+    "method": "DELETE",
+    "path": "/api/auth/invites/999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true,
+    "body": {}
+  },
+  {
+    "name": "auth-invite-delete-non-admin",
+    "method": "DELETE",
+    "path": "/api/auth/invites/1",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true,
+    "body": {}
+  },
+  {
+    "name": "auth-register-missing-email",
+    "method": "POST",
+    "path": "/api/auth/register",
+    "body": {
+      "username": "newparityuser",
+      "password": "Password1"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-register-username-pattern",
+    "method": "POST",
+    "path": "/api/auth/register",
+    "body": {
+      "username": "1badname",
+      "password": "Password1",
+      "email": "newuser@example.com"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-register-invalid-email",
+    "method": "POST",
+    "path": "/api/auth/register",
+    "body": {
+      "username": "newparityuser",
+      "password": "Password1",
+      "email": "nope"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-send-verification-missing-email",
+    "method": "POST",
+    "path": "/api/auth/send-verification-code",
+    "body": {},
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-send-verification-invalid-email",
+    "method": "POST",
+    "path": "/api/auth/send-verification-code",
+    "body": {
+      "email": "nope"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-forgot-send-code-invalid-email",
+    "method": "POST",
+    "path": "/api/auth/forgot-password/send-code",
+    "body": {
+      "email": "nope"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-forgot-reset-missing-code",
+    "method": "POST",
+    "path": "/api/auth/forgot-password/reset",
+    "body": {
+      "email": "someone@example.com",
+      "password": "Password1"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-forgot-reset-short-code",
+    "method": "POST",
+    "path": "/api/auth/forgot-password/reset",
+    "body": {
+      "email": "someone@example.com",
+      "code": "123",
+      "password": "Password1"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-forgot-reset-weak-password",
+    "method": "POST",
+    "path": "/api/auth/forgot-password/reset",
+    "body": {
+      "email": "someone@example.com",
+      "code": "123456",
+      "password": "aaaaaaaa"
+    },
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-history-anon",
+    "method": "GET",
+    "path": "/api/auth/login-history",
+    "ignoreRateLimit": true
+  },
+  {
+    "name": "auth-login-history-admin",
+    "method": "GET",
+    "path": "/api/auth/login-history?page=1&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "ignoreRateLimit": true,
+    "skipBody": true
+  }
+]

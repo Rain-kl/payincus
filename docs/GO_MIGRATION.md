@@ -286,7 +286,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 1. [x] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
 2. [x] `mail`（2361）— 97/97 对拍（含全新库复现），域名验证失败不落 verified、4109 订阅锁、上游失败不扣额度均有 DB 级测试；发现 Node 的 `throw apiError(...)` 在 handler 里实际返回 500 而非 400，已按真实行为复刻
-3. [ ] `auth`（1436）— 三套鉴权面 + 2FA + OAuth state
+3. [x] `auth`（1436）— 49/49 对拍；四条反向测试齐备；挖出并修掉两个运行时 bug（注册漏写 `updated_at`、GORM 的 `sql.ErrNoRows` 被当成 error）
 4. [x] `system-config`（941）— 49/49 对拍，脱敏/缓存失效/AJV 语义均有单测；挖出 `UpdateSystemConfigs` 的 RowsAffected 分歧（见「已知待办」）
 5. [ ] `hosts`（7987）— 最大单体；含节点健康、隧道控制面
 6. [ ] `packages`（2873）— 依赖 hosts
