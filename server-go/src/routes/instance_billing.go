@@ -1434,6 +1434,10 @@ func instanceBillingAJVInteger(value any) (int64, bool) {
 			return 1, true
 		}
 		return 0, true
+	case nil:
+		// AJV coerces null to 0 for an integer property (measured: {"instanceIds":null}
+		// on batch destroy-info answers 200 with an id-0 item, not a validation error).
+		return 0, true
 	case []any:
 		if len(typed) == 1 {
 			return instanceBillingAJVInteger(typed[0])
@@ -1541,7 +1545,14 @@ func instanceBillingValidateInstanceIDs(object map[string]any) ([]int32, string)
 	}
 	items, ok := raw.([]any)
 	if !ok {
-		return nil, "must be array"
+		// AJV's coerceTypes:'array' wraps a scalar into a one-element array. Measured
+		// against Node: "950001", 950001, true and null are all accepted, while an
+		// object is not coerced.
+		if _, isObject := raw.(map[string]any); !isObject {
+			items = []any{raw}
+		} else {
+			return nil, "must be array"
+		}
 	}
 	if len(items) < 1 {
 		return nil, "must NOT have fewer than 1 items"

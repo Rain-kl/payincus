@@ -538,8 +538,10 @@ func TestInstanceDestroyBodyValidation(t *testing.T) {
 		{"coerced-string-item", map[string]any{"instanceIds": []any{"3"}}, "", []int32{3}},
 		{"coerced-scalar-string", map[string]any{"instanceIds": "950001"}, "", []int32{950001}},
 		{"coerced-scalar-number", map[string]any{"instanceIds": float64(950001)}, "", []int32{950001}},
+		{"coerced-scalar-bool", map[string]any{"instanceIds": true}, "", []int32{1}},
+		{"coerced-scalar-null", map[string]any{"instanceIds": nil}, "", []int32{0}},
 	} {
-		ids, message := instanceDestroyValidateInstanceIDs(tc.body)
+		ids, message := instanceBillingValidateInstanceIDs(tc.body)
 		if message != tc.want {
 			t.Fatalf("%s: message = %q, want %q", tc.name, message, tc.want)
 		}

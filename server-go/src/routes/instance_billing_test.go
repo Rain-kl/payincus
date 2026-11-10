@@ -222,8 +222,20 @@ func TestInstanceBillingValidateInstanceIDs(t *testing.T) {
 	if _, message := instanceBillingValidateInstanceIDs(map[string]any{}); message != "instanceIds is required" {
 		t.Errorf("missing: %q", message)
 	}
-	if _, message := instanceBillingValidateInstanceIDs(map[string]any{"instanceIds": "nope"}); message != "must be array" {
-		t.Errorf("wrong type: %q", message)
+	// AJV coerceTypes:'array' wraps a scalar and then validates the item, so a
+	// scalar string is an integer failure, not a type-of-array failure. Measured
+	// against Node on POST /api/instances/batch/destroy-info.
+	if _, message := instanceBillingValidateInstanceIDs(map[string]any{"instanceIds": "nope"}); message != "must be integer" {
+		t.Errorf("unparsable scalar: %q", message)
+	}
+	if _, message := instanceBillingValidateInstanceIDs(map[string]any{"instanceIds": map[string]any{}}); message != "must be array" {
+		t.Errorf("object must not be coerced: %q", message)
+	}
+	if ids, message := instanceBillingValidateInstanceIDs(map[string]any{"instanceIds": "950001"}); message != "" || len(ids) != 1 || ids[0] != 950001 {
+		t.Errorf("scalar string not wrapped: ids=%v message=%q", ids, message)
+	}
+	if ids, message := instanceBillingValidateInstanceIDs(map[string]any{"instanceIds": nil}); message != "" || len(ids) != 1 || ids[0] != 0 {
+		t.Errorf("null must coerce to 0: ids=%v message=%q", ids, message)
 	}
 	if _, message := instanceBillingValidateInstanceIDs(map[string]any{"instanceIds": []any{}}); message != "must NOT have fewer than 1 items" {
 		t.Errorf("empty: %q", message)

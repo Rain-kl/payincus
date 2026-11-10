@@ -1489,53 +1489,6 @@ func instanceDestroyParseRouteID(c *gin.Context) (int32, bool) {
 	return int32(value), true
 }
 
-// instanceDestroyValidateInstanceIDs mirrors the route's body schema
-// (`instanceIds: { type: 'array', items: { type: 'integer' }, minItems: 1,
-// maxItems: 100 }`) under Fastify's default AJV options, which include
-// `coerceTypes: 'array'`. That last detail is observable: a scalar body value is
-// wrapped into a single-element array, so `{"instanceIds": "950001"}` is accepted
-// and means `[950001]` (measured against the Node reference).
-//
-// The returned slice is deduplicated in first-seen order, like
-// `Array.from(new Set(instanceIds))`.
-func instanceDestroyValidateInstanceIDs(object map[string]any) ([]int32, string) {
-	raw, present := object["instanceIds"]
-	if !present {
-		return nil, "instanceIds is required"
-	}
-
-	items, ok := raw.([]any)
-	if !ok {
-		switch typed := raw.(type) {
-		case string, float64, bool:
-			items = []any{typed}
-		default:
-			return nil, "must be array"
-		}
-	}
-	if len(items) < 1 {
-		return nil, "must NOT have fewer than 1 items"
-	}
-	if len(items) > 100 {
-		return nil, "must NOT have more than 100 items"
-	}
-
-	seen := map[int32]bool{}
-	unique := make([]int32, 0, len(items))
-	for _, item := range items {
-		value, ok := instanceBillingAJVInteger(item)
-		if !ok {
-			return nil, "must be integer"
-		}
-		converted := int32(value)
-		if !seen[converted] {
-			seen[converted] = true
-			unique = append(unique, converted)
-		}
-	}
-	return unique, ""
-}
-
 // ==================== handlers ====================
 
 // instanceDestroyBatchDestroyInfo handles POST /api/instances/batch/destroy-info.
@@ -1553,7 +1506,7 @@ func instanceDestroyBatchDestroyInfo(c *gin.Context) {
 		respondAJVValidation(c, validationMessage)
 		return
 	}
-	uniqueIDs, validationMessage := instanceDestroyValidateInstanceIDs(object)
+	uniqueIDs, validationMessage := instanceBillingValidateInstanceIDs(object)
 	if validationMessage != "" {
 		respondAJVValidation(c, validationMessage)
 		return
@@ -1590,7 +1543,7 @@ func instanceDestroyBatchDestroy(c *gin.Context) {
 		respondAJVValidation(c, validationMessage)
 		return
 	}
-	uniqueIDs, validationMessage := instanceDestroyValidateInstanceIDs(object)
+	uniqueIDs, validationMessage := instanceBillingValidateInstanceIDs(object)
 	if validationMessage != "" {
 		respondAJVValidation(c, validationMessage)
 		return
