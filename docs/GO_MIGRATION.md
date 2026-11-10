@@ -66,6 +66,17 @@
 
 > 注意：对拍必须在**每组前重启 Go**。限流是进程内固定窗口，连续跑多组会把窗口打满导致假 429（真实踩过）。
 
+### 对拍工具链纪律（2026-11-10 加固）
+
+**这一步曾经出过证据质量事故，必须记住结论：**
+
+- 提交在仓库里的 `test/conformance/requests-*.json` **只带占位符 token**（`REPLACE_WITH_A_REAL_ACCESS_TOKEN` / `..._ADMIN_...` / `..._NON_ADMIN_...`），真实 token 绝不入库。
+- 早期脚本只替换了其中一种占位符，导致 **103/1533 条**认证用例是拿字面量当 token，两边都回 401 —— **"全绿"但 handler 从未执行**。分布：`user-invites-oauth-apps` 39、`admin-notification-channels` 34、`aff` 12、`gpus-vip-benefits` 12、`traffic` 6。
+- 已用加固后的链路把这 5 组全部重跑，**238 例真实通过**（`admin-notification-channels` 38/38 里现在能看到真实的 403/415/404 分流）。其余 24 组不含占位符残留，历史结论仍然成立。
+- 现在的唯一入口是 `server-go/test/conformance/parity.sh`：起 3101 临时 Node + 3102 Go（同一 parity 库）→ 真登录拿 admin / non-admin token → 填占位符 → 逐条比对 → 自毁。**并发调用会排队**（目录锁），不会抢端口。DB 连接串只从 `PARITY_DATABASE_URL` 读，不写进仓库。
+- parity 库需要有第二个账号 `parityuser`（`role=user`，密码同 admin）才能真正验证 403 分支；只有 admin 的话 `NON_ADMIN` 用例会退化成空比对。
+- **判据**：报告里出现 `N/N cases matched` 时，必须同时给出 skipped 原因；若某组从未替换过占位符，必须在 `parity.sh` 下重跑后才能算证据。
+
 ### 已确认的关键事实（勿再重复踩）
 
 - **Fastify AJV 默认值**（`@fastify/ajv-compiler/lib/default-ajv-options.js`，已实测核对）：`coerceTypes:'array'`、`useDefaults:true`、`removeAdditional:true`、`allErrors:false`。含义：标量会被字符串化、单元素数组会解包、**只报第一个校验错误**。注意：`removeAdditional` **只在 schema 写了 `additionalProperties:false` 时才丢弃未知字段**；没写则未知字段保留给 handler（storage-configs 的 PATCH 因此会把未知字段透传给 Prisma 并 500，Go 侧已按真实行为复刻）。
@@ -87,7 +98,7 @@
 ### 待接线 / 已知缺口（下一步）
 
 - `lib/invite_pricing.go` 待办（依赖 `db/advisory_locks.go` + `db/system_config.go`，二者已就绪）。
-- `lib/operation_verification.go` 内有一份**未导出的** advisory-lock 副本，待与 `db.AdvisoryTransactionLockString` 归一。
+- `lib/operation_verification.go` 的 advisory-lock 已归一（`db.AdvisoryTransactionLockStringTx`）。
 - `lib/turnstile.go` 的客户端 IP 已接线到 `middleware.ClientIP`（trust-proxy 感知）。
 - 存储适配器（`StorageFactory` + 4 个 provider）未移植 → `routes.StorageConnectionTester` 钩子已留，默认显式失败（不伪装成功）。
 - 静态托管（生产 `SERVE_STATIC_CLIENT=true` 分支的 index.html / 预览机器人降级 / 缓存头）尚未移植。生产实际为 `false`，优先级低。
@@ -300,6 +311,6 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 ### 已知待办（散件）
 
 - [ ] `lib/invite_pricing.go` → 已在 `db/user_invites.go` 落地，若有用例需要 lib 侧再加
-- [ ] `lib/operation_verification.go` 内的私有 advisory-lock 副本与 `db.AdvisoryTransactionLockString` 归一
+- [x] `lib/operation_verification.go` 内的私有 advisory-lock 副本与 `db.AdvisoryTransactionLockString` 归一 —— 已改为调用 `db.AdvisoryTransactionLockStringTx`（GORM 事务 flavor），SQL 只保留一份
 - [ ] `db.GetRedeemCodeHostByID` 在真实 `db/hosts.go` 落地后删除
 - [ ] 存储适配器（`StorageFactory` + 4 provider）→ `routes.StorageConnectionTester` 钩子仍在显式失败

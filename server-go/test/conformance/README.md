@@ -6,6 +6,41 @@ cannot validate a Go binary, so behavioural compatibility must be proven
 differently: run **both** servers against the **same PostgreSQL database** and
 diff their HTTP responses.
 
+## Quick start: `parity.sh`
+
+`parity.sh` does the whole cycle (reference Node on 3101, Go under test on 3102,
+token filling, replay, teardown) and serialises concurrent runs with a lock:
+
+```bash
+PARITY_DATABASE_URL=postgresql://user:pass@127.0.0.1:5432/payincus_goparity \
+  ./test/conformance/parity.sh requests-users.json requests-auth.json
+```
+
+It needs one throwaway database that **both** backends point at, plus two login
+accounts inside it: an admin (`PARITY_ADMIN_USER`, default `admin`) and a plain
+user (`PARITY_USER_USER`, default `parityuser`, `role=user`) so admin-only 403
+paths are exercised for real instead of collapsing into 401-vs-401. Credentials
+come from the environment only — never commit them.
+
+The manual steps below are what the script automates; keep them for debugging a
+single case.
+
+## Token placeholders (important)
+
+Committed case files must **never** contain a real token. They carry one of three
+placeholders, which `parity.sh` replaces with freshly minted tokens before replay:
+
+| Placeholder | Replaced with |
+|---|---|
+| `REPLACE_WITH_A_REAL_ACCESS_TOKEN` | admin token (historical default) |
+| `REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN` | admin token |
+| `REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN` | non-admin (`role=user`) token |
+
+A case whose token is still an unreplaced placeholder proves nothing: both
+backends reject the literal string with 401, so the case "matches" while the
+handler was never executed. Always run through `parity.sh`, and when adding a
+group by hand check that no case still contains `REPLACE_WITH`.
+
 ## How to run
 
 1. Start PostgreSQL and apply migrations (Prisma owns the schema):
@@ -39,8 +74,8 @@ Volatile keys (default: `timestamp`) are dropped before comparison; override wit
 
 - Use **read-only** requests, or a throwaway database, so the two servers do not
   fight over writes.
-- For authenticated cases, generate a real access token once (log in against the
-  Node server) and paste it into the `token` field. Tokens are HMAC-signed with the
-  shared `JWT_SECRET`, so the same token is accepted by both backends.
+- For authenticated cases, use the `REPLACE_WITH_*` placeholders described above
+  and let `parity.sh` mint the tokens. Tokens are HMAC-signed with the shared
+  `JWT_SECRET`, so one token is accepted by both backends.
 - Add a case here **before** porting a module, so the module's contract is pinned
   from day one.
