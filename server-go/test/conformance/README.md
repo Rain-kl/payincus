@@ -47,6 +47,15 @@ placeholders, which `parity.sh` replaces with freshly minted tokens before repla
 | `REPLACE_WITH_A_REAL_ACCESS_TOKEN` | admin token (historical default) |
 | `REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN` | admin token |
 | `REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN` | non-admin (`role=user`) token |
+| `REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN` | a freshly minted `pat_` token |
+
+The public API token cannot be signed on the fly like a JWT: it lives in
+`public_api_tokens` as a sha256 digest. `parity.sh` therefore generates a random
+`pat_` plaintext on every run, inserts its digest and prefix for `parityuser`
+(with all scopes, no expiry, name `conformance-harness`) and fills the
+placeholder. The plaintext exists only in memory and inside the throwaway
+database — never in the repo. Cases that need a *deficient* token (missing
+scope, revoked, expired) seed their own row with a fixed fake value.
 
 A case whose token is still an unreplaced placeholder proves nothing: both
 backends reject the literal string with 401, so the case "matches" while the

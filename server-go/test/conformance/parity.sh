@@ -121,17 +121,45 @@ if [ -z "$ADMIN_TOKEN" ]; then
 fi
 [ -z "$USER_TOKEN" ] && echo "WARNING: no non-admin token; NON_ADMIN cases will compare 401 vs 401" >&2
 
+# --- Mint a public API token (pat_) and store only its digest ------------------
+# Web tokens can be signed on the fly because both backends share JWT_SECRET; a
+# pat_ token has to exist in the database. The plaintext is generated here, used
+# to fill REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN, and never written to the repo.
+PUBLIC_TOKEN=""
+if command -v psql >/dev/null 2>&1; then
+  read -r PUBLIC_TOKEN PUBLIC_TOKEN_HASH PUBLIC_TOKEN_PREFIX <<<"$(python3 - <<'PY'
+import base64, hashlib, secrets
+token = "pat_" + base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+print(token, hashlib.sha256(token.encode()).hexdigest(), token[:16])
+PY
+)"
+  psql "$PARITY_DATABASE_URL" -v ON_ERROR_STOP=1 -q \
+    -v tok_prefix="$PUBLIC_TOKEN_PREFIX" -v tok_hash="$PUBLIC_TOKEN_HASH" >/dev/null <<'SQL'
+DELETE FROM public_api_tokens WHERE name = 'conformance-harness';
+INSERT INTO public_api_tokens (user_id, name, token_prefix, token_hash, scopes, created_at, updated_at)
+SELECT u.id, 'conformance-harness', :'tok_prefix', :'tok_hash',
+       '["profile:read","profile:write","balance:read","balance:write","billing:read",
+         "products:read","services:read","services:operate","services:billing","orders:read",
+         "tickets:read","tickets:write","notifications:read","notifications:send"]'::jsonb,
+       now() at time zone 'utc', now() at time zone 'utc'
+  FROM users u WHERE u.username = 'parityuser';
+SQL
+else
+  echo "WARNING: psql not found; public API cases will not be filled" >&2
+fi
+
 # --- Fill token placeholders per group (real tokens never touch the repo) ---
 filled=()
 for f in "$@"; do
   src="$GODIR/test/conformance/$f"
   dst="$FILLED/$f"
-  python3 - "$src" "$dst" "$ADMIN_TOKEN" "$USER_TOKEN" <<'PY'
+  python3 - "$src" "$dst" "$ADMIN_TOKEN" "$USER_TOKEN" "$PUBLIC_TOKEN" <<'PY'
 import sys
-src, dst, admin, user = sys.argv[1:5]
+src, dst, admin, user, public = sys.argv[1:6]
 s = open(src, encoding='utf-8').read()
 s = s.replace('REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN', admin)
 s = s.replace('REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN', user or admin)
+s = s.replace('REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN', public)
 s = s.replace('REPLACE_WITH_A_REAL_ACCESS_TOKEN', admin)
 open(dst, 'w', encoding='utf-8').write(s)
 PY
