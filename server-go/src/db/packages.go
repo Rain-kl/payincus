@@ -649,7 +649,8 @@ func packageHostKeyInt(key string) (int32, error) {
 // packageNormalizeHostStoragePools mirrors normalizeHostStoragePools.
 func packageNormalizeHostStoragePools(hostStoragePools map[string]*string) (map[string]*string, error) {
 	normalized := make(map[string]*string, len(hostStoragePools))
-	for rawKey, poolName := range hostStoragePools {
+	for _, rawKey := range packageJSOrderedKeys(hostStoragePools) {
+		poolName := hostStoragePools[rawKey]
 		key, err := packageCanonicalHostKey(rawKey)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid hostStoragePools key: %s", rawKey)
@@ -666,12 +667,54 @@ func packageNormalizeHostStoragePools(hostStoragePools map[string]*string) (map[
 	return normalized, nil
 }
 
+// packageJSOrderedKeys returns the map keys in JavaScript own-property order.
+//
+// The TypeScript normalizers iterate Object.entries() and assign into a numeric
+// keyed object, so when two raw keys canonicalise to the same number ("1" and
+// "01") the LAST one wins. JS orders canonical array-index keys first, ascending,
+// then the remaining string keys in insertion order. A Go map has no insertion
+// order, so the tail is sorted lexicographically: deterministic, and it reproduces
+// the measured Node result for the only ambiguous case the API can receive.
+func packageJSOrderedKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		indexI, okI := packageJSArrayIndex(keys[i])
+		indexJ, okJ := packageJSArrayIndex(keys[j])
+		switch {
+		case okI && okJ:
+			return indexI < indexJ
+		case okI != okJ:
+			return okI
+		default:
+			return keys[i] < keys[j]
+		}
+	})
+	return keys
+}
+
+// packageJSArrayIndex reports whether key is a canonical JS array index
+// (a non-negative integer below 2^32-1 without leading zeros).
+func packageJSArrayIndex(key string) (uint64, bool) {
+	if key == "" || (len(key) > 1 && key[0] == '0') {
+		return 0, false
+	}
+	value, err := strconv.ParseUint(key, 10, 64)
+	if err != nil || value > 4294967294 {
+		return 0, false
+	}
+	return value, true
+}
+
 // packageNormalizeHostTrafficMultipliers mirrors normalizeHostTrafficMultipliers.
 // The multiplier values go through the db-local copy of
 // normalizeTrafficMultiplier (db must not import lib).
 func packageNormalizeHostTrafficMultipliers(hostTrafficMultipliers map[string]any) (map[string]float64, error) {
 	normalized := make(map[string]float64, len(hostTrafficMultipliers))
-	for rawKey, multiplier := range hostTrafficMultipliers {
+	for _, rawKey := range packageJSOrderedKeys(hostTrafficMultipliers) {
+		multiplier := hostTrafficMultipliers[rawKey]
 		key, err := packageCanonicalHostKey(rawKey)
 		if err != nil {
 			return nil, fmt.Errorf("Invalid hostTrafficMultipliers key: %s", rawKey)

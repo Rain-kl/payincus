@@ -156,11 +156,30 @@ func TestPackageNormalizeHostStoragePools(t *testing.T) {
 	if len(normalized) != 2 {
 		t.Fatalf("len = %d, want 2 (01 canonicalises onto 1): %#v", len(normalized), normalized)
 	}
-	if normalized["1"] == nil || *normalized["1"] != "data" {
-		t.Fatalf("host 1 pool = %v, want trimmed \"data\"", normalized["1"])
+	// Measured from the TypeScript: Object.entries() visits the canonical index
+	// keys first ("1", "2") and the non-canonical "01" last, so "01" overwrites
+	// host 1 with null. The Go side must be deterministic here, not depend on map
+	// iteration order.
+	if normalized["1"] != nil {
+		t.Fatalf("host 1 pool = %q, want null (the \"01\" key canonicalises onto it last)", *normalized["1"])
 	}
 	if normalized["2"] != nil {
 		t.Fatalf("whitespace-only pool must become null, got %q", *normalized["2"])
+	}
+
+	// Determinism: 200 runs must agree, otherwise the map iteration order leaks.
+	for i := 0; i < 200; i++ {
+		again, err := packageNormalizeHostStoragePools(map[string]*string{
+			"1":  &named,
+			"01": nil,
+			"2":  &space,
+		})
+		if err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+		if again["1"] != nil {
+			t.Fatalf("run %d: nondeterministic result for host 1: %q", i, *again["1"])
+		}
 	}
 
 	if _, err := packageNormalizeHostStoragePools(map[string]*string{"abc": nil}); err == nil {
