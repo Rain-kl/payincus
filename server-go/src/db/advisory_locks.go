@@ -12,6 +12,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+	"gorm.io/gorm"
 )
 
 // Advisory lock namespaces. The numeric values are a cross-process contract that
@@ -65,4 +66,20 @@ func AdvisoryTransactionLock(ctx context.Context, tx pgx.Tx, namespace, key int3
 func AdvisoryTransactionLockString(ctx context.Context, tx pgx.Tx, namespace int32, key string) error {
 	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1, hashtext($2))", namespace, key)
 	return err
+}
+
+// AdvisoryTransactionLockStringTx is the GORM-transaction flavour of
+// AdvisoryTransactionLockString. Critical sections that run inside a gorm.DB
+// transaction (lib/operation_verification.go is the first one) must take the lock
+// on that same transaction, otherwise pg_advisory_xact_lock would be scoped to an
+// implicit single-statement transaction and released immediately.
+//
+// Keep the SQL in exactly one place: the namespace + hashtext(key) scheme is a
+// cross-process contract, so a drifting local copy silently breaks mutual
+// exclusion. lib/* is allowed to import db; db must never import lib.
+func AdvisoryTransactionLockStringTx(tx *gorm.DB, namespace int32, key string) error {
+	return tx.Exec(
+		"WITH acquired_lock AS (SELECT pg_advisory_xact_lock(?, hashtext(?))) SELECT true AS locked FROM acquired_lock",
+		namespace, key,
+	).Error
 }

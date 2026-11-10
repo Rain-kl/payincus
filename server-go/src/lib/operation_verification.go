@@ -44,9 +44,6 @@ const (
 	operationVerificationAlreadySentWindow = 2 * time.Minute
 	// A successful verification stays claimable for 10 minutes.
 	operationVerificationValidWindow = 10 * time.Minute
-	// operationVerificationRequestLockNamespace mirrors
-	// OPERATION_VERIFICATION_REQUEST_LOCK_NAMESPACE from db/advisory-locks.ts.
-	operationVerificationRequestLockNamespace = 4118
 )
 
 // Error codes surfaced through the result envelopes. These are returned verbatim
@@ -261,16 +258,9 @@ func operationResourceClause(resourceID int64) (string, []any) {
 	return "resource_id = ?", []any{resourceID}
 }
 
-// advisoryTransactionLockString mirrors db/advisory-locks.ts's
-// advisoryTransactionLockString. It is duplicated locally (unexported) only until
-// server-go/src/db/advisory_locks.go lands; it should then be replaced by the
-// shared db.AdvisoryTransactionLockString. Same namespace + hashtext(key) scheme.
-func advisoryTransactionLockString(tx *gorm.DB, namespace int, key string) error {
-	return tx.Exec(
-		"WITH acquired_lock AS (SELECT pg_advisory_xact_lock(?, hashtext(?))) SELECT true AS locked FROM acquired_lock",
-		namespace, key,
-	).Error
-}
+// advisoryTransactionLockString is gone: the transaction-scoped lock now lives in
+// db.AdvisoryTransactionLockStringTx so the namespace + hashtext(key) scheme has
+// exactly one implementation.
 
 // userNotificationChannel mirrors the {channel, channelId, target} tuple.
 type userNotificationChannel struct {
@@ -357,7 +347,7 @@ func prepareOperationVerification(
 	var prepared preparedOperationVerification
 
 	err := db.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := advisoryTransactionLockString(tx, operationVerificationRequestLockNamespace, getOperationVerificationRequestLockKey(userID, operationType, resourceID)); err != nil {
+		if err := db.AdvisoryTransactionLockStringTx(tx, db.OperationVerificationRequestLockNamespace, getOperationVerificationRequestLockKey(userID, operationType, resourceID)); err != nil {
 			return err
 		}
 
