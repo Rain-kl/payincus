@@ -1477,13 +1477,8 @@ func hostsStorageCapacityFromStoragePolicy(
 }
 
 func init() {
-	// The seams other modules left for the WebSocket wave.
-	CaddyTunnelOpenStream = func(hostID int32, targetHost string, port int) (net.Conn, error) {
-		return TunnelManagerInstance().CreateDuplexStream(hostID, targetHost, port)
-	}
-	CaddyTunnelIsOnline = func(hostID int32) bool {
-		return TunnelManagerInstance().IsTunnelOnline(hostID)
-	}
+	// The remaining seam an earlier module left for this wave. The Caddy seams now
+	// default to the tunnel manager in caddy_client.go itself.
 	TunnelLogControl = func(hostID int64, taskID int32, name, action string) bool {
 		return TunnelManagerInstance().SendTaskLogControl(int32(hostID), taskID, name, TunnelLogAction(action))
 	}

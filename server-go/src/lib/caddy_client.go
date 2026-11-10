@@ -97,16 +97,18 @@ func IsCaddyNotFound(err error) bool {
 }
 
 // CaddyTunnelOpenStream is the seam for
-// `hostTunnelManager.createDuplexStream(hostId, targetHost, port)`. The WebSocket
-// wave assigns it. The default reports an explicit error: without a tunnel there is
-// no way to reach the node's loopback, and pretending otherwise would report a
-// configured site that does not exist.
+// `hostTunnelManager.createDuplexStream(hostId, targetHost, port)`. It defaults to
+// the real tunnel manager (same package) and stays overridable for tests. Without
+// a tunnel there is no way to reach the node's loopback, so the call fails rather
+// than reporting a site that does not exist.
 var CaddyTunnelOpenStream = func(hostID int32, targetHost string, port int) (net.Conn, error) {
-	return nil, errors.New("宿主机内网穿透通道未移植，无法访问 Caddy Admin API")
+	return TunnelManagerInstance().CreateDuplexStream(hostID, targetHost, port)
 }
 
 // CaddyTunnelIsOnline is the seam for `hostTunnelManager.isTunnelOnline(hostId)`.
-var CaddyTunnelIsOnline = func(hostID int32) bool { return false }
+var CaddyTunnelIsOnline = func(hostID int32) bool {
+	return TunnelManagerInstance().IsTunnelOnline(hostID)
+}
 
 // CaddyClient mirrors the TypeScript class.
 type CaddyClient struct {
