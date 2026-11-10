@@ -979,7 +979,7 @@ func oauthAppsGetByID(ctx context.Context, id int32) (*oauthAppsRow, error) {
 				" WHERE a.id = ? LIMIT 1", id,
 		).Row().Scan(dest...)
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {

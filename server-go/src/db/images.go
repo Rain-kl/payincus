@@ -401,13 +401,16 @@ func SaveHostAllowedImages(ctx context.Context, hostID int32, useDefault bool, i
 		}
 
 		placeholders := make([]string, 0, len(normalizedImageIDs))
-		args := make([]any, 0, len(normalizedImageIDs)*2)
+		args := make([]any, 0, len(normalizedImageIDs)*3)
+		// host_allowed_images.updated_at is NOT NULL with no database default;
+		// Prisma fills @updatedAt client-side, so a raw INSERT has to supply it.
+		now := time.Now().UTC()
 		for _, imageID := range normalizedImageIDs {
-			placeholders = append(placeholders, "(?, ?)")
-			args = append(args, hostID, imageID)
+			placeholders = append(placeholders, "(?, ?, ?)")
+			args = append(args, hostID, imageID, now)
 		}
 		// createMany({ skipDuplicates: true }) → ON CONFLICT DO NOTHING.
-		sql := "INSERT INTO host_allowed_images (host_id, image_id) VALUES " +
+		sql := "INSERT INTO host_allowed_images (host_id, image_id, updated_at) VALUES " +
 			strings.Join(placeholders, ", ") +
 			" ON CONFLICT (host_id, image_id) DO NOTHING"
 		return tx.Exec(sql, args...).Error

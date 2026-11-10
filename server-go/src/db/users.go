@@ -404,11 +404,14 @@ func CreateUser(ctx context.Context, username string, email *string, passwordHas
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var userID int32
+	// users.updated_at is NOT NULL with no database default: Prisma's @updatedAt
+	// fills it client-side, so a raw INSERT must supply it. Omitting it makes every
+	// call fail with a not-null violation at runtime (registration was broken).
 	err = tx.QueryRow(ctx,
-		`INSERT INTO users (username, email, password_hash, role, avatar_style)
-		 VALUES ($1, $2, $3, $4, '')
+		`INSERT INTO users (username, email, password_hash, role, avatar_style, updated_at)
+		 VALUES ($1, $2, $3, $4, '', $5)
 		 RETURNING id`,
-		username, email, passwordHash, string(role),
+		username, email, passwordHash, string(role), time.Now().UTC(),
 	).Scan(&userID)
 	if err != nil {
 		if usersIsUniqueViolation(err) {
@@ -698,11 +701,13 @@ func CreateRegisteredUser(ctx context.Context, input CreateRegisteredUserInput) 
 	}
 
 	var userID int32
+	// See CreateUser: updated_at has no database default and Prisma fills it
+	// client-side, so this INSERT must supply it or registration 500s.
 	err = tx.QueryRow(ctx,
-		`INSERT INTO users (username, email, password_hash, role, avatar_style)
-		 VALUES ($1, $2, $3, 'user', '')
+		`INSERT INTO users (username, email, password_hash, role, avatar_style, updated_at)
+		 VALUES ($1, $2, $3, 'user', '', $4)
 		 RETURNING id`,
-		input.Username, normalizedEmail, input.PasswordHash,
+		input.Username, normalizedEmail, input.PasswordHash, time.Now().UTC(),
 	).Scan(&userID)
 	if err != nil {
 		if usersIsUniqueViolation(err) {

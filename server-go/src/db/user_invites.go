@@ -526,7 +526,7 @@ func UserInvitesFindByCode(ctx context.Context, code string) (*UserInvitesCodeRo
 				" WHERE c.code = ? AND c.used_by IS NULL LIMIT 1", code,
 		).Row().Scan(dest...)
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {
@@ -544,7 +544,7 @@ func UserInvitesGetByID(ctx context.Context, id int32) (*UserInvitesCodeRow, err
 				" WHERE c.id = ? LIMIT 1", id,
 		).Row().Scan(dest...)
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNoRows(err) {
 		return nil, nil
 	}
 	if err != nil {
