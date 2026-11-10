@@ -1,0 +1,801 @@
+[
+  {
+    "name": "admin-billing-overview-anon",
+    "method": "GET",
+    "path": "/api/admin/billing/overview"
+  },
+  {
+    "name": "admin-billing-overview-non-admin",
+    "method": "GET",
+    "path": "/api/admin/billing/overview",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-overview-garbage-token",
+    "method": "GET",
+    "path": "/api/admin/billing/overview",
+    "token": "not-a-jwt"
+  },
+  {
+    "name": "admin-billing-overview",
+    "method": "GET",
+    "path": "/api/admin/billing/overview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-default",
+    "method": "GET",
+    "path": "/api/admin/billing/records",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-page-size-50",
+    "method": "GET",
+    "path": "/api/admin/billing/records?pageSize=50",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-type-refund",
+    "method": "GET",
+    "path": "/api/admin/billing/records?type=refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-unknown-type-ignored",
+    "method": "GET",
+    "path": "/api/admin/billing/records?type=not-a-type",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-page-two",
+    "method": "GET",
+    "path": "/api/admin/billing/records?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-invalid-page-falls-back",
+    "method": "GET",
+    "path": "/api/admin/billing/records?page=0&pageSize=abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-records-page-size-clamped",
+    "method": "GET",
+    "path": "/api/admin/billing/records?pageSize=500",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-seeded-run",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation?date=2021-03-04",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-no-run-for-date",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation?date=2021-04-01",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-invalid-date",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation?date=2021-3-4",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-impossible-date",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation?date=2021-02-30",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-non-admin",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation?date=2021-03-04",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-run-invalid-date",
+    "method": "POST",
+    "path": "/api/admin/billing/reconciliation/run",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "date": "2021-3-4" }
+  },
+  {
+    "name": "admin-billing-reconciliation-run-non-admin",
+    "method": "POST",
+    "path": "/api/admin/billing/reconciliation/run",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": { "date": "2021-03-05" }
+  },
+  {
+    "name": "admin-billing-reconciliation-run-empty-body",
+    "method": "POST",
+    "path": "/api/admin/billing/reconciliation/run",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-run-status-only",
+    "method": "POST",
+    "path": "/api/admin/billing/reconciliation/run",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "date": "2021-03-05" },
+    "skipBody": true
+  },
+  {
+    "name": "admin-billing-reconciliation-item-invalid-id",
+    "method": "PATCH",
+    "path": "/api/admin/billing/reconciliation/items/abc",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "status": "confirmed" }
+  },
+  {
+    "name": "admin-billing-reconciliation-item-zero-id",
+    "method": "PATCH",
+    "path": "/api/admin/billing/reconciliation/items/0",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "status": "confirmed" }
+  },
+  {
+    "name": "admin-billing-reconciliation-item-invalid-status",
+    "method": "PATCH",
+    "path": "/api/admin/billing/reconciliation/items/991001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "status": "resolved" }
+  },
+  {
+    "name": "admin-billing-reconciliation-item-note-not-string",
+    "method": "PATCH",
+    "path": "/api/admin/billing/reconciliation/items/991001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "status": "confirmed", "note": 42 }
+  },
+  {
+    "name": "admin-billing-reconciliation-item-missing-status-only",
+    "method": "PATCH",
+    "path": "/api/admin/billing/reconciliation/items/999999999",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "status": "confirmed" },
+    "skipBody": true
+  },
+  {
+    "name": "admin-billing-reconciliation-export-orders",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation/export?date=2021-03-04&type=orders",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-export-balance-logs",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation/export?date=2021-03-04&type=balance_logs",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-export-adjustments",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation/export?date=2021-03-04&type=adjustments",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-export-invalid-type",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation/export?date=2021-03-04&type=everything",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-export-invalid-date",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation/export?date=2021-3-4&type=orders",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-reconciliation-export-non-admin",
+    "method": "GET",
+    "path": "/api/admin/billing/reconciliation/export?date=2021-03-04&type=orders",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-default",
+    "method": "GET",
+    "path": "/api/admin/billing/instances",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-page-size-50",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?pageSize=50",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-status-running",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?status=running",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-status-deleted",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?status=deleted",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-unknown-status-ignored",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?status=not-a-status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-expiring",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?expiring=true",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-host-filter",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?hostId=991001",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-search",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?search=parity-adminbilling",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-instances-page-two",
+    "method": "GET",
+    "path": "/api/admin/billing/instances?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-recharge-records-default",
+    "method": "GET",
+    "path": "/api/admin/billing/recharge-records",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-recharge-records-page-size-50",
+    "method": "GET",
+    "path": "/api/admin/billing/recharge-records?pageSize=50",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-recharge-records-status-completed",
+    "method": "GET",
+    "path": "/api/admin/billing/recharge-records?status=completed",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-recharge-records-unknown-status-ignored",
+    "method": "GET",
+    "path": "/api/admin/billing/recharge-records?status=not-a-status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-recharge-sync-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/billing/recharge-records/abc/sync",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-recharge-sync-not-found",
+    "method": "POST",
+    "path": "/api/admin/billing/recharge-records/999999999/sync",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-recharge-sync-already-completed",
+    "method": "POST",
+    "path": "/api/admin/billing/recharge-records/991001/sync",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-suspend-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/instances/abc/suspend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-suspend-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/suspend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-suspend-deleted-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991004/suspend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-suspend-non-admin",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/suspend",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": { "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-unsuspend-not-suspended",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/unsuspend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-unsuspend-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/unsuspend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-extend-days-zero",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/extend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "days": 0 }
+  },
+  {
+    "name": "admin-billing-extend-days-too-large",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/extend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "days": 400 }
+  },
+  {
+    "name": "admin-billing-extend-free-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991002/extend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "days": 5 }
+  },
+  {
+    "name": "admin-billing-extend-deleted-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991004/extend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "days": 5 }
+  },
+  {
+    "name": "admin-billing-extend-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/extend",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "days": 5 }
+  },
+  {
+    "name": "admin-billing-refund-amount-zero",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "amount": 0, "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-refund-amount-missing",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-refund-reason-short",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "amount": 5, "reason": "x" }
+  },
+  {
+    "name": "admin-billing-refund-over-cap",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "amount": 99999, "reason": "parity over cap" }
+  },
+  {
+    "name": "admin-billing-refund-free-instance-cap-is-zero",
+    "method": "POST",
+    "path": "/api/admin/instances/991002/refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "amount": 5, "reason": "parity free" }
+  },
+  {
+    "name": "admin-billing-refund-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "amount": 5, "reason": "parity missing" }
+  },
+  {
+    "name": "admin-billing-refund-non-admin",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/refund",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": { "amount": 1, "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-delete-refund-reason-missing",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/delete-and-refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "refundType": "remaining" }
+  },
+  {
+    "name": "admin-billing-delete-refund-type-invalid",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/delete-and-refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "refundType": "everything", "reason": "parity" }
+  },
+  {
+    "name": "admin-billing-delete-refund-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/delete-and-refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "refundType": "full", "reason": "parity missing" }
+  },
+  {
+    "name": "admin-billing-delete-refund-already-deleted",
+    "method": "POST",
+    "path": "/api/admin/instances/991004/delete-and-refund",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "refundType": "full", "reason": "parity deleted" }
+  },
+  {
+    "name": "admin-billing-apply-aff-code-missing",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "affCode": "x" }
+  },
+  {
+    "name": "admin-billing-apply-aff-free-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991002/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "affCode": "PARITYABCODE" }
+  },
+  {
+    "name": "admin-billing-apply-aff-unknown-code",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "affCode": "NOSUCHCODE" }
+  },
+  {
+    "name": "admin-billing-apply-aff-already-bound",
+    "method": "POST",
+    "path": "/api/admin/instances/991003/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "affCode": "PARITYABCODE" }
+  },
+  {
+    "name": "admin-billing-apply-aff-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/apply-aff",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "affCode": "PARITYABCODE" }
+  },
+  {
+    "name": "admin-billing-update-price-not-a-number",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": "abc", "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-update-price-out-of-range",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 100001, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-update-price-unchanged",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 30, "settleBalance": true }
+  },
+  {
+    "name": "admin-billing-update-price-free-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991002/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-update-price-stale-version",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false, "expectedVersion": 99 }
+  },
+  {
+    "name": "admin-billing-update-price-bad-expected-version",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false, "expectedVersion": -1 }
+  },
+  {
+    "name": "admin-billing-update-price-not-found",
+    "method": "POST",
+    "path": "/api/admin/instances/999999999/update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-update-price-preview-no-settle",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-update-price-preview-free-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991002/update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-update-price-preview-deleted",
+    "method": "POST",
+    "path": "/api/admin/instances/991004/update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPrice": 40, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-batch-preview-empty-ids",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "instanceIds": [], "newPrice": 5 }
+  },
+  {
+    "name": "admin-billing-batch-preview-invalid-id",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "instanceIds": [0], "newPrice": 5 }
+  },
+  {
+    "name": "admin-billing-batch-preview-price-missing",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "instanceIds": [991001] }
+  },
+  {
+    "name": "admin-billing-batch-preview-mixed",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [991001, 991002, 999999999],
+      "newPrice": 5,
+      "settleBalance": false
+    }
+  },
+  {
+    "name": "admin-billing-batch-preview-no-settle",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price/preview",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "instanceIds": [991001], "newPrice": 5, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-batch-apply-missing-expectations",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "instanceIds": [991001], "newPrice": 5, "settleBalance": false }
+  },
+  {
+    "name": "admin-billing-batch-apply-bad-expectations",
+    "method": "POST",
+    "path": "/api/admin/instances/batch-update-price",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [991001],
+      "newPrice": 5,
+      "settleBalance": false,
+      "expectations": [{ "instanceId": 991001, "version": -3 }]
+    }
+  },
+  {
+    "name": "admin-billing-create-missing-params",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-create-bad-name",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "parityuser",
+      "name": "x",
+      "packageId": 991001,
+      "image": "images:debian/12",
+      "hostId": 991001
+    }
+  },
+  {
+    "name": "admin-billing-create-unknown-user",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "no-such-parity-user",
+      "name": "parity adminbilling x",
+      "packageId": 991001,
+      "image": "images:debian/12",
+      "hostId": 991001
+    }
+  },
+  {
+    "name": "admin-billing-create-inactive-package",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "parityuser",
+      "name": "parity adminbilling x",
+      "packageId": 999999999,
+      "image": "images:debian/12",
+      "hostId": 991001
+    }
+  },
+  {
+    "name": "admin-billing-create-plan-not-in-package",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "parityuser",
+      "name": "parity adminbilling x",
+      "packageId": 991001,
+      "planId": 991005,
+      "image": "images:debian/12",
+      "hostId": 991001
+    }
+  },
+  {
+    "name": "admin-billing-create-sold-out-plan",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "parityuser",
+      "name": "parity adminbilling x",
+      "packageId": 991001,
+      "planId": 991004,
+      "image": "images:debian/12",
+      "hostId": 991001
+    }
+  },
+  {
+    "name": "admin-billing-create-invalid-image",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "username": "parityuser",
+      "name": "parity adminbilling x",
+      "packageId": 991001,
+      "image": "images:does-not-exist",
+      "hostId": 991001
+    }
+  },
+  {
+    "name": "admin-billing-create-non-admin",
+    "method": "POST",
+    "path": "/api/admin/instances/create",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "admin-billing-available-plans-status-only",
+    "method": "GET",
+    "path": "/api/admin/instances/991001/available-plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "admin-billing-available-plans-free-instance",
+    "method": "GET",
+    "path": "/api/admin/instances/991002/available-plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-available-plans-invalid-id",
+    "method": "GET",
+    "path": "/api/admin/instances/abc/available-plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-available-plans-zero-id",
+    "method": "GET",
+    "path": "/api/admin/instances/0/available-plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-available-plans-not-found",
+    "method": "GET",
+    "path": "/api/admin/instances/999999999/available-plans",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "admin-billing-upgrade-plan-invalid-plan-id",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 0 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-free-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991002/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991002 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-deleted-instance",
+    "method": "POST",
+    "path": "/api/admin/instances/991004/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991002 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-not-found-plan",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 999999999 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-inactive-plan",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991003 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-sold-out-plan",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991004 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-other-package",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991005 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-downgrade",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991006 }
+  },
+  {
+    "name": "admin-billing-upgrade-plan-non-admin",
+    "method": "POST",
+    "path": "/api/admin/instances/991001/upgrade-plan",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": { "newPlanId": 991002 }
+  }
+]
