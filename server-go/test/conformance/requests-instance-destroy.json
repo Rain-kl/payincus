@@ -1,0 +1,223 @@
+[
+  {
+    "name": "instance-destroy-info-anon",
+    "method": "GET",
+    "path": "/api/instances/950001/destroy-info"
+  },
+  {
+    "name": "instance-destroy-info-invalid-id",
+    "method": "GET",
+    "path": "/api/instances/abc/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-not-found",
+    "method": "GET",
+    "path": "/api/instances/950999/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-owner-paid",
+    "method": "GET",
+    "path": "/api/instances/950001/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-fee-waiver-ignored-when-not-error",
+    "method": "GET",
+    "path": "/api/instances/950001/destroy-info?feeWaiver=error",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-host-owner-is-not-instance-owner",
+    "method": "GET",
+    "path": "/api/instances/950001/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-free-instance",
+    "method": "GET",
+    "path": "/api/instances/950002/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-deleted",
+    "method": "GET",
+    "path": "/api/instances/950003/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-creating",
+    "method": "GET",
+    "path": "/api/instances/950004/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-suspended-manual",
+    "method": "GET",
+    "path": "/api/instances/950005/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-suspended-expired",
+    "method": "GET",
+    "path": "/api/instances/950006/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-traffic-limit",
+    "method": "GET",
+    "path": "/api/instances/950007/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-error-state",
+    "method": "GET",
+    "path": "/api/instances/950008/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-error-state-fee-waiver",
+    "method": "GET",
+    "path": "/api/instances/950008/destroy-info?feeWaiver=error",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-no-billing-records",
+    "method": "GET",
+    "path": "/api/instances/950010/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-info-stranger",
+    "method": "GET",
+    "path": "/api/instances/950009/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "instance-destroy-batch-info-admin",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        950001
+      ]
+    }
+  },
+  {
+    "name": "instance-destroy-batch-info-empty",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": []
+    }
+  },
+  {
+    "name": "instance-destroy-batch-info-missing-field",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-destroy-batch-info-scalar-coerced-to-array",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": "950001"
+    }
+  },
+  {
+    "name": "instance-destroy-batch-info-object-not-array",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": {}
+    }
+  },
+  {
+    "name": "instance-destroy-batch-info-mixed",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        950001,
+        950002,
+        999999
+      ]
+    }
+  },
+  {
+    "name": "instance-destroy-batch-info-hidden-only",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy-info",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": [
+        950009,
+        999999
+      ]
+    }
+  },
+  {
+    "name": "instance-destroy-batch-destroy-empty",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": []
+    }
+  },
+  {
+    "name": "instance-destroy-batch-destroy-object-not-array",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "instanceIds": {}
+    }
+  },
+  {
+    "name": "instance-destroy-batch-destroy-anon",
+    "method": "POST",
+    "path": "/api/instances/batch/destroy",
+    "body": {
+      "instanceIds": [
+        950001
+      ]
+    }
+  },
+  {
+    "name": "instance-destroy-post-invalid-id",
+    "method": "POST",
+    "path": "/api/instances/abc/destroy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-destroy-post-not-found",
+    "method": "POST",
+    "path": "/api/instances/950999/destroy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-destroy-post-stranger",
+    "method": "POST",
+    "path": "/api/instances/950009/destroy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "instance-destroy-post-already-deleted",
+    "method": "POST",
+    "path": "/api/instances/950003/destroy",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  }
+]
