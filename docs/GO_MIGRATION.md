@@ -287,7 +287,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 1. [x] `users`（1572）— `db/users` 是几乎所有人的依赖，必须最先
 2. [ ] `mail`（2361）— auth 的重置密码/验证邮件依赖它
 3. [ ] `auth`（1436）— 三套鉴权面 + 2FA + OAuth state
-4. [ ] `system-config`（941）
+4. [x] `system-config`（941）— 49/49 对拍，脱敏/缓存失效/AJV 语义均有单测；挖出 `UpdateSystemConfigs` 的 RowsAffected 分歧（见「已知待办」）
 5. [ ] `hosts`（7987）— 最大单体；含节点健康、隧道控制面
 6. [ ] `packages`（2873）— 依赖 hosts
 7. [ ] `instances`（6894）— 依赖 hosts + packages + 计费
@@ -314,3 +314,6 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 - [x] `lib/operation_verification.go` 内的私有 advisory-lock 副本与 `db.AdvisoryTransactionLockString` 归一 —— 已改为调用 `db.AdvisoryTransactionLockStringTx`（GORM 事务 flavor），SQL 只保留一份
 - [ ] `db.GetRedeemCodeHostByID` 在真实 `db/hosts.go` 落地后删除
 - [ ] 存储适配器（`StorageFactory` + 4 provider）→ `routes.StorageConnectionTester` 钩子仍在显式失败
+- [ ] **`db.UpdateSystemConfigs` 忽略 `RowsAffected`（真实分歧，由 system-config 对拍挖出）**：Node 的 `prisma.systemConfig.update` 在行不存在时抛 P2025 → 500 且整事务回滚；Go 版静默返回成功。可达路径是白名单里从未 seed 的 `aff_commission_rate` / `aff_discount_rate`。修法二选一：函数返回"行不存在"错误，或写前 upsert 建行（需先确认 Node 期望值是 500）。
+- [ ] `routes.SystemConfigAvailableMailOffering` seam → mail 模块落地后指向 `db.MailHasAvailableOffering`（system-config 目前用同一条 SQL 的本地副本）。
+- [ ] **对拍脚本只能有一份**：`/tmp/parity.sh` 已改为 `test/conformance/parity.sh` 的 wrapper（共用 `/tmp/payincus-parity.lock`）。历史上两套脚本用不同锁文件，导致两个 parity 集群同时抢 3101/3102 并互相 kill，产生"随机失败"的假象。

@@ -1,0 +1,529 @@
+[
+  {
+    "name": "public-anon",
+    "method": "GET",
+    "path": "/api/system-config/public"
+  },
+  {
+    "name": "list-anon-401",
+    "method": "GET",
+    "path": "/api/system-config"
+  },
+  {
+    "name": "list-non-admin-403",
+    "method": "GET",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "list-admin",
+    "method": "GET",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "list-admin-trailing-slash",
+    "method": "GET",
+    "path": "/api/system-config/",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "default-quota-anon-401",
+    "method": "GET",
+    "path": "/api/system-config/default-quota"
+  },
+  {
+    "name": "default-quota-non-admin-403",
+    "method": "GET",
+    "path": "/api/system-config/default-quota",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "default-quota-admin",
+    "method": "GET",
+    "path": "/api/system-config/default-quota",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "put-anon-401",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "body": {
+      "configs": [
+        {
+          "key": "brand_name",
+          "value": "x"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-non-admin-403",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "brand_name",
+          "value": "x"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-high-risk-key-non-admin-403",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "system_update_allowed_admin_ids",
+          "value": ""
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-empty-body-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "put-missing-configs-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "put-configs-object-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": {}
+    }
+  },
+  {
+    "name": "put-item-empty-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {}
+      ]
+    }
+  },
+  {
+    "name": "put-item-scalar-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        5
+      ]
+    }
+  },
+  {
+    "name": "put-item-missing-value-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "brand_name"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-unknown-key-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "not_a_real_key",
+          "value": "b"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-empty-key-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": null,
+          "value": "b"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-boolean-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "smtp_enabled",
+          "value": "yes"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-smtp-port-out-of-range-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "smtp_port",
+          "value": "70000"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-negative-quota-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "default_quota_host",
+          "value": "-1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-brand-name-too-long-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "brand_name",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-brand-logo-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "brand_logo_url",
+          "value": "nope"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-promo-image-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "popup_promo_image_url",
+          "value": "/x.png"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-promo-package-unknown-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "popup_promo_package_id",
+          "value": "999"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-promo-package-zero-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "popup_promo_package_id",
+          "value": "0"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-lsky-version-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "ticket_image_lsky_api_version",
+          "value": "v3"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-transfer-fee-out-of-range-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "transfer_fee",
+          "value": "100.5"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-transfer-fee-too-many-decimals-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "transfer_fee",
+          "value": "1.234"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-aff-commission-too-high-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "aff_commission_rate",
+          "value": "0.9"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-aff-discount-too-high-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "aff_discount_rate",
+          "value": "1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-webhook-secret-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "telegram_webhook_secret",
+          "value": "bad.secret"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-join-mode-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "telegram_group_join_mode",
+          "value": "some"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-admin-ids-invalid-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "system_update_allowed_admin_ids",
+          "value": "0,1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-invite-costs-not-array-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "invite_generation_costs",
+          "value": "{\"a\": 1}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-invite-costs-unknown-resource-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "invite_generation_costs",
+          "value": "[{\"resource\": \"banana\", \"amount\": 1, \"enabled\": true}]"
+        }
+      ]
+    }
+  },
+  {
+    "name": "put-vip-benefits-incomplete-400",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "vip_benefits_config",
+          "value": "{}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "smtp-test-anon-401",
+    "method": "POST",
+    "path": "/api/system-config/smtp/test"
+  },
+  {
+    "name": "smtp-test-non-admin-403",
+    "method": "POST",
+    "path": "/api/system-config/smtp/test",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "smtp-test-admin",
+    "method": "POST",
+    "path": "/api/system-config/smtp/test",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "smtp-send-test-anon-401",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test"
+  },
+  {
+    "name": "smtp-send-test-non-admin-403",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "to": "a@b.com"
+    }
+  },
+  {
+    "name": "smtp-send-test-missing-to-400",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "smtp-send-test-bad-format-400",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "to": "not-an-email"
+    }
+  },
+  {
+    "name": "smtp-send-test-domain-without-dot-400",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "to": "a@b"
+    }
+  },
+  {
+    "name": "smtp-send-test-object-to-400",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "to": {
+        "a": 1
+      }
+    }
+  },
+  {
+    "name": "smtp-send-test-valid-to-empty-config",
+    "method": "POST",
+    "path": "/api/system-config/smtp/send-test",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "to": "a@b.com"
+    }
+  },
+  {
+    "name": "put-secret-placeholder-keeps-secret",
+    "method": "PUT",
+    "path": "/api/system-config",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {
+      "configs": [
+        {
+          "key": "smtp_password",
+          "value": "********"
+        }
+      ]
+    }
+  }
+]
