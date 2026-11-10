@@ -1,0 +1,277 @@
+[
+  {
+    "name": "agent-install-script-public",
+    "method": "GET",
+    "path": "/api/agent/install.sh"
+  },
+  {
+    "name": "agent-distribution-public",
+    "method": "GET",
+    "path": "/api/agent/distribution"
+  },
+  {
+    "name": "agent-install-config-unknown-token",
+    "method": "GET",
+    "path": "/api/agent/install-config/ait_parity_unknown_token_0000000000000000000"
+  },
+  {
+    "name": "agent-install-config-expired-token",
+    "method": "GET",
+    "path": "/api/agent/install-config/ait_parity_expired_token_000000000000000000"
+  },
+  {
+    "name": "agent-install-config-used-token",
+    "method": "GET",
+    "path": "/api/agent/install-config/ait_parity_used_token_0000000000000000000000"
+  },
+  {
+    "name": "agent-install-config-malformed-token",
+    "method": "GET",
+    "path": "/api/agent/install-config/not-a-token"
+  },
+  {
+    "name": "agent-install-config-invalid-format",
+    "method": "GET",
+    "path": "/api/agent/install-config/ait_parity_unknown_token_0000000000000000000?format=yaml"
+  },
+  {
+    "name": "agent-status-anonymous",
+    "method": "GET",
+    "path": "/api/agent/hosts/990001/status"
+  },
+  {
+    "name": "agent-status-admin-owner",
+    "method": "GET",
+    "path": "/api/agent/hosts/990001/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-status-user-own-host",
+    "method": "GET",
+    "path": "/api/agent/hosts/990002/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-status-user-other-host",
+    "method": "GET",
+    "path": "/api/agent/hosts/990001/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-status-invalid-host-id",
+    "method": "GET",
+    "path": "/api/agent/hosts/abc/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-status-zero-host-id",
+    "method": "GET",
+    "path": "/api/agent/hosts/0/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-status-missing-host",
+    "method": "GET",
+    "path": "/api/agent/hosts/999999/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-admin-status",
+    "method": "GET",
+    "path": "/api/agent/admin/hosts/990001/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-admin-status-non-admin",
+    "method": "GET",
+    "path": "/api/agent/admin/hosts/990001/status",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-admin-status-invalid-id",
+    "method": "GET",
+    "path": "/api/agent/admin/hosts/-1/status",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "agent-user-install-command-invalid-id",
+    "method": "POST",
+    "path": "/api/agent/hosts/abc/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-user-install-command-other-host",
+    "method": "POST",
+    "path": "/api/agent/hosts/990001/install-command",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-admin-credentials-invalid-id",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/abc/credentials",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-admin-credentials-missing-host",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/999999/credentials",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-admin-credentials-non-admin",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990001/credentials",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-admin-install-command-invalid-base-url",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990001/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "baseUrl": "ftp://panel.example.com" }
+  },
+  {
+    "name": "agent-admin-install-command-empty-base-url",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990001/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "baseUrl": "" }
+  },
+  {
+    "name": "agent-admin-install-command-invalid-channel",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990001/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "channel": "nightly" }
+  },
+  {
+    "name": "agent-admin-install-command-unknown-field-is-dropped",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990004/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "headers": { "Origin": "https://panel.example.com" },
+    "body": { "unexpected": true },
+    "skipBody": true
+  },
+  {
+    "name": "agent-tunnel-plain-get",
+    "method": "GET",
+    "path": "/api/agent/tunnel"
+  },
+  {
+    "name": "agent-heartbeat-anonymous",
+    "method": "POST",
+    "path": "/api/agent/heartbeat",
+    "body": {}
+  },
+  {
+    "name": "agent-heartbeat-web-jwt",
+    "method": "POST",
+    "path": "/api/agent/heartbeat",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-heartbeat-public-api-token",
+    "method": "POST",
+    "path": "/api/agent/heartbeat",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-heartbeat-expired-timestamp",
+    "method": "POST",
+    "path": "/api/agent/heartbeat",
+    "body": {},
+    "headers": {
+      "X-Incudal-Agent-Id": "agt_parity_fixture_agent_0001",
+      "X-Incudal-Timestamp": "1700000000000",
+      "X-Incudal-Nonce": "parity-nonce-0001",
+      "X-Incudal-Body-Sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "X-Incudal-Signature": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "name": "agent-heartbeat-invalid-agent-id",
+    "method": "POST",
+    "path": "/api/agent/heartbeat",
+    "body": {},
+    "headers": {
+      "X-Incudal-Agent-Id": "not-an-agent-id",
+      "X-Incudal-Timestamp": "1700000000000",
+      "X-Incudal-Nonce": "parity-nonce-0002",
+      "X-Incudal-Body-Sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "X-Incudal-Signature": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "name": "agent-startup-keys-anonymous",
+    "method": "POST",
+    "path": "/api/agent/startup-keys",
+    "body": {}
+  },
+  {
+    "name": "agent-startup-keys-web-jwt",
+    "method": "POST",
+    "path": "/api/agent/startup-keys",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "agent-security-report-anonymous",
+    "method": "POST",
+    "path": "/api/agent/security-report",
+    "body": {}
+  },
+  {
+    "name": "agent-security-report-web-jwt",
+    "method": "POST",
+    "path": "/api/agent/security-report",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": { "state": { "enabled": true, "locked": false, "revision": 1 }, "events": [] }
+  },
+  {
+    "name": "agent-security-report-expired-timestamp",
+    "method": "POST",
+    "path": "/api/agent/security-report",
+    "body": { "state": { "enabled": true, "locked": false, "revision": 1 }, "events": [] },
+    "headers": {
+      "X-Incudal-Agent-Id": "agt_parity_fixture_agent_0001",
+      "X-Incudal-Timestamp": "1700000000000",
+      "X-Incudal-Nonce": "parity-nonce-0003",
+      "X-Incudal-Body-Sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "X-Incudal-Signature": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "name": "agent-user-install-command-success",
+    "method": "POST",
+    "path": "/api/agent/hosts/990003/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "headers": { "Origin": "https://panel.example.com" },
+    "body": {},
+    "skipBody": true
+  },
+  {
+    "name": "agent-admin-install-command-success",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990004/install-command",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "headers": { "Origin": "https://panel.example.com" },
+    "body": { "enabled": true, "channel": "latest" },
+    "skipBody": true
+  },
+  {
+    "name": "agent-admin-credentials-success",
+    "method": "POST",
+    "path": "/api/agent/admin/hosts/990005/credentials",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {},
+    "skipBody": true
+  }
+]
