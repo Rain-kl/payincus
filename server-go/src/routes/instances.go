@@ -3956,16 +3956,64 @@ type InstancesIncusProvisionInput struct {
 	GPUPCIs []string
 }
 
-// InstancesIncusProvisioner is the seam for buildInstanceConfig + createInstance +
-// startInstance (lib/incus/incus-instances.ts). That module is owned by the
-// instances-deps wave and does not export the body builder yet. Unwired, the async
-// creation fails loudly, the purchase is refunded and the instance lands in `error`
-// — never a fake `running` row.
-var InstancesIncusProvisioner func(ctx context.Context, client *lib.IncusClient, input InstancesIncusProvisionInput) error
+// InstancesIncusProvisioner delegates to the real lib implementation:
+// buildInstanceConfig + createInstance + startInstance (+ the 180s VM start wait)
+// in lib/incus_instances.go.
+//
+// The seam has to stay in this package: its input carries routes-owned types
+// (instancesCreateConfig), and lib must not import routes (routes imports lib, so
+// that direction would be an import cycle). The closure below is a pure field
+// projection — every Incus-side step lives in lib, which keeps the resource-delivery
+// behaviour in one testable place.
+//
+// It is never nil now: a failure surfaces as the node's own error, the async
+// creation runs the compensation path and the instance lands in `error` — never a
+// fake `running` row.
+var InstancesIncusProvisioner = func(ctx context.Context, client *lib.IncusClient, input InstancesIncusProvisionInput) error {
+	return lib.IncusInstanceProvision(ctx, client, lib.IncusInstanceProvisionInput{
+		Host: input.Host,
+		Config: lib.IncusInstanceProvisionConfig{
+			Name:                    input.Config.Name,
+			Image:                   input.Config.Image,
+			CPU:                     input.Config.CPU,
+			Memory:                  input.Config.Memory,
+			Disk:                    input.Config.Disk,
+			SwapEnabled:             input.Config.SwapEnabled,
+			SwapSize:                input.Config.SwapSize,
+			CloudInitConfig:         input.Config.CloudInitConfig,
+			NetworkMode:             input.Config.NetworkMode,
+			Nested:                  input.Config.Nested,
+			Privileged:              input.Config.Privileged,
+			InstanceType:            input.Config.InstanceType,
+			StoragePool:             input.Config.StoragePool,
+			IPv4Address:             input.Config.IPv4Address,
+			IPv6Address:             input.Config.IPv6Address,
+			IPv6Gateway:             input.Config.IPv6Gateway,
+			HostInterface:           input.Config.HostInterface,
+			LimitsRead:              input.Config.LimitsRead,
+			LimitsWrite:             input.Config.LimitsWrite,
+			LimitsReadIops:          input.Config.LimitsReadIops,
+			LimitsWriteIops:         input.Config.LimitsWriteIops,
+			LimitsIngress:           input.Config.LimitsIngress,
+			LimitsEgress:            input.Config.LimitsEgress,
+			LimitsProcesses:         input.Config.LimitsProcesses,
+			LimitsCPUPriority:       input.Config.LimitsCPUPriority,
+			BootAutostart:           input.Config.BootAutostart,
+			BootAutostartPriority:   input.Config.BootAutostartPriority,
+			BootAutostartDelay:      input.Config.BootAutostartDelay,
+			BootHostShutdownTimeout: input.Config.BootHostShutdownTimeout,
+		},
+		GPUPCIs: input.GPUPCIs,
+	})
+}
 
-// InstancesIncusCleanup is the seam for the best-effort `deleteInstance` cleanup
-// after a failed creation.
-var InstancesIncusCleanup func(ctx context.Context, client *lib.IncusClient, instanceName string) error
+// InstancesIncusCleanup delegates to lib.IncusInstanceCleanup, the best-effort
+// `deleteInstance` the compensation path runs after a failed creation. A 404 is a
+// success: cleaning up an instance that never landed must not become a second
+// failure.
+var InstancesIncusCleanup = func(ctx context.Context, client *lib.IncusClient, instanceName string) error {
+	return lib.IncusInstanceCleanup(ctx, client, instanceName)
+}
 
 // instancesCreateInstanceAsync mirrors createInstanceAsync: create + start on the
 // node, flip creating→running, write IP records, provision the automatic remote
