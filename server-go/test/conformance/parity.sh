@@ -185,6 +185,8 @@ for dst in "${filled[@]}"; do
   tail -60 "$log"
   if [ $status -ne 0 ]; then
     rc=1
+    # The summary sits at the end, so a FAIL line can fall outside the tail.
+    grep -E '^(FAIL|skip)' "$log" >&2 || true
     echo "FAIL: $(basename "$dst") exited $status; full output kept at $log" >&2
   fi
 done

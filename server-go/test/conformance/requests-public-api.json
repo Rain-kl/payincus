@@ -1,0 +1,934 @@
+[
+  {
+    "name": "public-openapi-json",
+    "method": "GET",
+    "path": "/api/v1/openapi.json"
+  },
+  {
+    "name": "public-openapi-yaml",
+    "method": "GET",
+    "path": "/api/v1/openapi.yaml"
+  },
+  {
+    "name": "public-me-anon",
+    "method": "GET",
+    "path": "/api/v1/me"
+  },
+  {
+    "name": "public-me-bad-format",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "not-a-public-api-token"
+  },
+  {
+    "name": "public-me-web-jwt",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "public-me-unknown-pat",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "pat_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  {
+    "name": "public-me-restricted-token",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "pat_conformance_scope_probe_only_profile_read_0001"
+  },
+  {
+    "name": "public-balance-restricted-token",
+    "method": "GET",
+    "path": "/api/v1/balance",
+    "token": "pat_conformance_scope_probe_only_profile_read_0001"
+  },
+  {
+    "name": "public-orders-restricted-token",
+    "method": "GET",
+    "path": "/api/v1/orders",
+    "token": "pat_conformance_scope_probe_only_profile_read_0001"
+  },
+  {
+    "name": "public-me-revoked",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "pat_conformance_revoked_probe_00000000000000002"
+  },
+  {
+    "name": "public-me-expired",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "pat_conformance_expired_probe_00000000000000003"
+  },
+  {
+    "name": "public-me",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-me-patch-invalid-style",
+    "method": "PATCH",
+    "path": "/api/v1/me",
+    "body": {
+      "avatarStyle": "not-a-style"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-me-patch-missing-field",
+    "method": "PATCH",
+    "path": "/api/v1/me",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-me-patch-non-string",
+    "method": "PATCH",
+    "path": "/api/v1/me",
+    "body": {
+      "avatarStyle": 123
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-me-patch-valid",
+    "method": "PATCH",
+    "path": "/api/v1/me",
+    "body": {
+      "avatarStyle": "identicon"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance",
+    "method": "GET",
+    "path": "/api/v1/balance",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs",
+    "method": "GET",
+    "path": "/api/v1/balance/logs",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-type-consume",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?type=consume",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-type-unknown",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?type=not-a-type",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-lottery-only",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?lotteryGift=only",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-lottery-exclude",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?lotteryGift=exclude",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-sort-asc",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?sort=createdAt",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-invalid-sort",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?sort=name",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-page-clamped",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?page=0&pageSize=1000",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-page-two",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-balance-logs-repeated-page",
+    "method": "GET",
+    "path": "/api/v1/balance/logs?page=1&page=2",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-list",
+    "method": "GET",
+    "path": "/api/v1/balance/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-invalid-status",
+    "method": "GET",
+    "path": "/api/v1/balance/adjustment-requests?status=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-invalid-sort",
+    "method": "GET",
+    "path": "/api/v1/balance/adjustment-requests?sort=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-create-invalid-amount",
+    "method": "POST",
+    "path": "/api/v1/balance/adjustment-requests",
+    "body": {
+      "amount": 0,
+      "reason": "this is a valid reason text",
+      "orderNo": "ORDER-1"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-create-invalid-reason",
+    "method": "POST",
+    "path": "/api/v1/balance/adjustment-requests",
+    "body": {
+      "amount": 10,
+      "reason": "short"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-create-invalid-order-no",
+    "method": "POST",
+    "path": "/api/v1/balance/adjustment-requests",
+    "body": {
+      "amount": 10,
+      "reason": "this is a valid reason text",
+      "orderNo": "bad order!"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-adjustments-create-valid",
+    "method": "POST",
+    "path": "/api/v1/balance/adjustment-requests",
+    "body": {
+      "amount": 12.34,
+      "reason": "conformance adjustment reason",
+      "requestType": "refund",
+      "orderNo": "PARITY-PUB-ADJ-1"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "public-adjustments-list-after-create",
+    "method": "GET",
+    "path": "/api/v1/balance/adjustment-requests",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-products",
+    "method": "GET",
+    "path": "/api/v1/products",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-products-sort-created-asc",
+    "method": "GET",
+    "path": "/api/v1/products?sort=createdAt&pageSize=5",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-products-invalid-sort",
+    "method": "GET",
+    "path": "/api/v1/products?sort=name",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-products-page-size-clamped",
+    "method": "GET",
+    "path": "/api/v1/products?pageSize=1000",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-product-980001",
+    "method": "GET",
+    "path": "/api/v1/products/980001",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-product-inactive",
+    "method": "GET",
+    "path": "/api/v1/products/980002",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-product-invalid-id",
+    "method": "GET",
+    "path": "/api/v1/products/abc",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-product-not-found",
+    "method": "GET",
+    "path": "/api/v1/products/999999",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders",
+    "method": "GET",
+    "path": "/api/v1/orders",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-status-pending",
+    "method": "GET",
+    "path": "/api/v1/orders?status=pending",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-status-completed",
+    "method": "GET",
+    "path": "/api/v1/orders?status=completed",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-status-refunded",
+    "method": "GET",
+    "path": "/api/v1/orders?status=refunded",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-status-failed",
+    "method": "GET",
+    "path": "/api/v1/orders?status=failed",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-invalid-status",
+    "method": "GET",
+    "path": "/api/v1/orders?status=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-sort-asc",
+    "method": "GET",
+    "path": "/api/v1/orders?sort=createdAt",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-page-one",
+    "method": "GET",
+    "path": "/api/v1/orders?page=1&pageSize=1",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-orders-page-two",
+    "method": "GET",
+    "path": "/api/v1/orders?page=2&pageSize=2",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-order-recharge",
+    "method": "GET",
+    "path": "/api/v1/orders/recharge:980401",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-order-billing",
+    "method": "GET",
+    "path": "/api/v1/orders/instance_billing:980301",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-order-recharge-not-found",
+    "method": "GET",
+    "path": "/api/v1/orders/recharge:999999",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-order-invalid",
+    "method": "GET",
+    "path": "/api/v1/orders/bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-order-invalid-id",
+    "method": "GET",
+    "path": "/api/v1/orders/recharge:abc",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-records",
+    "method": "GET",
+    "path": "/api/v1/billing-records",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-type-refund",
+    "method": "GET",
+    "path": "/api/v1/billing-records?type=refund",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-type-invalid",
+    "method": "GET",
+    "path": "/api/v1/billing-records?type=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-service-filter",
+    "method": "GET",
+    "path": "/api/v1/billing-records?serviceId=980101",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-service-invalid",
+    "method": "GET",
+    "path": "/api/v1/billing-records?serviceId=abc",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-sort-asc",
+    "method": "GET",
+    "path": "/api/v1/billing-records?sort=createdAt",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-detail-980301",
+    "method": "GET",
+    "path": "/api/v1/billing-records/980301",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-detail-not-found",
+    "method": "GET",
+    "path": "/api/v1/billing-records/999999",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-billing-detail-invalid-id",
+    "method": "GET",
+    "path": "/api/v1/billing-records/abc",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services",
+    "method": "GET",
+    "path": "/api/v1/services",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services-status-running",
+    "method": "GET",
+    "path": "/api/v1/services?status=running",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services-status-invalid",
+    "method": "GET",
+    "path": "/api/v1/services?status=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services-include-product-plan",
+    "method": "GET",
+    "path": "/api/v1/services?include=product,plan",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services-include-invalid",
+    "method": "GET",
+    "path": "/api/v1/services?include=instance",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services-sort-created-asc",
+    "method": "GET",
+    "path": "/api/v1/services?sort=createdAt",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-services-sort-display-desc",
+    "method": "GET",
+    "path": "/api/v1/services?sort=-displayOrder",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-service-980101",
+    "method": "GET",
+    "path": "/api/v1/services/980101",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-service-980101-include-product",
+    "method": "GET",
+    "path": "/api/v1/services/980101?include=product",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-service-other-user",
+    "method": "GET",
+    "path": "/api/v1/services/980107",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-service-invalid-id",
+    "method": "GET",
+    "path": "/api/v1/services/abc",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-service-not-found",
+    "method": "GET",
+    "path": "/api/v1/services/999999",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-invalid-action",
+    "method": "POST",
+    "path": "/api/v1/services/980101/actions",
+    "body": {
+      "action": "delete"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-invalid-id",
+    "method": "POST",
+    "path": "/api/v1/services/abc/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-other-user",
+    "method": "POST",
+    "path": "/api/v1/services/980107/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-deleted",
+    "method": "POST",
+    "path": "/api/v1/services/980105/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-suspended-expired",
+    "method": "POST",
+    "path": "/api/v1/services/980103/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-suspended-manual",
+    "method": "POST",
+    "path": "/api/v1/services/980104/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-already-running",
+    "method": "POST",
+    "path": "/api/v1/services/980101/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-already-stopped",
+    "method": "POST",
+    "path": "/api/v1/services/980102/actions",
+    "body": {
+      "action": "stop"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-action-transfer-locked",
+    "method": "POST",
+    "path": "/api/v1/services/980102/actions",
+    "body": {
+      "action": "start"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-renew-invalid-months-zero",
+    "method": "POST",
+    "path": "/api/v1/services/980101/renew",
+    "body": {
+      "months": 0
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-renew-invalid-months-high",
+    "method": "POST",
+    "path": "/api/v1/services/980101/renew",
+    "body": {
+      "months": 25
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-renew-other-user",
+    "method": "POST",
+    "path": "/api/v1/services/980107/renew",
+    "body": {
+      "months": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-renew-free-service",
+    "method": "POST",
+    "path": "/api/v1/services/980106/renew",
+    "body": {
+      "months": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-task-invalid-ids",
+    "method": "GET",
+    "path": "/api/v1/services/abc/tasks/1",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-task-not-found",
+    "method": "GET",
+    "path": "/api/v1/services/980101/tasks/999999",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-task-completed",
+    "method": "GET",
+    "path": "/api/v1/services/980101/tasks/980801",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-task-delete-invalid-ids",
+    "method": "DELETE",
+    "path": "/api/v1/services/980101/tasks/abc",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-task-delete-not-found",
+    "method": "DELETE",
+    "path": "/api/v1/services/980101/tasks/999999",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-task-delete-completed",
+    "method": "DELETE",
+    "path": "/api/v1/services/980101/tasks/980801",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-tickets",
+    "method": "GET",
+    "path": "/api/v1/tickets",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-tickets-status-open",
+    "method": "GET",
+    "path": "/api/v1/tickets?status=open",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-tickets-category-invalid",
+    "method": "GET",
+    "path": "/api/v1/tickets?category=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-tickets-priority-urgent",
+    "method": "GET",
+    "path": "/api/v1/tickets?priority=urgent",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-tickets-sort-created-asc",
+    "method": "GET",
+    "path": "/api/v1/tickets?sort=createdAt",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-tickets-sort-invalid",
+    "method": "GET",
+    "path": "/api/v1/tickets?sort=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-980601",
+    "method": "GET",
+    "path": "/api/v1/tickets/980601",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-980602",
+    "method": "GET",
+    "path": "/api/v1/tickets/980602",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-invalid-id",
+    "method": "GET",
+    "path": "/api/v1/tickets/abc",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-not-found",
+    "method": "GET",
+    "path": "/api/v1/tickets/999999",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-create-invalid-subject",
+    "method": "POST",
+    "path": "/api/v1/tickets",
+    "body": {
+      "subject": "a",
+      "content": "long enough content"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-create-invalid-content",
+    "method": "POST",
+    "path": "/api/v1/tickets",
+    "body": {
+      "subject": "valid subject",
+      "content": "short"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-create-invalid-instance",
+    "method": "POST",
+    "path": "/api/v1/tickets",
+    "body": {
+      "subject": "valid subject",
+      "content": "long enough content",
+      "instanceId": "abc"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-create-instance-not-found",
+    "method": "POST",
+    "path": "/api/v1/tickets",
+    "body": {
+      "subject": "valid subject",
+      "content": "long enough content",
+      "instanceId": 999999
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-create-valid",
+    "method": "POST",
+    "path": "/api/v1/tickets",
+    "body": {
+      "subject": "conformance-public-api-new-ticket",
+      "content": "conformance ticket body"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "public-ticket-status-invalid-action",
+    "method": "PATCH",
+    "path": "/api/v1/tickets/980602/status",
+    "body": {
+      "action": "delete"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-status-not-found",
+    "method": "PATCH",
+    "path": "/api/v1/tickets/999999/status",
+    "body": {
+      "action": "close"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-status-close-closed",
+    "method": "PATCH",
+    "path": "/api/v1/tickets/980601/status",
+    "body": {
+      "action": "close"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-status-reopen-open",
+    "method": "PATCH",
+    "path": "/api/v1/tickets/980602/status",
+    "body": {
+      "action": "reopen"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-reply-empty-content",
+    "method": "POST",
+    "path": "/api/v1/tickets/980602/replies",
+    "body": {
+      "content": "  "
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-reply-closed",
+    "method": "POST",
+    "path": "/api/v1/tickets/980601/replies",
+    "body": {
+      "content": "hello"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-ticket-reply-not-found",
+    "method": "POST",
+    "path": "/api/v1/tickets/999999/replies",
+    "body": {
+      "content": "hello"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications",
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-unread-count",
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-count",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-unread-only",
+    "method": "GET",
+    "path": "/api/v1/notifications?isRead=false",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-read-only",
+    "method": "GET",
+    "path": "/api/v1/notifications?isRead=true",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-sort-asc",
+    "method": "GET",
+    "path": "/api/v1/notifications?sort=createdAt",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-sort-invalid",
+    "method": "GET",
+    "path": "/api/v1/notifications?sort=bogus",
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-post-invalid-variables",
+    "method": "POST",
+    "path": "/api/v1/notifications",
+    "body": {
+      "title": "t",
+      "message": "m",
+      "variables": [
+        "x"
+      ]
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-post-invalid-template",
+    "method": "POST",
+    "path": "/api/v1/notifications",
+    "body": {
+      "template": "unknown_template"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-post-template-missing-vars",
+    "method": "POST",
+    "path": "/api/v1/notifications",
+    "body": {
+      "template": "flash_sale_reminder",
+      "variables": {
+        "campaignName": "x"
+      }
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-post-missing-payload",
+    "method": "POST",
+    "path": "/api/v1/notifications",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN"
+  },
+  {
+    "name": "public-notifications-post-valid",
+    "method": "POST",
+    "path": "/api/v1/notifications",
+    "body": {
+      "title": "conformance custom title",
+      "message": "conformance custom message",
+      "source": "conformance-harness"
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN",
+    "skipBody": true
+  },
+  {
+    "name": "public-notifications-post-template-valid",
+    "method": "POST",
+    "path": "/api/v1/notifications",
+    "body": {
+      "template": "billing_notice",
+      "variables": {
+        "subject": "2026-11",
+        "amount": "12.34",
+        "note": "conformance note"
+      }
+    },
+    "token": "REPLACE_WITH_A_REAL_PUBLIC_API_TOKEN",
+    "skipBody": true
+  }
+]
