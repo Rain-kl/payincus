@@ -73,6 +73,21 @@ func main() {
 		stopWorkers()
 		stopRun()
 
+		// Console sessions hold live sockets through the host tunnel; close them and
+		// let the SPICE backends finish their onClose cleanup (the Node app does the
+		// same in its close hook). Bounded so a stuck backend cannot block exit.
+		closed := lib.CloseAllSessions("Server shutdown")
+		drained := make(chan struct{})
+		go func() {
+			lib.SpiceSessions.Drain()
+			close(drained)
+		}()
+		select {
+		case <-drained:
+		case <-time.After(10 * time.Second):
+			log.Printf("console drain timed out (terminal sessions closed: %d)", closed)
+		}
+
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
