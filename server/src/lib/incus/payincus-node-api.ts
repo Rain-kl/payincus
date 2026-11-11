@@ -18,7 +18,7 @@ export const requestNodeAPI: NodeAPIRequester = async (hostId, method, params, s
 
 export async function callNodeAPI(client: Pick<IncusClient, 'request'>, method: ControlMethod, params: unknown, signal: AbortSignal) {
   signal.throwIfAborted()
-  const info = await client.request<{ api_extensions: string[] }>('GET', '/1.0/payincus', null, undefined, signal)
-  if (!Array.isArray(info?.api_extensions) || !info.api_extensions.includes('payincus_node_v1')) throw new Error('Node API extension unavailable')
-  return client.request(method === 'proxy.probe' ? 'POST' : 'PUT', method === 'proxy.probe' ? '/1.0/payincus/proxy-probes' : '/1.0/payincus/network', params, undefined, signal)
+  const info = await client.request<{ api_extensions: string[] }>('GET', '/1.0/agent', null, undefined, signal)
+  if (!Array.isArray(info?.api_extensions) || !info.api_extensions.includes('incus_node_v1')) throw new Error('Node API extension unavailable')
+  return client.request(method === 'proxy.probe' ? 'POST' : 'PUT', method === 'proxy.probe' ? '/1.0/agent/proxy-probes' : '/1.0/agent/network', params, undefined, signal)
 }

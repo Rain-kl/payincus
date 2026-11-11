@@ -597,7 +597,7 @@ func TestHostsInjectInstallVariable(t *testing.T) {
 func TestHostsBuildNodeInstallCommand(t *testing.T) {
 	command := hostsBuildNodeInstallCommand("https://panel.example.com/", "ait_token")
 	want := "curl -fsSL 'https://panel.example.com/api/agent/install.sh' -o incus-node-install.sh && " +
-		"sudo env INCUDAL_PANEL_URL='https://panel.example.com' INCUDAL_AGENT_INSTALL_TOKEN='ait_token' " +
+		"sudo env INCUS_PANEL_URL='https://panel.example.com' INCUS_AGENT_INSTALL_TOKEN='ait_token' " +
 		"INCUS_NODE_CHANNEL='canary' bash incus-node-install.sh"
 	if command != want {
 		t.Fatalf("install command = %q\nwant %q", command, want)

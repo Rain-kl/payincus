@@ -29,11 +29,11 @@ export async function provisionEncryptedPool(hostId: number, input: EncryptedPoo
     if (!Number.isSafeInteger(sizeGiB) || sizeGiB < 1 || sizeGiB > 65536) throw new StorageEncryptionError(400, '文件池容量必须为 1–65536 GiB')
   }
   return withStorageSession(hostId, true, async (node, vault) => {
-    const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
-    if (!Array.isArray(info.api_extensions) || !info.api_extensions.includes('payincus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持自动加密存储创建，请先更新节点集成包')
-    if (directory && !info.api_extensions.includes('payincus_storage_pool_dir_v1')) throw new StorageEncryptionError(409, '节点尚不支持自定义存储目录，请先更新节点集成包')
-    if (size && !info.api_extensions.includes('payincus_storage_pool_alloc_v1')) throw new StorageEncryptionError(409, '节点尚不支持按需分配的文件池，请先更新节点集成包')
-    const security = await node.request<{ locked: boolean }>('GET', '/1.0/payincus/security')
+    const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/agent')
+    if (!Array.isArray(info.api_extensions) || !info.api_extensions.includes('incus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持自动加密存储创建，请先更新节点集成包')
+    if (directory && !info.api_extensions.includes('incus_storage_pool_dir_v1')) throw new StorageEncryptionError(409, '节点尚不支持自定义存储目录，请先更新节点集成包')
+    if (size && !info.api_extensions.includes('incus_storage_pool_alloc_v1')) throw new StorageEncryptionError(409, '节点尚不支持按需分配的文件池，请先更新节点集成包')
+    const security = await node.request<{ locked: boolean }>('GET', '/1.0/agent/security')
     if (security.locked !== false) throw new StorageEncryptionError(423, '节点安全锁定中，不能创建存储池')
     const dataset = `${poolName}/incus`
     const existing = await vault.find(dataset)
@@ -51,7 +51,7 @@ export async function provisionEncryptedPool(hostId: number, input: EncryptedPoo
       if (!Array.isArray(paths)) throw new Error('invalid storage pool list')
       const poolPath = `/1.0/storage-pools/${encodeURIComponent(input.name)}`
       if (!paths.includes(poolPath)) {
-        const state = await node.request<{ targets: Array<{ dataset: string; fingerprint: string }> }>('POST', '/1.0/payincus/storage/pool', { name: poolName, device, sizeGiB, ...(directory ? { directory } : {}), preallocate: !!size && input.preallocate === true, key })
+        const state = await node.request<{ targets: Array<{ dataset: string; fingerprint: string }> }>('POST', '/1.0/agent/storage/pool', { name: poolName, device, sizeGiB, ...(directory ? { directory } : {}), preallocate: !!size && input.preallocate === true, key })
         if (!state.targets?.some(t => t.dataset === dataset && t.fingerprint === fp)) throw new Error('node did not confirm dataset identity')
         await node.request('POST', '/1.0/storage-pools', { name: input.name, driver: 'zfs', config: { source: dataset }, description: input.description || '' })
       }

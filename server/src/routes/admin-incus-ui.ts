@@ -69,7 +69,7 @@ function parsePositiveRouteId(value: string): number | null {
  * 规范化并校验代理到宿主机 incusd 的目标路径：
  * 1. 仅允许 /1.0 及 /1.0/* 路径
  * 2. 严禁路径穿越 (.. 或 \)
- * 3. 严禁访问内部节点控制扩展 /1.0/payincus
+ * 3. 严禁访问内部节点控制扩展 /1.0/agent
  */
 export function normalizeIncusProxyTargetPath(wildcard: string, rawSearch = ''): string | null {
   const trimmed = String(wildcard || '').replace(/^\/+/, '')
@@ -99,7 +99,7 @@ export function normalizeIncusProxyTargetPath(wildcard: string, rawSearch = ''):
     return null
   }
 
-  if (cleanPath === '/1.0/payincus' || cleanPath.startsWith('/1.0/payincus/')) {
+  if (cleanPath === '/1.0/agent' || cleanPath.startsWith('/1.0/agent/')) {
     return null
   }
 

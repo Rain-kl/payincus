@@ -424,8 +424,8 @@ func agentShellEscape(value string) string {
 
 // agentBuildAgentInstallConfig mirrors buildAgentInstallConfig.
 func agentBuildAgentInstallConfig(agentID, agentSecret string) string {
-	return "INCUDAL_AGENT_ID=" + agentShellEscape(agentID) + "\n" +
-		"INCUDAL_AGENT_SECRET=" + agentShellEscape(agentSecret) + "\n"
+	return "INCUS_AGENT_ID=" + agentShellEscape(agentID) + "\n" +
+		"INCUS_AGENT_SECRET=" + agentShellEscape(agentSecret) + "\n"
 }
 
 // agentBuildNodeInstallCommand mirrors buildNodeInstallCommand from
@@ -438,8 +438,8 @@ func agentBuildNodeInstallCommand(panelURL, installToken string, channel *string
 		channelValue = *channel
 	}
 	return "curl -fsSL " + agentShellEscape(stripped+"/api/agent/install.sh") +
-		" -o incus-node-install.sh && sudo env INCUDAL_PANEL_URL=" + agentShellEscape(stripped) +
-		" INCUDAL_AGENT_INSTALL_TOKEN=" + agentShellEscape(installToken) +
+		" -o incus-node-install.sh && sudo env INCUS_PANEL_URL=" + agentShellEscape(stripped) +
+		" INCUS_AGENT_INSTALL_TOKEN=" + agentShellEscape(installToken) +
 		" INCUS_NODE_CHANNEL=" + agentShellEscape(channelValue) +
 		" bash incus-node-install.sh"
 }
@@ -523,7 +523,7 @@ func agentSerialize(agent *models.HostAgent) gin.H {
 	capabilities := agentJSONArray(agent.Capabilities)
 	versionStatus := "unknown"
 	for _, capability := range capabilities {
-		if text, ok := capability.(string); ok && text == "payincus_node_v1" {
+		if text, ok := capability.(string); ok && text == "incus_node_v1" {
 			versionStatus = "managed"
 			break
 		}
@@ -1423,7 +1423,7 @@ func agentStartupKeysHandler(c *gin.Context) {
 			defer cancel()
 			_, lockErr := storageEncryptionWithStorageSession(lockCtx, hostID, false,
 				func(node StorageEncryptionNode, _ storageEncryptionKeyVault) (storageEncryptionPoolState, error) {
-					_, requestErr := node.Request(lockCtx, http.MethodPost, "/1.0/payincus/security/lock",
+					_, requestErr := node.Request(lockCtx, http.MethodPost, "/1.0/agent/security/lock",
 						map[string]any{"generation": generation})
 					return storageEncryptionPoolState{}, requestErr
 				})
@@ -1584,7 +1584,7 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 	}
 
 	nodeAPI, _ := body.Raw["nodeApi"].(string)
-	if nodeAPI != "payincus_node_v1" {
+	if nodeAPI != "incus_node_v1" {
 		c.JSON(http.StatusConflict, gin.H{
 			"code":  "NODE_API_REQUIRED",
 			"error": "Install the Incus node package",

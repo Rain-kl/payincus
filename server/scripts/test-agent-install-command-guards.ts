@@ -39,7 +39,7 @@ printf '%s\\n' "$@" > curl-args
 [ "\${FAIL_DOWNLOAD:-}" != 1 ] || exit 22
 cat > incus-node-install.sh <<'SCRIPT'
 #!/bin/sh
-printf '%s\\n' "$INCUDAL_PANEL_URL" "$INCUDAL_AGENT_INSTALL_TOKEN" "$INCUS_NODE_CHANNEL"
+printf '%s\\n' "$INCUS_PANEL_URL" "$INCUS_AGENT_INSTALL_TOKEN" "$INCUS_NODE_CHANNEL"
 SCRIPT
 `, { mode: 0o755 })
   writeFileSync(join(directory, 'sudo'), '#!/bin/sh\nexec "$@"\n', { mode: 0o755 })

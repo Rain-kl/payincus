@@ -70,7 +70,7 @@ let transaction = Promise.resolve()
 Object.assign(IncusClient.prototype, {
   connect: async () => {}, close: async () => {},
   request: async (method: string, path: string, body: any) => {
-    if (path === '/1.0/payincus') return { api_extensions: ['payincus_security_v1', 'payincus_security_resume_v1'] }
+    if (path === '/1.0/agent') return { api_extensions: ['incus_security_v1', 'incus_security_resume_v1'] }
     if (path.endsWith('/recover')) {
       approvals++
       if (failApproval) throw new Error('approval refused')

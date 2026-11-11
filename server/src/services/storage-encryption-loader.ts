@@ -6,7 +6,7 @@ import { evaluateHostService } from '../lib/host-service-status.js'
 import { storageReportMaxAgeMs } from '../lib/storage-capacity-policy.js'
 
 async function automaticStorageNeeded(node: StorageNode, hostId: number, name: string, vault: StorageKeyVault) {
-  const security = await node.request<{ locked: boolean; recoveryPending?: boolean }>('GET', '/1.0/payincus/security')
+  const security = await node.request<{ locked: boolean; recoveryPending?: boolean }>('GET', '/1.0/agent/security')
   if (security.locked !== false || security.recoveryPending) return false
   const readNode = await nodeForPendingPool(node, hostId, name)
   const state = await poolEncryption(readNode, name, vault)

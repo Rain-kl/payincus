@@ -377,7 +377,7 @@ type storageEncryptionKeyVault interface {
 func storageEncryptionPoolEncryption(
 	ctx context.Context, node StorageEncryptionNode, poolName string, vault storageEncryptionKeyVault,
 ) (storageEncryptionPoolState, error) {
-	infoRaw, err := node.Request(ctx, http.MethodGet, "/1.0/payincus", nil)
+	infoRaw, err := node.Request(ctx, http.MethodGet, "/1.0/agent", nil)
 	if err != nil {
 		return storageEncryptionPoolState{}, err
 	}
@@ -386,7 +386,7 @@ func storageEncryptionPoolEncryption(
 		return storageEncryptionPoolState{}, newStorageEncryptionError(409, "节点尚不支持存储加密管理，请先更新节点集成包")
 	}
 	extensions, ok := info["api_extensions"].([]any)
-	if !ok || !storageEncryptionAnyContains(extensions, "payincus_storage_encryption_v1") {
+	if !ok || !storageEncryptionAnyContains(extensions, "incus_storage_encryption_v1") {
 		return storageEncryptionPoolState{}, newStorageEncryptionError(409, "节点尚不支持存储加密管理，请先更新节点集成包")
 	}
 
@@ -410,7 +410,7 @@ func storageEncryptionPoolEncryption(
 		return storageEncryptionPoolState{}, newStorageEncryptionError(409, "无法确定此存储池的 ZFS 数据集，请刷新存储配置")
 	}
 
-	inventoryRaw, err := node.Request(ctx, http.MethodGet, "/1.0/payincus/storage", nil)
+	inventoryRaw, err := node.Request(ctx, http.MethodGet, "/1.0/agent/storage", nil)
 	if err != nil {
 		return storageEncryptionPoolState{}, err
 	}
@@ -554,7 +554,7 @@ func storageEncryptionUnlockPool(
 		return storageEncryptionPoolState{}, newStorageEncryptionError(503, "控制端密钥托管未就绪，请检查主密钥配置")
 	}
 
-	nodeStateRaw, err := node.Request(ctx, http.MethodGet, "/1.0/payincus/security", nil)
+	nodeStateRaw, err := node.Request(ctx, http.MethodGet, "/1.0/agent/security", nil)
 	if err != nil {
 		return storageEncryptionPoolState{}, err
 	}
@@ -607,7 +607,7 @@ func storageEncryptionUnlockPool(
 			action = "unlock"
 		}
 	}
-	if _, err := node.Request(ctx, http.MethodPost, "/1.0/payincus/storage/"+action,
+	if _, err := node.Request(ctx, http.MethodPost, "/1.0/agent/storage/"+action,
 		map[string]any{"dataset": state.EncryptionRoot, "key": key}); err != nil {
 		return storageEncryptionPoolState{}, err
 	}
@@ -643,7 +643,7 @@ func storageEncryptionUnlockPool(
 func storageEncryptionRestoreStorageInstances(
 	ctx context.Context, node StorageEncryptionNode, dataset string, hostID int32,
 ) error {
-	raw, err := node.Request(ctx, http.MethodGet, "/1.0/payincus/security", nil)
+	raw, err := node.Request(ctx, http.MethodGet, "/1.0/agent/security", nil)
 	if err != nil {
 		return err
 	}
@@ -701,7 +701,7 @@ func storageEncryptionLockPool(
 		return storageEncryptionPoolState{}, newStorageEncryptionError(503, "托管密钥暂不可用，未停止实例或锁盘，请先检查控制端主密钥配置")
 	}
 
-	registrationRaw, err := node.Request(ctx, http.MethodGet, "/1.0/payincus/security", nil)
+	registrationRaw, err := node.Request(ctx, http.MethodGet, "/1.0/agent/security", nil)
 	if err != nil {
 		return storageEncryptionPoolState{}, err
 	}
@@ -733,7 +733,7 @@ func storageEncryptionLockPool(
 		fmt.Sprintf("节点 #%d 管理员锁定存储池 %s", hostID, poolName)); err != nil {
 		return storageEncryptionPoolState{}, err
 	}
-	if _, err := node.Request(ctx, http.MethodPost, "/1.0/payincus/storage/lock-pool",
+	if _, err := node.Request(ctx, http.MethodPost, "/1.0/agent/storage/lock-pool",
 		map[string]any{"dataset": state.EncryptionRoot}); err != nil {
 		return storageEncryptionPoolState{}, err
 	}

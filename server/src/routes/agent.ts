@@ -321,8 +321,8 @@ function buildAgentInstallConfig(input: {
   agentSecret: string
 }): string {
   return [
-    `INCUDAL_AGENT_ID=${shellEscape(input.agentId)}`,
-    `INCUDAL_AGENT_SECRET=${shellEscape(input.agentSecret)}`
+    `INCUS_AGENT_ID=${shellEscape(input.agentId)}`,
+    `INCUS_AGENT_SECRET=${shellEscape(input.agentSecret)}`
   ].join('\n') + '\n'
 }
 
@@ -360,7 +360,7 @@ function deriveAgentStatus(agent: HostAgentRecord, now = new Date()): string {
 }
 
 async function serializeAgent(agent: HostAgentRecord) {
-  const versionStatus = Array.isArray(agent.capabilities) && agent.capabilities.includes('payincus_node_v1') ? 'managed' : 'unknown'
+  const versionStatus = Array.isArray(agent.capabilities) && agent.capabilities.includes('incus_node_v1') ? 'managed' : 'unknown'
 
   return {
     id: agent.id,
@@ -380,7 +380,7 @@ async function serializeAgent(agent: HostAgentRecord) {
 }
 
 async function serializeAgentStatus(agent: HostAgentRecord) {
-  const versionStatus = Array.isArray(agent.capabilities) && agent.capabilities.includes('payincus_node_v1') ? 'managed' : 'unknown'
+  const versionStatus = Array.isArray(agent.capabilities) && agent.capabilities.includes('incus_node_v1') ? 'managed' : 'unknown'
 
   return {
     id: agent.id,
@@ -833,7 +833,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     const result = await grantStartupKeys(agent, secret, request.body)
     if ('unavailable' in result) return reply.code(503).send({ error: 'Startup service unavailable' })
     if ('invalid' in result) {
-      void withStorageSession(agent.hostId, false, node => node.request('POST', '/1.0/payincus/security/lock', { generation: result.generation })).catch(() => fastify.log.warn({ hostId: agent.hostId }, 'Node action pending'))
+      void withStorageSession(agent.hostId, false, node => node.request('POST', '/1.0/agent/security/lock', { generation: result.generation })).catch(() => fastify.log.warn({ hostId: agent.hostId }, 'Node action pending'))
       return reply.code(409).send({ error: 'Internal service unavailable' })
     }
     if ('replay' in result) return reply.code(409).send({ error: 'Request could not be completed' })
@@ -886,7 +886,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     reply.raw.once('finish', () => {
       hostTunnelManager.completeHeartbeat(agent.hostId, request.body.heartbeatRequestId, reply.statusCode >= 400 ? '本次节点上报未能保存，测试失败' : reportError)
     })
-    if (request.body.nodeApi !== 'payincus_node_v1') return reply.code(409).send({ code: 'NODE_API_REQUIRED', error: 'Install the Incus node package' })
+    if (request.body.nodeApi !== 'incus_node_v1') return reply.code(409).send({ code: 'NODE_API_REQUIRED', error: 'Install the Incus node package' })
     const now = new Date()
     // Locked nodes remain online without turning an intentionally absent inventory into deletions.
     if (request.body.nodeSecurity?.state?.locked === true) {

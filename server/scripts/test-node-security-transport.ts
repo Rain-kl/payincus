@@ -43,7 +43,7 @@ try {
       const valid = new IncusClient({ ...options, tunnelEnabled: tunnel, hostId: 1 })
       try {
         await valid.connect()
-        assert.deepEqual(await valid.request('POST', '/1.0/payincus/security/unlock', { key: 'fixture-only' }), { ok: true })
+        assert.deepEqual(await valid.request('POST', '/1.0/agent/security/unlock', { key: 'fixture-only' }), { ok: true })
         assert.equal(lastBody, JSON.stringify({ key: 'fixture-only' }))
         for (const scenario of [
           { status: 409, message: 'refresh recovery state' },
@@ -53,7 +53,7 @@ try {
           { status: 500, message: 'Failed to begin transaction: sql: database disk image is malformed (11)' }
         ]) {
           failure = scenario
-          for (const endpoint of ['/1.0/payincus/security/recover', '/1.0/instances', '/1.0/storage-pools']) {
+          for (const endpoint of ['/1.0/agent/security/recover', '/1.0/instances', '/1.0/storage-pools']) {
             await assert.rejects(valid.request('POST', endpoint, { revision: 1 }), (error: unknown) => {
               assert.ok(error instanceof IncusApiError)
               assert.equal(error.message, scenario.message)
@@ -95,7 +95,7 @@ try {
         }
         asyncFailure = false
         failure = { status: 409, message: `key rejected: ${secret}` }
-        await assert.rejects(valid.request('POST', '/1.0/payincus/storage/create', { key: secret }), (error: unknown) => {
+        await assert.rejects(valid.request('POST', '/1.0/agent/storage/create', { key: secret }), (error: unknown) => {
           assert.ok(error instanceof IncusApiError)
           assert.equal(error.message.includes(secret), false)
           assert.match(error.message, /key rejected: \[REDACTED\]/)

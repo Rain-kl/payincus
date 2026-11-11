@@ -423,8 +423,8 @@ func adminIncusUINormalizeProxyTargetPath(wildcard, rawSearch string) string {
 	if cleanPath != "/1.0" && !strings.HasPrefix(cleanPath, "/1.0/") {
 		return ""
 	}
-	// /1.0/payincus is the node agent's private control extension: never proxied.
-	if cleanPath == "/1.0/payincus" || strings.HasPrefix(cleanPath, "/1.0/payincus/") {
+	// /1.0/agent is the node agent's private control extension: never proxied.
+	if cleanPath == "/1.0/agent" || strings.HasPrefix(cleanPath, "/1.0/agent/") {
 		return ""
 	}
 

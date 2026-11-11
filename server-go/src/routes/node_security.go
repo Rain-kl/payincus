@@ -15,8 +15,8 @@
 //
 //   - Every response is Cache-Control: no-store + Pragma: no-cache, including a
 //     revealed storage key.
-//   - The node client checks the node advertises `payincus_security_v1` (and
-//     `payincus_security_resume_v1` before a recover) and refuses to send anything
+//   - The node client checks the node advertises `incus_security_v1` (and
+//     `incus_security_resume_v1` before a recover) and refuses to send anything
 //     else. A node without the extension fails with
 //     `节点不支持此功能，请升级集成包` — it never proceeds on a guess.
 //   - The certificate pin comes from the operator-verified fingerprint stored in
@@ -55,9 +55,9 @@ const (
 	nodeSecurityBase = "/api/admin/hosts/:hostId/node-security"
 
 	// nodeSecuritySecurityV1 is the required Incus API extension.
-	nodeSecuritySecurityV1 = "payincus_security_v1"
+	nodeSecuritySecurityV1 = "incus_security_v1"
 	// nodeSecuritySecurityResumeV1 gates the recover path only.
-	nodeSecuritySecurityResumeV1 = "payincus_security_resume_v1"
+	nodeSecuritySecurityResumeV1 = "incus_security_resume_v1"
 
 	// nodeSecurityEventsTake mirrors `take: 100`.
 	nodeSecurityEventsTake = 100
@@ -349,7 +349,7 @@ func (n *nodeSecurityNodeClient) Request(ctx context.Context, method, path strin
 		return nil, err
 	}
 
-	infoRaw, err := node.Request(ctx, http.MethodGet, "/1.0/payincus", nil, 0, nil)
+	infoRaw, err := node.Request(ctx, http.MethodGet, "/1.0/agent", nil, 0, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,7 @@ func (n *nodeSecurityNodeClient) Request(ctx context.Context, method, path strin
 	if !nodeSecurityHasExtension(info.APIExtensions, nodeSecuritySecurityV1) {
 		return nil, errors.New("节点不支持此功能，请升级集成包")
 	}
-	if path == "/1.0/payincus/security/recover" && !nodeSecurityHasExtension(info.APIExtensions, nodeSecuritySecurityResumeV1) {
+	if path == "/1.0/agent/security/recover" && !nodeSecurityHasExtension(info.APIExtensions, nodeSecuritySecurityResumeV1) {
 		return nil, errors.New("节点不支持状态恢复")
 	}
 
@@ -519,7 +519,7 @@ func nodeSecurityLiveState(ctx context.Context, hostID int32) (json.RawMessage, 
 	if err != nil {
 		return nil, err
 	}
-	raw, err := client.Request(ctx, http.MethodGet, "/1.0/payincus/security", nil)
+	raw, err := client.Request(ctx, http.MethodGet, "/1.0/agent/security", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +575,7 @@ func nodeSecurityActionHandler(c *gin.Context, action string) {
 		return
 	}
 
-	raw, err := client.Request(ctx, http.MethodPost, "/1.0/payincus/security/"+action, payload)
+	raw, err := client.Request(ctx, http.MethodPost, "/1.0/agent/security/"+action, payload)
 	if err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": lib.NodeErrorDetail(err, nodeSecurityActionFallback, payload)})
 		return
@@ -631,7 +631,7 @@ func nodeSecurityRecoverHandler(
 			fmt.Sprintf("节点 #%d 管理员批准后台恢复", hostID),
 			db.LogResultSuccess, db.CreateLogOptions{})
 
-		rawState, err := client.Request(taskCtx, http.MethodPost, "/1.0/payincus/security/recover", map[string]any{
+		rawState, err := client.Request(taskCtx, http.MethodPost, "/1.0/agent/security/recover", map[string]any{
 			"revision":          approvedRevision,
 			"controlGeneration": controlGeneration,
 		})
@@ -738,10 +738,10 @@ func nodeSecurityRecoveryAllowList(ctx context.Context, hostID int32) func(lib.R
 
 // nodeSecurityRefreshAfterRecovery mirrors
 //
-//	try { await recordReport(hostId, {state: await node.request('GET', '/1.0/payincus/security'), events: []}) }
+//	try { await recordReport(hostId, {state: await node.request('GET', '/1.0/agent/security'), events: []}) }
 //	catch { taskLog('warn', '无法刷新节点状态，待连接恢复后重新核验') }
 func nodeSecurityRefreshAfterRecovery(ctx context.Context, client *nodeSecurityNodeClient, hostID int32) {
-	raw, err := client.Request(ctx, http.MethodGet, "/1.0/payincus/security", nil)
+	raw, err := client.Request(ctx, http.MethodGet, "/1.0/agent/security", nil)
 	if err != nil {
 		lib.TaskLog(ctx, "warn", "无法刷新节点状态，待连接恢复后重新核验")
 		return
@@ -905,7 +905,7 @@ func nodeSecurityKeyActionHandler(c *gin.Context, action string) {
 	client, err := nodeSecurityClient(ctx, hostID)
 	if err == nil {
 		var state json.RawMessage
-		state, err = client.Request(ctx, http.MethodPost, "/1.0/payincus/security/unlock", map[string]any{
+		state, err = client.Request(ctx, http.MethodPost, "/1.0/agent/security/unlock", map[string]any{
 			"dataset": record.Dataset,
 			"key":     key,
 		})

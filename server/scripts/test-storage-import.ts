@@ -25,12 +25,12 @@ Object.assign(prisma.nodeStorageKey,{
 })
 const node:StorageNode={request:async<T>(method:string,path:string,body?:any):Promise<T>=>{
  let value:any
- if(path==='/1.0/payincus')value={api_extensions:['payincus_storage_encryption_v1']}
+ if(path==='/1.0/agent')value={api_extensions:['incus_storage_encryption_v1']}
  else if(path==='/1.0/storage-pools'&&method==='GET')value=bound?['/1.0/storage-pools/data']:[]
  else if(path==='/1.0/storage-pools/data')value={driver:'zfs',config:{'zfs.pool_name':changed?'other/root':source}}
- else if(path==='/1.0/payincus/storage')value={datasets:inventory(),locks:{[source]:{locked:manual,complete:manual,resumeInstances:[]}}}
- else if(path==='/1.0/payincus/security')value={locked:globalLocked,targets:registered?[{dataset:source,fingerprint:fingerprint(key)}]:[]}
- else if(['/1.0/payincus/storage/register','/1.0/payincus/storage/unlock','/1.0/payincus/storage/auto-unlock'].includes(path)){
+ else if(path==='/1.0/agent/storage')value={datasets:inventory(),locks:{[source]:{locked:manual,complete:manual,resumeInstances:[]}}}
+ else if(path==='/1.0/agent/security')value={locked:globalLocked,targets:registered?[{dataset:source,fingerprint:fingerprint(key)}]:[]}
+ else if(['/1.0/agent/storage/register','/1.0/agent/storage/unlock','/1.0/agent/storage/auto-unlock'].includes(path)){
   if(body.key!==key)throw new Error('fixture wrong key')
   assert.equal(body.dataset,source)
   if(path.endsWith('/auto-unlock')){automaticWrites++;assert.equal(manual,false);assert.equal(globalLocked,false)}

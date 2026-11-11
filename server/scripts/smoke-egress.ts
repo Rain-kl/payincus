@@ -35,7 +35,7 @@ try {
     const body = { version: 'v1.2.6', capabilities: ['xray-egress', 'network-control'], ...extra }
     const timestamp = String(Date.now()), nonce = randomUUID(), bodyHash = createAgentBodyHash(body)
     const signature = createAgentSignature(agentSecret, { method: 'POST', path: '/api/agent/heartbeat', timestamp, nonce, bodyHash })
-    const response = await app.inject({ method: 'POST', url: '/api/agent/heartbeat', payload: body, headers: { 'x-incudal-agent-id': agentId, 'x-incudal-timestamp': timestamp, 'x-incudal-nonce': nonce, 'x-incudal-body-sha256': bodyHash, 'x-incudal-signature': signature } })
+    const response = await app.inject({ method: 'POST', url: '/api/agent/heartbeat', payload: body, headers: { 'x-incus-agent-id': agentId, 'x-incus-timestamp': timestamp, 'x-incus-nonce': nonce, 'x-incus-body-sha256': bodyHash, 'x-incus-signature': signature } })
     assert.equal(response.statusCode, 200, response.body)
     assert.equal(response.json().network, undefined, 'Heartbeats must not deliver configuration or test tasks')
     assert.equal(response.json().tunnel.enabled, body.capabilities.includes('network-control'), 'Direct Incus hosts need control connections when supported')
@@ -63,7 +63,7 @@ try {
   const timestamp = String(Date.now()), nonce = randomUUID(), bodyHash = createHash('sha256').update('').digest('hex')
   // A real websocket goes through the same HMAC route as the Go Agent.
   const signature = createAgentSignature(agentSecret, { method: 'GET', path: '/api/agent/tunnel', timestamp, nonce, bodyHash })
-  const socket = new WebSocket(address.replace('http:', 'ws:') + '/api/agent/tunnel', { headers: { 'x-incudal-agent-id': agentId, 'x-incudal-timestamp': timestamp, 'x-incudal-nonce': nonce, 'x-incudal-body-sha256': bodyHash, 'x-incudal-signature': signature } })
+  const socket = new WebSocket(address.replace('http:', 'ws:') + '/api/agent/tunnel', { headers: { 'x-incus-agent-id': agentId, 'x-incus-timestamp': timestamp, 'x-incus-nonce': nonce, 'x-incus-body-sha256': bodyHash, 'x-incus-signature': signature } })
   let failApply = false
   let probeRelease: (() => void) | undefined
   let controlRequests = 0
@@ -143,7 +143,7 @@ try {
   // Reconnect must recover the latest persisted configuration without a heartbeat.
   const reconnectTimestamp = String(Date.now()), reconnectNonce = randomUUID()
   const reconnectSignature = createAgentSignature(agentSecret, { method: 'GET', path: '/api/agent/tunnel', timestamp: reconnectTimestamp, nonce: reconnectNonce, bodyHash })
-  const reconnect = new WebSocket(address.replace('http:', 'ws:') + '/api/agent/tunnel', { headers: { 'x-incudal-agent-id': agentId, 'x-incudal-timestamp': reconnectTimestamp, 'x-incudal-nonce': reconnectNonce, 'x-incudal-body-sha256': bodyHash, 'x-incudal-signature': reconnectSignature } })
+  const reconnect = new WebSocket(address.replace('http:', 'ws:') + '/api/agent/tunnel', { headers: { 'x-incus-agent-id': agentId, 'x-incus-timestamp': reconnectTimestamp, 'x-incus-nonce': reconnectNonce, 'x-incus-body-sha256': bodyHash, 'x-incus-signature': reconnectSignature } })
   reconnect.on('message', data => {
     const frame = decodeFrame(Buffer.from(data as Buffer))
     if (frame.type === TunnelFrameType.CONTROL_HELLO) reconnect.send(encodeFrame(TunnelFrameType.CONTROL_HELLO, 0, Buffer.from(JSON.stringify({ capabilities: ['network.apply', 'proxy.probe'] }))))

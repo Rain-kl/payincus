@@ -10,11 +10,11 @@ export async function lockPool(node: StorageNode, poolName: string, vault: Stora
   try {
     if (!stored || fingerprint(unseal(stored.ciphertext, { hostId, dataset: stored.dataset, version: stored.version })) !== stored.fingerprint) throw new Error('invalid custody')
   } catch { throw new StorageEncryptionError(503, '托管密钥暂不可用，未停止实例或锁盘，请先检查控制端主密钥配置') }
-  const registration = await node.request<{ targets: Array<{ dataset: string; fingerprint: string }> | null }>('GET', '/1.0/payincus/security')
+  const registration = await node.request<{ targets: Array<{ dataset: string; fingerprint: string }> | null }>('GET', '/1.0/agent/security')
   if (!registration.targets?.some(target => target.dataset === state.encryptionRoot && target.fingerprint === stored!.fingerprint)) throw new StorageEncryptionError(409, '托管密钥与节点加密卷登记不一致，未停止实例或锁盘')
   // Audit before any stop/unload; a failed audit must not interrupt workloads.
   await prisma.log.create({ data: { userId: actorId, module: 'security', action: 'storage.lock.request', content: `节点 #${hostId} 管理员锁定存储池 ${poolName}`, result: 'success' } })
-  await node.request('POST', '/1.0/payincus/storage/lock-pool', { dataset: state.encryptionRoot })
+  await node.request('POST', '/1.0/agent/storage/lock-pool', { dataset: state.encryptionRoot })
   const verified = await poolEncryption(node, poolName, vault)
   if (!verified.encrypted || verified.state !== 'locked' || !verified.manualLocked || verified.lockPending) throw new StorageEncryptionError(409, '锁盘未完成，请检查相关实例和存储占用后重试')
   return verified

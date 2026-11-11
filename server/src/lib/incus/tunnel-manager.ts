@@ -190,7 +190,7 @@ export class HostTunnelManager extends EventEmitter {
   }
 
   supportsControl(hostId: number, _method: ControlMethod): boolean {
-    return this.isTunnelOnline(hostId) && this.controlCapabilities.get(hostId)?.has('payincus_node_v1') === true
+    return this.isTunnelOnline(hostId) && this.controlCapabilities.get(hostId)?.has('incus_node_v1') === true
   }
 
   async requestControl<T>(hostId: number, method: ControlMethod, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<T> {
@@ -381,10 +381,10 @@ export class HostTunnelManager extends EventEmitter {
         if (streamId !== 0 || payload.length > 4096) break
         try {
           const hello = JSON.parse(payload.toString('utf8'))
-          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'payincus_node_v1' || v === 'heartbeat-trigger-v1' || v === 'heartbeat-confirm-v1') : [])
+          const capabilities = new Set<string>(Array.isArray(hello.capabilities) ? hello.capabilities.filter((v: unknown) => v === 'incus_node_v1' || v === 'heartbeat-trigger-v1' || v === 'heartbeat-confirm-v1') : [])
           const firstHello = !this.controlCapabilities.has(hostId)
           this.controlCapabilities.set(hostId, capabilities)
-          if (firstHello && capabilities.has('payincus_node_v1')) this.emit('control_ready', hostId)
+          if (firstHello && capabilities.has('incus_node_v1')) this.emit('control_ready', hostId)
         } catch { /* never log control payloads */ }
         break
       }

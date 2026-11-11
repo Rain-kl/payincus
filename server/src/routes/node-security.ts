@@ -26,9 +26,9 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
         const node = new IncusClient({ url: host.url, certPath: host.certPath, keyPath: host.keyPath, hostId, tunnelEnabled: host.tunnelEnabled, targetHost: host.targetHost, targetPort: host.targetPort, serverFingerprint: identity.serverFingerprint! })
         try {
           await node.connect()
-          const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
-          if (!Array.isArray(info?.api_extensions) || !info.api_extensions.includes('payincus_security_v1')) throw new Error('节点不支持此功能，请升级集成包')
-          if (path === '/1.0/payincus/security/recover' && !info.api_extensions.includes('payincus_security_resume_v1')) throw new Error('节点不支持状态恢复')
+          const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/agent')
+          if (!Array.isArray(info?.api_extensions) || !info.api_extensions.includes('incus_security_v1')) throw new Error('节点不支持此功能，请升级集成包')
+          if (path === '/1.0/agent/security/recover' && !info.api_extensions.includes('incus_security_resume_v1')) throw new Error('节点不支持状态恢复')
           return await node.request<T>(method, path, body)
         } finally { await node.close() }
       }
@@ -55,7 +55,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
     ])
     const identity = { serverFingerprint: reported?.serverFingerprint ?? null, recoveryTask }
     try {
-      const state = await (await client(hostId)).request('GET', '/1.0/payincus/security')
+      const state = await (await client(hostId)).request('GET', '/1.0/agent/security')
       await recordReport(hostId, { state, events: [] })
       return { ...identity, state, keys, events: events.map(e => ({ ...e, uid: Number(e.uid) })), reportedAt: reported?.reportedAt }
     }
@@ -78,7 +78,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
           const task = await enqueueNodeRecovery(hostId, async () => {
             taskLog('info', `管理员 #${actorId} 已批准恢复，正在核验节点状态及存储`)
             await createLog(actorId, LogModule.SECURITY, 'node.recover', `节点 #${hostId} 管理员批准后台恢复`, LogResult.SUCCESS)
-            const state = await node.request<RecoveryState>('POST', '/1.0/payincus/security/recover', { revision: approvedRevision, controlGeneration: approval.recoveryGeneration })
+            const state = await node.request<RecoveryState>('POST', '/1.0/agent/security/recover', { revision: approvedRevision, controlGeneration: approval.recoveryGeneration })
             const cleared = await prisma.nodeSecurityState.updateMany({ where: { hostId, recoveryGeneration: approval.recoveryGeneration }, data: { recoveryBlocked: false } })
             if (cleared.count !== 1) throw new Error('恢复期间节点状态发生变化，请重新核验并批准')
             recordHostSuccess(hostId, 0)
@@ -98,14 +98,14 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
               if (result.failed) throw new Error(`部分实例恢复未完成（${result.failed}），请刷新状态后重试`)
             } catch (error) {
               // Cancellation or disconnect leaves the node's unacknowledged identities available for retry.
-              try { await recordReport(hostId, { state: await node.request('GET', '/1.0/payincus/security'), events: [] }) }
+              try { await recordReport(hostId, { state: await node.request('GET', '/1.0/agent/security'), events: [] }) }
               catch { taskLog('warn', '无法刷新节点状态，待连接恢复后重新核验') }
               throw error
             }
           })
           return reply.code(202).send(task)
         }
-        const state = await node.request<RecoveryState>('POST', `/1.0/payincus/security/${action}`, req.body)
+        const state = await node.request<RecoveryState>('POST', `/1.0/agent/security/${action}`, req.body)
         await recordReport(req.params.hostId, { state, events: [] })
         await createLog(req.user.id, LogModule.SECURITY, `node.${action}`, `节点 #${req.params.hostId} 管理操作 ${action}`, LogResult.SUCCESS)
         return { state }
@@ -150,7 +150,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
       } catch { return reply.code(503).send({ error: '审计记录未能保存，未提供密钥' }) }
       if (action === 'reveal') return { key, fingerprint: record.fingerprint }
       try {
-        const state = await (await client(hostId)).request('POST', '/1.0/payincus/security/unlock', { dataset: record.dataset, key })
+        const state = await (await client(hostId)).request('POST', '/1.0/agent/security/unlock', { dataset: record.dataset, key })
         return { state }
       } catch (error) {
         const status = error instanceof IncusApiError ? error.statusCode === 401 ? 502 : error.statusCode : 409

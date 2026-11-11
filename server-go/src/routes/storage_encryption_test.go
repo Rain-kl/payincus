@@ -67,14 +67,14 @@ type storageEncryptionTestPoolNode struct {
 func (p *storageEncryptionTestPoolNode) node() *storageEncryptionTestNode {
 	return &storageEncryptionTestNode{handler: func(method, path string, body any) (any, error) {
 		switch {
-		case method == http.MethodGet && path == "/1.0/payincus":
+		case method == http.MethodGet && path == "/1.0/agent":
 			return map[string]any{"api_extensions": p.extensions}, nil
 		case method == http.MethodGet && path == "/1.0/storage-pools/data":
 			if p.poolMissing {
 				return map[string]any{}, nil
 			}
 			return map[string]any{"driver": p.driver, "config": p.config}, nil
-		case method == http.MethodGet && path == "/1.0/payincus/storage":
+		case method == http.MethodGet && path == "/1.0/agent/storage":
 			return map[string]any{"locked": p.locked, "datasets": p.datasets, "locks": p.locks}, nil
 		}
 		return nil, errors.New("unexpected endpoint " + method + " " + path)
@@ -204,7 +204,7 @@ func TestStorageEncryptionPoolEncryptionPlain(t *testing.T) {
 	node := (&storageEncryptionTestPoolNode{
 		driver:     "dir",
 		config:     map[string]any{},
-		extensions: []any{"payincus_storage_encryption_v1"},
+		extensions: []any{"incus_storage_encryption_v1"},
 	}).node()
 	vault := &storageEncryptionTestVault{keys: map[string]storageEncryptionStoredKey{}}
 
@@ -239,7 +239,7 @@ func TestStorageEncryptionPoolEncryptionRejections(t *testing.T) {
 			node: &storageEncryptionTestPoolNode{
 				driver:     "zfs",
 				config:     map[string]any{"source": "/dev/zvol/foo"},
-				extensions: []any{"payincus_storage_encryption_v1"},
+				extensions: []any{"incus_storage_encryption_v1"},
 			},
 			status:  409,
 			message: "无法确定此存储池的 ZFS 数据集，请刷新存储配置",
@@ -250,7 +250,7 @@ func TestStorageEncryptionPoolEncryptionRejections(t *testing.T) {
 				driver:     "zfs",
 				config:     map[string]any{"zfs.pool_name": "tank/incus"},
 				datasets:   []any{},
-				extensions: []any{"payincus_storage_encryption_v1"},
+				extensions: []any{"incus_storage_encryption_v1"},
 			},
 			status:  409,
 			message: "ZFS 数据集暂不可见，可能未导入或已离线，请检查节点状态",
@@ -261,7 +261,7 @@ func TestStorageEncryptionPoolEncryptionRejections(t *testing.T) {
 				driver:     "zfs",
 				config:     map[string]any{"zfs.pool_name": "tank/incus"},
 				datasets:   []any{map[string]any{"dataset": "tank/incus", "encryptionRoot": "tank/incus", "algorithm": "aes-256-gcm", "keyStatus": "weird"}},
-				extensions: []any{"payincus_storage_encryption_v1"},
+				extensions: []any{"incus_storage_encryption_v1"},
 			},
 			status:  502,
 			message: "节点返回的加密状态无效",
@@ -284,7 +284,7 @@ func TestStorageEncryptionPoolEncryptionEncrypted(t *testing.T) {
 		driver:     "zfs",
 		config:     map[string]any{"zfs.pool_name": "tank/incus"},
 		locked:     true,
-		extensions: []any{"payincus_storage_encryption_v1"},
+		extensions: []any{"incus_storage_encryption_v1"},
 		datasets: []any{map[string]any{
 			"dataset": "tank/incus", "encryptionRoot": "tank/incus",
 			"algorithm": "aes-256-gcm", "keyStatus": "unavailable", "keyFormat": "hex",
@@ -321,7 +321,7 @@ func TestStorageEncryptionPoolEncryptionEncrypted(t *testing.T) {
 	node = (&storageEncryptionTestPoolNode{
 		driver:     "zfs",
 		config:     map[string]any{"source": "tank/incus"},
-		extensions: []any{"payincus_storage_encryption_v1"},
+		extensions: []any{"incus_storage_encryption_v1"},
 		datasets: []any{map[string]any{
 			"dataset": "tank/incus", "algorithm": "off",
 		}},
@@ -341,7 +341,7 @@ func TestStorageEncryptionUnlockPoolErrors(t *testing.T) {
 		return &storageEncryptionTestPoolNode{
 			driver:     "zfs",
 			config:     map[string]any{"zfs.pool_name": "tank/incus"},
-			extensions: []any{"payincus_storage_encryption_v1"},
+			extensions: []any{"incus_storage_encryption_v1"},
 			datasets: []any{map[string]any{
 				"dataset": "tank/incus", "encryptionRoot": "tank/incus",
 				"algorithm": "aes-256-gcm", "keyStatus": keyStatus, "keyFormat": keyFormat,
@@ -361,7 +361,7 @@ func TestStorageEncryptionUnlockPoolErrors(t *testing.T) {
 	}{
 		{
 			name:    "plain-pool",
-			node:    &storageEncryptionTestPoolNode{driver: "dir", extensions: []any{"payincus_storage_encryption_v1"}},
+			node:    &storageEncryptionTestPoolNode{driver: "dir", extensions: []any{"incus_storage_encryption_v1"}},
 			status:  409,
 			message: "此存储池没有 ZFS 加密，不能执行解锁",
 		},
@@ -415,18 +415,18 @@ func TestStorageEncryptionUnlockPoolSuccess(t *testing.T) {
 	var posted map[string]any
 	node := &storageEncryptionTestNode{handler: func(method, path string, body any) (any, error) {
 		switch {
-		case method == http.MethodGet && path == "/1.0/payincus":
-			return map[string]any{"api_extensions": []any{"payincus_storage_encryption_v1"}}, nil
+		case method == http.MethodGet && path == "/1.0/agent":
+			return map[string]any{"api_extensions": []any{"incus_storage_encryption_v1"}}, nil
 		case method == http.MethodGet && path == "/1.0/storage-pools/data":
 			return map[string]any{"driver": "zfs", "config": map[string]any{"zfs.pool_name": "tank/incus"}}, nil
-		case method == http.MethodGet && path == "/1.0/payincus/storage":
+		case method == http.MethodGet && path == "/1.0/agent/storage":
 			return map[string]any{"locked": false, "datasets": []any{map[string]any{
 				"dataset": "tank/incus", "encryptionRoot": "tank/incus",
 				"algorithm": "aes-256-gcm", "keyStatus": keyStatus, "keyFormat": "hex",
 			}}}, nil
-		case method == http.MethodGet && path == "/1.0/payincus/security":
+		case method == http.MethodGet && path == "/1.0/agent/security":
 			return map[string]any{"locked": false, "revision": float64(1), "targets": []any{}, "storageLocks": map[string]any{}}, nil
-		case method == http.MethodPost && path == "/1.0/payincus/storage/register":
+		case method == http.MethodPost && path == "/1.0/agent/storage/register":
 			posted, _ = body.(map[string]any)
 			keyStatus = "available"
 			return map[string]any{}, nil
@@ -465,7 +465,7 @@ func TestStorageEncryptionUnlockPoolRefusesDifferentKey(t *testing.T) {
 	node := (&storageEncryptionTestPoolNode{
 		driver:     "zfs",
 		config:     map[string]any{"zfs.pool_name": "tank/incus"},
-		extensions: []any{"payincus_storage_encryption_v1"},
+		extensions: []any{"incus_storage_encryption_v1"},
 		datasets: []any{map[string]any{
 			"dataset": "tank/incus", "encryptionRoot": "tank/incus",
 			"algorithm": "aes-256-gcm", "keyStatus": "unavailable", "keyFormat": "hex",

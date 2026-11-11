@@ -871,7 +871,7 @@ func hostsBuildNodeInstallCommand(panelURL, installToken string) string {
 	}
 	stripped := regexp.MustCompile(`/+$`).ReplaceAllString(panelURL, "")
 	return fmt.Sprintf(
-		"curl -fsSL %s -o incus-node-install.sh && sudo env INCUDAL_PANEL_URL=%s INCUDAL_AGENT_INSTALL_TOKEN=%s INCUS_NODE_CHANNEL=%s bash incus-node-install.sh",
+		"curl -fsSL %s -o incus-node-install.sh && sudo env INCUS_PANEL_URL=%s INCUS_AGENT_INSTALL_TOKEN=%s INCUS_NODE_CHANNEL=%s bash incus-node-install.sh",
 		shellEscape(stripped+"/api/agent/install.sh"),
 		shellEscape(stripped),
 		shellEscape(installToken),

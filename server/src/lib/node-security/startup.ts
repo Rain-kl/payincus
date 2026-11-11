@@ -5,8 +5,8 @@ import { unseal } from './vault.js'
 
 export const startupWindowMs = 180_000
 export interface StartupEnvelope { iv: string; ciphertext: string }
-const aad = (agentId: string, direction: 'request' | 'response') => Buffer.from(`payincus-startup-v1:${direction}:${agentId}`)
-const key = (secret: string) => createHash('sha256').update(`payincus-startup-v1\0${secret}`).digest()
+const aad = (agentId: string, direction: 'request' | 'response') => Buffer.from(`incus-startup-v1:${direction}:${agentId}`)
+const key = (secret: string) => createHash('sha256').update(`incus-startup-v1\0${secret}`).digest()
 export function sealStartup(secret: string, agentId: string, direction: 'request' | 'response', value: unknown): StartupEnvelope {
   const iv = randomBytes(12), material = key(secret)
   try {

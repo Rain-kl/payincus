@@ -9,5 +9,5 @@ export function buildNodeInstallCommand(input: {
   channel?: 'latest' | 'canary'
 }): string {
   const panelUrl = input.panelUrl.replace(/\/+$/, '')
-  return `curl -fsSL ${shellEscape(`${panelUrl}/api/agent/install.sh`)} -o incus-node-install.sh && sudo env INCUDAL_PANEL_URL=${shellEscape(panelUrl)} INCUDAL_AGENT_INSTALL_TOKEN=${shellEscape(input.installToken)} INCUS_NODE_CHANNEL=${shellEscape(input.channel || 'canary')} bash incus-node-install.sh`
+  return `curl -fsSL ${shellEscape(`${panelUrl}/api/agent/install.sh`)} -o incus-node-install.sh && sudo env INCUS_PANEL_URL=${shellEscape(panelUrl)} INCUS_AGENT_INSTALL_TOKEN=${shellEscape(input.installToken)} INCUS_NODE_CHANNEL=${shellEscape(input.channel || 'canary')} bash incus-node-install.sh`
 }

@@ -58,12 +58,12 @@ var errStartupInvalidEnvelope = errors.New("invalid envelope")
 
 // startupAAD mirrors aad(agentId, direction).
 func startupAAD(agentID string, direction string) []byte {
-	return []byte("payincus-startup-v1:" + direction + ":" + agentID)
+	return []byte("incus-startup-v1:" + direction + ":" + agentID)
 }
 
-// startupKey mirrors key(secret): sha256("payincus-startup-v1\0" + secret).
+// startupKey mirrors key(secret): sha256("incus-startup-v1\0" + secret).
 func startupKey(secret string) []byte {
-	sum := sha256.Sum256([]byte("payincus-startup-v1\x00" + secret))
+	sum := sha256.Sum256([]byte("incus-startup-v1\x00" + secret))
 	return sum[:]
 }
 

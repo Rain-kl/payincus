@@ -52,8 +52,8 @@ export async function unlockAndBindPool(node: StorageNode, hostId: number, poolN
 export async function importEncryptedPool(hostId: number, input: { name: string; source?: string; purpose?: 'instance_data' | 'instance_storage'; description?: string }) {
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/.test(input.name) || (input.source !== undefined && !validSource(input.source))) throw new StorageEncryptionError(400, '请输入有效的存储池名和 ZFS 数据集名称')
   return withStorageSession(hostId, true, async (node, vault) => {
-    const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
-    if (!info.api_extensions?.includes('payincus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持加密卷导入，请先更新节点集成包')
+    const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/agent')
+    if (!info.api_extensions?.includes('incus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持加密卷导入，请先更新节点集成包')
     const paths = await node.request<string[]>('GET', '/1.0/storage-pools')
     const poolPath = `/1.0/storage-pools/${encodeURIComponent(input.name)}`
     let requestedSource = input.source || input.name
@@ -63,7 +63,7 @@ export async function importEncryptedPool(hostId: number, input: { name: string;
       if (actual.driver !== 'zfs' || !source || (input.source && input.source !== source)) throw new StorageEncryptionError(409, '已存在的 Incus 存储池与指定来源不一致')
       requestedSource = source
     }
-    const inventory = await node.request<{ datasets: EncryptedDataset[] }>('GET', '/1.0/payincus/storage')
+    const inventory = await node.request<{ datasets: EncryptedDataset[] }>('GET', '/1.0/agent/storage')
     if (!Array.isArray(inventory.datasets)) throw new StorageEncryptionError(502, '节点返回的加密卷信息无效')
     let item = inventory.datasets.find(d => d.dataset === requestedSource)
     if (!item) throw new StorageEncryptionError(409, '节点暂未发现此数据集，请确认外部 ZFS 池已导入且在线')
@@ -78,7 +78,7 @@ export async function importEncryptedPool(hostId: number, input: { name: string;
     if (existing.record && (!existing.pending || existing.pending.source !== item.dataset)) throw new StorageEncryptionError(409, '此存储池名称已登记，请从存储列表管理')
     await prisma.storagePool.upsert({ where: { hostId_name: { hostId, name: input.name } }, create: { hostId, name: input.name, driver: 'zfs', purpose: input.purpose || 'instance_data', description: input.description || null, config: { source: item.dataset, [pendingImportMarker]: { source: item.dataset, encryptionRoot: item.encryptionRoot } } }, update: {} })
     const stored = await vault.find(item.encryptionRoot)
-    const state = await node.request<{ locked: boolean }>('GET', '/1.0/payincus/security')
+    const state = await node.request<{ locked: boolean }>('GET', '/1.0/agent/security')
     if (stored && state.locked === false) {
       try {
         const ready = await unlockAndBindPool(node, hostId, input.name, vault, undefined, true)

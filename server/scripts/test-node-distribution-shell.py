@@ -6,7 +6,7 @@ with tempfile.TemporaryDirectory(prefix='node-installer-') as directory:
 import os,sys,pathlib
 args=sys.argv[1:]
 url=next(a for a in args if a.startswith('https://'))
-expected='https://raw.githubusercontent.com/Rain-kl/incus/'+os.environ['EXPECTED_BRANCH']+'/scripts/payincus/install.sh'
+expected='https://raw.githubusercontent.com/Rain-kl/incus/'+os.environ['EXPECTED_BRANCH']+'/scripts/node/install.sh'
 assert url==expected
 assert '--proto' in args and args[args.index('--proto')+1]=='=https'
 if os.environ.get('FAIL_DOWNLOAD')=='1':sys.exit(22)
@@ -14,14 +14,14 @@ path=pathlib.Path(args[args.index('-o')+1])
 path.write_text('''+repr('''#!/bin/bash
 set -eu
 [[ "$1" == "$EXPECTED_CHANNEL" ]]
-[[ "${INCUDAL_PANEL_URL:-}" == 'https://panel.example.com' ]]
-[[ "${INCUDAL_AGENT_INSTALL_TOKEN:-}" == 'ait_fixture_not_a_real_secret' ]]
+[[ "${INCUS_PANEL_URL:-}" == 'https://panel.example.com' ]]
+[[ "${INCUS_AGENT_INSTALL_TOKEN:-}" == 'ait_fixture_not_a_real_secret' ]]
 printf 'NATIVE_INSTALLER_REACHED\\n'
 ''')+''')
 ''');binary.chmod(0o755)
  for name in ['install.sh']:
   for channel,branch in [('latest','main'),('canary','canary')]:
-   env={**os.environ,'PATH':str(root)+':'+os.environ['PATH'],'INCUS_NODE_CHANNEL':channel,'EXPECTED_BRANCH':branch,'EXPECTED_CHANNEL':channel,'INCUDAL_PANEL_URL':'https://panel.example.com','INCUDAL_AGENT_INSTALL_TOKEN':'ait_fixture_not_a_real_secret'}
+   env={**os.environ,'PATH':str(root)+':'+os.environ['PATH'],'INCUS_NODE_CHANNEL':channel,'EXPECTED_BRANCH':branch,'EXPECTED_CHANNEL':channel,'INCUS_PANEL_URL':'https://panel.example.com','INCUS_AGENT_INSTALL_TOKEN':'ait_fixture_not_a_real_secret'}
    source=(repo/'server/templates'/name).read_text()
    assert '[[ $EUID -eq 0 ]]' in source
    # The real root guard remains in production; mocked downloads need no privileges.

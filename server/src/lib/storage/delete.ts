@@ -16,8 +16,8 @@ const within = (dataset: string, source: string) => dataset === source || datase
 // Keep a durable cleanup checkpoint until remote deletion, registration and key removal all finish.
 export async function deleteManagedZfsPool(hostId: number, poolName: string) {
   return withStorageSession(hostId, true, async node => {
-    const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
-    if (!info.api_extensions?.includes('payincus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持存储密钥同步清理，请先更新节点集成包')
+    const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/agent')
+    if (!info.api_extensions?.includes('incus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持存储密钥同步清理，请先更新节点集成包')
     const record = await prisma.storagePool.findUnique({ where: { hostId_name: { hostId, name: poolName } } })
     const config = record?.config && typeof record.config === 'object' && !Array.isArray(record.config) ? record.config as Record<string, any> : {}
     let intent = config[marker] as DeletionIntent | undefined
@@ -34,7 +34,7 @@ export async function deleteManagedZfsPool(hostId: number, poolName: string) {
       const pool = await node.request<{ driver: string; description?: string; config: Record<string, string> }>('GET', path)
       const source = pool.config?.['zfs.pool_name'] || pool.config?.source
       if (pool.driver !== 'zfs' || !source || !/^[A-Za-z][A-Za-z0-9_.:-]*(\/[A-Za-z0-9_.:-]+)*$/.test(source) || source.includes('..')) throw new StorageEncryptionError(409, '无法确定待删除 ZFS 数据集身份，未执行删除')
-      const state = await node.request<{ targets: Array<{ dataset: string; guid: string }> | null }>('GET', '/1.0/payincus/security')
+      const state = await node.request<{ targets: Array<{ dataset: string; guid: string }> | null }>('GET', '/1.0/agent/security')
       if (state.targets !== null && !Array.isArray(state.targets)) throw new StorageEncryptionError(502, '无法读取节点存储登记信息')
       const keys = await prisma.nodeStorageKey.findMany({ where: { hostId, OR: [{ dataset: source }, { dataset: { startsWith: source + '/' } }] }, select: { id: true, dataset: true, fingerprint: true } })
       const roots = (state.targets || []).filter(t => within(t.dataset, source)).map(t => ({ dataset: t.dataset, guid: t.guid }))
@@ -50,7 +50,7 @@ export async function deleteManagedZfsPool(hostId: number, poolName: string) {
       await node.request('DELETE', path)
     }
     try {
-      for (const target of intent.roots) await node.request('POST', '/1.0/payincus/storage/forget', target)
+      for (const target of intent.roots) await node.request('POST', '/1.0/agent/storage/forget', target)
       await prisma.$transaction(async tx => {
         for (const key of intent!.keys) {
           const current = await tx.nodeStorageKey.findUnique({ where: { id: key.id } })

@@ -29,10 +29,10 @@ Object.assign(prisma.storagePool, { updateMany: async () => ({ count: 1 }), upse
 Object.assign(IncusClient.prototype, {
  connect: async function(this: IncusClient) { assert.equal(this.options.serverFingerprint,'a'.repeat(64)) }, close: async () => {},
  request: async (method: string, path: string, body?: any) => {
-  if (path === '/1.0/payincus') return {api_extensions:supported?['payincus_storage_encryption_v1','payincus_storage_pool_alloc_v1']:[]}
-  if (path === '/1.0/payincus/security') return {locked}
+  if (path === '/1.0/agent') return {api_extensions:supported?['incus_storage_encryption_v1','incus_storage_pool_alloc_v1']:[]}
+  if (path === '/1.0/agent/security') return {locked}
   if (path === '/1.0/storage-pools' && method === 'GET') return bound?['/1.0/storage-pools/data']:[]
-  if (path === '/1.0/payincus/storage/pool') {
+  if (path === '/1.0/agent/storage/pool') {
    nodeWrites++
    assert.ok(saved,'node write preceded durable key custody')
    assert.equal(body.name,'test'); assert.equal(body.sizeGiB,2); assert.equal(body.device,'')
@@ -50,7 +50,7 @@ Object.assign(IncusClient.prototype, {
    bound=true; return {}
   }
   if(path === '/1.0/storage-pools/data') return {driver:'zfs',config:{'zfs.pool_name':'test/incus'}}
-  if(path === '/1.0/payincus/storage') return {datasets:[{dataset:'test/incus',encryptionRoot:'test/incus',algorithm:'aes-256-gcm',keyStatus:'available',keyFormat:'hex'}]}
+  if(path === '/1.0/agent/storage') return {datasets:[{dataset:'test/incus',encryptionRoot:'test/incus',algorithm:'aes-256-gcm',keyStatus:'available',keyFormat:'hex'}]}
   throw new Error('unexpected endpoint')
  }
 })

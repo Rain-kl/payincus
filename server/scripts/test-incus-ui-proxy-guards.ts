@@ -50,8 +50,8 @@ assert.equal(
 // Forbidden paths must return null
 assert.equal(normalizeIncusProxyTargetPath('', ''), null)
 assert.equal(normalizeIncusProxyTargetPath('ui/assets/app.js', ''), null)
-assert.equal(normalizeIncusProxyTargetPath('1.0/payincus', ''), null)
-assert.equal(normalizeIncusProxyTargetPath('1.0/payincus/network', ''), null)
+assert.equal(normalizeIncusProxyTargetPath('1.0/agent', ''), null)
+assert.equal(normalizeIncusProxyTargetPath('1.0/agent/network', ''), null)
 assert.equal(normalizeIncusProxyTargetPath('1.0/../etc/passwd', ''), null)
 assert.equal(normalizeIncusProxyTargetPath('1.0/instances/..%2f..', ''), null)
 assert.equal(normalizeIncusProxyTargetPath('1.0\\instances', ''), null)

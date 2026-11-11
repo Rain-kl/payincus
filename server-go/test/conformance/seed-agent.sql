@@ -78,7 +78,7 @@ VALUES (
   'fixture-secret-not-decryptable',
   NULL, NULL, NULL,
   true, 'online', '1.4.0',
-  '["payincus_node_v1","network-control"]'::jsonb,
+  '["incus_node_v1","network-control"]'::jsonb,
   '{"metrics":{"heartbeatIntervalSeconds":30}}'::jsonb,
   timestamptz '2020-01-01 00:00:00+00',
   '203.0.113.9',

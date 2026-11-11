@@ -58,7 +58,7 @@ const socket=Object.assign(new EventEmitter(),{readyState:1,send:(frame:Buffer)=
 assert.equal(manager.requestHeartbeat(4),false)
 manager.registerTunnel(4,socket)
 assert.equal(manager.requestHeartbeat(4),false,'must not assume capability support')
-socket.emit('message',encodeFrame(TunnelFrameType.CONTROL_HELLO,0,Buffer.from(JSON.stringify({capabilities:['payincus_node_v1','heartbeat-trigger-v1']}))))
+socket.emit('message',encodeFrame(TunnelFrameType.CONTROL_HELLO,0,Buffer.from(JSON.stringify({capabilities:['incus_node_v1','heartbeat-trigger-v1']}))))
 assert.equal(manager.requestHeartbeat(4),true)
 assert.equal(decodeFrame(sent.at(-1)!).type,TunnelFrameType.HEARTBEAT)
 socket.readyState=3

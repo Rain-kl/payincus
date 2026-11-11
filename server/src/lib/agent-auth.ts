@@ -121,11 +121,11 @@ export function verifyAgentSignature(secret: string, payload: AgentSigningPayloa
 }
 
 export function readAgentAuthHeaders(headers: IncomingHttpHeaders): AgentAuthHeaders | null {
-  const agentId = getHeaderValue(headers['x-incudal-agent-id'])
-  const timestamp = getHeaderValue(headers['x-incudal-timestamp'])
-  const nonce = getHeaderValue(headers['x-incudal-nonce'])
-  const bodyHash = getHeaderValue(headers['x-incudal-body-sha256'])
-  const signature = getHeaderValue(headers['x-incudal-signature'])
+  const agentId = getHeaderValue(headers['x-incus-agent-id'])
+  const timestamp = getHeaderValue(headers['x-incus-timestamp'])
+  const nonce = getHeaderValue(headers['x-incus-nonce'])
+  const bodyHash = getHeaderValue(headers['x-incus-body-sha256'])
+  const signature = getHeaderValue(headers['x-incus-signature'])
 
   if (!agentId || !timestamp || !nonce || !bodyHash || !signature) {
     return null

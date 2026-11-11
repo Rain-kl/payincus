@@ -3,13 +3,13 @@ import { restoreNodeInstances, type RecoveryState, type ResumeInstance } from '.
 import { StorageEncryptionError, type StorageNode } from './encryption.js'
 
 export async function restoreStorageInstances(node: StorageNode, dataset: string, hostId: number) {
-  const state = await node.request<{ locked: boolean; revision: number; storageLocks?: Record<string, { locked: boolean; resumeInstances: ResumeInstance[] }> }>('GET', '/1.0/payincus/security')
+  const state = await node.request<{ locked: boolean; revision: number; storageLocks?: Record<string, { locked: boolean; resumeInstances: ResumeInstance[] }> }>('GET', '/1.0/agent/security')
   const lock = state.storageLocks?.[dataset]
   if (!lock?.resumeInstances?.length) return
   if (state.locked || lock.locked) throw new StorageEncryptionError(423, '存储密钥已加载，但节点或存储仍被锁定，实例尚未恢复')
   const adapter: StorageNode = {
     request: async <T>(method: string, path: string, body?: any): Promise<T> => {
-      if (path === '/1.0/payincus/security/resume') return node.request<T>('POST', '/1.0/payincus/storage/resume', { ...body, dataset })
+      if (path === '/1.0/agent/security/resume') return node.request<T>('POST', '/1.0/agent/storage/resume', { ...body, dataset })
       const value = await node.request<T>(method, path, body)
       if (method === 'GET' && /^\/1\.0\/instances\/[^/]+\?/.test(path)) {
         const instance = value as { expanded_devices?: Record<string, Record<string, string>> }

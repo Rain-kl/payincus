@@ -189,7 +189,7 @@ func restoreNodeInstance(
 			"revision": *state.Revision,
 			"instance": item,
 		}
-		raw, err := client.Request(ctx, "POST", "/1.0/payincus/security/resume", payload)
+		raw, err := client.Request(ctx, "POST", "/1.0/agent/security/resume", payload)
 		if err != nil {
 			return err
 		}

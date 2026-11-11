@@ -54,7 +54,7 @@ IncusClient.prototype.close = async () => {}
 try {
   for (const status of [401, 403, 409, 500]) {
     IncusClient.prototype.request = async function (_method, path) {
-      if (path === '/1.0/payincus') return { api_extensions: ['payincus_security_v1'] } as any
+      if (path === '/1.0/agent') return { api_extensions: ['incus_security_v1'] } as any
       throw new IncusApiError(`key loading permission denied: ${key}`, status)
     }
     const failed = await app.inject({ method: 'POST', url: base + '/keys/unlock', headers: { authorization: 'admin' }, payload: { dataset: 'tank/private' } })

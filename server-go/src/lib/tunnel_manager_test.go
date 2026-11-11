@@ -363,9 +363,9 @@ func TestTunnelManagerControlGating(t *testing.T) {
 		socket := newTunnelTestSocket()
 		manager.RegisterTunnel(8101, socket)
 		manager.HandleTunnelMessage(8101, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-			[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+			[]byte(`{"capabilities":["incus_node_v1"]}`)))
 		if !manager.SupportsControl(8101, TunnelControlNetworkApplyV2) {
-			t.Fatalf("payincus_node_v1 must enable control")
+			t.Fatalf("incus_node_v1 must enable control")
 		}
 
 		params := map[string]any{"schemaVersion": 2, "revision": 7}
@@ -405,7 +405,7 @@ func TestTunnelManagerControlGating(t *testing.T) {
 			socket := newTunnelTestSocket()
 			manager.RegisterTunnel(3, socket)
 			manager.HandleTunnelMessage(3, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-				[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+				[]byte(`{"capabilities":["incus_node_v1"]}`)))
 			_, err := manager.RequestControl(context.Background(), 3, TunnelControlProxyProbe, nil, time.Second)
 			if !tunnelIsControlError(err, testCase.code) {
 				t.Fatalf("status %d: err = %v, want %s", testCase.status, err, testCase.code)
@@ -422,7 +422,7 @@ func TestTunnelManagerControlGating(t *testing.T) {
 		socket := newTunnelTestSocket()
 		manager.RegisterTunnel(88, socket)
 		manager.HandleTunnelMessage(88, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-			[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+			[]byte(`{"capabilities":["incus_node_v1"]}`)))
 
 		if _, err := manager.RequestControl(context.Background(), 88, TunnelControlProxyProbe, nil, 5*time.Millisecond); !tunnelIsControlError(err, TunnelControlTimeout) {
 			t.Fatalf("err = %v, want TIMEOUT", err)
@@ -450,7 +450,7 @@ func TestTunnelManagerControlGating(t *testing.T) {
 		socket := newTunnelTestSocket()
 		manager.RegisterTunnel(88, socket)
 		manager.HandleTunnelMessage(88, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-			[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+			[]byte(`{"capabilities":["incus_node_v1"]}`)))
 
 		results := make(chan error, 4)
 		for index := 0; index < 4; index++ {
@@ -500,7 +500,7 @@ func TestTunnelManagerControlGating(t *testing.T) {
 		socket := newTunnelTestSocket()
 		manager.RegisterTunnel(5, socket)
 		manager.HandleTunnelMessage(5, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-			[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+			[]byte(`{"capabilities":["incus_node_v1"]}`)))
 		huge := strings.Repeat("x", 1024*1024)
 		if _, err := manager.RequestControl(context.Background(), 5, TunnelControlNetworkApply, map[string]any{"blob": huge}, time.Second); !tunnelIsControlError(err, TunnelControlInvalidResponse) {
 			t.Fatalf("err = %v, want INVALID_RESPONSE", err)
@@ -513,7 +513,7 @@ func TestTunnelManagerControlGating(t *testing.T) {
 		ready := 0
 		manager.OnControlReady(func(int32) { ready++ })
 		manager.RegisterTunnel(6, socket)
-		hello := TunnelEncodeFrame(TunnelFrameControlHello, 0, []byte(`{"capabilities":["payincus_node_v1","heartbeat-trigger-v1","bogus"]}`))
+		hello := TunnelEncodeFrame(TunnelFrameControlHello, 0, []byte(`{"capabilities":["incus_node_v1","heartbeat-trigger-v1","bogus"]}`))
 		manager.HandleTunnelMessage(6, socket, hello)
 		manager.HandleTunnelMessage(6, socket, hello)
 		if ready != 1 {
@@ -562,7 +562,7 @@ func TestTunnelManagerHeartbeat(t *testing.T) {
 		socket := newTunnelTestSocket()
 		manager.RegisterTunnel(1, socket)
 		manager.HandleTunnelMessage(1, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-			[]byte(`{"capabilities":["payincus_node_v1","heartbeat-trigger-v1"]}`)))
+			[]byte(`{"capabilities":["incus_node_v1","heartbeat-trigger-v1"]}`)))
 		// Trigger requires heartbeat-trigger-v1; it is present.
 		if !manager.RequestHeartbeat(1) {
 			t.Fatalf("RequestHeartbeat = false with heartbeat-trigger-v1")
@@ -578,7 +578,7 @@ func TestTunnelManagerHeartbeat(t *testing.T) {
 		socket := newTunnelTestSocket()
 		manager.RegisterTunnel(2, socket)
 		manager.HandleTunnelMessage(2, socket, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-			[]byte(`{"capabilities":["payincus_node_v1","heartbeat-trigger-v1","heartbeat-confirm-v1"]}`)))
+			[]byte(`{"capabilities":["incus_node_v1","heartbeat-trigger-v1","heartbeat-confirm-v1"]}`)))
 		if !manager.RequestHeartbeat(2) {
 			t.Fatalf("RequestHeartbeat = false")
 		}
@@ -787,7 +787,7 @@ func TestTunnelManagerReplacementAndStaleFrames(t *testing.T) {
 	first := newTunnelTestSocket()
 	manager.RegisterTunnel(11, first)
 	manager.HandleTunnelMessage(11, first, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-		[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+		[]byte(`{"capabilities":["incus_node_v1"]}`)))
 
 	// A pending control belongs to the first socket.
 	pending := make(chan error, 1)
@@ -822,7 +822,7 @@ func TestTunnelManagerReplacementAndStaleFrames(t *testing.T) {
 
 	// Stale frames and stale close notifications from the old socket are ignored.
 	manager.HandleTunnelMessage(11, first, TunnelEncodeFrame(TunnelFrameControlHello, 0,
-		[]byte(`{"capabilities":["payincus_node_v1"]}`)))
+		[]byte(`{"capabilities":["incus_node_v1"]}`)))
 	if manager.SupportsControl(11, TunnelControlNetworkApply) {
 		t.Fatalf("frames from a replaced socket must be ignored")
 	}

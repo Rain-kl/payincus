@@ -37,16 +37,16 @@ Object.assign(prisma,{$transaction:async(fn:any)=>{
 Object.assign(IncusClient.prototype,{
  connect:async function(this:IncusClient){assert.equal(this.options.serverFingerprint,'a'.repeat(64))},close:async()=>{},
  request:async(method:string,path:string,body?:any)=>{
-  if(path==='/1.0/payincus')return {api_extensions:['payincus_storage_encryption_v1']}
+  if(path==='/1.0/agent')return {api_extensions:['incus_storage_encryption_v1']}
   if(path==='/1.0/storage-pools')return exists?['/1.0/storage-pools/data']:[]
   if(path==='/1.0/storage-pools/data'&&method==='GET')return {driver:'zfs',config:{'zfs.pool_name':actualSource}}
-  if(path==='/1.0/payincus/security')return {targets:[{dataset:source,guid:'123'},{dataset:'pool/other',guid:'456'}]}
+  if(path==='/1.0/agent/security')return {targets:[{dataset:source,guid:'123'},{dataset:'pool/other',guid:'456'}]}
   if(method==='DELETE'){
    assert.ok(record.config._payincusDeletion,'remote delete preceded durable checkpoint')
    deletes++;if(remoteFailure)throw new Error('fixture deletion refused')
    exists=false;return {}
   }
-  if(path==='/1.0/payincus/storage/forget'){
+  if(path==='/1.0/agent/storage/forget'){
    assert.equal(exists,false,'registration removed before remote deletion')
    assert.equal(body.dataset,source,'sibling or ancestor root was unregistered')
    assert.equal(body.guid,'123')

@@ -57,11 +57,11 @@ async function postAgentHeartbeat(input: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       'User-Agent': 'incudal-agent-heartbeat-smoke/1.0',
-      'x-incudal-agent-id': input.agentId,
-      'x-incudal-timestamp': timestamp,
-      'x-incudal-nonce': input.nonce,
-      'x-incudal-body-sha256': bodyHash,
-      'x-incudal-signature': signature
+      'x-incus-agent-id': input.agentId,
+      'x-incus-timestamp': timestamp,
+      'x-incus-nonce': input.nonce,
+      'x-incus-body-sha256': bodyHash,
+      'x-incus-signature': signature
     },
     body: JSON.stringify(input.body)
   })

@@ -8,7 +8,7 @@
 //     by lib/incus_client.go's tunnel branch, lib/caddy_client.go and
 //     lib/node_security_transport.go;
 //   - bounded control RPCs to the node agent (RequestControl → Incus
-//     /1.0/payincus endpoints), 4 in flight per host;
+//     /1.0/agent endpoints), 4 in flight per host;
 //   - heartbeat round-trips, agent log streaming and task-log streaming.
 //
 // Transport boundary (IMPORTANT)
@@ -639,7 +639,7 @@ func (m *TunnelManager) SupportsControl(hostID int32, _ TunnelControlMethod) boo
 	defer m.mu.Unlock()
 	socket := m.activeTunnels[hostID]
 	return socket != nil && socket.TunnelReadyState() == TunnelSocketOpen &&
-		m.controlCapabilities[hostID]["payincus_node_v1"]
+		m.controlCapabilities[hostID]["incus_node_v1"]
 }
 
 // RequestControl mirrors requestControl(hostId, method, params, timeout, signal?).
@@ -658,7 +658,7 @@ func (m *TunnelManager) RequestControl(
 		m.mu.Unlock()
 		return nil, &TunnelControlError{Code: TunnelControlOffline}
 	}
-	supported := m.controlCapabilities[hostID]["payincus_node_v1"]
+	supported := m.controlCapabilities[hostID]["incus_node_v1"]
 	pendingCount := 0
 	for _, pending := range m.pendingControls {
 		if pending.hostID == hostID {
@@ -925,7 +925,7 @@ func (m *TunnelManager) handleIncomingFrame(hostID int32, frame TunnelFrame) {
 		capabilities := map[string]bool{}
 		for _, capability := range hello.Capabilities {
 			switch capability {
-			case "payincus_node_v1", "heartbeat-trigger-v1", "heartbeat-confirm-v1":
+			case "incus_node_v1", "heartbeat-trigger-v1", "heartbeat-confirm-v1":
 				capabilities[capability] = true
 			}
 		}
@@ -935,7 +935,7 @@ func (m *TunnelManager) handleIncomingFrame(hostID int32, frame TunnelFrame) {
 		m.controlCapabilities[hostID] = capabilities
 		m.mu.Unlock()
 
-		if !hadCapabilities && capabilities["payincus_node_v1"] {
+		if !hadCapabilities && capabilities["incus_node_v1"] {
 			m.emitControlReady(hostID)
 		}
 
@@ -1262,7 +1262,7 @@ func tunnelDefaultNodeRequest(ctx context.Context, hostID int32, method TunnelCo
 // TunnelCallNodeAPI mirrors callNodeAPI: the node API extension must be
 // advertised before any control call is sent.
 func TunnelCallNodeAPI(ctx context.Context, client *IncusClient, method TunnelControlMethod, params any) (any, error) {
-	infoRaw, err := client.Request(ctx, http.MethodGet, "/1.0/payincus", nil, 0, nil)
+	infoRaw, err := client.Request(ctx, http.MethodGet, "/1.0/agent", nil, 0, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1274,7 +1274,7 @@ func TunnelCallNodeAPI(ctx context.Context, client *IncusClient, method TunnelCo
 	}
 	available := false
 	for _, extension := range info.APIExtensions {
-		if extension == "payincus_node_v1" {
+		if extension == "incus_node_v1" {
 			available = true
 			break
 		}
@@ -1284,10 +1284,10 @@ func TunnelCallNodeAPI(ctx context.Context, client *IncusClient, method TunnelCo
 	}
 
 	verb := http.MethodPut
-	path := "/1.0/payincus/network"
+	path := "/1.0/agent/network"
 	if method == TunnelControlProxyProbe {
 		verb = http.MethodPost
-		path = "/1.0/payincus/proxy-probes"
+		path = "/1.0/agent/proxy-probes"
 	}
 	raw, err := client.Request(ctx, verb, path, params, 0, params)
 	if err != nil {

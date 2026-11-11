@@ -54,7 +54,7 @@ try {
   await prisma.hostAgent.create({ data: { hostId: host.id, agentId, secretHash: 'fixture-unused', secretEncrypted: encryptSensitiveData(agentSecret), lastReport: { preserved: true } } })
   function headers(body: unknown, path: string, nonce = randomBytes(16).toString('hex'), bodyHash = createAgentBodyHash(body)) {
     const timestamp = String(Date.now())
-    return { 'x-incudal-agent-id': agentId, 'x-incudal-timestamp': timestamp, 'x-incudal-nonce': nonce, 'x-incudal-body-sha256': bodyHash, 'x-incudal-signature': createAgentSignature(agentSecret, { method: 'POST', path, timestamp, nonce, bodyHash }) }
+    return { 'x-incus-agent-id': agentId, 'x-incus-timestamp': timestamp, 'x-incus-nonce': nonce, 'x-incus-body-sha256': bodyHash, 'x-incus-signature': createAgentSignature(agentSecret, { method: 'POST', path, timestamp, nonce, bodyHash }) }
   }
   const path = '/api/agent/security-report'
   const signed = headers(report, path)
@@ -65,7 +65,7 @@ try {
   assert.equal((await app.inject({ method: 'POST', url: path, headers: headers(report, path), payload: { ...report, state: { ...report.state, locked: false } } })).statusCode, 401)
   const malformed = { state: {}, events: [] }
   assert.equal((await app.inject({ method: 'POST', url: path, headers: headers(malformed, path), payload: malformed })).statusCode, 503)
-  const heartbeat = { nodeApi: 'payincus_node_v1', nodeSecurity: { state: { locked: true } } }
+  const heartbeat = { nodeApi: 'incus_node_v1', nodeSecurity: { state: { locked: true } } }
   assert.equal((await app.inject({ method: 'POST', url: '/api/agent/heartbeat', headers: headers({}, '/api/agent/heartbeat'), payload: {} })).statusCode, 409)
   const heartbeatResponse = await app.inject({ method: 'POST', url: '/api/agent/heartbeat', headers: headers(heartbeat, '/api/agent/heartbeat'), payload: heartbeat })
   assert.equal(heartbeatResponse.statusCode, 200)
@@ -86,7 +86,7 @@ try {
 
   const badInner = { ...inner, ciphertext: 'invalid-ciphertext' }
   const badOuter = headers(badInner, startupPath)
-  badOuter['x-incudal-signature'] = '0'.repeat(64)
+  badOuter['x-incus-signature'] = '0'.repeat(64)
   assert.equal((await app.inject({ method: 'POST', url: startupPath, headers: badOuter, payload: badInner })).statusCode, 401)
   assert.equal((await prisma.nodeSecurityState.findUniqueOrThrow({ where: { hostId: host.id } })).recoveryBlocked, false, 'outer identity failure must never lock a node')
 

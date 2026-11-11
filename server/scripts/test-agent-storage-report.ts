@@ -104,20 +104,20 @@ try {
  await app.register(agentRoutes,{prefix:'/api/agent'})
  const send=(body:any)=>{
   const timestamp=String(Date.now()),nonce=randomUUID(),bodyHash=createAgentBodyHash(body)
-  return app.inject({method:'POST',url:'/api/agent/heartbeat',payload:body,headers:{'x-incudal-agent-id':agentId,'x-incudal-timestamp':timestamp,'x-incudal-nonce':nonce,'x-incudal-body-sha256':bodyHash,'x-incudal-signature':createAgentSignature(secret,{method:'POST',path:'/api/agent/heartbeat',timestamp,nonce,bodyHash})}})
+  return app.inject({method:'POST',url:'/api/agent/heartbeat',payload:body,headers:{'x-incus-agent-id':agentId,'x-incus-timestamp':timestamp,'x-incus-nonce':nonce,'x-incus-body-sha256':bodyHash,'x-incus-signature':createAgentSignature(secret,{method:'POST',path:'/api/agent/heartbeat',timestamp,nonce,bodyHash})}})
  }
  try {
   const oldId=generateAgentId()
-  const timestamp=String(Date.now()), nonce=randomUUID(), unknownBody={nodeApi:'payincus_node_v1'}, hash=createAgentBodyHash(unknownBody)
-  const unknown=await app.inject({method:'POST',url:'/api/agent/heartbeat',payload:unknownBody,headers:{'x-incudal-agent-id':oldId,'x-incudal-timestamp':timestamp,'x-incudal-nonce':nonce,'x-incudal-body-sha256':hash,'x-incudal-signature':createAgentSignature(secret,{method:'POST',path:'/api/agent/heartbeat',timestamp,nonce,bodyHash:hash})}})
+  const timestamp=String(Date.now()), nonce=randomUUID(), unknownBody={nodeApi:'incus_node_v1'}, hash=createAgentBodyHash(unknownBody)
+  const unknown=await app.inject({method:'POST',url:'/api/agent/heartbeat',payload:unknownBody,headers:{'x-incus-agent-id':oldId,'x-incus-timestamp':timestamp,'x-incus-nonce':nonce,'x-incus-body-sha256':hash,'x-incus-signature':createAgentSignature(secret,{method:'POST',path:'/api/agent/heartbeat',timestamp,nonce,bodyHash:hash})}})
   assert.equal(unknown.statusCode,401)
   assert.equal(unknown.json().code,'AGENT_NOT_REGISTERED')
   await prisma.hostAgent.update({where:{hostId:live.id},data:{enabled:false}})
-  const disabled=await send({nodeApi:'payincus_node_v1'})
+  const disabled=await send({nodeApi:'incus_node_v1'})
   assert.equal(disabled.statusCode,401)
   assert.equal(disabled.json().code,'AGENT_DISABLED')
   await prisma.hostAgent.update({where:{hostId:live.id},data:{enabled:true}})
-  const payload={nodeApi:'payincus_node_v1',capabilities:['network-control'],runtime:{goarch:'arm64'},incus:{available:true},instances:{available:true,items:[]},metrics:{heartbeatIntervalSeconds:10},resources:{storageAvailable:true,storage:{disks:[{id:'disk0',size:100*1024*MiB}]}},storage:sample(new Date())}
+  const payload={nodeApi:'incus_node_v1',capabilities:['network-control'],runtime:{goarch:'arm64'},incus:{available:true},instances:{available:true,items:[]},metrics:{heartbeatIntervalSeconds:10},resources:{storageAvailable:true,storage:{disks:[{id:'disk0',size:100*1024*MiB}]}},storage:sample(new Date())}
   const result=await send(payload)
   assert.equal(result.statusCode,200,result.body)
   assert.equal((await prisma.storagePool.findUniqueOrThrow({where:{id:signedPool.id}})).status,'ready')
@@ -153,9 +153,9 @@ try {
    const confirmed=hostTunnelManager.requestHeartbeatAndWait(live.id,1000).then(()=>{completed=true})
    const requestId=JSON.parse(decodeFrame(frames.at(-1)!).payload.toString()).requestId
    const storage={available:true,complete:true,collectionComplete:true,reportedAt:new Date().toISOString(),pools:[{name:'data',driver:'dir',status:'locked',config:{source:'/data'}},{name:'default',driver:'zfs',status:'locked',config:{source:'default/incus'},encryption:{encrypted:true,nodeLocked:true,state:'locked',source:'default/incus',encryptionRoot:'default/incus',keyFormat:'hex',manualLocked:false}}]}
-   await send({nodeApi:'payincus_node_v1',nodeSecurity:{state:{locked:true}},storage})
+   await send({nodeApi:'incus_node_v1',nodeSecurity:{state:{locked:true}},storage})
    assert.equal(completed,false,'unrelated periodic heartbeat completed a node test')
-   const lockedReport=await send({heartbeatRequestId:requestId,nodeApi:'payincus_node_v1',nodeSecurity:{state:{locked:true}},storage:{...storage,reportedAt:new Date().toISOString()}})
+   const lockedReport=await send({heartbeatRequestId:requestId,nodeApi:'incus_node_v1',nodeSecurity:{state:{locked:true}},storage:{...storage,reportedAt:new Date().toISOString()}})
    assert.equal(lockedReport.statusCode,200,lockedReport.body)
    await confirmed
    const encryption=await storedPoolEncryption(live.id,'default')
@@ -166,13 +166,13 @@ try {
    assert.equal((await prisma.storagePool.findUniqueOrThrow({where:{id:zfs.id}})).status,'locked')
    const failed=assert.rejects(hostTunnelManager.requestHeartbeatAndWait(live.id,1000),/采集|保存/)
    const failedId=JSON.parse(decodeFrame(frames.at(-1)!).payload.toString()).requestId
-   await send({heartbeatRequestId:failedId,nodeApi:'payincus_node_v1',incus:{available:false},storage:{available:false,reportedAt:new Date().toISOString()}})
+   await send({heartbeatRequestId:failedId,nodeApi:'incus_node_v1',incus:{available:false},storage:{available:false,reportedAt:new Date().toISOString()}})
    await failed
    for (const kind of ['partial','stale','instances']) {
     const refused=assert.rejects(hostTunnelManager.requestHeartbeatAndWait(live.id,1000),/采集|保存/)
     const id=JSON.parse(decodeFrame(frames.at(-1)!).payload.toString()).requestId
     const at=kind==='stale' ? (await prisma.storagePool.findUniqueOrThrow({where:{id:zfs.id}})).reportedAt!.toISOString() : new Date().toISOString()
-    await send({heartbeatRequestId:id,nodeApi:'payincus_node_v1',...(kind==='instances'?{incus:{available:true},instances:{available:false},resources:{storageAvailable:true}}:{nodeSecurity:{state:{locked:true}}}),storage:{...storage,collectionComplete:kind!=='partial',reportedAt:at}})
+    await send({heartbeatRequestId:id,nodeApi:'incus_node_v1',...(kind==='instances'?{incus:{available:true},instances:{available:false},resources:{storageAvailable:true}}:{nodeSecurity:{state:{locked:true}}}),storage:{...storage,collectionComplete:kind!=='partial',reportedAt:at}})
     await refused
    }
    // Persist failure must reject the test, even though the agent record was already updated.
@@ -181,13 +181,13 @@ try {
    const dbId=JSON.parse(decodeFrame(frames.at(-1)!).payload.toString()).requestId
    try {
     prisma.storagePool.updateMany=async()=>{throw new Error('fixture storage persistence failed')}
-    const bad=await send({heartbeatRequestId:dbId,nodeApi:'payincus_node_v1',incus:{available:true},storage:{...storage,reportedAt:new Date().toISOString()}})
+    const bad=await send({heartbeatRequestId:dbId,nodeApi:'incus_node_v1',incus:{available:true},storage:{...storage,reportedAt:new Date().toISOString()}})
     assert.equal(bad.statusCode,500)
     await dbFailed
    } finally {prisma.storagePool.updateMany=original}
   } finally {hostTunnelManager.unregisterTunnel(live.id,socket)}
   const beforeLegacy=await prisma.storagePool.findUniqueOrThrow({where:{id:signedPool.id}})
-  const locked=await send({nodeApi:'payincus_node_v1',nodeSecurity:{state:{locked:true}}})
+  const locked=await send({nodeApi:'incus_node_v1',nodeSecurity:{state:{locked:true}}})
   assert.equal(locked.statusCode,200,locked.body)
   assert.equal((await prisma.storagePool.findUniqueOrThrow({where:{id:signedPool.id}})).status,beforeLegacy.status,'unversioned legacy lock heartbeat overwrote a newer storage sample')
  } finally { await app.close() }

@@ -14,7 +14,7 @@ export async function restoreNodeInstances(client: RecoveryClient, initial: Reco
       if (!item || typeof item.project !== 'string' || !item.project || typeof item.name !== 'string' || !item.name || typeof item.uuid !== 'string' || !item.uuid || typeof item.frozen !== 'boolean') throw new Error('invalid workload identity')
       const query = `?project=${encodeURIComponent(item.project)}`
       const base = `/1.0/instances/${encodeURIComponent(item.name)}`
-      const acknowledged = async () => { state = await client.request<RecoveryState>('POST', '/1.0/payincus/security/resume', { revision: state.revision, instance: item }) }
+      const acknowledged = async () => { state = await client.request<RecoveryState>('POST', '/1.0/agent/security/resume', { revision: state.revision, instance: item }) }
       if (!await allowed(item)) { await acknowledged(); continue }
       const instance = await client.request<{ config?: Record<string, string>; type?: string }>('GET', base + query)
       if (!(options.types || ['container']).includes(instance.type || '') || instance.config?.['volatile.uuid'] !== item.uuid) throw new Error('workload identity changed')

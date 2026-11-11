@@ -87,7 +87,7 @@ func TestRestoreNodeInstancesStartsAndFreezes(t *testing.T) {
 			return json.RawMessage(`{"status":"Stopped"}`), nil
 		case method == "PUT" && strings.HasPrefix(path, "/1.0/instances/vm-2/state"):
 			return json.RawMessage(`{}`), nil
-		case method == "POST" && path == "/1.0/payincus/security/resume":
+		case method == "POST" && path == "/1.0/agent/security/resume":
 			revision++
 			return json.RawMessage(fmt.Sprintf(`{"locked":false,"revision":%d,"resumeInstances":[]}`, revision)), nil
 		}
@@ -124,12 +124,12 @@ func TestRestoreNodeInstancesStartsAndFreezes(t *testing.T) {
 	want := []string{
 		"GET /1.0/instances/vm-1?project=default",
 		"GET /1.0/instances/vm-1/state?project=default",
-		"POST /1.0/payincus/security/resume",
+		"POST /1.0/agent/security/resume",
 		"GET /1.0/instances/vm-2?project=default",
 		"GET /1.0/instances/vm-2/state?project=default",
 		"PUT /1.0/instances/vm-2/state?project=default",
 		"GET /1.0/instances/vm-2/state?project=default",
-		"POST /1.0/payincus/security/resume",
+		"POST /1.0/agent/security/resume",
 	}
 	got := client.requestPaths()
 	if len(got) != len(want) {
@@ -232,7 +232,7 @@ func TestRestoreNodeInstancesAcknowledgesSkippedItems(t *testing.T) {
 		t.Fatalf("failed = %d, want 0", failed)
 	}
 	got := client.requestPaths()
-	if len(got) != 1 || got[0] != "POST /1.0/payincus/security/resume" {
+	if len(got) != 1 || got[0] != "POST /1.0/agent/security/resume" {
 		t.Fatalf("requests = %v", got)
 	}
 }

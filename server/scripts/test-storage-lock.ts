@@ -4,6 +4,7 @@ import Fastify from 'fastify'
 import routes from '../src/routes/storage-encryption.js'
 import { prisma } from '../src/db/prisma.js'
 import { IncusClient } from '../src/lib/incus/incus-client.js'
+import { hostTunnelManager } from '../src/lib/incus/tunnel-manager.js'
 import { fingerprint, seal } from '../src/lib/node-security/vault.js'
 
 process.env.ENCRYPTION_KEY=randomBytes(48).toString('base64')
@@ -15,7 +16,8 @@ const identities=[{project:'default',name:'running',uuid:'one',frozen:false},{pr
 let pending=identities.map(i=>({...i}))
 const statuses:Record<string,string>={running:'Stopped',frozen:'Stopped',vm:'Stopped',suspended:'Stopped'}
 const starts:string[]=[]
-Object.assign(prisma.storagePool, { updateMany:async()=>({count:1}), findUnique: async () => null })
+Object.assign(hostTunnelManager, { requestHeartbeatAndWait: async () => {} })
+Object.assign(prisma.storagePool, { updateMany:async()=>({count:1}), findUnique: async () => ({ driver: 'zfs', config: {}, telemetry: { encryption: { encrypted: true, state: available ? 'unlocked' : 'locked', dataset, encryptionRoot: dataset, keyFormat: 'hex', manualLocked: manual, lockPending: manual && !complete, pendingRecovery: pending.length } } }) })
 Object.assign(prisma.host,{findUnique:async()=>({id:4,userId:10,url:'https://node.invalid'})})
 Object.assign(prisma.nodeSecurityState,{findUnique:async()=>({serverFingerprint:'a'.repeat(64)})})
 Object.assign(prisma.nodeStorageKey,{findUnique:async()=>saved,upsert:async()=>saved,updateMany:async()=>({count:1})})
@@ -24,20 +26,20 @@ Object.assign(prisma.instance,{findFirst:async({where}:any)=>({status:where.incu
 Object.assign(IncusClient.prototype,{
  connect:async()=>{},close:async()=>{},
  request:async(method:string,path:string,body?:any)=>{
-  if(path==='/1.0/payincus')return {api_extensions:['payincus_storage_encryption_v1']}
+  if(path==='/1.0/agent')return {api_extensions:['incus_storage_encryption_v1']}
   if(path==='/1.0/storage-pools/data')return {driver:'zfs',config:{'zfs.pool_name':dataset}}
   if(path==='/1.0/storage-pools/moved')return {driver:'zfs',config:{'zfs.pool_name':'other/incus'}}
-  if(path==='/1.0/payincus/storage')return {datasets:[{dataset,encryptionRoot:dataset,algorithm:'aes-256-gcm',keyStatus:available?'available':'unavailable',keyFormat:'hex'}],locks:{[dataset]:{locked:manual,complete,resumeInstances:pending}}}
-  if(path==='/1.0/payincus/security')return {locked:globalLocked,revision,targets:[{dataset,guid:'123',fingerprint:saved.fingerprint}],storageLocks:{[dataset]:{locked:manual,complete,resumeInstances:pending}}}
-  if(path==='/1.0/payincus/storage/lock-pool'){
+  if(path==='/1.0/agent/storage')return {datasets:[{dataset,encryptionRoot:dataset,algorithm:'aes-256-gcm',keyStatus:available?'available':'unavailable',keyFormat:'hex'}],locks:{[dataset]:{locked:manual,complete,resumeInstances:pending}}}
+  if(path==='/1.0/agent/security')return {locked:globalLocked,revision,targets:[{dataset,guid:'123',fingerprint:saved.fingerprint}],storageLocks:{[dataset]:{locked:manual,complete,resumeInstances:pending}}}
+  if(path==='/1.0/agent/storage/lock-pool'){
    assert.equal(body.dataset,dataset);lockWrites++;manual=true;complete=true;available=false;revision++;return {}
   }
-  if(['/1.0/payincus/storage/unlock-pool','/1.0/payincus/storage/unlock'].includes(path)){
+  if(['/1.0/agent/storage/unlock-pool','/1.0/agent/storage/unlock'].includes(path)){
    assert.equal(body.key,key);assert.equal(body.dataset,dataset)
-   if(manual)assert.equal(path,'/1.0/payincus/storage/unlock-pool')
+   if(manual)assert.equal(path,'/1.0/agent/storage/unlock-pool')
    manual=false;complete=false;available=true;revision++;return {}
   }
-  if(path==='/1.0/payincus/storage/resume'){
+  if(path==='/1.0/agent/storage/resume'){
    assert.equal(body.dataset,dataset);assert.equal(body.revision,revision)
    pending=pending.filter(p=>p.uuid!==body.instance.uuid);revision++
    return {locked:false,revision,resumeInstances:pending}

@@ -4,6 +4,7 @@ import Fastify from 'fastify'
 import routes from '../src/routes/storage-encryption.js'
 import { prisma } from '../src/db/prisma.js'
 import { IncusClient, IncusApiError } from '../src/lib/incus/incus-client.js'
+import { hostTunnelManager } from '../src/lib/incus/tunnel-manager.js'
 import { fingerprint } from '../src/lib/node-security/vault.js'
 
 process.env.ENCRYPTION_KEY = randomBytes(48).toString('base64')
@@ -16,6 +17,7 @@ let nodeLocked = false
 let failSave = false
 let requests = 0
 let managementDenied = false
+Object.assign(hostTunnelManager, { requestHeartbeatAndWait: async () => {} })
 Object.assign(prisma.storagePool, { updateMany: async () => ({count:1}), findUnique: async () => ({driver:'zfs',config:{},telemetry:{encryption:{encrypted:true,state:available?'unlocked':'locked',dataset:'test/incus',encryptionRoot:'test/incus',keyFormat:'hex'}}}) })
 Object.assign(prisma.host, { findUnique: async () => ({ id: 4, userId: 10, url: 'https://node.invalid', tunnelEnabled: false }) })
 Object.assign(prisma.nodeSecurityState, { findUnique: async () => ({ serverFingerprint: 'a'.repeat(64) }) })
@@ -28,15 +30,15 @@ Object.assign(IncusClient.prototype, {
   connect: async function (this: IncusClient) { assert.equal(this.options.serverFingerprint, 'a'.repeat(64)) }, close: async () => {},
   request: async (method: string, path: string, body?: any) => {
     requests++
-    if (path === '/1.0/payincus') return { api_extensions: supported ? ['payincus_storage_encryption_v1'] : [] }
+    if (path === '/1.0/agent') return { api_extensions: supported ? ['incus_storage_encryption_v1'] : [] }
     if (path === '/1.0/storage-pools/data') return { driver: 'zfs', config: { 'zfs.pool_name': 'test/incus', source: '/some/loop.img' } }
-    if (path === '/1.0/payincus/storage') return { datasets: [{ dataset: 'test/incus', encryptionRoot: 'test/incus', algorithm: 'aes-256-gcm', keyFormat: 'hex', keyStatus: available ? 'available' : 'unavailable' }] }
-    if (path === '/1.0/payincus/security') return { locked: nodeLocked, targets: registered ? [{ dataset: 'test/incus', fingerprint: fingerprint(key) }] : [] }
-    if (method === 'POST' && ['/1.0/payincus/storage/register', '/1.0/payincus/storage/unlock'].includes(path)) {
+    if (path === '/1.0/agent/storage') return { datasets: [{ dataset: 'test/incus', encryptionRoot: 'test/incus', algorithm: 'aes-256-gcm', keyFormat: 'hex', keyStatus: available ? 'available' : 'unavailable' }] }
+    if (path === '/1.0/agent/security') return { locked: nodeLocked, targets: registered ? [{ dataset: 'test/incus', fingerprint: fingerprint(key) }] : [] }
+    if (method === 'POST' && ['/1.0/agent/storage/register', '/1.0/agent/storage/unlock'].includes(path)) {
       if (managementDenied) throw new IncusApiError('storage registration permission denied', 403, body)
       assert.equal(body.dataset, 'test/incus')
       assert.equal(body.key, key)
-      if (nodeLocked) assert.equal(path, '/1.0/payincus/storage/unlock')
+      if (nodeLocked) assert.equal(path, '/1.0/agent/storage/unlock')
       available = true; registered = true; return {}
     }
     throw new Error('unexpected endpoint')

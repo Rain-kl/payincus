@@ -15,13 +15,13 @@ export class StorageEncryptionError extends Error {
 }
 
 export async function poolEncryption(node: StorageNode, poolName: string, vault: StorageKeyVault) {
-  const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/payincus')
-  if (!Array.isArray(info.api_extensions) || !info.api_extensions.includes('payincus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持存储加密管理，请先更新节点集成包')
+  const info = await node.request<{ api_extensions: string[] }>('GET', '/1.0/agent')
+  if (!Array.isArray(info.api_extensions) || !info.api_extensions.includes('incus_storage_encryption_v1')) throw new StorageEncryptionError(409, '节点尚不支持存储加密管理，请先更新节点集成包')
   const pool = await node.request<{ driver: string; config: Record<string, string>; pendingImport?: boolean }>('GET', `/1.0/storage-pools/${encodeURIComponent(poolName)}`)
   if (pool.driver !== 'zfs') return { encrypted: false as const, state: 'plain' as const, dataset: '', encryptionRoot: '', keySaved: false }
   const source = pool.config?.['zfs.pool_name'] || pool.config?.source
   if (!source || source.startsWith('/')) throw new StorageEncryptionError(409, '无法确定此存储池的 ZFS 数据集，请刷新存储配置')
-  const inventory = await node.request<{ locked?: boolean; datasets: EncryptedDataset[]; locks?: Record<string, { locked: boolean; complete: boolean; resumeInstances: unknown[] }> }>('GET', '/1.0/payincus/storage')
+  const inventory = await node.request<{ locked?: boolean; datasets: EncryptedDataset[]; locks?: Record<string, { locked: boolean; complete: boolean; resumeInstances: unknown[] }> }>('GET', '/1.0/agent/storage')
   if (!Array.isArray(inventory.datasets)) throw new StorageEncryptionError(502, '节点返回的加密状态无效')
   const item = inventory.datasets.find(d => d.dataset === source)
   if (!item) throw new StorageEncryptionError(409, 'ZFS 数据集暂不可见，可能未导入或已离线，请检查节点状态')
@@ -51,12 +51,12 @@ export async function unlockPool(node: StorageNode, poolName: string, hostId: nu
   let ciphertext: string
   try { ciphertext = seal(key, { hostId, dataset: state.encryptionRoot, version: existing?.version || 1 }) }
   catch { throw new StorageEncryptionError(503, '控制端密钥托管未就绪，请检查主密钥配置') }
-  const nodeState = await node.request<{ locked: boolean; targets: Array<{ dataset: string; fingerprint: string }> | null }>('GET', '/1.0/payincus/security')
+  const nodeState = await node.request<{ locked: boolean; targets: Array<{ dataset: string; fingerprint: string }> | null }>('GET', '/1.0/agent/security')
   if (typeof nodeState.locked !== 'boolean' || (nodeState.targets !== null && !Array.isArray(nodeState.targets))) throw new StorageEncryptionError(502, '无法核验节点存储注册状态')
   const registered = nodeState.targets?.find(t => t.dataset === state.encryptionRoot)
   if (registered && registered.fingerprint !== fp) throw new StorageEncryptionError(409, '密钥与节点登记的加密卷不匹配')
   if (!registered && nodeState.locked) throw new StorageEncryptionError(423, '节点安全锁定中，不能登记新的加密卷')
-  await node.request('POST', `/1.0/payincus/storage/${registered ? state.manualLocked ? 'unlock-pool' : options.automatic ? 'auto-unlock' : 'unlock' : 'register'}`, { dataset: state.encryptionRoot, key })
+  await node.request('POST', `/1.0/agent/storage/${registered ? state.manualLocked ? 'unlock-pool' : options.automatic ? 'auto-unlock' : 'unlock' : 'register'}`, { dataset: state.encryptionRoot, key })
   try { await vault.save({ dataset: state.encryptionRoot, fingerprint: fp, ciphertext, version: existing?.version || 1 }) }
   catch { throw new StorageEncryptionError(503, '节点已加载密钥，但控制端保存失败，请保留密钥后重试') }
   key = ''

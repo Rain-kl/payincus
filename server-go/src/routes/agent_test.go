@@ -504,7 +504,7 @@ func TestAgentSignedSecurityReportAndHeartbeat(t *testing.T) {
 		t.Fatalf("ack = %v", body["ack"])
 	}
 
-	heartbeatBody := []byte(`{"nodeApi":"payincus_node_v1","incus":{"available":true},"instances":{"available":true},"resources":{"storageAvailable":true,"network":{"cards":[]}},"storage":{"available":true,"collectionComplete":true},"caddy":{"available":false}}`)
+	heartbeatBody := []byte(`{"nodeApi":"incus_node_v1","incus":{"available":true},"instances":{"available":true},"resources":{"storageAvailable":true,"network":{"cards":[]}},"storage":{"available":true,"collectionComplete":true},"caddy":{"available":false}}`)
 	headers = agentSignedHeaders(t, secret, agent.AgentID, http.MethodPost, "/api/agent/heartbeat",
 		heartbeatBody, "nonce-heartbeat-1", timestamp)
 	recorder = agentDoRequest(t, router, http.MethodPost, "/api/agent/heartbeat", heartbeatBody, headers)
@@ -854,7 +854,7 @@ func agentTestAgent() *models.HostAgent {
 		AgentID:      "agt_0123456789abcdefghijklmn",
 		Enabled:      true,
 		Status:       "online",
-		Capabilities: datatypes.JSON(`["payincus_node_v1"]`),
+		Capabilities: datatypes.JSON(`["incus_node_v1"]`),
 		LastReport:   datatypes.JSON(`{}`),
 		CreatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		UpdatedAt:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -885,12 +885,12 @@ func TestAgentHeartbeatLockedNodeStaysOnline(t *testing.T) {
 	agentResetCaddyState()
 	capture := &agentHeartbeatCapture{}
 	payload := map[string]any{
-		"nodeApi":      "payincus_node_v1",
+		"nodeApi":      "incus_node_v1",
 		"version":      "1.4.0",
 		"instances":    map[string]any{"available": true, "items": []any{}},
 		"storage":      map[string]any{"available": true, "collectionComplete": true, "reportedAt": "2026-11-11T12:00:00.000Z", "pools": []any{}},
 		"nodeSecurity": map[string]any{"state": map[string]any{"locked": true}},
-		"capabilities": []any{"payincus_node_v1", "network-control"},
+		"capabilities": []any{"incus_node_v1", "network-control"},
 	}
 	c, recorder := agentHeartbeatTestContext(t, payload)
 	agentHeartbeatStateMachine(c, agentTestAgent(), agentHeartbeatBody{Raw: payload}, agentFakeHeartbeatDeps(capture))
@@ -922,7 +922,7 @@ func TestAgentHeartbeatLockedNodeStorageFailure(t *testing.T) {
 		return false, nil
 	}
 	payload := map[string]any{
-		"nodeApi":      "payincus_node_v1",
+		"nodeApi":      "incus_node_v1",
 		"nodeSecurity": map[string]any{"state": map[string]any{"locked": true}},
 		"storage":      map[string]any{"available": true, "collectionComplete": true},
 	}
@@ -939,9 +939,9 @@ func TestAgentHeartbeatLockedNodeStorageFailure(t *testing.T) {
 
 func agentFullHeartbeatPayload() map[string]any {
 	return map[string]any{
-		"nodeApi":      "payincus_node_v1",
+		"nodeApi":      "incus_node_v1",
 		"version":      "1.4.0",
-		"capabilities": []any{"payincus_node_v1", "network-control"},
+		"capabilities": []any{"incus_node_v1", "network-control"},
 		"runtime":      map[string]any{"goarch": "arm64"},
 		"incus":        map[string]any{"available": true},
 		"instances":    map[string]any{"available": true, "items": []any{}},
@@ -1291,7 +1291,7 @@ func TestAgentSerializeShape(t *testing.T) {
 		t.Fatalf("createdAt = %v", serialized["createdAt"])
 	}
 
-	agent.Capabilities = datatypes.JSON(`["payincus_node_v1","network-control"]`)
+	agent.Capabilities = datatypes.JSON(`["incus_node_v1","network-control"]`)
 	agent.LastReport = datatypes.JSON(`{"metrics":{"heartbeatIntervalSeconds":30}}`)
 	seen := time.Date(2026, 11, 11, 11, 0, 0, 0, time.UTC)
 	agent.LastSeenAt = &seen
@@ -1437,8 +1437,8 @@ func TestAgentBuildNodeInstallCommand(t *testing.T) {
 	channel := "latest"
 	got := agentBuildNodeInstallCommand("https://panel.example.com/", "ait_token'quote", &channel)
 	want := "curl -fsSL 'https://panel.example.com/api/agent/install.sh' -o incus-node-install.sh && " +
-		"sudo env INCUDAL_PANEL_URL='https://panel.example.com' " +
-		"INCUDAL_AGENT_INSTALL_TOKEN='ait_token'\\''quote' INCUS_NODE_CHANNEL='latest' bash incus-node-install.sh"
+		"sudo env INCUS_PANEL_URL='https://panel.example.com' " +
+		"INCUS_AGENT_INSTALL_TOKEN='ait_token'\\''quote' INCUS_NODE_CHANNEL='latest' bash incus-node-install.sh"
 	if got != want {
 		t.Fatalf("install command =\n%s\nwant\n%s", got, want)
 	}
@@ -1450,7 +1450,7 @@ func TestAgentBuildNodeInstallCommand(t *testing.T) {
 
 func TestAgentBuildInstallConfig(t *testing.T) {
 	got := agentBuildAgentInstallConfig("agt_x", "ias_y'z")
-	want := "INCUDAL_AGENT_ID='agt_x'\nINCUDAL_AGENT_SECRET='ias_y'\\''z'\n"
+	want := "INCUS_AGENT_ID='agt_x'\nINCUS_AGENT_SECRET='ias_y'\\''z'\n"
 	if got != want {
 		t.Fatalf("install config = %q, want %q", got, want)
 	}
@@ -1570,7 +1570,7 @@ func TestAgentHeartbeatSchemaValidationPrecedesHMAC(t *testing.T) {
 	// A valid schema with a scalar capability is coerced to an array and then
 	// reaches the HMAC check (401), not a 400.
 	recorder = agentDoRequest(t, router, http.MethodPost, "/api/agent/heartbeat",
-		[]byte(`{"capabilities":"payincus_node_v1"}`), nil)
+		[]byte(`{"capabilities":"incus_node_v1"}`), nil)
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401 (schema accepted, HMAC missing)", recorder.Code)
 	}
