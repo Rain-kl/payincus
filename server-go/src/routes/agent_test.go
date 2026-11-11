@@ -214,11 +214,11 @@ func agentSignedHeaders(t *testing.T, secret, agentID, method, path string, body
 		BodyHash:  bodyHash,
 	})
 	return map[string]string{
-		"X-Incudal-Agent-Id":    agentID,
-		"X-Incudal-Timestamp":   timestamp,
-		"X-Incudal-Nonce":       nonce,
-		"X-Incudal-Body-Sha256": bodyHash,
-		"X-Incudal-Signature":   signature,
+		"X-Incus-Agent-Id":    agentID,
+		"X-Incus-Timestamp":   timestamp,
+		"X-Incus-Nonce":       nonce,
+		"X-Incus-Body-Sha256": bodyHash,
+		"X-Incus-Signature":   signature,
 		"Content-Type":          "application/json",
 	}
 }
@@ -372,7 +372,7 @@ func TestAgentHMACAuthenticationMatrix(t *testing.T) {
 
 	t.Run("invalid header shapes are rejected before any lookup", func(t *testing.T) {
 		headers := agentSignedHeaders(t, secret, agent.AgentID, http.MethodPost, "/probe", body, "nonce-badheader", freshTimestamp)
-		headers["X-Incudal-Agent-Id"] = "not-an-agent-id"
+		headers["X-Incus-Agent-Id"] = "not-an-agent-id"
 		recorder := agentDoRequest(t, router, http.MethodPost, "/probe", body, headers)
 		if recorder.Code != http.StatusUnauthorized {
 			t.Fatalf("status = %d, want 401", recorder.Code)

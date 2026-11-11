@@ -207,17 +207,17 @@ func TestAgentReadAuthHeaders(t *testing.T) {
 	if lib.ReadAgentAuthHeaders(headers) != nil {
 		t.Fatal("empty headers must produce nil")
 	}
-	headers.Set("X-Incudal-Agent-Id", "agt_0123456789abcdefghijklmn")
-	headers.Set("X-Incudal-Timestamp", "1700000000000")
-	headers.Set("X-Incudal-Nonce", "nonce-12345")
-	headers.Set("X-Incudal-Body-Sha256", strings.Repeat("a", 64))
-	headers.Set("X-Incudal-Signature", strings.Repeat("b", 64))
+	headers.Set("X-Incus-Agent-Id", "agt_0123456789abcdefghijklmn")
+	headers.Set("X-Incus-Timestamp", "1700000000000")
+	headers.Set("X-Incus-Nonce", "nonce-12345")
+	headers.Set("X-Incus-Body-Sha256", strings.Repeat("a", 64))
+	headers.Set("X-Incus-Signature", strings.Repeat("b", 64))
 	parsed := lib.ReadAgentAuthHeaders(headers)
 	if parsed == nil || parsed.AgentID != "agt_0123456789abcdefghijklmn" {
 		t.Fatalf("headers not parsed: %+v", parsed)
 	}
 	// Multiple values: the first wins (getHeaderValue).
-	headers.Add("X-Incudal-Nonce", "second-nonce")
+	headers.Add("X-Incus-Nonce", "second-nonce")
 	if parsed := lib.ReadAgentAuthHeaders(headers); parsed.Nonce != "nonce-12345" {
 		t.Fatalf("nonce = %q, want the first header value", parsed.Nonce)
 	}

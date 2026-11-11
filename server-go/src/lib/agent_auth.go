@@ -4,11 +4,11 @@
 // three mutually exclusive credential planes). It is deliberately NOT a JWT and
 // NOT a public-API token:
 //
-//	X-Incudal-Agent-Id      agt_…
-//	X-Incudal-Timestamp     13-digit epoch milliseconds
-//	X-Incudal-Nonce         caller-chosen, 8..128 chars, unique per agent
-//	X-Incudal-Body-Sha256   sha256 hex of the stable-stringified JSON body
-//	X-Incudal-Signature     hex HMAC-SHA256(secret, signing payload)
+//	X-Incus-Agent-Id      agt_…
+//	X-Incus-Timestamp     13-digit epoch milliseconds
+//	X-Incus-Nonce         caller-chosen, 8..128 chars, unique per agent
+//	X-Incus-Body-Sha256   sha256 hex of the stable-stringified JSON body
+//	X-Incus-Signature     hex HMAC-SHA256(secret, signing payload)
 //
 // The signing payload is built byte-for-byte like the TypeScript:
 //
@@ -319,11 +319,11 @@ func agentHeaderFirstValue(header http.Header, name string) (string, bool) {
 // ReadAgentAuthHeaders mirrors readAgentAuthHeaders. A missing header yields
 // nil, which the route renders as AGENT_AUTH_REQUIRED.
 func ReadAgentAuthHeaders(header http.Header) *AgentAuthHeaders {
-	agentID, ok1 := agentHeaderFirstValue(header, "X-Incudal-Agent-Id")
-	timestamp, ok2 := agentHeaderFirstValue(header, "X-Incudal-Timestamp")
-	nonce, ok3 := agentHeaderFirstValue(header, "X-Incudal-Nonce")
-	bodyHash, ok4 := agentHeaderFirstValue(header, "X-Incudal-Body-Sha256")
-	signature, ok5 := agentHeaderFirstValue(header, "X-Incudal-Signature")
+	agentID, ok1 := agentHeaderFirstValue(header, "X-Incus-Agent-Id")
+	timestamp, ok2 := agentHeaderFirstValue(header, "X-Incus-Timestamp")
+	nonce, ok3 := agentHeaderFirstValue(header, "X-Incus-Nonce")
+	bodyHash, ok4 := agentHeaderFirstValue(header, "X-Incus-Body-Sha256")
+	signature, ok5 := agentHeaderFirstValue(header, "X-Incus-Signature")
 	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
 		return nil
 	}
