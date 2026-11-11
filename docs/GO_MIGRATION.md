@@ -318,6 +318,18 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 - [x] 入口接线 — `cmd/server/main.go` 启动 scheduler/worker，SIGTERM 优雅关闭（含 console drain）
 - [ ] 静态托管（生产 `SERVE_STATIC_CLIENT=false`，**故意未移植**：线上不启用，且双端构建产物由 Nginx 提供）
 
+### 全量对拍基线（2026-11-11，47 组逐组独立运行）
+
+| 指标 | 数值 |
+|---|---|
+| 组数 | 47 |
+| 用例总数 | 2868 |
+| 逐项一致 | **2848** |
+| 失败 | **0** |
+| skip | 20（**全部**是同一类：`inbox-host-notify` / `init-commands-create` / `snapshots-create` 的规则表限流——Node 侧该规则是死代码，Go 真的执行，故 Go 429 / Node 4xx） |
+
+运行方式：每组单独起一次 Node(3101)+Go(3102)，避免 Go 的进程内固定窗口限流跨组累计造成假 429。脚本为 `/tmp/fullregress.sh`（逐组调用 `test/conformance/parity.sh`）。
+
 ### 迁移完成度快照（2026-11-11）
 
 | 维度 | 状态 |
