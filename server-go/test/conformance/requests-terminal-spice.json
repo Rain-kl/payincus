@@ -1,0 +1,180 @@
+[
+  {
+    "name": "terminal-ticket-no-token",
+    "method": "POST",
+    "path": "/api/ws/instances/994001/terminal-ticket",
+    "body": {}
+  },
+  {
+    "name": "terminal-ticket-invalid-id",
+    "method": "POST",
+    "path": "/api/ws/instances/0/terminal-ticket",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "terminal-ticket-instance-not-found",
+    "method": "POST",
+    "path": "/api/ws/instances/994999/terminal-ticket",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "terminal-ticket-non-owner",
+    "method": "POST",
+    "path": "/api/ws/instances/994002/terminal-ticket",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "terminal-ticket-not-running",
+    "method": "POST",
+    "path": "/api/ws/instances/994004/terminal-ticket",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "terminal-ticket-owner-running",
+    "method": "POST",
+    "path": "/api/ws/instances/994001/terminal-ticket",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "skipBody": true,
+    "body": {}
+  },
+  {
+    "name": "terminal-ticket-admin-foreign",
+    "method": "POST",
+    "path": "/api/ws/instances/994002/terminal-ticket",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "skipBody": true,
+    "body": {}
+  },
+  {
+    "name": "terminal-stats-anonymous",
+    "method": "GET",
+    "path": "/api/ws/instances/stats"
+  },
+  {
+    "name": "terminal-stats-non-admin",
+    "method": "GET",
+    "path": "/api/ws/instances/stats",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "terminal-stats-admin",
+    "method": "GET",
+    "path": "/api/ws/instances/stats",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "terminal-ws-plain-get",
+    "method": "GET",
+    "path": "/api/ws/instances/994001/terminal"
+  },
+  {
+    "name": "spice-session-no-token",
+    "method": "POST",
+    "path": "/api/ws/instances/994003/spice-session",
+    "body": {}
+  },
+  {
+    "name": "spice-session-invalid-id",
+    "method": "POST",
+    "path": "/api/ws/instances/0/spice-session",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "spice-session-non-owner",
+    "method": "POST",
+    "path": "/api/ws/instances/994005/spice-session",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "spice-session-container",
+    "method": "POST",
+    "path": "/api/ws/instances/994001/spice-session",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "spice-session-instance-not-found",
+    "method": "POST",
+    "path": "/api/ws/instances/994999/spice-session",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "body": {}
+  },
+  {
+    "name": "spice-session-unreachable-vm",
+    "method": "POST",
+    "path": "/api/ws/instances/994003/spice-session",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {}
+  },
+  {
+    "name": "spice-session-extra-property",
+    "method": "POST",
+    "path": "/api/ws/instances/994003/spice-session",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "extra": 1
+    }
+  },
+  {
+    "name": "spice-delete-no-token",
+    "method": "DELETE",
+    "path": "/api/ws/instances/994005/spice-session",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "ticket": "unknown-ticket"
+    }
+  },
+  {
+    "name": "spice-delete-invalid-id",
+    "method": "DELETE",
+    "path": "/api/ws/instances/0/spice-session",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "ticket": "unknown-ticket"
+    }
+  },
+  {
+    "name": "spice-delete-unknown-ticket",
+    "method": "DELETE",
+    "path": "/api/ws/instances/994005/spice-session",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "ticket": "unknown-ticket"
+    }
+  },
+  {
+    "name": "spice-delete-missing-ticket",
+    "method": "DELETE",
+    "path": "/api/ws/instances/994005/spice-session",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {}
+  },
+  {
+    "name": "spice-ws-plain-get",
+    "method": "GET",
+    "path": "/api/ws/instances/994005/spice"
+  }
+]
