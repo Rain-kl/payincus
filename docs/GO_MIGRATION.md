@@ -281,7 +281,7 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 
 - [x] `lib/caddy-client.go`（394）— proxy-sites 与 transfers 的共同依赖
 - [x] `proxy-sites`（986）
-- [ ] `transfers`（1152）— 还需 `incus-backups`/`incus-restore`/`incus-pool`
+- [x] `transfers`（1152）— 96/96 对拍；4103 非阻塞重试、accept 原子 claim、拒绝/取消退款与快照
 
 ### Wave D — 高危核心（AGENTS.md §2.3：先读后写；按依赖链排序）
 
@@ -294,27 +294,48 @@ server/src/config/rate-limit.ts →  server-go/src/config/rate_limit_gen.go（�
 3. [x] `auth`（1436）— 49/49 对拍；四条反向测试齐备；挖出并修掉两个运行时 bug（注册漏写 `updated_at`、GORM 的 `sql.ErrNoRows` 被当成 error）
 4. [x] `system-config`（941）— 49/49 对拍，脱敏/缓存失效/AJV 语义均有单测；挖出 `UpdateSystemConfigs` 的 RowsAffected 分歧（见「已知待办」）
 5. [x] `hosts`（7987）— 65 条声明 + 2 个别名，143/143 对拍；通配符必须是 `:hostId`（同位置已有别模块占用）；Incus 触达路径**故意不进对拍**（两端错误文案必然不同，见「已知待办」）
-6. [ ] `packages`（2873）— 依赖 hosts
-7. [ ] `instances`（6894）— 依赖 hosts + packages + 计费
-8. [ ] `instance-billing`（1080）
-9. [ ] `instance-destroy`（1337）
-10. [ ] `backups`（1467）
+6. [x] `packages`（2873）— 82/82 对拍；含 package-shares 与 storage-pool 读模型
+7. [x] `instances`（6894）— 133/133 对拍；创建事务（74201→行锁预占→扣款快照）+ 单一补偿闸门
+8. [x] `instance-billing`（1080）— 60/60；4106→4110、版本守卫、精确重放
+9. [x] `instance-destroy`（1337）— 30/30；报价=结算、条件 UPDATE 幂等、Incus 失败不落 deleted
+10. [x] `backups`（1467）— 109/109；配额并发（12 并发/上限 3 恰好 3 个）、下载票据单次
 11. [x] `recharge`（3027）— 支付；73/73 对拍，三种回调验签/幂等/金额校验有 DB 级测试
-12. [ ] `admin-billing`（4786）— 支付/退款/对账（进行中）
+12. [x] `admin-billing`（4786）— 113/113；退款上限事务内复核、批量原子、对账幂等
 13. [x] `public-api`（2396）— `pat_`/`poa_` 鉴权面；131/131 对拍，scope 矩阵双向测试
-14. [ ] `agent`（1042）— host agent HMAC 鉴权面（进行中）
-15. [ ] `system-update`（275）— OTA
-16. [ ] `oauth`（748）— `/api/oauth` 10 条路由 + **一次性 OAuth state nonce 与登录码**（spec §3.5 的实际归属，auth.ts 不涉及）
+14. [x] `agent`（1042）— 40/40；HMAC 跨实现实证、nonce 重放、自写 RFC6455 隧道
+15. [x] `system-update`（275）— 33/33；只读实现，start/rollback 显式 501（源码守卫禁止执行面）
+16. [x] `oauth`（748）— 38/38；state 单次消费（并发只赢一次）、redirect 绕过矩阵 45 例、action-ticket
 
-> **机械核对（2026-11-11）**：用「TS 路由文件名 → Go 路由文件名」逐文件比对，当前 **57 个已存在 / 8 个缺失**：`admin-billing`、`admin-incus-ui`、`agent`、`oauth`、`spice`、`system-update`、`terminal`、`transfers`。此前的手工清单漏掉了 `oauth`，已补入。后续每次收尾都用这条脚本复核，避免"以为做完了"。
+> **机械核对（2026-11-11 收尾）**：`server/src/routes/*.ts`（65 个）→ `server-go/src/routes/*.go` **65 个已存在 / 0 个缺失**。此前手工清单漏掉的 `oauth` 已补齐。这条脚本必须每次收尾复跑。
 
 ### Wave E — 长连接与运行时（Phase 7）
 
-- [ ] `terminal`（527）— WebSocket 终端
-- [ ] `spice`（123）— SPICE 控制台
-- [ ] `admin-incus-ui`（723）— Incus UI 隧道
-- [ ] 15 个 worker/scheduler（`traffic-scheduler`、`instance-expiry`、`exchangeDeliveryWorker` 等）
-- [ ] 静态托管（生产 `SERVE_STATIC_CLIENT=false`，优先级最低）
+- [x] `terminal`（527）— 23/23 对拍；通用 RFC6455 引擎（server+client）、升级前鉴权、单次票据
+- [x] `spice`（123）— 同一组对拍；会话上限/重连替换/子协议回显
+- [x] `admin-incus-ui`（723）— 36/36；HTTP+WS 隧道、票据 5min/256 次、关闭码透传
+- [x] 后台 worker（4 个）— 条件 UPDATE 领取 + 4101/4106 锁 + per-host 并发；44 测试
+- [x] 调度器（7 个）+ app.ts 内联清理（4 段）— `StartSchedulers`/`DISABLE_SCHEDULERS`，下次触发为纯函数测试
+- [x] 入口接线 — `cmd/server/main.go` 启动 scheduler/worker，SIGTERM 优雅关闭（含 console drain）
+- [ ] 静态托管（生产 `SERVE_STATIC_CLIENT=false`，**故意未移植**：线上不启用，且双端构建产物由 Nginx 提供）
+
+### 迁移完成度快照（2026-11-11）
+
+| 维度 | 状态 |
+|---|---|
+| 路由文件 | **65/65**（机械核对，0 缺失） |
+| 对拍组 | 47 组，逐组独立运行（Go 限流是进程内固定窗口，不能批量跑） |
+| 后台运行时 | 4 worker + 7 scheduler + 4 段启动清理，已由 `main.go` 启动并支持优雅关闭 |
+| 数据层 | 所有 TS `db/*.ts` 均有 Go 对应；跨模块依赖用注册钩子反转（db ↛ lib） |
+
+**仍然存在的缺口（不是"没做"，是有意为之或依赖外部条件）**：
+1. **真实设备/服务验证**：实例开通、控制台、备份恢复、支付回调、OTA、邮件投递都只做到对拍 + 单测，**没有在生产或真实节点验证过**（AGENTS §2.1 / WAVE_D_SPEC §4.3）。
+2. **OTA 写操作**：`start`/`rollback` 显式 501，理由与撤除条件见该模块注释。
+3. **静态托管**：未移植（生产关闭）。
+4. **存储适配器**（S3/WebDAV/FTP/SFTP）：未移植；备份上传任务在未注册 provider 时显式失败，不会静默跳过。
+5. **worker 的 clone/recreate/change_host 执行体**：未移植（需要实例开通执行器），未注册时任务立即失败并写原因。
+6. **host 地址注册表**：未移植（同 IP 双主不会被拒绝）。
+7. **重复实现待收敛**（语义已核对一致，但两份会漂移）：包出站绑定（db pgx 版 / lib gorm 版）、流量线速归一化（packages 路由内 / services）、快照配额（db/snapshots 与 db/quota_operations）。
+8. **限流口径差异**：Node 只有"内联 config.rateLimit"生效，Go 会执行生成规则表 → 规则表独有的路径 Go 更严（owner 已决定保持现状并记录）。
 
 ### 已知待办（散件）
 
