@@ -1,0 +1,40 @@
+[
+  { "name": "system-update-version-anon", "method": "GET", "path": "/api/admin/system-update/version" },
+  { "name": "system-update-check-anon", "method": "GET", "path": "/api/admin/system-update/check" },
+  { "name": "system-update-tasks-anon", "method": "GET", "path": "/api/admin/system-update/tasks" },
+  { "name": "system-update-task-anon", "method": "GET", "path": "/api/admin/system-update/tasks/996001" },
+  { "name": "system-update-task-logs-anon", "method": "GET", "path": "/api/admin/system-update/tasks/996001/logs" },
+  { "name": "system-update-start-anon", "method": "POST", "path": "/api/admin/system-update/start" },
+  { "name": "system-update-rollback-anon", "method": "POST", "path": "/api/admin/system-update/tasks/996001/rollback" },
+  { "name": "system-update-version-trailing-slash", "method": "GET", "path": "/api/admin/system-update/version/" },
+  { "name": "system-update-tasks-trailing-slash", "method": "GET", "path": "/api/admin/system-update/tasks/" },
+  { "name": "system-update-version-bogus-token", "method": "GET", "path": "/api/admin/system-update/version", "token": "not-a-real-token" },
+
+  { "name": "system-update-version", "method": "GET", "path": "/api/admin/system-update/version", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-version-non-admin", "method": "GET", "path": "/api/admin/system-update/version", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "system-update-tasks", "method": "GET", "path": "/api/admin/system-update/tasks", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-tasks-non-admin", "method": "GET", "path": "/api/admin/system-update/tasks", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-tasks-with-query", "method": "GET", "path": "/api/admin/system-update/tasks?limit=1", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-tasks-trailing-slash-admin", "method": "GET", "path": "/api/admin/system-update/tasks/", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-logs-empty-id", "method": "GET", "path": "/api/admin/system-update/tasks//logs", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "system-update-task-success", "method": "GET", "path": "/api/admin/system-update/tasks/996001", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-failed", "method": "GET", "path": "/api/admin/system-update/tasks/996002", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-rolled-back", "method": "GET", "path": "/api/admin/system-update/tasks/996003", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-leading-zero-id", "method": "GET", "path": "/api/admin/system-update/tasks/0996001", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-missing", "method": "GET", "path": "/api/admin/system-update/tasks/999999", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-id-zero", "method": "GET", "path": "/api/admin/system-update/tasks/0", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-id-text", "method": "GET", "path": "/api/admin/system-update/tasks/abc", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-id-fraction", "method": "GET", "path": "/api/admin/system-update/tasks/1.5", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-non-admin", "method": "GET", "path": "/api/admin/system-update/tasks/996001", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "system-update-task-logs-null-path", "method": "GET", "path": "/api/admin/system-update/tasks/996001/logs", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-logs-outside-dir", "method": "GET", "path": "/api/admin/system-update/tasks/996003/logs", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-logs-missing-task", "method": "GET", "path": "/api/admin/system-update/tasks/999999/logs", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-logs-invalid-id", "method": "GET", "path": "/api/admin/system-update/tasks/abc/logs", "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-task-logs-non-admin", "method": "GET", "path": "/api/admin/system-update/tasks/996001/logs", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+
+  { "name": "system-update-start-non-admin", "method": "POST", "path": "/api/admin/system-update/start", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" },
+  { "name": "system-update-rollback-non-admin", "method": "POST", "path": "/api/admin/system-update/tasks/996001/rollback", "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN" }
+]

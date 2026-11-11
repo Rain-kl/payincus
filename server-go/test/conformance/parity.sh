@@ -169,7 +169,11 @@ done
 # --- Go server under test ---
 lsof -ti:$GO_PORT | xargs -r kill -9 2>/dev/null
 ( cd "$GODIR" && go build -o "$FILLED/server" ./cmd/server ) || { echo "FATAL: go build failed" >&2; exit 4; }
-( env "${common_env[@]}" PORT=$GO_PORT "$FILLED/server" > /tmp/parity-go.log 2>&1 & )
+# Run the Go server with the repository as cwd, like the Node reference does
+# (getProjectRoot()). Some endpoints resolve files relative to the working
+# directory — /version reads version.json, install.sh serves templates — so the
+# comparison must not depend on where the caller happened to stand.
+( cd "$REPO" && env "${common_env[@]}" PORT=$GO_PORT "$FILLED/server" > /tmp/parity-go.log 2>&1 & )
 wait_health $GO_PORT /tmp/parity-go.log "Go server" || exit 5
 
 rc=0
