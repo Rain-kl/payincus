@@ -1492,8 +1492,8 @@ const goBack = closeDrawer
                 {{ t('packageForm.fields.limitsRead') }}
               </label>
               <div class="flex gap-2">
-                <Input v-model="form.limitsRead" type="text" class="flex-1 font-mono tabular-nums" />
-                <Select v-model="form.limitsReadUnit" :options="storageUnits" class="w-24 shrink-0" />
+                <Input v-model="form.limitsRead" type="text" class="flex-1 min-w-0 font-mono tabular-nums" />
+                <Select v-model="form.limitsReadUnit" :options="storageUnits" :block="false" class="w-24 shrink-0" />
               </div>
             </div>
             <div>
@@ -1501,8 +1501,8 @@ const goBack = closeDrawer
                 {{ t('packageForm.fields.limitsWrite') }}
               </label>
               <div class="flex gap-2">
-                <Input v-model="form.limitsWrite" type="text" class="flex-1 font-mono tabular-nums" />
-                <Select v-model="form.limitsWriteUnit" :options="storageUnits" class="w-24 shrink-0" />
+                <Input v-model="form.limitsWrite" type="text" class="flex-1 min-w-0 font-mono tabular-nums" />
+                <Select v-model="form.limitsWriteUnit" :options="storageUnits" :block="false" class="w-24 shrink-0" />
               </div>
             </div>
           </div>
@@ -1554,8 +1554,8 @@ const goBack = closeDrawer
                 {{ t('packageForm.fields.limitsIngress') }}
               </label>
               <div class="flex gap-2">
-                <Input v-model="form.limitsIngress" type="text" class="flex-1 font-mono tabular-nums" />
-                <Select v-model="form.limitsIngressUnit" :options="networkUnits" class="w-28 shrink-0" />
+                <Input v-model="form.limitsIngress" type="text" class="flex-1 min-w-0 font-mono tabular-nums" />
+                <Select v-model="form.limitsIngressUnit" :options="networkUnits" :block="false" class="w-28 shrink-0" />
               </div>
             </div>
             <div>
@@ -1563,8 +1563,8 @@ const goBack = closeDrawer
                 {{ t('packageForm.fields.limitsEgress') }}
               </label>
               <div class="flex gap-2">
-                <Input v-model="form.limitsEgress" type="text" class="flex-1 font-mono tabular-nums" />
-                <Select v-model="form.limitsEgressUnit" :options="networkUnits" class="w-28 shrink-0" />
+                <Input v-model="form.limitsEgress" type="text" class="flex-1 min-w-0 font-mono tabular-nums" />
+                <Select v-model="form.limitsEgressUnit" :options="networkUnits" :block="false" class="w-28 shrink-0" />
               </div>
             </div>
           </div>

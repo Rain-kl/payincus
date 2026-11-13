@@ -36,6 +36,9 @@ const handleClick = (event: MouseEvent) => {
 }
 
 const variantClasses = computed(() => {
+  if (props.disabled) {
+    return 'border'
+  }
   switch (props.variant) {
     case 'primary':
       return 'bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)] border-0 focus-visible:ring-[var(--accent)]'
