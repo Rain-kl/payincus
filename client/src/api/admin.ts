@@ -1,3 +1,4 @@
+import type { HostInstanceBackupTask } from './host-instance-backup-types'
 import type { StorageEncryptionState } from './storage-encryption-types'
 import type { NodeSecurityOverview, NodeSecurityState } from './node-security-types'
 import type { ProxyNode, EgressSelection, EgressProfile, EgressProfileInput, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
@@ -1653,6 +1654,10 @@ const api = {
       types: Array<{ value: string; label: string; unit: string }>
       ranges: Record<string, { min: number; max: number; unit: string }>
     }> => http.get('/redeem-code-options'),
+    getInstanceBackupTasks: (hostId: number): Promise<{ tasks: HostInstanceBackupTask[] }> =>
+      http.get(`/admin/hosts/${hostId}/instance-backups`, { timeout: 0 }),
+    startInstanceBackup: (hostId: number, data: { id: string; directory: string }): Promise<HostInstanceBackupTask> =>
+      http.post(`/admin/hosts/${hostId}/instance-backups`, data, { timeout: 0 }),
     opsDiscover: (hostId: number): Promise<{
       managed: Array<{ incusName: string; incusType: string; incusStatus: string; dbId: number; dbStatus: string; userId: number }>
       orphaned: Array<{ incusName: string; incusType: string; incusStatus: string }>

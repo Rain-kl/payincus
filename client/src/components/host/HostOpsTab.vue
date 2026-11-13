@@ -5,6 +5,7 @@ import { Check } from 'lucide-vue-next'
 import api from '@/api'
 import IconButton from '@/components/IconButton.vue'
 import { useAuthStore } from '@/stores/auth'
+const HostInstanceBackups = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostInstanceBackups.vue')) : null
 const HostNodeSecurity = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostNodeSecurity.vue')) : null
 import type { SshKey, SystemImage } from '@/types/api'
 import { useThemeStore } from '@/stores/theme'
@@ -291,7 +292,7 @@ const { t } = useI18n()
 const themeStore = useThemeStore()
 const toast = useToast()
 
-const activeOpsMenu = ref<'actions' | 'audit'>('actions')
+const activeOpsMenu = ref<'actions' | 'audit' | 'backups'>('actions')
 const loadingAction = ref<'discover' | 'baseline' | 'network' | 'preview' | 'instanceSync' | 'instanceRestart' | 'instanceDanger' | 'auditScan' | 'auditKill' | ''>('')
 const lastAction = ref<'discover' | 'baseline' | 'network' | 'preview' | 'instanceSync' | 'instanceRestart' | 'instanceDanger' | 'auditScan' | 'auditKill' | ''>('')
 const lastRunAt = ref<string>('')
@@ -1291,6 +1292,13 @@ async function runAuditKillProcess() {
         >
           实例审查
         </button>
+        <button
+          v-if="nodeSecurityAdmin"
+          type="button"
+          class="min-h-[44px] px-4 py-2 text-sm rounded-full font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] motion-reduce:transition-none"
+          :class="activeOpsMenu === 'backups' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'"
+          @click="activeOpsMenu = 'backups'"
+        >实例备份</button>
       </div>
 
       <div v-if="activeOpsMenu === 'actions'" class="grid gap-4 lg:grid-cols-3">
@@ -1334,6 +1342,8 @@ async function runAuditKillProcess() {
         </div>
       </div>
     </div>
+
+    <component :is="HostInstanceBackups" v-if="activeOpsMenu === 'backups' && nodeSecurityAdmin && HostInstanceBackups" :host-id="hostId" />
 
     <div v-if="activeOpsMenu === 'actions' && discoverResult" class="card p-5 space-y-4">
       <div class="flex items-center justify-between gap-3 flex-wrap">

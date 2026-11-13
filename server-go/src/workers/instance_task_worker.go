@@ -15,9 +15,10 @@
 //
 // Create is the one task type whose executor lives outside this package (the
 // provisioning/route layer registers it), mirroring `setCreateTaskExecutor` in the
-// TypeScript. Clone/recreate/change_host have the same registration hook because
-// their provisioning flows belong to the instance routes; without a registration
-// they fail closed with an explicit reason instead of half-mutating a host.
+// TypeScript. Clone/recreate/change_host use the same registry but the built-in
+// executors install themselves from instance_task_exec_heavy.go's init(); if a
+// registry entry is removed they fail closed with an explicit reason instead of
+// half-mutating a host.
 package workers
 
 import (
@@ -64,10 +65,20 @@ type CreateTaskPayload struct {
 // CreateTaskExecutor mirrors CreateTaskExecutor.
 type CreateTaskExecutor func(ctx context.Context, instanceID, hostID int32, payload CreateTaskPayload) error
 
+// InstanceTaskHeavyExecutor executes one clone/recreate/change_host task.
+//
+// Unlike create, these three tasks are driven by the task row itself (image,
+// sshKeyId, targetHostId, payload), not by a provisioning snapshot, so the
+// executor receives the fully loaded runtime that executeTask already built: the
+// task row, the instance row, the (source) host row and the Incus client. The
+// TypeScript dispatch happens after the same prerequisites, so an executor never
+// has to repeat the deleted/earliest/host checks.
+type InstanceTaskHeavyExecutor func(ctx context.Context, rt *instanceTaskRuntime) error
+
 var (
 	executorRegistryMu sync.RWMutex
 	createTaskExecutor CreateTaskExecutor
-	heavyTaskExecutors = map[string]CreateTaskExecutor{}
+	heavyTaskExecutors = map[string]InstanceTaskHeavyExecutor{}
 )
 
 // SetCreateTaskExecutor mirrors setCreateTaskExecutor. The provisioning module
@@ -79,10 +90,10 @@ func SetCreateTaskExecutor(executor CreateTaskExecutor) {
 }
 
 // SetInstanceTaskExecutor registers the executor for a heavy task type
-// (clone/recreate/change_host). The callback has the same "instanceId, hostId,
-// payload" shape as create; clone/recreate/change_host ignore the payload, so the
-// task row's own fields drive them.
-func SetInstanceTaskExecutor(taskType models.InstanceTaskType, executor CreateTaskExecutor) {
+// (clone/recreate/change_host). The three built-in executors register themselves
+// from instance_task_exec_heavy.go's init(); the hook stays useful for
+// replacements (staging, tests) and matches the TypeScript's executor registry.
+func SetInstanceTaskExecutor(taskType models.InstanceTaskType, executor InstanceTaskHeavyExecutor) {
 	executorRegistryMu.Lock()
 	defer executorRegistryMu.Unlock()
 	if executor == nil {
@@ -98,7 +109,7 @@ func registeredCreateExecutor() CreateTaskExecutor {
 	return createTaskExecutor
 }
 
-func registeredHeavyExecutor(taskType string) CreateTaskExecutor {
+func registeredHeavyExecutor(taskType string) InstanceTaskHeavyExecutor {
 	executorRegistryMu.RLock()
 	defer executorRegistryMu.RUnlock()
 	return heavyTaskExecutors[taskType]

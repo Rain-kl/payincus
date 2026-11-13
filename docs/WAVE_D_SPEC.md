@@ -178,7 +178,9 @@ instances  ← 创建/销毁/迁移，全部资源交付动作
 `db/hosts.ts`（**1238 行、20 个导出函数**）是 22 个路由模块的共同依赖（`instances` 32 处、`ip-addresses` 10 处、`traffic` 8 处、`admin-billing` 7 处……），因此**必须先落地并稳定**，再动 `routes/hosts.go`。
 
 已核实的关键事实：
-- `db/hosts.ts` **不使用 advisory lock**。`selectAndReserveHostWithLock` 用的是 SQL 行锁 `FOR UPDATE SKIP LOCKED`（`lockQuery`，约 1057 行），选宿主机后在同一事务里预占资源。Go 侧必须保留同一段 SQL 语义（同一筛选条件、同一 SKIP LOCKED、同一事务边界），**不要替换成 advisory lock**——两者并发语义不同。
+- `db/hosts.ts` **不使用 advisory lock**。`selectAndReserveHostWithLock` 用的是 SQL 行锁 **`FOR UPDATE`（没有 `SKIP LOCKED`）**，选宿主机后在同一事务里预占资源。Go 侧必须保留同一段 SQL 语义（同一筛选条件、同一排序 `ORDER BY memory_used ASC, cpu_used ASC`、同一事务边界），**不要替换成 advisory lock**——两者并发语义不同。
+  > 勘误（2026-11-10，由 `hosts_db` 施工时发现）：本文档早前写成 `FOR UPDATE SKIP LOCKED` 是错的。`SKIP LOCKED` 只出现在 `db/public-ipv4.ts:69`（不同的表、不同的函数）。以 TypeScript 为准。
+- **`db/public-ipv4.ts` 的地址分配**才是 `FOR UPDATE SKIP LOCKED` 的持有者：并发分配公网 IPv4 时跳过已被别人锁住的行。Go 侧同样必须保留。
 - `reservePlanUpgradeCapacityWithLock` 是另一条独立的锁路径（套餐升级容量预占），同样必须在事务内完成。
 - `lib/incus/tunnel-manager.ts`（544 行）是隧道控制面，和 `lib/incus_client.go` 的拨号分支耦合；移植时先确认 `incus_client.go` 现有 seam（指纹固定传输层已在 `lib/node_security_transport.go`）。
 - 公开端点（A 组的 install.sh/cert、D 组的 logs/stream）**没有 JWT**，对拍时不要塞 token；它们的安全性来自一次性 token/ticket，反向测试要覆盖「token 已用过 → 401/403」。

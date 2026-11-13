@@ -6,12 +6,13 @@
 // eth1, start, re-attach three seconds later) and the "already running/stopped"
 // reconciliation that repairs the database instead of failing the task.
 //
-// Clone / recreate / change_host / create are *registered* executors, mirroring
-// setCreateTaskExecutor in the TypeScript. Their remaining primitives are still
-// being ported in the provisioning wave; until a executor is registered they fail
-// with an explicit message instead of half-mutating a host (no resource is
-// reserved, no instance is deleted). This is the fail-closed choice: a task that
-// cannot be executed completely must not be executed partially.
+// Clone / recreate / change_host live in instance_task_exec_heavy.go. Create
+// remains a *registered* executor, mirroring setCreateTaskExecutor in the
+// TypeScript, because its provisioning flow belongs to the instance routes. When
+// create has no executor it fails with an explicit message instead of
+// half-mutating a host (no resource is reserved, no instance is deleted). This is
+// the fail-closed choice: a task that cannot be executed completely must not be
+// executed partially.
 package workers
 
 import (
@@ -113,7 +114,7 @@ func (e *pgInstanceTaskExecutor) Execute(ctx context.Context, task *instanceTask
 		}
 	}
 
-	rt := &instanceTaskRuntime{task: task, instance: instance, host: host, client: client}
+	rt := &instanceTaskRuntime{Task: task, Instance: instance, Host: host, Client: client}
 
 	switch models.InstanceTaskType(task.TaskType) {
 	case models.InstanceTaskTypeStart:
@@ -139,25 +140,29 @@ func (e *pgInstanceTaskExecutor) Execute(ctx context.Context, task *instanceTask
 		if executor == nil {
 			return fmt.Errorf("任务类型 %s 的 Go 执行器未就绪，等待实例开通流程迁移完成后重试", task.TaskType)
 		}
-		var payload CreateTaskPayload
-		if len(task.Payload) > 0 {
-			_ = json.Unmarshal(task.Payload, &payload)
-		}
-		return executor(ctx, task.InstanceID, task.HostID, payload)
+		return executor(ctx, rt)
 	default:
 		return fmt.Errorf("未知任务类型: %s", task.TaskType)
 	}
 }
 
-type instanceTaskRuntime struct {
-	task     *instanceTaskRecord
-	instance *db.InstanceDetailRecord
-	host     *db.HostsRecord
-	client   *lib.IncusClient
+// InstanceTaskRuntime is the prerequisite set executeTask loads before any task
+// type runs: the claimed row, the instance, the (source) host and its Incus
+// client. It is exported because SetInstanceTaskExecutor accepts executors for
+// heavy task types from outside this package.
+type InstanceTaskRuntime struct {
+	Task     *instanceTaskRecord
+	Instance *db.InstanceDetailRecord
+	Host     *db.HostsRecord
+	Client   *lib.IncusClient
 }
 
+// instanceTaskRuntime keeps the historical unexported spelling used throughout
+// this file; it is the same type.
+type instanceTaskRuntime = InstanceTaskRuntime
+
 func (e *pgInstanceTaskExecutor) setProgress(ctx context.Context, rt *instanceTaskRuntime, progress string) error {
-	return e.store.UpdateProgress(ctx, rt.task.ID, progress)
+	return e.store.UpdateProgress(ctx, rt.Task.ID, progress)
 }
 
 // ==================== shared helpers ====================
@@ -348,11 +353,11 @@ func (e *pgInstanceTaskExecutor) executeStartTask(ctx context.Context, rt *insta
 		return err
 	}
 
-	if _, err := lib.IncusInstanceStart(ctx, rt.client, rt.instance.IncusID); err != nil {
+	if _, err := lib.IncusInstanceStart(ctx, rt.Client, rt.Instance.IncusID); err != nil {
 		if strings.Contains(err.Error(), "file exists") {
-			if incusInstance, getErr := lib.GetInstance(ctx, rt.client, rt.instance.IncusID); getErr == nil {
+			if incusInstance, getErr := lib.GetInstance(ctx, rt.Client, rt.Instance.IncusID); getErr == nil {
 				if eth1, ok := incusInstance.Devices["eth1"]; ok && eth1 != nil {
-					if startErr := startWithIPv6RouteFallback(ctx, rt.client, rt.instance.IncusID, incusInstance.Devices); startErr != nil {
+					if startErr := startWithIPv6RouteFallback(ctx, rt.Client, rt.Instance.IncusID, incusInstance.Devices); startErr != nil {
 						return startErr
 					}
 				} else {
@@ -362,48 +367,48 @@ func (e *pgInstanceTaskExecutor) executeStartTask(ctx context.Context, rt *insta
 				return err
 			}
 		} else if isAlreadyInStateError(err, "running") {
-			log.Printf("[Start] 实例 %s 已经是运行状态，自动修正数据库", rt.instance.IncusID)
-			state, stateErr := getInstanceState(ctx, rt.client, rt.instance.IncusID)
+			log.Printf("[Start] 实例 %s 已经是运行状态，自动修正数据库", rt.Instance.IncusID)
+			state, stateErr := getInstanceState(ctx, rt.Client, rt.Instance.IncusID)
 			if stateErr != nil {
 				return stateErr
 			}
 			ipv4, ipv6 := extractIPv4(state), extractIPv6(state)
-			if err := updateInstanceStatus(ctx, rt.task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
+			if err := updateInstanceStatus(ctx, rt.Task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
 				return err
 			}
-			reconcileTrafficState(ctx, []int32{rt.task.InstanceID})
+			reconcileTrafficState(ctx, []int32{rt.Task.InstanceID})
 			notifySafely("start notification", func() {
-				e.notifier.InstanceStarted(ctx, rt.task.UserID, rt.instance.Name, rt.host.Name, ipv4, ipv6)
+				e.notifier.InstanceStarted(ctx, rt.Task.UserID, rt.Instance.Name, rt.Host.Name, ipv4, ipv6)
 			})
-			db.CreateLog(ctx, notifierUserID(rt.task.UserID), "instance", "instance.start",
-				fmt.Sprintf("Instance \"%s\" already running, synced status [host: %s]", rt.instance.Name, rt.host.Name),
-				"success", db.LogOptionsWithInstance(&rt.task.InstanceID))
+			db.CreateLog(ctx, notifierUserID(rt.Task.UserID), "instance", "instance.start",
+				fmt.Sprintf("Instance \"%s\" already running, synced status [host: %s]", rt.Instance.Name, rt.Host.Name),
+				"success", db.LogOptionsWithInstance(&rt.Task.InstanceID))
 			return nil
 		} else {
 			return err
 		}
 	}
 
-	incusInstance, err := lib.GetInstance(ctx, rt.client, rt.instance.IncusID)
+	incusInstance, err := lib.GetInstance(ctx, rt.Client, rt.Instance.IncusID)
 	if err != nil {
 		return err
 	}
 	isVM := incusInstance.Type == "virtual-machine"
-	ipv4, ipv6, err := waitForInstanceIPs(ctx, rt.client, rt.instance.IncusID, rt.instance.NetworkMode, isVM)
+	ipv4, ipv6, err := waitForInstanceIPs(ctx, rt.Client, rt.Instance.IncusID, rt.Instance.NetworkMode, isVM)
 	if err != nil {
 		return err
 	}
 
-	if err := updateInstanceStatus(ctx, rt.task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
+	if err := updateInstanceStatus(ctx, rt.Task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
 		return err
 	}
-	reconcileTrafficState(ctx, []int32{rt.task.InstanceID})
+	reconcileTrafficState(ctx, []int32{rt.Task.InstanceID})
 
 	notifySafely("start notification", func() {
-		e.notifier.InstanceStarted(ctx, rt.task.UserID, rt.instance.Name, rt.host.Name, ipv4, ipv6)
+		e.notifier.InstanceStarted(ctx, rt.Task.UserID, rt.Instance.Name, rt.Host.Name, ipv4, ipv6)
 	})
-	recordSuccessLog(ctx, rt.task.UserID, "instance", "instance.start",
-		fmt.Sprintf("Started instance \"%s\" [host: %s]", rt.instance.Name, rt.host.Name), rt.task.InstanceID)
+	recordSuccessLog(ctx, rt.Task.UserID, "instance", "instance.start",
+		fmt.Sprintf("Started instance \"%s\" [host: %s]", rt.Instance.Name, rt.Host.Name), rt.Task.InstanceID)
 	return nil
 }
 
@@ -412,40 +417,40 @@ func (e *pgInstanceTaskExecutor) executeStopTask(ctx context.Context, rt *instan
 		return err
 	}
 
-	if success, collectErr := collectTrafficForRunningInstance(ctx, rt.task.InstanceID); !success {
-		log.Printf("[Stop] 实例 %d 关机前即时采集流量失败: %s", rt.task.InstanceID, collectErr)
+	if success, collectErr := collectTrafficForRunningInstance(ctx, rt.Task.InstanceID); !success {
+		log.Printf("[Stop] 实例 %d 关机前即时采集流量失败: %s", rt.Task.InstanceID, collectErr)
 	}
 
-	if closed := lib.CloseInstanceSessions(rt.task.InstanceID, "Instance is stopping"); closed > 0 {
-		log.Printf("[Stop] Closed %d terminal session(s) for instance %d", closed, rt.task.InstanceID)
+	if closed := lib.CloseInstanceSessions(rt.Task.InstanceID, "Instance is stopping"); closed > 0 {
+		log.Printf("[Stop] Closed %d terminal session(s) for instance %d", closed, rt.Task.InstanceID)
 	}
 
-	allowCancel := isAlpineImageAlias(&rt.instance.Image)
-	if _, err := lib.IncusInstanceStop(ctx, rt.client, rt.instance.IncusID, true, busyStopOptions(allowCancel)); err != nil {
+	allowCancel := isAlpineImageAlias(&rt.Instance.Image)
+	if _, err := lib.IncusInstanceStop(ctx, rt.Client, rt.Instance.IncusID, true, busyStopOptions(allowCancel)); err != nil {
 		if isAlreadyInStateError(err, "stopped") {
-			log.Printf("[Stop] 实例 %s 已经是停止状态，自动修正数据库", rt.instance.IncusID)
-			if err := updateInstanceStatus(ctx, rt.task.InstanceID, models.InstanceStatusStopped, nil, nil); err != nil {
+			log.Printf("[Stop] 实例 %s 已经是停止状态，自动修正数据库", rt.Instance.IncusID)
+			if err := updateInstanceStatus(ctx, rt.Task.InstanceID, models.InstanceStatusStopped, nil, nil); err != nil {
 				return err
 			}
 			notifySafely("stop notification", func() {
-				e.notifier.InstanceStopped(ctx, rt.task.UserID, rt.instance.Name, rt.host.Name)
+				e.notifier.InstanceStopped(ctx, rt.Task.UserID, rt.Instance.Name, rt.Host.Name)
 			})
-			db.CreateLog(ctx, notifierUserID(rt.task.UserID), "instance", "instance.stop",
-				fmt.Sprintf("Instance \"%s\" already stopped, synced status [host: %s]", rt.instance.Name, rt.host.Name),
-				"success", db.LogOptionsWithInstance(&rt.task.InstanceID))
+			db.CreateLog(ctx, notifierUserID(rt.Task.UserID), "instance", "instance.stop",
+				fmt.Sprintf("Instance \"%s\" already stopped, synced status [host: %s]", rt.Instance.Name, rt.Host.Name),
+				"success", db.LogOptionsWithInstance(&rt.Task.InstanceID))
 			return nil
 		}
 		return err
 	}
 
-	if err := updateInstanceStatus(ctx, rt.task.InstanceID, models.InstanceStatusStopped, nil, nil); err != nil {
+	if err := updateInstanceStatus(ctx, rt.Task.InstanceID, models.InstanceStatusStopped, nil, nil); err != nil {
 		return err
 	}
 	notifySafely("stop notification", func() {
-		e.notifier.InstanceStopped(ctx, rt.task.UserID, rt.instance.Name, rt.host.Name)
+		e.notifier.InstanceStopped(ctx, rt.Task.UserID, rt.Instance.Name, rt.Host.Name)
 	})
-	recordSuccessLog(ctx, rt.task.UserID, "instance", "instance.stop",
-		fmt.Sprintf("Stopped instance \"%s\" [host: %s]", rt.instance.Name, rt.host.Name), rt.task.InstanceID)
+	recordSuccessLog(ctx, rt.Task.UserID, "instance", "instance.stop",
+		fmt.Sprintf("Stopped instance \"%s\" [host: %s]", rt.Instance.Name, rt.Host.Name), rt.Task.InstanceID)
 	return nil
 }
 
@@ -454,24 +459,24 @@ func (e *pgInstanceTaskExecutor) executeRestartTask(ctx context.Context, rt *ins
 		return err
 	}
 
-	if success, collectErr := collectTrafficForRunningInstance(ctx, rt.task.InstanceID); !success {
-		log.Printf("[Restart] 实例 %d 重启前即时采集流量失败: %s", rt.task.InstanceID, collectErr)
+	if success, collectErr := collectTrafficForRunningInstance(ctx, rt.Task.InstanceID); !success {
+		log.Printf("[Restart] 实例 %d 重启前即时采集流量失败: %s", rt.Task.InstanceID, collectErr)
 	}
-	if closed := lib.CloseInstanceSessions(rt.task.InstanceID, "Instance is restarting"); closed > 0 {
-		log.Printf("[Restart] Closed %d terminal session(s) for instance %d", closed, rt.task.InstanceID)
+	if closed := lib.CloseInstanceSessions(rt.Task.InstanceID, "Instance is restarting"); closed > 0 {
+		log.Printf("[Restart] Closed %d terminal session(s) for instance %d", closed, rt.Task.InstanceID)
 	}
 
-	if _, err := lib.IncusInstanceRestart(ctx, rt.client, rt.instance.IncusID, true); err != nil {
+	if _, err := lib.IncusInstanceRestart(ctx, rt.Client, rt.Instance.IncusID, true); err != nil {
 		if !isAlreadyInStateError(err, "stopped") {
 			return err
 		}
-		log.Printf("[Restart] 实例 %s 处于停止状态，尝试启动", rt.instance.IncusID)
-		if _, startErr := lib.IncusInstanceStart(ctx, rt.client, rt.instance.IncusID); startErr != nil {
+		log.Printf("[Restart] 实例 %s 处于停止状态，尝试启动", rt.Instance.IncusID)
+		if _, startErr := lib.IncusInstanceStart(ctx, rt.Client, rt.Instance.IncusID); startErr != nil {
 			if strings.Contains(startErr.Error(), "file exists") {
-				incusInstance, getErr := lib.GetInstance(ctx, rt.client, rt.instance.IncusID)
+				incusInstance, getErr := lib.GetInstance(ctx, rt.Client, rt.Instance.IncusID)
 				if getErr == nil {
 					if eth1, ok := incusInstance.Devices["eth1"]; ok && eth1 != nil {
-						if fallbackErr := startWithIPv6RouteFallback(ctx, rt.client, rt.instance.IncusID, incusInstance.Devices); fallbackErr != nil {
+						if fallbackErr := startWithIPv6RouteFallback(ctx, rt.Client, rt.Instance.IncusID, incusInstance.Devices); fallbackErr != nil {
 							return fallbackErr
 						}
 					} else {
@@ -486,24 +491,24 @@ func (e *pgInstanceTaskExecutor) executeRestartTask(ctx context.Context, rt *ins
 		}
 	}
 
-	incusInstance, err := lib.GetInstance(ctx, rt.client, rt.instance.IncusID)
+	incusInstance, err := lib.GetInstance(ctx, rt.Client, rt.Instance.IncusID)
 	if err != nil {
 		return err
 	}
-	ipv4, ipv6, err := waitForInstanceIPs(ctx, rt.client, rt.instance.IncusID, rt.instance.NetworkMode, incusInstance.Type == "virtual-machine")
+	ipv4, ipv6, err := waitForInstanceIPs(ctx, rt.Client, rt.Instance.IncusID, rt.Instance.NetworkMode, incusInstance.Type == "virtual-machine")
 	if err != nil {
 		return err
 	}
 
-	if err := updateInstanceStatus(ctx, rt.task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
+	if err := updateInstanceStatus(ctx, rt.Task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
 		return err
 	}
 	// The TypeScript restart path does NOT reconcile traffic state; keep that.
 	notifySafely("restart notification", func() {
-		e.notifier.InstanceRestarted(ctx, rt.task.UserID, rt.instance.Name, rt.host.Name, ipv4, ipv6)
+		e.notifier.InstanceRestarted(ctx, rt.Task.UserID, rt.Instance.Name, rt.Host.Name, ipv4, ipv6)
 	})
-	recordSuccessLog(ctx, rt.task.UserID, "instance", "instance.restart",
-		fmt.Sprintf("Restarted instance \"%s\" [host: %s]", rt.instance.Name, rt.host.Name), rt.task.InstanceID)
+	recordSuccessLog(ctx, rt.Task.UserID, "instance", "instance.restart",
+		fmt.Sprintf("Restarted instance \"%s\" [host: %s]", rt.Instance.Name, rt.Host.Name), rt.Task.InstanceID)
 	return nil
 }
 
@@ -511,19 +516,19 @@ func (e *pgInstanceTaskExecutor) executeRestartTask(ctx context.Context, rt *ins
 
 func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *instanceTaskRuntime) error {
 	imageAlias := ""
-	if rt.task.ImageAlias != nil {
-		imageAlias = *rt.task.ImageAlias
+	if rt.Task.ImageAlias != nil {
+		imageAlias = *rt.Task.ImageAlias
 	}
 	if imageAlias == "" {
 		return errors.New("未指定重装镜像")
 	}
-	allowCancel := isAlpineImageAlias(&rt.instance.Image) || isAlpineImageAlias(&imageAlias)
+	allowCancel := isAlpineImageAlias(&rt.Instance.Image) || isAlpineImageAlias(&imageAlias)
 
-	if closed := lib.CloseInstanceSessions(rt.task.InstanceID, "Instance is being rebuilt"); closed > 0 {
-		log.Printf("[Rebuild] Closed %d terminal session(s) for instance %d", closed, rt.task.InstanceID)
+	if closed := lib.CloseInstanceSessions(rt.Task.InstanceID, "Instance is being rebuilt"); closed > 0 {
+		log.Printf("[Rebuild] Closed %d terminal session(s) for instance %d", closed, rt.Task.InstanceID)
 	}
-	if success, collectErr := collectTrafficForRunningInstance(ctx, rt.task.InstanceID); !success {
-		log.Printf("[Rebuild] 实例 %d 重装前即时采集流量失败: %s", rt.task.InstanceID, collectErr)
+	if success, collectErr := collectTrafficForRunningInstance(ctx, rt.Task.InstanceID); !success {
+		log.Printf("[Rebuild] 实例 %d 重装前即时采集流量失败: %s", rt.Task.InstanceID, collectErr)
 	}
 
 	// Ensure the instance is stopped. A state-query failure is ignored, matching the
@@ -531,14 +536,14 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 	if err := e.setProgress(ctx, rt, "stopping"); err != nil {
 		return err
 	}
-	if state, stateErr := getInstanceState(ctx, rt.client, rt.instance.IncusID); stateErr == nil && state.Status == "Running" {
-		if _, err := lib.IncusInstanceStop(ctx, rt.client, rt.instance.IncusID, true, busyStopOptions(allowCancel)); err != nil {
+	if state, stateErr := getInstanceState(ctx, rt.Client, rt.Instance.IncusID); stateErr == nil && state.Status == "Running" {
+		if _, err := lib.IncusInstanceStop(ctx, rt.Client, rt.Instance.IncusID, true, busyStopOptions(allowCancel)); err != nil {
 			return err
 		}
 	}
 
 	// A rebuilt instance runs cloud-init again: the old detection state is stale.
-	if err := resetInstanceCloudInitState(ctx, rt.task.InstanceID); err != nil {
+	if err := resetInstanceCloudInitState(ctx, rt.Task.InstanceID); err != nil {
 		return err
 	}
 
@@ -547,14 +552,14 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 	if err := e.setProgress(ctx, rt, "deleting_snapshots"); err != nil {
 		return err
 	}
-	if snapshots, err := lib.ListSnapshots(ctx, rt.client, rt.instance.IncusID); err != nil {
+	if snapshots, err := lib.ListSnapshots(ctx, rt.Client, rt.Instance.IncusID); err != nil {
 		log.Printf("[InstanceTaskWorker] 删除快照失败，继续执行: %v", err)
 	} else {
 		for _, snapshot := range snapshots {
 			if snapshot.Name == "" {
 				continue
 			}
-			if _, err := lib.DeleteSnapshot(ctx, rt.client, rt.instance.IncusID, snapshot.Name); err != nil {
+			if _, err := lib.DeleteSnapshot(ctx, rt.Client, rt.Instance.IncusID, snapshot.Name); err != nil {
 				log.Printf("[InstanceTaskWorker] 删除快照 %s 失败: %v", snapshot.Name, err)
 			}
 		}
@@ -562,7 +567,7 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 	if db.DB == nil {
 		return errors.New("数据库未初始化")
 	}
-	if err := db.DB.WithContext(ctx).Exec(`DELETE FROM snapshots WHERE instance_id = ?`, rt.task.InstanceID).Error; err != nil {
+	if err := db.DB.WithContext(ctx).Exec(`DELETE FROM snapshots WHERE instance_id = ?`, rt.Task.InstanceID).Error; err != nil {
 		log.Printf("[InstanceTaskWorker] 删除快照记录失败，继续执行: %v", err)
 	}
 
@@ -570,13 +575,13 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 		return err
 	}
 
-	targetUserID := rt.task.UserID
+	targetUserID := rt.Task.UserID
 	if targetUserID == 0 {
-		targetUserID = rt.instance.UserID
+		targetUserID = rt.Instance.UserID
 	}
 	var sshKey *string
-	if rt.task.SSHKeyID != nil {
-		if keyRecord, err := db.GetSSHKeyByID(ctx, *rt.task.SSHKeyID); err == nil && keyRecord != nil && keyRecord.UserID == targetUserID {
+	if rt.Task.SSHKeyID != nil {
+		if keyRecord, err := db.GetSSHKeyByID(ctx, *rt.Task.SSHKeyID); err == nil && keyRecord != nil && keyRecord.UserID == targetUserID {
 			value := keyRecord.PublicKey
 			sshKey = &value
 		}
@@ -588,13 +593,13 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 		}
 	}
 	if sshKey == nil || *sshKey == "" {
-		log.Printf("[Rebuild] Instance %d has no SSH key; continuing without injecting authorized_keys", rt.task.InstanceID)
+		log.Printf("[Rebuild] Instance %d has no SSH key; continuing without injecting authorized_keys", rt.Task.InstanceID)
 	}
 
 	extraShellCommands := ""
-	if rt.task.CustomInitCommandIDs != nil && *rt.task.CustomInitCommandIDs != "" {
+	if rt.Task.CustomInitCommandIDs != nil && *rt.Task.CustomInitCommandIDs != "" {
 		var commandIDs []int32
-		if err := json.Unmarshal([]byte(*rt.task.CustomInitCommandIDs), &commandIDs); err != nil {
+		if err := json.Unmarshal([]byte(*rt.Task.CustomInitCommandIDs), &commandIDs); err != nil {
 			log.Printf("[Rebuild] 解析自定义初始化命令失败: %v", err)
 		} else if len(commandIDs) > 0 {
 			if commands, err := db.GetCustomInitCommandsByIds(ctx, commandIDs); err == nil {
@@ -627,7 +632,7 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 
 	newPassword := lib.GenerateRandomPassword(16)
 
-	incusInstance, err := lib.GetInstance(ctx, rt.client, rt.instance.IncusID)
+	incusInstance, err := lib.GetInstance(ctx, rt.Client, rt.Instance.IncusID)
 	if err != nil {
 		return err
 	}
@@ -664,7 +669,7 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 	var rebuildDevices map[string]map[string]any
 	if instanceType == "virtual-machine" {
 		rebuildConfig["security.secureboot"] = "false"
-		macs := lib.VMNetworkGenerateMacs(rt.instance.IncusID)
+		macs := lib.VMNetworkGenerateMacs(rt.Instance.IncusID)
 		rebuildDevices = map[string]map[string]any{}
 		for name, device := range incusInstance.Devices {
 			copied := map[string]any{}
@@ -685,22 +690,22 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 		}
 	}
 
-	log.Printf("[Rebuild] 更新实例 %s 的 cloud-init 配置...", rt.instance.IncusID)
+	log.Printf("[Rebuild] 更新实例 %s 的 cloud-init 配置...", rt.Instance.IncusID)
 	updates := map[string]any{"config": rebuildConfig}
 	if rebuildDevices != nil {
 		updates["devices"] = rebuildDevices
 	}
-	if _, err := lib.UpdateInstance(ctx, rt.client, rt.instance.IncusID, updates); err != nil {
+	if _, err := lib.UpdateInstance(ctx, rt.Client, rt.Instance.IncusID, updates); err != nil {
 		return err
 	}
 
-	log.Printf("[Rebuild] 开始重装实例 %s，镜像: %s", rt.instance.IncusID, imageAlias)
-	if _, err := lib.IncusInstanceRebuild(ctx, rt.client, rt.instance.IncusID,
+	log.Printf("[Rebuild] 开始重装实例 %s，镜像: %s", rt.Instance.IncusID, imageAlias)
+	if _, err := lib.IncusInstanceRebuild(ctx, rt.Client, rt.Instance.IncusID,
 		map[string]string{"alias": imageAlias}, nil, busyStopOptions(allowCancel)); err != nil {
 		return err
 	}
 
-	if err := db.DB.WithContext(ctx).Exec(`DELETE FROM traffic_snapshots WHERE instance_id = ?`, rt.task.InstanceID).Error; err != nil {
+	if err := db.DB.WithContext(ctx).Exec(`DELETE FROM traffic_snapshots WHERE instance_id = ?`, rt.Task.InstanceID).Error; err != nil {
 		return err
 	}
 
@@ -709,7 +714,7 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 		return err
 	}
 	if err := db.DB.WithContext(ctx).Exec(`UPDATE instances SET image = ?, root_password = ?, updated_at = NOW() WHERE id = ?`,
-		imageAlias, encryptedPassword, rt.task.InstanceID).Error; err != nil {
+		imageAlias, encryptedPassword, rt.Task.InstanceID).Error; err != nil {
 		return err
 	}
 
@@ -718,24 +723,24 @@ func (e *pgInstanceTaskExecutor) executeRebuildTask(ctx context.Context, rt *ins
 	}
 	// `rebuildDevices` is nil for containers, in which case the fallback resolves the
 	// devices from Incus just like the start task does.
-	if startErr := startWithIPv6RouteFallback(ctx, rt.client, rt.instance.IncusID, rebuildDevices); startErr != nil {
+	if startErr := startWithIPv6RouteFallback(ctx, rt.Client, rt.Instance.IncusID, rebuildDevices); startErr != nil {
 		return startErr
 	}
 
-	ipv4, ipv6, err := waitForInstanceIPs(ctx, rt.client, rt.instance.IncusID, rt.instance.NetworkMode, instanceType == "virtual-machine")
+	ipv4, ipv6, err := waitForInstanceIPs(ctx, rt.Client, rt.Instance.IncusID, rt.Instance.NetworkMode, instanceType == "virtual-machine")
 	if err != nil {
 		return err
 	}
-	if err := updateInstanceStatus(ctx, rt.task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
+	if err := updateInstanceStatus(ctx, rt.Task.InstanceID, models.InstanceStatusRunning, ipv4, ipv6); err != nil {
 		return err
 	}
-	reconcileTrafficState(ctx, []int32{rt.task.InstanceID})
+	reconcileTrafficState(ctx, []int32{rt.Task.InstanceID})
 
 	notifySafely("rebuild notification", func() {
-		e.notifier.InstanceRebuilt(ctx, rt.task.UserID, rt.instance.Name, rt.host.Name, imageAlias)
+		e.notifier.InstanceRebuilt(ctx, rt.Task.UserID, rt.Instance.Name, rt.Host.Name, imageAlias)
 	})
-	recordSuccessLog(ctx, rt.task.UserID, "instance", "instance.rebuild",
-		fmt.Sprintf("Rebuilt instance \"%s\" with image %s", rt.instance.Name, imageAlias), rt.task.InstanceID)
+	recordSuccessLog(ctx, rt.Task.UserID, "instance", "instance.rebuild",
+		fmt.Sprintf("Rebuilt instance \"%s\" with image %s", rt.Instance.Name, imageAlias), rt.Task.InstanceID)
 	return nil
 }
 
@@ -748,42 +753,42 @@ func (e *pgInstanceTaskExecutor) buildRebuildPayload(
 	extraShellCommands, instanceType string,
 ) (map[string]string, error) {
 	var network *lib.IncusConfigStaticNetwork
-	if rt.instance.IPv4 != nil && *rt.instance.IPv4 != "" && instanceType != "virtual-machine" {
+	if rt.Instance.IPv4 != nil && *rt.Instance.IPv4 != "" && instanceType != "virtual-machine" {
 		network = &lib.IncusConfigStaticNetwork{
-			IPAddress: *rt.instance.IPv4 + "/22",
+			IPAddress: *rt.Instance.IPv4 + "/22",
 			Gateway:   "10.10.0.1",
 			DNS:       []string{"10.10.0.1"},
 		}
-		if rt.instance.IPv6 != nil && *rt.instance.IPv6 != "" {
-			network.IPv6Address = *rt.instance.IPv6 + "/128"
+		if rt.Instance.IPv6 != nil && *rt.Instance.IPv6 != "" {
+			network.IPv6Address = *rt.Instance.IPv6 + "/128"
 			network.IPv6Gateway = "fe80::1"
 		}
 	}
 
 	var payload lib.IncusConfigPayload
 	if instanceType == "virtual-machine" {
-		if rt.instance.IPv4 != nil && *rt.instance.IPv4 != "" {
+		if rt.Instance.IPv4 != nil && *rt.Instance.IPv4 != "" {
 			network = &lib.IncusConfigStaticNetwork{
-				IPAddress: *rt.instance.IPv4 + "/22",
+				IPAddress: *rt.Instance.IPv4 + "/22",
 				Gateway:   "10.10.0.1",
 				DNS:       []string{"10.10.0.1"},
 			}
-			if rt.instance.IPv6 != nil && *rt.instance.IPv6 != "" {
-				network.IPv6Address = *rt.instance.IPv6
-				if rt.host.IPv6Gateway != nil {
-					network.IPv6Gateway = *rt.host.IPv6Gateway
+			if rt.Instance.IPv6 != nil && *rt.Instance.IPv6 != "" {
+				network.IPv6Address = *rt.Instance.IPv6
+				if rt.Host.IPv6Gateway != nil {
+					network.IPv6Gateway = *rt.Host.IPv6Gateway
 				}
 			}
 		}
 		vmResult, err := lib.IncusConfigGenerateVM(lib.IncusConfigVMParams{
-			InstanceName:       rt.instance.Name,
-			InstanceIDSeed:     rt.instance.IncusID,
+			InstanceName:       rt.Instance.Name,
+			InstanceIDSeed:     rt.Instance.IncusID,
 			ImageAlias:         imageAlias,
 			RootPassword:       newPassword,
 			SSHKey:             sshKey,
 			Network:            network,
 			ExtraShellCommands: extraShellCommands,
-			NetworkMode:        string(rt.instance.NetworkMode),
+			NetworkMode:        string(rt.Instance.NetworkMode),
 		})
 		if err != nil {
 			return nil, err
@@ -791,12 +796,12 @@ func (e *pgInstanceTaskExecutor) buildRebuildPayload(
 		payload = vmResult
 	} else {
 		containerResult, err := lib.GenerateIncusConfig(lib.IncusConfigParams{
-			InstanceName:       rt.instance.Name,
+			InstanceName:       rt.Instance.Name,
 			ImageAlias:         imageAlias,
 			RootPassword:       newPassword,
 			SSHKey:             sshKey,
 			Type:               "container",
-			NetworkMode:        string(rt.instance.NetworkMode),
+			NetworkMode:        string(rt.Instance.NetworkMode),
 			Network:            network,
 			ExtraShellCommands: extraShellCommands,
 		})
@@ -813,9 +818,9 @@ func (e *pgInstanceTaskExecutor) buildRebuildPayload(
 	if payload.UserNetworkConfig != "" {
 		configPayload["user.network-config"] = payload.UserNetworkConfig
 	}
-	if instanceType == "container" && rt.instance.IPv4 != nil && *rt.instance.IPv4 != "" &&
-		rt.instance.IPv6 != nil && *rt.instance.IPv6 != "" && lib.NetworkPayloadHasIpv6Support(string(rt.instance.NetworkMode)) {
-		configPayload["user.network-config"] = lib.GenerateCloudInitNetworkConfig(*rt.instance.IPv4, []string{*rt.instance.IPv6})
+	if instanceType == "container" && rt.Instance.IPv4 != nil && *rt.Instance.IPv4 != "" &&
+		rt.Instance.IPv6 != nil && *rt.Instance.IPv6 != "" && lib.NetworkPayloadHasIpv6Support(string(rt.Instance.NetworkMode)) {
+		configPayload["user.network-config"] = lib.GenerateCloudInitNetworkConfig(*rt.Instance.IPv4, []string{*rt.Instance.IPv6})
 	}
 	return configPayload, nil
 }
