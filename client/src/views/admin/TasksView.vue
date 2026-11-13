@@ -85,7 +85,9 @@ const kindOptions = computed<SelectOption[]>(() => [
   { label: t(key('allKinds')), value: '' },
   { label: t(key('create')), value: 'create' },
   { label: t(key('destroy')), value: 'destroy' },
-  { label: t(key('node_recover')), value: 'node_recover' }
+  { label: t(key('node_recover')), value: 'node_recover' },
+  { label: t(key('instance_export')), value: 'instance_export' },
+  { label: t(key('instance_import')), value: 'instance_import' }
 ])
 
 function getStatusBadgeVariant(taskStatus: string): BadgeVariant {
@@ -106,9 +108,11 @@ function getStatusBadgeVariant(taskStatus: string): BadgeVariant {
 function getKindBadgeVariant(taskKind: string): BadgeVariant {
   switch (taskKind) {
     case 'create':
+    case 'instance_import':
       return 'info'
     case 'destroy':
       return 'warning'
+    case 'instance_export':
     case 'node_recover':
     default:
       return 'default'

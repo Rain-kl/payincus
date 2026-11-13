@@ -23,6 +23,117 @@ function generateTaskId(): string {
   return randomBytes(16).toString('hex')
 }
 
+interface NodeBackupTask {
+  id: string
+  kind?: string
+  instance?: string
+  filePath?: string
+  directory?: string
+  status: string
+  error?: string
+  items?: Array<{ name?: string; status?: string; error?: string; file?: string; bytes?: number }>
+}
+
+function formatNodeBackupError(task: NodeBackupTask): string | null {
+  const itemErr = task.items?.find(i => i.error)?.error
+  if (itemErr && task.error && !task.error.includes(itemErr)) return `${task.error}: ${itemErr}`
+  return task.error || itemErr || null
+}
+
+async function trackNodeTransferTask(params: {
+  hostId: number
+  instanceName: string
+  kind: 'instance_export' | 'instance_import'
+  targetPath: string
+  task: NodeBackupTask
+}) {
+  const { hostId, instanceName, kind, targetPath, task } = params
+  const actionLabel = kind === 'instance_export' ? '导出' : '导入'
+  const initialStatus = task.status === 'running' ? 'running' : task.status === 'success' ? 'success' : 'failed'
+  const opTask = await prisma.operationTask.create({
+    data: {
+      hostId,
+      instanceName,
+      kind,
+      status: initialStatus,
+      error: initialStatus === 'running' ? null : formatNodeBackupError(task),
+      finishedAt: initialStatus === 'running' ? null : new Date()
+    }
+  }).catch(() => null)
+  if (!opTask) return null
+
+  await prisma.operationTaskLog.create({
+    data: {
+      taskId: opTask.id,
+      source: 'server',
+      level: initialStatus === 'failed' ? 'error' : 'info',
+      message: `开始${actionLabel}实例 ${instanceName}（节点任务 ${task.id}，路径 ${targetPath}）`
+    }
+  }).catch(() => {})
+
+  if (initialStatus !== 'running') {
+    const errText = formatNodeBackupError(task)
+    await prisma.operationTaskLog.create({
+      data: {
+        taskId: opTask.id,
+        source: 'node',
+        level: initialStatus === 'success' ? 'info' : 'error',
+        message: initialStatus === 'success' ? `${actionLabel}完成：${task.filePath || targetPath}` : (errText || `${actionLabel}失败`)
+      }
+    }).catch(() => {})
+    return opTask.id
+  }
+
+  let attempts = 0
+  const maxAttempts = 3600
+  const poll = async () => {
+    attempts += 1
+    try {
+      const host = await prisma.host.findUnique({ where: { id: hostId } })
+      if (!host) {
+        await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'failed', error: '宿主机不存在', finishedAt: new Date() } })
+        return
+      }
+      const client = await getIncusClient(host)
+      const data = await client.request<{ tasks?: NodeBackupTask[] }>('GET', BACKUPS_ENDPOINT)
+      const found = (data.tasks || []).find(t => t.id === task.id)
+      if (!found) {
+        if (attempts >= 5) {
+          await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'interrupted', error: '节点未返回该任务状态', finishedAt: new Date() } })
+          return
+        }
+      } else if (found.status !== 'running') {
+        const finalStatus = found.status === 'success' ? 'success' : 'failed'
+        const errText = formatNodeBackupError(found)
+        await prisma.operationTaskLog.create({
+          data: {
+            taskId: opTask.id,
+            source: 'node',
+            level: finalStatus === 'success' ? 'info' : 'error',
+            message: finalStatus === 'success' ? `${actionLabel}完成：${found.filePath || targetPath}` : (errText || `${actionLabel}失败`)
+          }
+        }).catch(() => {})
+        await prisma.operationTask.updateMany({
+          where: { id: opTask.id, status: 'running' },
+          data: { status: finalStatus, error: finalStatus === 'success' ? null : (errText || `${actionLabel}失败`), finishedAt: new Date() }
+        })
+        return
+      }
+    } catch {
+      // Transient poll failure; keep waiting until maxAttempts
+    }
+    if (attempts >= maxAttempts) {
+      await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'interrupted', error: '轮询超时，请检查节点实际状态', finishedAt: new Date() } }).catch(() => {})
+      return
+    }
+    const timer = setTimeout(poll, 2000)
+    timer.unref?.()
+  }
+  const timer = setTimeout(poll, 2000)
+  timer.unref?.()
+  return opTask.id
+}
+
 function parseSizeToMB(raw: unknown, fallbackMB: number): number {
   if (typeof raw !== 'string' || !raw.trim()) return fallbackMB
   const match = raw.trim().match(/^(\d+(?:\.\d+)?)\s*(B|KB|KIB|MB|MIB|GB|GIB|TB|TIB)?$/i)
@@ -196,7 +307,14 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
           ...(isFileMode ? { filePath: targetPath } : { directory: targetPath })
         }
 
-        const task = await res.client.request('POST', BACKUPS_ENDPOINT, payload)
+        const task = await res.client.request<NodeBackupTask>('POST', BACKUPS_ENDPOINT, payload)
+        const operationTaskId = await trackNodeTransferTask({
+          hostId,
+          instanceName: instance.incusId,
+          kind: 'instance_export',
+          targetPath,
+          task
+        })
         await prisma.log.create({
           data: {
             userId: req.user.id,
@@ -206,7 +324,7 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
             result: LogResult.SUCCESS
           }
         })
-        return task
+        return { ...task, operationTaskId }
       } catch (error) {
         const status = error instanceof IncusApiError && [400, 403, 404, 409, 503].includes(error.statusCode) ? error.statusCode : 502
         return reply.code(status).send({ error: nodeErrorDetail(error, '导出实例失败') })
@@ -249,7 +367,14 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         if (req.body.name?.trim()) payload.name = req.body.name.trim()
         if (req.body.storagePool?.trim()) payload.storagePool = req.body.storagePool.trim()
 
-        const task = await res.client.request('POST', IMPORT_ENDPOINT, payload)
+        const task = await res.client.request<NodeBackupTask>('POST', IMPORT_ENDPOINT, payload)
+        const operationTaskId = await trackNodeTransferTask({
+          hostId,
+          instanceName: payload.name || payload.filePath,
+          kind: 'instance_import',
+          targetPath: payload.filePath,
+          task
+        })
         await prisma.log.create({
           data: {
             userId: req.user.id,
@@ -259,7 +384,7 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
             result: LogResult.SUCCESS
           }
         })
-        return task
+        return { ...task, operationTaskId }
       } catch (error) {
         const status = error instanceof IncusApiError && [400, 403, 404, 409, 503].includes(error.statusCode) ? error.statusCode : 502
         return reply.code(status).send({ error: nodeErrorDetail(error, '导入实例失败') })
