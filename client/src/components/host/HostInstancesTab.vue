@@ -1271,7 +1271,23 @@ async function loadUnassignedInstances() {
   }
 }
 
-function pollTransferTask(taskId: string, onDone: (task: { status: string; filePath?: string; instance?: string; error?: string }) => void) {
+interface TransferTaskSummary {
+  status: string
+  filePath?: string
+  instance?: string
+  error?: string
+  items?: Array<{ error?: string }>
+}
+
+function formatTransferError(task: TransferTaskSummary, fallback: string): string {
+  const itemErr = task.items?.find(i => i.error)?.error
+  if (itemErr && task.error && !task.error.includes(itemErr)) {
+    return `${task.error}: ${itemErr}`
+  }
+  return task.error || itemErr || fallback
+}
+
+function pollTransferTask(taskId: string, onDone: (task: TransferTaskSummary) => void) {
   const timer = window.setInterval(async () => {
     try {
       const res = await hostTransferApi.getTransferTasks(props.hostId)
@@ -1318,7 +1334,7 @@ async function submitExport() {
           exportResultPath.value = outPath
           toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
         } else {
-          toast.error(doneTask.error || t('admin.hosts.exportFailed'))
+          toast.error(formatTransferError(doneTask, t('admin.hosts.exportFailed')))
         }
       })
     } else {
@@ -1328,7 +1344,7 @@ async function submitExport() {
         exportResultPath.value = outPath
         toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
       } else {
-        toast.error(task.error || t('admin.hosts.exportFailed'))
+        toast.error(formatTransferError(task, t('admin.hosts.exportFailed')))
       }
     }
   } catch (err) {

@@ -487,7 +487,7 @@ onUnmounted(() => {
 
         <!-- 单元格：实例名称与错误 -->
         <template #cell-instance="{ row: task }">
-          <div class="min-w-0 pr-2">
+          <div class="min-w-0 overflow-hidden pr-2">
             <button
               type="button"
               class="text-left font-medium text-sm text-[var(--text-primary)] hover:text-[var(--accent)] hover:underline truncate block max-w-full transition-colors"
@@ -498,15 +498,15 @@ onUnmounted(() => {
             <div class="flex items-center gap-2 mt-0.5">
               <span class="font-mono text-xs text-[var(--text-tertiary)]">#{{ task.id }}</span>
             </div>
-            <div v-if="task.error" class="mt-1">
+            <div v-if="task.error" class="mt-1 min-w-0 max-w-full">
               <button
                 type="button"
-                class="text-xs text-[var(--error)] text-left hover:underline break-words line-clamp-2 cursor-pointer inline-flex items-center gap-1"
+                class="flex items-start gap-1 w-full max-w-full min-w-0 text-xs text-[var(--error)] text-left hover:underline cursor-pointer"
                 :title="task.error"
                 @click="open(task)"
               >
-                <AlertCircle class="w-3.5 h-3.5 shrink-0" />
-                <span class="truncate">{{ task.error }}</span>
+                <AlertCircle class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span class="min-w-0 flex-1 break-words line-clamp-2">{{ task.error }}</span>
               </button>
             </div>
           </div>
@@ -546,7 +546,7 @@ onUnmounted(() => {
 
         <!-- 单元格：创建时间 -->
         <template #cell-created="{ row: task }">
-          <span class="text-xs font-mono tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
+          <span class="text-xs font-mono tabular-nums text-[var(--text-secondary)] block leading-snug">
             {{ date(task.createdAt) }}
           </span>
         </template>
