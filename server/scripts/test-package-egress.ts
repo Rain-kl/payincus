@@ -43,6 +43,7 @@ try {
   const node = await prisma.proxyNode.create({ data: { name: prefix, protocol: 'socks', server: 'proxy.invalid', port: 1080, fingerprint: prefix, configEncrypted: encryptSensitiveData(JSON.stringify(outbound)) } }); nodes.push(node.id)
   const nextNode = await prisma.proxyNode.create({ data: { name: `${prefix}-next`, protocol: 'socks', server: 'next-proxy.invalid', port: 1080, fingerprint: `${prefix}-next`, configEncrypted: encryptSensitiveData(JSON.stringify({ ...outbound, settings: { servers: [{ address: 'next-proxy.invalid', port: 1080 }] } })) } }); nodes.push(nextNode.id)
   app.decorate('authenticate', async (req: any, reply: any) => { const idx = Number(req.headers['x-fixture-user']); if (!Number.isInteger(idx) || !users[idx]) return reply.code(401).send(); req.user = { id: users[idx], role: idx === 0 ? 'admin' : 'user' } })
+  app.decorate('authenticateUser', (app as any).authenticate)
   app.decorate('requireAdmin', async (req: any, reply: any) => { if (req.user.role !== 'admin') return reply.code(403).send() })
   await app.register(routes)
   await app.register(packageRoutes, { prefix: '/api/packages' })
