@@ -16,7 +16,10 @@ const error = ref('')
 const message = ref('')
 const pending = ref<{ id: string; directory: string } | null>(null)
 const running = computed(() => tasks.value.some(task => task.status === 'running'))
-const pathValid = computed(() => /^\/[^\u0000\r\n]+$/.test(directory.value.trim()))
+const pathValid = computed(() => {
+  const value = directory.value.trim()
+  return !value.includes('\0') && /^\/[^\r\n]+$/.test(value)
+})
 const statusText: Record<string, string> = { running: '备份中', pending: '等待备份', success: '备份完成', partial: '部分失败', failed: '备份失败', interrupted: '已中断' }
 let generation = 0
 let timer: ReturnType<typeof setInterval> | undefined
