@@ -94,6 +94,7 @@ import telegramRoutes from './routes/telegram.js'
 import agentRoutes from './routes/agent.js'
 import nodeSecurityRoutes from './routes/node-security.js'
 import hostInstanceBackupRoutes from './routes/host-instance-backups.js'
+import adminHostInstanceTransferRoutes from './routes/admin-host-instance-transfer.js'
 import storageEncryptionRoutes from './routes/storage-encryption.js'
 import userInviteRoutes from './routes/user-invites.js'
 import vipLevelRoutes from './routes/vip-levels.js'
@@ -558,6 +559,7 @@ await fastify.register(telegramRoutes, { prefix: '/api/telegram' })
 await fastify.register(agentRoutes, { prefix: '/api/agent' })
 await fastify.register(nodeSecurityRoutes)
 await fastify.register(hostInstanceBackupRoutes)
+await fastify.register(adminHostInstanceTransferRoutes)
 await fastify.register(storageEncryptionRoutes)
 let stopStorageEncryptionLoader: (() => Promise<void>) | undefined
 fastify.addHook('onClose', async () => { await stopStorageEncryptionLoader?.() })

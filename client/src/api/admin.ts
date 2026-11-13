@@ -1658,6 +1658,43 @@ const api = {
       http.get(`/admin/hosts/${hostId}/instance-backups`, { timeout: 0 }),
     startInstanceBackup: (hostId: number, data: { id: string; directory: string }): Promise<HostInstanceBackupTask> =>
       http.post(`/admin/hosts/${hostId}/instance-backups`, data, { timeout: 0 }),
+    getInstanceTransferTasks: (hostId: number): Promise<{
+      supported: boolean
+      tasks: Array<HostInstanceBackupTask & { kind?: 'export' | 'import'; instance?: string; filePath?: string }>
+    }> => http.get(`/admin/hosts/${hostId}/instance-transfer`, { timeout: 0 }),
+    exportInstanceToHost: (
+      hostId: number,
+      instanceId: number,
+      data: { id?: string; targetPath: string; mode?: 'directory' | 'file' }
+    ): Promise<HostInstanceBackupTask & { kind?: 'export'; instance?: string; filePath?: string }> =>
+      http.post(`/admin/hosts/${hostId}/instances/${instanceId}/export`, data, { timeout: 0 }),
+    importInstanceFromHost: (
+      hostId: number,
+      data: { id?: string; filePath: string; name?: string; storagePool?: string }
+    ): Promise<HostInstanceBackupTask & { kind?: 'import'; instance?: string; filePath?: string }> =>
+      http.post(`/admin/hosts/${hostId}/instances/import`, data, { timeout: 0 }),
+    getUnassignedInstances: (hostId: number): Promise<{
+      instances: Array<{
+        incusName: string
+        instanceType: 'container' | 'vm'
+        status: 'running' | 'stopped'
+        cpu: number
+        memory: number
+        disk: number
+        storagePoolName: string | null
+        ipv4: string | null
+        ipv6: string | null
+        networkMode: string
+        image: string
+        createdAt: string | null
+      }>
+    }> => http.get(`/admin/hosts/${hostId}/unassigned-instances`),
+    assignUnassignedInstance: (
+      hostId: number,
+      incusName: string,
+      data: { userId: number; name?: string }
+    ): Promise<{ instance: { id: number; name: string; incusId: string; userId: number } }> =>
+      http.post(`/admin/hosts/${hostId}/unassigned-instances/${encodeURIComponent(incusName)}/assign`, data),
     opsDiscover: (hostId: number): Promise<{
       managed: Array<{ incusName: string; incusType: string; incusStatus: string; dbId: number; dbStatus: string; userId: number }>
       orphaned: Array<{ incusName: string; incusType: string; incusStatus: string }>

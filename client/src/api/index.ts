@@ -226,7 +226,7 @@ function buildTicketFormData(
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 // 创建 axios 实例
-const http: AxiosInstance = axios.create({
+export const http: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
   timeout: TIMEOUT.DEFAULT,

@@ -4,13 +4,15 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
   Search, RefreshCw, Ban, CheckCircle2, Settings2,
-  ArrowRightLeft, Gift, Bell, Trash2, ArrowUpDown, Server
+  ArrowRightLeft, Gift, Bell, Trash2, ArrowUpDown, Server,
+  Upload, UserPlus
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 
 import api from '@/api'
+import { hostTransferApi, type UnassignedHostInstance } from '@/api/host-transfer'
 import { Button, Card, EmptyState, Input, Pagination, Select } from '@/components/ui'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import BatchConfigModal from '@/components/host/BatchConfigModal.vue'
@@ -847,6 +849,7 @@ async function loadInstances() {
 
     // 批量加载实例流量数据
     await loadInstancesTraffic()
+    void loadUnassignedInstances()
   } catch (err) {
     console.error('Failed to load instances:', err)
   } finally {
@@ -1248,6 +1251,201 @@ function goToInstance(id: number) {
     query: { fromHost: props.hostId.toString() }
   })
 }
+
+// ==================== 管理员：实例导出 / 导入 / 无归属分配 ====================
+const isAdmin = computed(() => authStore.user?.role === 'admin')
+
+const unassignedInstances = ref<UnassignedHostInstance[]>([])
+const loadingUnassigned = ref(false)
+
+async function loadUnassignedInstances() {
+  if (!isAdmin.value) return
+  loadingUnassigned.value = true
+  try {
+    const res = await hostTransferApi.getUnassignedInstances(props.hostId)
+    unassignedInstances.value = res.instances || []
+  } catch {
+    // 节点离线或暂未就绪时不阻塞主实例列表
+  } finally {
+    loadingUnassigned.value = false
+  }
+}
+
+function pollTransferTask(taskId: string, onDone: (task: { status: string; filePath?: string; instance?: string; error?: string }) => void) {
+  const timer = window.setInterval(async () => {
+    try {
+      const res = await hostTransferApi.getTransferTasks(props.hostId)
+      const found = (res.tasks || []).find(item => item.id === taskId)
+      if (!found || found.status === 'running') return
+      window.clearInterval(timer)
+      onDone(found)
+    } catch {
+      window.clearInterval(timer)
+      onDone({ status: 'failed', error: '查询任务状态失败' })
+    }
+  }, 1500)
+}
+
+// 导出实例弹窗
+const showExportModal = ref(false)
+const exportTargetInstance = ref<Instance | null>(null)
+const exportTargetPath = ref('/var/backups')
+const exportSubmitting = ref(false)
+const exportResultPath = ref<string | null>(null)
+
+function openExportModal(instance: Instance) {
+  exportTargetInstance.value = instance
+  exportTargetPath.value = `/var/backups/${instance.incusId || instance.name}.tar.gz`
+  exportResultPath.value = null
+  showExportModal.value = true
+}
+
+async function submitExport() {
+  if (!exportTargetInstance.value || !exportTargetPath.value.trim() || exportSubmitting.value) return
+  exportSubmitting.value = true
+  exportResultPath.value = null
+  try {
+    const task = await hostTransferApi.exportInstance(
+      props.hostId,
+      exportTargetInstance.value.id,
+      { targetPath: exportTargetPath.value.trim() }
+    )
+    if (task.status === 'running') {
+      pollTransferTask(task.id, (doneTask) => {
+        exportSubmitting.value = false
+        if (doneTask.status === 'success') {
+          const outPath = doneTask.filePath || exportTargetPath.value.trim()
+          exportResultPath.value = outPath
+          toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
+        } else {
+          toast.error(doneTask.error || t('admin.hosts.exportFailed'))
+        }
+      })
+    } else {
+      exportSubmitting.value = false
+      if (task.status === 'success') {
+        const outPath = task.filePath || exportTargetPath.value.trim()
+        exportResultPath.value = outPath
+        toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
+      } else {
+        toast.error(task.error || t('admin.hosts.exportFailed'))
+      }
+    }
+  } catch (err) {
+    exportSubmitting.value = false
+    toast.error(translateError(err) || t('admin.hosts.exportFailed'))
+  }
+}
+
+// 导入实例弹窗
+const showImportModal = ref(false)
+const importFilePath = ref('')
+const importNewName = ref('')
+const importStoragePool = ref('')
+const importSubmitting = ref(false)
+
+function openImportModal() {
+  importFilePath.value = ''
+  importNewName.value = ''
+  importStoragePool.value = ''
+  showImportModal.value = true
+}
+
+async function submitImport() {
+  if (!importFilePath.value.trim() || importSubmitting.value) return
+  importSubmitting.value = true
+  try {
+    const task = await hostTransferApi.importInstance(props.hostId, {
+      filePath: importFilePath.value.trim(),
+      name: importNewName.value.trim() || undefined,
+      storagePool: importStoragePool.value.trim() || undefined
+    })
+    if (task.status === 'running') {
+      pollTransferTask(task.id, async (doneTask) => {
+        importSubmitting.value = false
+        if (doneTask.status === 'success') {
+          showImportModal.value = false
+          toast.success(t('admin.hosts.importSuccess', { name: doneTask.instance || importNewName.value || '-' }))
+          await loadUnassignedInstances()
+        } else {
+          toast.error(doneTask.error || t('admin.hosts.importFailed'))
+        }
+      })
+    } else {
+      importSubmitting.value = false
+      if (task.status === 'success') {
+        showImportModal.value = false
+        toast.success(t('admin.hosts.importSuccess', { name: task.instance || importNewName.value || '-' }))
+        await loadUnassignedInstances()
+      } else {
+        toast.error(task.error || t('admin.hosts.importFailed'))
+      }
+    }
+  } catch (err) {
+    importSubmitting.value = false
+    toast.error(translateError(err) || t('admin.hosts.importFailed'))
+  }
+}
+
+// 分配用户弹窗
+const showAssignModal = ref(false)
+const assignTarget = ref<UnassignedHostInstance | null>(null)
+const assignUserSearch = ref('')
+const assignUserOptions = ref<Array<{ id: number; username: string; email: string }>>([])
+const assignUserLoading = ref(false)
+const assignSelectedUserId = ref<number | null>(null)
+const assignDisplayName = ref('')
+const assignSubmitting = ref(false)
+
+async function searchAssignUsers() {
+  assignUserLoading.value = true
+  try {
+    const res = await hostTransferApi.searchUsers({
+      search: assignUserSearch.value.trim() || undefined,
+      pageSize: 20
+    })
+    assignUserOptions.value = (res.users || []).map(u => ({
+      id: u.id,
+      username: u.username,
+      email: u.email
+    }))
+  } catch {
+    assignUserOptions.value = []
+  } finally {
+    assignUserLoading.value = false
+  }
+}
+
+function openAssignModal(item: UnassignedHostInstance) {
+  assignTarget.value = item
+  assignUserSearch.value = ''
+  assignSelectedUserId.value = null
+  assignDisplayName.value = item.incusName
+  showAssignModal.value = true
+  void searchAssignUsers()
+}
+
+async function submitAssign() {
+  if (!assignTarget.value || !assignSelectedUserId.value || assignSubmitting.value) return
+  assignSubmitting.value = true
+  try {
+    const targetUser = assignUserOptions.value.find(u => u.id === assignSelectedUserId.value)
+    await hostTransferApi.assignUnassignedInstance(props.hostId, assignTarget.value.incusName, {
+      userId: assignSelectedUserId.value,
+      name: assignDisplayName.value.trim() || undefined
+    })
+    showAssignModal.value = false
+    toast.success(t('admin.hosts.assignSuccess', {
+      name: assignTarget.value.incusName,
+      username: targetUser?.username || `#${assignSelectedUserId.value}`
+    }))
+    await Promise.all([loadUnassignedInstances(), loadInstances()])
+  } catch (err) {
+    toast.error(translateError(err) || t('admin.hosts.assignFailed'))
+  } finally {
+    assignSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -1287,10 +1485,68 @@ function goToInstance(id: number) {
           <ArrowUpDown class="w-4 h-4" />
           {{ t('instance.createdAt') }} {{ sortOrder === 'desc' ? '↓' : '↑' }}
         </Button>
+        <Button v-if="isAdmin" variant="primary" @click="openImportModal">
+          <Upload class="w-4 h-4" />
+          {{ t('admin.hosts.importInstance') }}
+        </Button>
       </div>
     </Card>
 
     <template v-if="!loading">
+      <!-- 无归属实例列表（刚导入或宿主机未分配实例） -->
+      <Card v-if="isAdmin && unassignedInstances.length > 0" padding="md">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ t('admin.hosts.unassignedTitle') }}
+              </h3>
+              <span class="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--accent)]">
+                {{ unassignedInstances.length }}
+              </span>
+            </div>
+            <p class="mt-0.5 text-xs text-[var(--text-secondary)]">
+              {{ t('admin.hosts.unassignedDesc') }}
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" :loading="loadingUnassigned" @click="loadUnassignedInstances">
+            <RefreshCw class="w-4 h-4" />
+            {{ t('admin.hosts.unassignedRefresh') }}
+          </Button>
+        </div>
+
+        <div class="space-y-2.5">
+          <div
+            v-for="item in unassignedInstances"
+            :key="item.incusName"
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-4 py-3"
+          >
+            <div class="min-w-0 space-y-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-mono text-sm font-semibold text-[var(--text-primary)]">{{ item.incusName }}</span>
+                <span class="rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">
+                  {{ item.instanceType === 'vm' ? 'VM' : 'LXC' }}
+                </span>
+                <span class="rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">
+                  {{ item.status }}
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)]">
+                <span>CPU {{ item.cpu }}%</span>
+                <span>{{ formatMemory(item.memory) }}</span>
+                <span>{{ formatDisk(item.disk) }}</span>
+                <span v-if="item.ipv4" class="font-mono">{{ item.ipv4 }}</span>
+                <span v-if="item.ipv6" class="font-mono">{{ item.ipv6 }}</span>
+              </div>
+            </div>
+            <Button variant="primary" size="sm" @click="openAssignModal(item)">
+              <UserPlus class="w-4 h-4" />
+              {{ t('admin.hosts.assignUser') }}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
       <!-- 空状态 -->
       <Card v-if="instances.length === 0" padding="none">
         <EmptyState :title="t('admin.hosts.noInstances')">
@@ -1403,6 +1659,7 @@ function goToInstance(id: number) {
         :can-toggle-swap="canToggleSwap"
         :get-swap-display="getSwapDisplay"
         :get-expiry-summary="getExpirySummary"
+        :can-export="isAdmin"
         @toggle-select="toggleSelect"
         @toggle-select-all="toggleSelectAll"
         @toggle-expand="(instance) => { void toggleExpandInstance(instance as Instance) }"
@@ -1413,6 +1670,7 @@ function goToInstance(id: number) {
         @open-price="openPriceModal"
         @open-reset-traffic="openResetTrafficModal"
         @open-recreate="(instance) => { void openRecreateModal(instance as Instance) }"
+        @open-export="(instance) => openExportModal(instance as Instance)"
         @open-delete="openSingleDeleteModal"
         @open-detail="goToInstance"
       />
@@ -1870,4 +2128,185 @@ function goToInstance(id: number) {
     @update:visible="handleRecreateModalVisibleChange"
     @submit="doRecreate"
   />
+
+  <!-- 导出实例弹窗 -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div
+        v-if="showExportModal && exportTargetInstance"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="!exportSubmitting && (showExportModal = false)"
+      >
+        <div class="w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
+          <div>
+            <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('admin.hosts.exportTitle') }}
+            </h3>
+            <p class="mt-1 text-sm text-[var(--text-secondary)]">
+              {{ t('admin.hosts.exportDesc', { name: exportTargetInstance.name }) }}
+            </p>
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-sm font-medium text-[var(--text-primary)]">
+              {{ t('admin.hosts.exportTargetPath') }}
+            </label>
+            <Input
+              v-model="exportTargetPath"
+              :disabled="exportSubmitting"
+              :placeholder="t('admin.hosts.exportTargetPathPlaceholder')"
+            />
+            <p class="text-xs text-[var(--text-tertiary)]">
+              {{ t('admin.hosts.exportTargetPathHint') }}
+            </p>
+          </div>
+          <div
+            v-if="exportResultPath"
+            class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs font-mono text-[var(--text-primary)] break-all"
+          >
+            {{ exportResultPath }}
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" :disabled="exportSubmitting" @click="showExportModal = false">
+              {{ t('common.close') }}
+            </Button>
+            <Button variant="primary" :loading="exportSubmitting" :disabled="!exportTargetPath.trim()" @click="submitExport">
+              {{ exportSubmitting ? t('admin.hosts.exportRunning') : t('admin.hosts.exportInstance') }}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- 导入实例弹窗 -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div
+        v-if="showImportModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="!importSubmitting && (showImportModal = false)"
+      >
+        <div class="w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
+          <div>
+            <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('admin.hosts.importTitle') }}
+            </h3>
+            <p class="mt-1 text-sm text-[var(--text-secondary)]">
+              {{ t('admin.hosts.importDesc') }}
+            </p>
+          </div>
+          <div class="space-y-3">
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-[var(--text-primary)]">
+                {{ t('admin.hosts.importFilePath') }}
+              </label>
+              <Input
+                v-model="importFilePath"
+                :disabled="importSubmitting"
+                :placeholder="t('admin.hosts.importFilePathPlaceholder')"
+              />
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-[var(--text-primary)]">
+                {{ t('admin.hosts.importNewName') }}
+              </label>
+              <Input
+                v-model="importNewName"
+                :disabled="importSubmitting"
+                :placeholder="t('admin.hosts.importNewNamePlaceholder')"
+              />
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-[var(--text-primary)]">
+                {{ t('admin.hosts.importStoragePool') }}
+              </label>
+              <Input
+                v-model="importStoragePool"
+                :disabled="importSubmitting"
+                :placeholder="t('admin.hosts.importStoragePoolPlaceholder')"
+              />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" :disabled="importSubmitting" @click="showImportModal = false">
+              {{ t('common.cancel') }}
+            </Button>
+            <Button variant="primary" :loading="importSubmitting" :disabled="!importFilePath.trim()" @click="submitImport">
+              {{ importSubmitting ? t('admin.hosts.importRunning') : t('admin.hosts.importInstance') }}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- 分配用户弹窗 -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div
+        v-if="showAssignModal && assignTarget"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="!assignSubmitting && (showAssignModal = false)"
+      >
+        <div class="w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
+          <div>
+            <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('admin.hosts.assignTitle') }}
+            </h3>
+            <p class="mt-1 text-sm text-[var(--text-secondary)]">
+              {{ t('admin.hosts.assignDesc', { name: assignTarget.incusName }) }}
+            </p>
+          </div>
+          <div class="space-y-3">
+            <div class="flex gap-2">
+              <Input
+                v-model="assignUserSearch"
+                class="flex-1"
+                :placeholder="t('admin.hosts.assignSearchUser')"
+                @enter="searchAssignUsers"
+              />
+              <Button variant="secondary" :loading="assignUserLoading" @click="searchAssignUsers">
+                {{ t('admin.hosts.search') }}
+              </Button>
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-[var(--text-primary)]">
+                {{ t('admin.hosts.assignSelectUser') }}
+              </label>
+              <div class="max-h-48 overflow-y-auto rounded-xl border border-[var(--border-color)] divide-y divide-[var(--border-color)]">
+                <div v-if="assignUserOptions.length === 0" class="px-3 py-4 text-center text-xs text-[var(--text-tertiary)]">
+                  {{ t('admin.hosts.assignNoUserFound') }}
+                </div>
+                <button
+                  v-for="user in assignUserOptions"
+                  :key="user.id"
+                  type="button"
+                  class="w-full flex items-center justify-between px-3 py-2 text-left text-sm transition-colors"
+                  :class="assignSelectedUserId === user.id ? 'bg-[var(--accent-soft)] text-[var(--accent)] font-medium' : 'hover:bg-[var(--bg-surface-soft)] text-[var(--text-primary)]'"
+                  @click="assignSelectedUserId = user.id"
+                >
+                  <span>{{ user.username }} <span class="text-xs text-[var(--text-tertiary)]">#{{ user.id }}</span></span>
+                  <span class="text-xs text-[var(--text-secondary)] truncate max-w-[200px]">{{ user.email }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-[var(--text-primary)]">
+                {{ t('admin.hosts.assignDisplayName') }}
+              </label>
+              <Input v-model="assignDisplayName" :disabled="assignSubmitting" />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" :disabled="assignSubmitting" @click="showAssignModal = false">
+              {{ t('common.cancel') }}
+            </Button>
+            <Button variant="primary" :loading="assignSubmitting" :disabled="!assignSelectedUserId" @click="submitAssign">
+              {{ t('common.confirm') }}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
