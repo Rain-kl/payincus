@@ -1556,39 +1556,44 @@ async function submitAssign() {
         </EmptyState>
       </Card>
 
-      <!-- 批量操作栏 -->
-      <Card v-if="instances.length > 0" padding="sm">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <span class="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">
-            {{ selectedCount > 0 ? t('admin.hosts.selectedCount', { count: selectedCount }) : t('admin.hosts.noInstanceSelected') }}
-          </span>
-          <div class="flex items-center gap-2 flex-wrap">
-            <Button variant="ghost" size="sm" :disabled="selectedCount === 0" @click="selectedIds.clear(); selectedIds = new Set()">
+      <!-- 批量操作栏（仅选中实例时出现，避免空选时堆砌大量禁用按钮） -->
+      <div
+        v-if="instances.length > 0 && selectedCount > 0"
+        class="rounded-2xl border border-[var(--accent)]/40 bg-[var(--bg-surface)] px-4 py-3 shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-200"
+      >
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="inline-flex items-center gap-2 rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-surface))] px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+              <span class="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+              {{ t('admin.hosts.selectedCount', { count: selectedCount }) }}
+            </span>
+            <Button variant="ghost" size="sm" @click="selectedIds.clear(); selectedIds = new Set()">
               {{ t('common.cancel') }}
             </Button>
-            <Button variant="secondary" size="sm" :loading="isSyncing" :disabled="isSyncing || selectedCount === 0" @click="batchSyncStatus">
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <Button variant="secondary" size="sm" :loading="isSyncing" :disabled="isSyncing" @click="batchSyncStatus">
               <RefreshCw v-if="!isSyncing" class="w-4 h-4" />
               {{ isSyncing ? t('common.syncing') : t('admin.hosts.batchSyncStatus') }}
             </Button>
-            <Button variant="secondary" size="sm" :loading="isSuspending" :disabled="isSuspending || selectedCount === 0" @click="openBatchSuspendModal">
-              <Ban v-if="!isSuspending" class="w-4 h-4" />
-              {{ t('admin.hosts.batchSuspend') }}
-            </Button>
-            <Button variant="secondary" size="sm" :loading="isUnsuspending" :disabled="isUnsuspending || selectedCount === 0" @click="confirmBatchUnsuspend">
-              <CheckCircle2 v-if="!isUnsuspending" class="w-4 h-4" />
-              {{ t('admin.hosts.batchUnsuspend') }}
-            </Button>
-            <Button variant="secondary" size="sm" :disabled="selectedCount === 0" @click="openBatchConfigForSelection">
+            <Button variant="secondary" size="sm" @click="openBatchConfigForSelection">
               <Settings2 class="w-4 h-4" />
               {{ t('host.batchConfig.button') }}
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              :disabled="selectedCount === 0"
-              :title="selectedCount === 0 ? t('host.migrate.noInstancesSelected') : ''"
-              @click="selectedCount > 0 && (showMigrateModal = true)"
-            >
+            <Button variant="secondary" size="sm" @click="openNotifyModal">
+              <Bell class="w-4 h-4" />
+              {{ t('host.notify.sendToUsers') }}
+            </Button>
+            <span class="hidden sm:inline-block h-4 w-px bg-[var(--border-color)] mx-0.5" aria-hidden="true" />
+            <Button variant="secondary" size="sm" :loading="isSuspending" :disabled="isSuspending" @click="openBatchSuspendModal">
+              <Ban v-if="!isSuspending" class="w-4 h-4" />
+              {{ t('admin.hosts.batchSuspend') }}
+            </Button>
+            <Button variant="secondary" size="sm" :loading="isUnsuspending" :disabled="isUnsuspending" @click="confirmBatchUnsuspend">
+              <CheckCircle2 v-if="!isUnsuspending" class="w-4 h-4" />
+              {{ t('admin.hosts.batchUnsuspend') }}
+            </Button>
+            <Button variant="secondary" size="sm" @click="showMigrateModal = true">
               <ArrowRightLeft class="w-4 h-4" />
               {{ t('host.migrate.button') }}
             </Button>
@@ -1603,17 +1608,14 @@ async function submitAssign() {
               <Gift v-if="!isGifting" class="w-4 h-4" />
               {{ t('host.giftDays.button') }}
             </Button>
-            <Button variant="secondary" size="sm" :disabled="selectedCount === 0" @click="openNotifyModal">
-              <Bell class="w-4 h-4" />
-              {{ t('host.notify.sendToUsers') }}
-            </Button>
-            <Button variant="danger" size="sm" :disabled="selectedCount === 0" @click="openBatchDeleteModal">
+            <span class="hidden sm:inline-block h-4 w-px bg-[var(--border-color)] mx-0.5" aria-hidden="true" />
+            <Button variant="danger" size="sm" @click="openBatchDeleteModal">
               <Trash2 class="w-4 h-4" />
               {{ t('admin.hosts.batchDelete') }}
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
 
       <HostInstancesList
         :instances="instances"

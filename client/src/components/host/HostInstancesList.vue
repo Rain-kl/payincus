@@ -146,57 +146,39 @@ function isStatusPulsing(status: string): boolean {
       </Button>
     </div>
 
-    <div class="space-y-3">
+    <div class="divide-y divide-[var(--border-color)] -mx-4 -mb-4 border-t border-[var(--border-color)]">
       <div
         v-for="instance in props.instances"
         :key="instance.id"
-        class="overflow-hidden rounded-2xl border bg-[var(--bg-surface)] transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
-        :class="[
-          isSelected(instance.id)
-            ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20'
-            : 'border-[var(--border-color)] hover:border-[var(--border-hover)]',
-          props.isInstanceExpanded(instance.id) ? 'shadow-[0_4px_12px_rgba(0,0,0,0.06)]' : ''
-        ]"
+        class="transition-colors duration-200"
+        :class="isSelected(instance.id) ? 'bg-[color-mix(in_srgb,var(--accent)_4%,var(--bg-surface))]' : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-soft)]/50'"
       >
-        <div class="px-4 py-4 sm:px-5">
-          <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+        <div class="px-4 py-4 sm:px-6">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <!-- Zone 1: Identity, Specs & Owner -->
             <div class="min-w-0 flex-1">
               <div class="flex items-start gap-3">
-                <div class="flex items-center gap-2 pt-0.5" @click.stop>
-                  <label class="flex items-center justify-center min-h-[36px] min-w-[28px] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      class="w-4 h-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
-                      :checked="isSelected(instance.id)"
-                      @change="emit('toggle-select', instance.id)"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] cursor-pointer"
-                    :title="props.isInstanceExpanded(instance.id) ? t('common.collapse') : t('common.expand')"
-                    :aria-expanded="props.isInstanceExpanded(instance.id)"
-                    @click="emit('toggle-expand', instance)"
-                  >
-                    <ChevronDown
-                      class="w-4 h-4 transition-transform duration-200"
-                      :class="props.isInstanceExpanded(instance.id) ? 'rotate-180' : ''"
-                    />
-                  </button>
-                </div>
+                <label class="flex items-center justify-center min-h-[36px] min-w-[24px] pt-0.5 cursor-pointer" @click.stop>
+                  <input
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
+                    :checked="isSelected(instance.id)"
+                    @change="emit('toggle-select', instance.id)"
+                  />
+                </label>
 
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0 flex-1 space-y-1.5">
                   <div class="flex flex-wrap items-center gap-2">
                     <InstanceDisplayIcon
                       v-if="instance.iconBadgeId || props.getPaidIconType(instance)"
                       :badge-id="instance.iconBadgeId"
                       :fallback-icon="props.getPaidIconType(instance)"
                       :alt="instance.name"
-                      :size="40"
+                      :size="36"
                     />
                     <button
                       type="button"
-                      class="text-left text-sm font-semibold tracking-tight text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded cursor-pointer"
+                      class="text-left text-base font-semibold tracking-tight text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded cursor-pointer"
                       @click="emit('open-detail', instance.id)"
                     >
                       {{ instance.name }}
@@ -208,102 +190,116 @@ function isStatusPulsing(status: string): boolean {
                     >
                       {{ props.getStatusInfo(instance.status).label }}
                     </Badge>
-                    <Badge size="sm">{{ props.getInstanceTypeLabel(instance) }}</Badge>
-                    <Badge v-if="instance.packagePlanId" variant="success" size="sm" class="font-mono tabular-nums">
-                      {{ props.formatMoney(instance.billingPrice) }}
-                    </Badge>
+                    <span class="text-xs text-[var(--text-tertiary)]">
+                      {{ props.getInstanceTypeLabel(instance) }}
+                      <template v-if="props.getNetworkModeLabel(instance)"> · {{ props.getNetworkModeLabel(instance) }}</template>
+                    </span>
                   </div>
 
-                  <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-tertiary)]">
-                    <span class="font-mono tabular-nums">#{{ instance.id }}</span>
-                    <span class="font-mono">Incus {{ instance.incusId || instance.incus_id || '-' }}</span>
+                  <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--text-secondary)]">
+                    <span class="font-mono tabular-nums text-[var(--text-tertiary)]">#{{ instance.id }}</span>
+                    <span class="text-[var(--border-color)]">·</span>
+                    <span class="font-mono">{{ instance.incusId || instance.incus_id || '-' }}</span>
+                    <span class="text-[var(--border-color)]">·</span>
                     <span>{{ instance.imageName || instance.image?.replace(/^images:/, '') || '-' }}</span>
-                    <span>{{ props.formatDateTime(instance.createdAt || instance.created_at || null) }}</span>
+                    <template v-if="props.getSummaryMeta(instance).length">
+                      <span class="text-[var(--border-color)]">·</span>
+                      <span class="font-mono tabular-nums text-[var(--text-primary)]">
+                        {{ props.getSummaryMeta(instance).join(' · ') }}
+                      </span>
+                    </template>
                   </div>
 
-                  <div class="mt-3 flex flex-wrap items-center gap-1.5">
-                    <Badge v-for="meta in props.getSummaryMeta(instance)" :key="meta" size="sm">
-                      {{ meta }}
-                    </Badge>
-                    <Badge size="sm">{{ props.getNetworkModeLabel(instance) }}</Badge>
-                  </div>
-
-                  <div v-if="instance.username" class="mt-3 flex items-center gap-3">
+                  <div v-if="instance.username" class="pt-1 flex items-center gap-2.5">
                     <UserAvatar
                       :username="instance.username"
                       :email="instance.userEmail"
                       :avatar-style="instance.userAvatarStyle || ''"
                       :badge-id="instance.userAvatarBadgeId || null"
-                      :size="28"
+                      :size="24"
                     />
-                    <div class="min-w-0">
-                      <div class="truncate text-sm font-medium text-[var(--text-primary)]">{{ instance.username }}</div>
-                      <div v-if="instance.userEmail" class="truncate text-xs text-[var(--text-tertiary)]">{{ instance.userEmail }}</div>
+                    <div class="flex flex-wrap items-center gap-x-2 text-xs min-w-0">
+                      <span class="font-medium text-[var(--text-primary)] truncate">{{ instance.username }}</span>
+                      <span v-if="instance.userEmail" class="text-[var(--text-tertiary)] truncate">{{ instance.userEmail }}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="w-full shrink-0 2xl:w-[360px]">
-              <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5">
-                <div class="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                  <span>{{ t('admin.hosts.trafficUsage') }}</span>
-                  <span class="font-mono tabular-nums">{{ props.getTrafficSummary(instance) }}</span>
+            <!-- Zone 2: Traffic & Billing Metrics (flat typographic hierarchy, no nested boxes) -->
+            <div class="w-full lg:w-[280px] shrink-0 space-y-2.5 pl-9 lg:pl-0">
+              <div>
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <span class="text-[var(--text-tertiary)]">{{ t('admin.hosts.trafficUsage') }}</span>
+                  <span class="font-mono tabular-nums text-[var(--text-secondary)]">{{ props.getTrafficSummary(instance) }}</span>
                 </div>
-                <div class="mt-2 h-2 overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+                <div class="h-1.5 overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
                   <div
                     class="h-full rounded-full transition-all duration-300"
                     :class="props.getTrafficBarClass(instance)"
                     :style="{ width: `${props.getTrafficPercentage(instance)}%` }"
                   />
                 </div>
+              </div>
 
-                <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2">
-                    <div class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('billing.renewPrice') }}</div>
-                    <div class="mt-1 text-sm font-semibold font-mono tabular-nums text-[var(--text-primary)]">
-                      {{ instance.packagePlanId ? props.formatMoney(instance.billingPrice) : '-' }}
-                    </div>
-                  </div>
-                  <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-2">
-                    <div class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('billing.expiresAt') }}</div>
-                    <div class="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-                      {{ props.getExpirySummary(instance) }}
-                    </div>
+              <div class="grid grid-cols-2 gap-4 text-xs">
+                <div class="min-w-0">
+                  <div class="text-[var(--text-tertiary)]">{{ t('billing.renewPrice') }}</div>
+                  <div class="mt-0.5 font-semibold font-mono tabular-nums text-[var(--text-primary)] truncate">
+                    {{ instance.packagePlanId ? props.formatMoney(instance.billingPrice) : '-' }}
                   </div>
                 </div>
-
-                <div class="mt-3 flex flex-wrap justify-end gap-2" @click.stop>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    :disabled="props.isInstanceSyncing(instance.id)"
-                    :title="t('admin.hosts.batchSyncStatus')"
-                    @click="emit('sync-instance', instance)"
-                  >
-                    <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': props.isInstanceSyncing(instance.id) }" />
-                  </Button>
-                  <Button
-                    v-if="instance.packagePlanId"
-                    variant="ghost"
-                    size="sm"
-                    :title="t('host.price.editPrice')"
-                    @click="emit('open-price', instance)"
-                  >
-                    <DollarSign class="w-4 h-4" />
-                  </Button>
-                  <Button variant="secondary" size="sm" @click="emit('open-single-config', instance.id)">
-                    {{ t('host.batchConfig.button') }}
-                  </Button>
-                  <Button v-if="props.canExport" variant="secondary" size="sm" @click="emit('open-export', instance)">
-                    {{ t('admin.hosts.exportInstance') }}
-                  </Button>
-                  <Button variant="primary" size="sm" @click="emit('open-detail', instance.id)">
-                    {{ t('common.details') }}
-                  </Button>
+                <div class="min-w-0">
+                  <div class="text-[var(--text-tertiary)]">{{ t('billing.expiresAt') }}</div>
+                  <div class="mt-0.5 font-medium text-[var(--text-primary)] truncate">
+                    {{ props.getExpirySummary(instance) }}
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Zone 3: Clean Action Controls -->
+            <div class="flex flex-wrap items-center justify-end gap-1.5 shrink-0 pl-9 lg:pl-0" @click.stop>
+              <Button
+                variant="ghost"
+                size="sm"
+                :disabled="props.isInstanceSyncing(instance.id)"
+                :title="t('admin.hosts.batchSyncStatus')"
+                @click="emit('sync-instance', instance)"
+              >
+                <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': props.isInstanceSyncing(instance.id) }" />
+              </Button>
+              <Button
+                v-if="instance.packagePlanId"
+                variant="ghost"
+                size="sm"
+                :title="t('host.price.editPrice')"
+                @click="emit('open-price', instance)"
+              >
+                <DollarSign class="w-4 h-4" />
+              </Button>
+              <Button variant="secondary" size="sm" @click="emit('open-single-config', instance.id)">
+                {{ t('host.batchConfig.button') }}
+              </Button>
+              <Button v-if="props.canExport" variant="secondary" size="sm" @click="emit('open-export', instance)">
+                {{ t('admin.hosts.exportInstance') }}
+              </Button>
+              <Button variant="primary" size="sm" @click="emit('open-detail', instance.id)">
+                {{ t('common.details') }}
+              </Button>
+              <button
+                type="button"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-surface-soft)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] cursor-pointer"
+                :title="props.isInstanceExpanded(instance.id) ? t('common.collapse') : t('common.expand')"
+                :aria-expanded="props.isInstanceExpanded(instance.id)"
+                @click="emit('toggle-expand', instance)"
+              >
+                <ChevronDown
+                  class="w-4 h-4 transition-transform duration-200"
+                  :class="props.isInstanceExpanded(instance.id) ? 'rotate-180' : ''"
+                />
+              </button>
             </div>
           </div>
         </div>

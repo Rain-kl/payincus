@@ -115,97 +115,128 @@ onUnmounted(() => { generation++; clearInterval(timer) })
 
 <template>
   <section class="space-y-6">
-    <!-- Header + Sync Status -->
-    <Card padding="md">
-      <template #header>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-          <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-[var(--accent)]">
-              <Shield class="w-5 h-5 stroke-[1.8]" />
-            </div>
-            <div class="min-w-0">
-              <h2 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
-                {{ t('egress.firewall') }}
-              </h2>
-              <p class="mt-0.5 text-sm text-[var(--text-secondary)] leading-relaxed">
-                {{ t('egress.firewallHint') }}
-              </p>
-            </div>
-          </div>
-          <Button variant="secondary" size="sm" :disabled="busy" @click="load(true)">
-            <RotateCw class="w-4 h-4" :class="{ 'animate-spin': busy }" />
-            {{ t('egress.reload') }}
-          </Button>
+    <!-- Top Page Action Header -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-start gap-3.5 min-w-0">
+        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[var(--accent)]">
+          <Shield class="w-5 h-5 stroke-[1.8]" />
         </div>
-      </template>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('egress.firewall') }}
+            </h2>
+            <Badge v-if="dirty" variant="warning" size="sm" dot>
+              {{ t('common.unsavedChanges', '未保存') }}
+            </Badge>
+          </div>
+          <p class="mt-1 text-sm text-[var(--text-secondary)] leading-relaxed max-w-2xl">
+            {{ t('egress.firewallHint') }}
+          </p>
+        </div>
+      </div>
 
-      <NetworkPolicyStatus :policy="policy" />
-    </Card>
+      <div v-if="form" class="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
+        <Button variant="secondary" size="sm" :disabled="busy" @click="load(true)">
+          <RotateCw class="w-4 h-4" :class="{ 'animate-spin': busy }" />
+          {{ t('egress.reload') }}
+        </Button>
+        <Button variant="primary" size="sm" :loading="busy" :disabled="busy || !dirty" @click="save">
+          {{ t(busy ? 'egress.applying' : 'egress.saveFirewall') }}
+        </Button>
+      </div>
+    </div>
 
     <!-- Error Feedback -->
     <div
       v-if="error"
       role="alert"
-      class="flex items-start gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--error)_30%,var(--border-color))] bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))] px-4 py-3 text-sm text-[var(--error)]"
+      class="flex items-start gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--error)_30%,var(--border-color))] bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))] px-4 py-3.5 text-sm text-[var(--error)]"
     >
       <AlertCircle class="w-4 h-4 mt-0.5 shrink-0" />
       <span class="break-words">{{ error }}</span>
     </div>
 
     <!-- Loading Skeleton -->
-    <Card v-if="!form && !error" padding="md" loading>
-      <div class="space-y-4">
-        <div class="h-11 rounded-xl bg-[var(--bg-surface-soft)] animate-pulse" />
-        <div class="grid gap-4 sm:grid-cols-2">
+    <div v-if="!form && !error" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <Card padding="md" class="lg:col-span-4" loading>
+        <div class="space-y-4">
+          <div class="h-12 rounded-xl bg-[var(--bg-surface-soft)] animate-pulse" />
           <div class="h-11 rounded-xl bg-[var(--bg-surface-soft)] animate-pulse" />
           <div class="h-11 rounded-xl bg-[var(--bg-surface-soft)] animate-pulse" />
         </div>
-        <div class="h-24 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse" />
-      </div>
-    </Card>
-
-    <!-- Policy & Rules Form -->
-    <Card v-if="form" padding="md">
-      <div class="space-y-6" @input="dirty = true" @change="dirty = true">
-        <!-- Enable Toggle -->
-        <label class="flex items-center justify-between gap-4 min-h-[44px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-4 py-3 cursor-pointer transition-colors hover:border-[var(--border-hover)]">
-          <span class="text-sm font-medium text-[var(--text-primary)] select-none">{{ t('egress.enableFirewall') }}</span>
-          <input
-            v-model="form.enabled"
-            type="checkbox"
-            class="h-4 w-4 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)] cursor-pointer"
-          />
-        </label>
-
-        <!-- Default Actions -->
-        <div class="grid gap-4 sm:grid-cols-2">
-          <Select
-            v-model="form.ingressAction"
-            :label="t('egress.defaultIngress')"
-            :options="defaultActionOptions"
-          />
-          <Select
-            v-model="form.egressAction"
-            :label="t('egress.defaultEgress')"
-            :options="defaultActionOptions"
-          />
-        </div>
-
-        <p class="text-xs text-[var(--text-tertiary)] leading-relaxed">
-          {{ t('egress.aclOrder') }}
-        </p>
-
-        <!-- Rules Section -->
+      </Card>
+      <Card padding="md" class="lg:col-span-8" loading>
         <div class="space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-              {{ t('egress.firewall') }} ({{ form.rules.length }}/200)
-            </span>
-            <Button variant="secondary" size="sm" :disabled="form.rules.length >= 200" @click="edit()">
-              <Plus class="w-4 h-4" />
-              {{ t('egress.addRule') }}
-            </Button>
+          <div class="h-16 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse" />
+          <div class="h-16 rounded-2xl bg-[var(--bg-surface-soft)] animate-pulse" />
+        </div>
+      </Card>
+    </div>
+
+    <!-- 2-Column Policy Layout -->
+    <div v-if="form" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start" @input="dirty = true" @change="dirty = true">
+      <!-- Left Sidebar: Default Policy & Sync Status -->
+      <div class="lg:col-span-4 space-y-5">
+        <Card padding="md">
+          <div class="space-y-5">
+            <!-- Apple-style Switch Row -->
+            <label class="flex items-center justify-between gap-4 min-h-[44px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-4 py-3 cursor-pointer transition-colors hover:border-[var(--border-hover)]">
+              <span class="text-sm font-medium text-[var(--text-primary)] select-none">
+                {{ t('egress.enableFirewall') }}
+              </span>
+              <span class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200" :class="form.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border border-[var(--border-color)]'">
+                <input v-model="form.enabled" type="checkbox" class="sr-only" />
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200"
+                  :class="form.enabled ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </span>
+            </label>
+
+            <div class="space-y-4">
+              <Select
+                v-model="form.ingressAction"
+                :label="t('egress.defaultIngress')"
+                :options="defaultActionOptions"
+              />
+              <Select
+                v-model="form.egressAction"
+                :label="t('egress.defaultEgress')"
+                :options="defaultActionOptions"
+              />
+            </div>
+
+            <div class="rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] p-3.5 text-xs text-[var(--text-secondary)] leading-relaxed">
+              {{ t('egress.aclOrder') }}
+            </div>
+
+            <div class="pt-3 border-t border-[var(--border-color)]">
+              <NetworkPolicyStatus :policy="policy" />
+            </div>
           </div>
+        </Card>
+      </div>
+
+      <!-- Right Main Area: Rules List -->
+      <div class="lg:col-span-8">
+        <Card padding="none">
+          <template #header>
+            <div class="flex items-center justify-between gap-3 w-full">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <h3 class="text-base font-semibold tracking-tight text-[var(--text-primary)]">
+                  {{ t('egress.firewall') }}
+                </h3>
+                <Badge size="sm" class="font-mono tabular-nums">
+                  {{ form.rules.length }} / 200
+                </Badge>
+              </div>
+              <Button variant="primary" size="sm" :disabled="form.rules.length >= 200" @click="edit()">
+                <Plus class="w-4 h-4" />
+                {{ t('egress.addRule') }}
+              </Button>
+            </div>
+          </template>
 
           <EmptyState
             v-if="form.rules.length === 0"
@@ -223,14 +254,14 @@ onUnmounted(() => { generation++; clearInterval(timer) })
             </template>
           </EmptyState>
 
-          <div v-else class="space-y-2.5">
+          <div v-else class="divide-y divide-[var(--border-color)]">
             <article
               v-for="(rule, index) in form.rules"
               :key="index"
-              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-4 py-3.5 transition-all duration-200 hover:border-[var(--border-hover)]"
-              :class="{ 'opacity-60': !rule.enabled }"
+              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-4 transition-colors duration-150 hover:bg-[var(--bg-surface-soft)]/70"
+              :class="{ 'opacity-55': !rule.enabled }"
             >
-              <div class="flex items-start gap-3 min-w-0 flex-1">
+              <div class="flex items-start gap-3.5 min-w-0 flex-1">
                 <label class="flex items-center justify-center min-h-[44px] min-w-[24px] sm:min-h-[24px] cursor-pointer pt-0.5">
                   <input
                     v-model="rule.enabled"
@@ -241,12 +272,15 @@ onUnmounted(() => { generation++; clearInterval(timer) })
                 </label>
                 <div class="min-w-0 flex-1 space-y-1.5">
                   <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="font-mono text-[11px] text-[var(--text-tertiary)] mr-1">#{{ index + 1 }}</span>
                     <Badge size="sm">{{ t(`egress.${rule.direction}`) }}</Badge>
                     <Badge :variant="ruleActionVariant(rule.action)" size="sm">{{ t(`egress.${rule.action}`) }}</Badge>
                     <Badge variant="info" size="sm">{{ rule.protocol ? rule.protocol.toUpperCase() : t('egress.any') }}</Badge>
                   </div>
                   <p class="break-all font-mono text-xs text-[var(--text-primary)] tabular-nums">
-                    {{ rule.source || '*' }}:{{ rule.sourcePort || '*' }} → {{ rule.destination || '*' }}:{{ rule.destinationPort || '*' }}
+                    {{ rule.source || '*' }}:{{ rule.sourcePort || '*' }}
+                    <span class="mx-1.5 text-[var(--text-tertiary)]">→</span>
+                    {{ rule.destination || '*' }}:{{ rule.destinationPort || '*' }}
                   </p>
                   <p v-if="rule.description" class="text-xs text-[var(--text-secondary)] break-words">
                     {{ rule.description }}
@@ -254,7 +288,7 @@ onUnmounted(() => { generation++; clearInterval(timer) })
                 </div>
               </div>
 
-              <div class="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+              <div class="flex items-center gap-1 shrink-0 self-end sm:self-center">
                 <Button variant="ghost" size="sm" @click="edit(index)">
                   <Pencil class="w-3.5 h-3.5" />
                   {{ t('egress.editRule') }}
@@ -266,19 +300,9 @@ onUnmounted(() => { generation++; clearInterval(timer) })
               </div>
             </article>
           </div>
-        </div>
-
-        <!-- Save Bar -->
-        <div class="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
-          <Button variant="secondary" :disabled="busy" @click="load(true)">
-            {{ t('egress.reload') }}
-          </Button>
-          <Button variant="primary" :loading="busy" :disabled="busy || !dirty" @click="save">
-            {{ t(busy ? 'egress.applying' : 'egress.saveFirewall') }}
-          </Button>
-        </div>
+        </Card>
       </div>
-    </Card>
+    </div>
 
     <!-- Rule Drawer Modal -->
     <DrawerModal :show="showRule" :title="editing < 0 ? t('egress.addRule') : t('egress.editRule')" @close="showRule = false">
