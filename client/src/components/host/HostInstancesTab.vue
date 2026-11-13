@@ -2,11 +2,16 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import {
+  Search, RefreshCw, Ban, CheckCircle2, Settings2,
+  ArrowRightLeft, Gift, Bell, Trash2, ArrowUpDown, Server
+} from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 
 import api from '@/api'
+import { Button, Card, EmptyState, Input, Pagination, Select } from '@/components/ui'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import BatchConfigModal from '@/components/host/BatchConfigModal.vue'
 import MigrateHostModal from '@/components/host/MigrateHostModal.vue'
@@ -161,6 +166,9 @@ const statusOptions = [
   { value: 'creating', label: 'instance.status.creating' },
   { value: 'error', label: 'instance.status.error' }
 ]
+const statusSelectOptions = computed(() =>
+  statusOptions.map(opt => ({ value: opt.value, label: t(opt.label) }))
+)
 
 // 批量选择相关
 const selectedIds = ref<Set<number>>(new Set())
@@ -898,11 +906,6 @@ function toggleSort() {
   loadInstances()
 }
 
-function handlePageSizeChange() {
-  page.value = 1
-  loadInstances()
-}
-
 watch(() => props.hostId, () => {
   page.value = 1
   searchQuery.value = ''
@@ -1248,223 +1251,113 @@ function goToInstance(id: number) {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-5">
     <SkeletonLoader v-if="loading" type="table" />
 
-    <!-- 搜索栏 - 始终显示 -->
-    <div v-if="!loading" class="flex items-center gap-2 flex-wrap">
-      <div class="relative flex-1 max-w-md min-w-[200px]">
-        <input
-          v-model="searchQuery"
-          type="text"
-          :placeholder="t('admin.hosts.instanceSearchPlaceholder')"
-          class="input w-full pl-10 pr-10"
-          @keyup.enter="handleSearch"
-        />
-        <svg
-          v-if="searchQuery"
-          class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 cursor-pointer"
-          :class="themeStore.isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          @click="clearSearch"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-        <svg
-          v-else
-          class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-          :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-      <!-- 状态筛选下拉框 -->
-      <div class="relative">
-        <select
+    <!-- 搜索与筛选栏 -->
+    <Card v-if="!loading" padding="sm">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex-1 min-w-[220px] max-w-md">
+          <Input
+            v-model="searchQuery"
+            clearable
+            :placeholder="t('admin.hosts.instanceSearchPlaceholder')"
+            @enter="handleSearch"
+            @clear="clearSearch"
+          >
+            <template #prefix>
+              <Search class="w-4 h-4" />
+            </template>
+          </Input>
+        </div>
+        <Select
           v-model="statusFilter"
-          class="h-[38px] pl-3 pr-8 rounded-lg border-0 ring-1 ring-inset focus:ring-2 focus:ring-primary cursor-pointer text-sm appearance-none"
-          :class="themeStore.isDark 
-            ? 'bg-gray-800 text-gray-300 ring-gray-700 hover:ring-gray-600' 
-            : 'bg-white text-gray-700 ring-gray-200 hover:ring-gray-300'"
+          :options="statusSelectOptions"
+          :block="false"
+          class="w-40 shrink-0"
           @change="handleStatusChange"
-        >
-          <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-            {{ t(opt.label) }}
-          </option>
-        </select>
-        <svg 
-          class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-          :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-400'"
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-        </svg>
+        />
+        <Button variant="primary" @click="handleSearch">
+          {{ t('admin.hosts.search') }}
+        </Button>
+        <Button v-if="searchQuery" variant="ghost" @click="clearSearch">
+          {{ t('common.reset') }}
+        </Button>
+        <Button variant="secondary" @click="toggleSort">
+          <ArrowUpDown class="w-4 h-4" />
+          {{ t('instance.createdAt') }} {{ sortOrder === 'desc' ? '↓' : '↑' }}
+        </Button>
       </div>
-      <button class="btn-primary h-[38px] px-4" @click="handleSearch">
-        {{ t('admin.hosts.search') }}
-      </button>
-      <button 
-        v-if="searchQuery" 
-        class="btn-ghost h-[38px] px-4" 
-        @click="clearSearch"
-      >
-        {{ t('common.reset') }}
-      </button>
-      <button class="btn-ghost h-[38px] px-4" @click="toggleSort">
-        {{ t('instance.createdAt') }} {{ sortOrder === 'desc' ? '↓' : '↑' }}
-      </button>
-    </div>
+    </Card>
 
     <template v-if="!loading">
       <!-- 空状态 -->
-      <div v-if="instances.length === 0" class="card p-12 text-center">
-        <svg
-          class="w-12 h-12 mx-auto mb-4"
-          :class="themeStore.isDark ? 'text-gray-700' : 'text-gray-300'"
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-        <p class="text-themed-secondary">{{ t('admin.hosts.noInstances') }}</p>
-      </div>
+      <Card v-if="instances.length === 0" padding="none">
+        <EmptyState :title="t('admin.hosts.noInstances')">
+          <template #icon>
+            <Server class="w-7 h-7 stroke-[1.5]" />
+          </template>
+        </EmptyState>
+      </Card>
 
-      <!-- 批量操作栏 - 始终显示（有实例时） -->
-      <div
-        v-if="instances.length > 0"
-        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg"
-        :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-100'"
-      >
-        <span class="text-sm text-themed-secondary whitespace-nowrap">
-          {{ selectedCount > 0 ? t('admin.hosts.selectedCount', { count: selectedCount }) : t('admin.hosts.noInstanceSelected') }}
-        </span>
-        <div class="flex items-center gap-2 flex-wrap">
-          <button class="btn-ghost btn-sm" :disabled="selectedCount === 0" @click="selectedIds.clear(); selectedIds = new Set()">
-            {{ t('common.cancel') }}
-          </button>
-          <button
-            class="btn-secondary btn-sm"
-            :disabled="isSyncing || selectedCount === 0"
-            @click="batchSyncStatus"
-          >
-            <svg v-if="isSyncing" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {{ isSyncing ? t('common.syncing') : t('admin.hosts.batchSyncStatus') }}
-          </button>
-          <button
-            class="btn-sm inline-flex items-center rounded-lg"
-            :class="selectedCount === 0 || isSuspending
-              ? (themeStore.isDark ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')
-              : (themeStore.isDark ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white')"
-            :disabled="isSuspending || selectedCount === 0"
-            @click="openBatchSuspendModal"
-          >
-            <svg v-if="isSuspending" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>
-            {{ t('admin.hosts.batchSuspend') }}
-          </button>
-          <button
-            class="btn-sm inline-flex items-center rounded-lg"
-            :class="selectedCount === 0 || isUnsuspending
-              ? (themeStore.isDark ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')
-              : (themeStore.isDark ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white')"
-            :disabled="isUnsuspending || selectedCount === 0"
-            @click="confirmBatchUnsuspend"
-          >
-            <svg v-if="isUnsuspending" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {{ t('admin.hosts.batchUnsuspend') }}
-          </button>
-          <button
-            class="btn-secondary btn-sm"
-            :disabled="selectedCount === 0"
-            @click="openBatchConfigForSelection"
-          >
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {{ t('host.batchConfig.button') }}
-          </button>
-          <button
-            class="btn-sm inline-flex items-center rounded-lg"
-            :class="[
-              selectedCount === 0
-                ? (themeStore.isDark ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')
-                : (themeStore.isDark ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white')
-            ]"
-            :disabled="selectedCount === 0"
-            :title="selectedCount === 0 ? t('host.migrate.noInstancesSelected') : ''"
-            @click="selectedCount > 0 && (showMigrateModal = true)"
-          >
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            {{ t('host.migrate.button') }}
-          </button>
-          <button
-            class="btn-sm inline-flex items-center rounded-lg"
-            :class="[
-              selectedPaidCount === 0
-                ? (themeStore.isDark ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed')
-                : (themeStore.isDark ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'bg-teal-500 hover:bg-teal-600 text-white')
-            ]"
-            :disabled="isGifting || selectedPaidCount === 0"
-            :title="selectedPaidCount === 0 ? t('host.giftDays.noPaidInstances') : ''"
-            @click="openGiftDaysModal"
-          >
-            <svg v-if="isGifting" class="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <svg v-else class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-            </svg>
-            {{ t('host.giftDays.button') }}
-          </button>
-          <button
-            class="btn-secondary btn-sm"
-            :disabled="selectedCount === 0"
-            @click="openNotifyModal"
-          >
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            {{ t('host.notify.sendToUsers') }}
-          </button>
-          <button
-            class="btn-danger btn-sm"
-            :disabled="selectedCount === 0"
-            @click="openBatchDeleteModal"
-          >
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            {{ t('admin.hosts.batchDelete') }}
-          </button>
+      <!-- 批量操作栏 -->
+      <Card v-if="instances.length > 0" padding="sm">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span class="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">
+            {{ selectedCount > 0 ? t('admin.hosts.selectedCount', { count: selectedCount }) : t('admin.hosts.noInstanceSelected') }}
+          </span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <Button variant="ghost" size="sm" :disabled="selectedCount === 0" @click="selectedIds.clear(); selectedIds = new Set()">
+              {{ t('common.cancel') }}
+            </Button>
+            <Button variant="secondary" size="sm" :loading="isSyncing" :disabled="isSyncing || selectedCount === 0" @click="batchSyncStatus">
+              <RefreshCw v-if="!isSyncing" class="w-4 h-4" />
+              {{ isSyncing ? t('common.syncing') : t('admin.hosts.batchSyncStatus') }}
+            </Button>
+            <Button variant="secondary" size="sm" :loading="isSuspending" :disabled="isSuspending || selectedCount === 0" @click="openBatchSuspendModal">
+              <Ban v-if="!isSuspending" class="w-4 h-4" />
+              {{ t('admin.hosts.batchSuspend') }}
+            </Button>
+            <Button variant="secondary" size="sm" :loading="isUnsuspending" :disabled="isUnsuspending || selectedCount === 0" @click="confirmBatchUnsuspend">
+              <CheckCircle2 v-if="!isUnsuspending" class="w-4 h-4" />
+              {{ t('admin.hosts.batchUnsuspend') }}
+            </Button>
+            <Button variant="secondary" size="sm" :disabled="selectedCount === 0" @click="openBatchConfigForSelection">
+              <Settings2 class="w-4 h-4" />
+              {{ t('host.batchConfig.button') }}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              :disabled="selectedCount === 0"
+              :title="selectedCount === 0 ? t('host.migrate.noInstancesSelected') : ''"
+              @click="selectedCount > 0 && (showMigrateModal = true)"
+            >
+              <ArrowRightLeft class="w-4 h-4" />
+              {{ t('host.migrate.button') }}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              :loading="isGifting"
+              :disabled="isGifting || selectedPaidCount === 0"
+              :title="selectedPaidCount === 0 ? t('host.giftDays.noPaidInstances') : ''"
+              @click="openGiftDaysModal"
+            >
+              <Gift v-if="!isGifting" class="w-4 h-4" />
+              {{ t('host.giftDays.button') }}
+            </Button>
+            <Button variant="secondary" size="sm" :disabled="selectedCount === 0" @click="openNotifyModal">
+              <Bell class="w-4 h-4" />
+              {{ t('host.notify.sendToUsers') }}
+            </Button>
+            <Button variant="danger" size="sm" :disabled="selectedCount === 0" @click="openBatchDeleteModal">
+              <Trash2 class="w-4 h-4" />
+              {{ t('admin.hosts.batchDelete') }}
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
 
       <HostInstancesList
         :instances="instances"
@@ -1525,72 +1418,17 @@ function goToInstance(id: number) {
       />
 
       <!-- 分页 -->
-      <div 
-        v-if="total > 0" 
-        class="flex items-center justify-between px-4 py-3 border-t"
-        :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-100'"
-      >
-        <div class="flex items-center gap-3">
-          <span class="text-sm" :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">
-            {{ t('admin.users.totalRecords', { count: total }) }}
-          </span>
-          <select
-            v-model="pageSize"
-            class="text-sm rounded-md border-0 py-1 pl-2 pr-7 ring-1 ring-inset focus:ring-2 focus:ring-primary cursor-pointer"
-            :class="themeStore.isDark 
-              ? 'bg-gray-800 text-gray-300 ring-gray-700' 
-              : 'bg-gray-50 text-gray-700 ring-gray-200'"
-            @change="handlePageSizeChange"
-          >
-            <option :value="10">10 / {{ t('common.page') }}</option>
-            <option :value="30">30 / {{ t('common.page') }}</option>
-            <option :value="50">50 / {{ t('common.page') }}</option>
-            <option :value="100">100 / {{ t('common.page') }}</option>
-          </select>
-        </div>
-        <div v-if="totalPages > 1" class="flex items-center gap-1">
-          <button
-            :disabled="page <= 1"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-sm transition-colors"
-            :class="[
-              page <= 1 
-                ? 'opacity-40 cursor-not-allowed' 
-                : themeStore.isDark 
-                  ? 'hover:bg-gray-800 text-gray-400' 
-                  : 'hover:bg-gray-100 text-gray-600'
-            ]"
-            @click="page--; loadInstances()"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div 
-            class="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium"
-            :class="themeStore.isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'"
-          >
-            <span>{{ page }}</span>
-            <span :class="themeStore.isDark ? 'text-gray-600' : 'text-gray-400'">/</span>
-            <span :class="themeStore.isDark ? 'text-gray-500' : 'text-gray-500'">{{ totalPages }}</span>
-          </div>
-          <button
-            :disabled="page >= totalPages"
-            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-sm transition-colors"
-            :class="[
-              page >= totalPages 
-                ? 'opacity-40 cursor-not-allowed' 
-                : themeStore.isDark 
-                  ? 'hover:bg-gray-800 text-gray-400' 
-                  : 'hover:bg-gray-100 text-gray-600'
-            ]"
-            @click="page++; loadInstances()"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <Card v-if="total > 0" padding="sm">
+        <Pagination
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          show-total
+          show-size-changer
+          :page-size-options="[10, 30, 50, 100]"
+          @change="() => loadInstances()"
+        />
+      </Card>
 
       <!-- 批量删除确认弹窗 -->
       <Teleport to="body">
