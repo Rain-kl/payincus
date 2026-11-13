@@ -2618,3 +2618,11 @@ Acceptance rule:
 - Treat auth, payment, permissions, OTA, Agent, and resource delivery as high-risk.
 - Do not revert user changes or staged files without explicit approval.
 - Before changing backend/admin/user boundary code, read existing guards and update tests with the change.
+
+## 2026-11-13：旧节点签名协议兼容与实例异常显示恢复
+
+- 根因：`229f0c1` 将控制端签名头改为 `X-Incus-*`、心跳身份改为 `incus_node_v1`，现场节点仍发送 `X-Incudal-*` 与 `payincus_node_v1`；心跳、安全报告及隧道认证返回 401，最后成功上报停在 11 月 11 日。数据库实例仍为 running，但离线/过期状态叠加使用户侧显示 error，并非实例业务状态被安全锁永久改写。
+- 修复：TypeScript 与 Go 控制端接受两代完整签名头，优先选择新头，禁止跨代拼接；HMAC、正文散列、时间戳与 nonce 防重放校验保持。已签名心跳接受两代节点身份；不自动映射旧控制能力或调用节点恢复接口。
+- 现场：只在 OCI-JP-A1 面板容器中备份并热修 `dist/lib/agent-auth.js` 和 `dist/routes/agent.js`，重启面板容器。收到宿主机 1、2 的新心跳与安全报告 HTTP 200，节点恢复 online，实例 2、4 的 running 状态刷新到当前时间。宿主机 1 上报 enabled=true、locked=false、recoveryPending=false、resumeInstances=[]；安全锁功能保持开启，未连接或操作宿主机，未执行解锁/恢复/实例启停。
+- 验证：TypeScript 认证、host-service-status、node-security-recovery、node-security-routes 测试、类型检查、后端构建及 make check；Go lib/routes 的 TestAgent 用例通过。线上验证依赖已认证上报与数据库状态，未执行浏览器界面验证。
+- 线上热修位于运行容器；后续应使用包含本修复的镜像，避免容器重建覆盖。新节点安装与新版控制协议继续以 Incus 命名为准，兼容入口用于现有节点平滑升级。

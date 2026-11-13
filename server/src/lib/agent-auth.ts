@@ -121,11 +121,14 @@ export function verifyAgentSignature(secret: string, payload: AgentSigningPayloa
 }
 
 export function readAgentAuthHeaders(headers: IncomingHttpHeaders): AgentAuthHeaders | null {
-  const agentId = getHeaderValue(headers['x-incus-agent-id'])
-  const timestamp = getHeaderValue(headers['x-incus-timestamp'])
-  const nonce = getHeaderValue(headers['x-incus-nonce'])
-  const bodyHash = getHeaderValue(headers['x-incus-body-sha256'])
-  const signature = getHeaderValue(headers['x-incus-signature'])
+  // Select one complete protocol generation; never combine authentication fields.
+  const fields = ['agent-id', 'timestamp', 'nonce', 'body-sha256', 'signature']
+  const prefix = fields.some(field => headers[`x-incus-${field}`] !== undefined) ? 'x-incus' : 'x-incudal'
+  const agentId = getHeaderValue(headers[`${prefix}-agent-id`])
+  const timestamp = getHeaderValue(headers[`${prefix}-timestamp`])
+  const nonce = getHeaderValue(headers[`${prefix}-nonce`])
+  const bodyHash = getHeaderValue(headers[`${prefix}-body-sha256`])
+  const signature = getHeaderValue(headers[`${prefix}-signature`])
 
   if (!agentId || !timestamp || !nonce || !bodyHash || !signature) {
     return null

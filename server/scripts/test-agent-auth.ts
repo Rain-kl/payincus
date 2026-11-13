@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  readAgentAuthHeaders,
   createAgentBodyHash,
   createAgentSignature,
   generateAgentSecret,
@@ -56,3 +57,10 @@ assert.equal(isAgentTimestampFresh(payload.timestamp), true)
 assert.equal(isAgentTimestampFresh(String(Date.now() - 10 * 60 * 1000)), false)
 
 console.log('agent-auth self-test passed')
+
+const modern = Object.fromEntries(Object.entries({ 'agent-id': 'agt_0123456789abcdefghijklmn', timestamp: payload.timestamp, nonce: payload.nonce, 'body-sha256': payload.bodyHash, signature }).map(([key, value]) => [`x-incus-${key}`, value]))
+const legacy = Object.fromEntries(Object.entries(modern).map(([key, value]) => [key.replace('x-incus-', 'x-incudal-'), value]))
+assert.deepEqual(readAgentAuthHeaders(legacy), readAgentAuthHeaders(modern))
+assert.equal(readAgentAuthHeaders({ ...legacy, 'x-incus-nonce': 'modern-partial' }), null)
+assert.deepEqual(readAgentAuthHeaders({ ...legacy, ...modern }), readAgentAuthHeaders(modern))
+assert.equal(readAgentAuthHeaders({}), null)

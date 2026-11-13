@@ -1584,7 +1584,7 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 	}
 
 	nodeAPI, _ := body.Raw["nodeApi"].(string)
-	if nodeAPI != "incus_node_v1" {
+	if nodeAPI != "incus_node_v1" && nodeAPI != "payincus_node_v1" {
 		c.JSON(http.StatusConflict, gin.H{
 			"code":  "NODE_API_REQUIRED",
 			"error": "Install the Incus node package",

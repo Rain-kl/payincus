@@ -319,11 +319,18 @@ func agentHeaderFirstValue(header http.Header, name string) (string, bool) {
 // ReadAgentAuthHeaders mirrors readAgentAuthHeaders. A missing header yields
 // nil, which the route renders as AGENT_AUTH_REQUIRED.
 func ReadAgentAuthHeaders(header http.Header) *AgentAuthHeaders {
-	agentID, ok1 := agentHeaderFirstValue(header, "X-Incus-Agent-Id")
-	timestamp, ok2 := agentHeaderFirstValue(header, "X-Incus-Timestamp")
-	nonce, ok3 := agentHeaderFirstValue(header, "X-Incus-Nonce")
-	bodyHash, ok4 := agentHeaderFirstValue(header, "X-Incus-Body-Sha256")
-	signature, ok5 := agentHeaderFirstValue(header, "X-Incus-Signature")
+	prefix := "X-Incudal-"
+	for _, field := range []string{"Agent-Id", "Timestamp", "Nonce", "Body-Sha256", "Signature"} {
+		if _, present := header[http.CanonicalHeaderKey("X-Incus-"+field)]; present {
+			prefix = "X-Incus-"
+			break
+		}
+	}
+	agentID, ok1 := agentHeaderFirstValue(header, prefix+"Agent-Id")
+	timestamp, ok2 := agentHeaderFirstValue(header, prefix+"Timestamp")
+	nonce, ok3 := agentHeaderFirstValue(header, prefix+"Nonce")
+	bodyHash, ok4 := agentHeaderFirstValue(header, prefix+"Body-Sha256")
+	signature, ok5 := agentHeaderFirstValue(header, prefix+"Signature")
 	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
 		return nil
 	}

@@ -886,7 +886,7 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     reply.raw.once('finish', () => {
       hostTunnelManager.completeHeartbeat(agent.hostId, request.body.heartbeatRequestId, reply.statusCode >= 400 ? '本次节点上报未能保存，测试失败' : reportError)
     })
-    if (request.body.nodeApi !== 'incus_node_v1') return reply.code(409).send({ code: 'NODE_API_REQUIRED', error: 'Install the Incus node package' })
+    if (request.body.nodeApi !== 'incus_node_v1' && request.body.nodeApi !== 'payincus_node_v1') return reply.code(409).send({ code: 'NODE_API_REQUIRED', error: 'Install the Incus node package' })
     const now = new Date()
     // Locked nodes remain online without turning an intentionally absent inventory into deletions.
     if (request.body.nodeSecurity?.state?.locked === true) {

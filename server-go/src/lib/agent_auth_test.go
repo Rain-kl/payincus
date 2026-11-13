@@ -421,3 +421,18 @@ func TestReadPanelClientCertificateRejections(t *testing.T) {
 		t.Fatal("garbage certificate accepted")
 	}
 }
+
+func TestAgentReadLegacyHeadersWithoutMixing(t *testing.T) {
+	legacy := http.Header{}
+	for key, value := range map[string]string{"Agent-Id": "agt_0123456789abcdefghijklmn", "Timestamp": "1700000000000", "Nonce": "nonce-12345", "Body-Sha256": strings.Repeat("a", 64), "Signature": strings.Repeat("b", 64)} {
+		legacy.Set("X-Incudal-"+key, value)
+	}
+	parsed := lib.ReadAgentAuthHeaders(legacy)
+	if parsed == nil || parsed.Nonce != "nonce-12345" {
+		t.Fatal("legacy signed headers rejected")
+	}
+	legacy.Set("X-Incus-Nonce", "modern-partial")
+	if lib.ReadAgentAuthHeaders(legacy) != nil {
+		t.Fatal("mixed protocol headers accepted")
+	}
+}
