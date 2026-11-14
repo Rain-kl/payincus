@@ -13,7 +13,6 @@ import { useThemeStore } from '@/stores/theme'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import { useToast } from '@/stores/toast'
 import { useConfigStore } from '@/stores/config'
-import InstanceGpuInfo from '@/components/instance/InstanceGpuInfo.vue'
 import InstanceInfoTab from '@/components/instance/InstanceInfoTab.vue'
 import InstanceNetworkTab from '@/components/instance/InstanceNetworkTab.vue'
 import InstanceQuotaTab from '@/components/instance/InstanceQuotaTab.vue'
@@ -53,6 +52,7 @@ import {
   Clock,
   Copy,
   Edit2,
+  Gift,
   HelpCircle,
   Info,
   Loader2,
@@ -2227,11 +2227,11 @@ function requestReassignIpv6(): void {
 async function togglePasswordVisibility(instanceId: number): Promise<void> {
   const isCurrentlyVisible = showPassword.value[instanceId]
 
-  if (!isCurrentlyVisible && !instancePassword.value[instanceId]) {
+  if (!isCurrentlyVisible && instancePassword.value[instanceId] === undefined) {
     // 如果密码未加载，先加载密码
     try {
       const response = await api.instances.getPassword(instanceId)
-      instancePassword.value[instanceId] = (response as { rootPassword?: string | null }).rootPassword || null
+      instancePassword.value[instanceId] = (response as { rootPassword?: string | null }).rootPassword ?? null
     } catch (error: any) {
       toast.error(`${t('instance.detail.password.loadFailed')}: ${translateError(error)}`)
       return
@@ -2239,6 +2239,25 @@ async function togglePasswordVisibility(instanceId: number): Promise<void> {
   }
 
   showPassword.value[instanceId] = !showPassword.value[instanceId]
+}
+
+async function copyInstancePassword(instanceId: number): Promise<void> {
+  if (instancePassword.value[instanceId] === undefined) {
+    try {
+      const response = await api.instances.getPassword(instanceId)
+      instancePassword.value[instanceId] = (response as { rootPassword?: string | null }).rootPassword ?? null
+    } catch (error: any) {
+      toast.error(`${t('instance.detail.password.loadFailed')}: ${translateError(error)}`)
+      return
+    }
+  }
+
+  const pwd = instancePassword.value[instanceId]
+  if (!pwd) {
+    toast.error(t('instance.detail.password.loadFailed'))
+    return
+  }
+  await copyToClipboard(pwd, 'password')
 }
 
 // 计算剩余天数（向上取整，与后端保持一致）
@@ -2575,6 +2594,19 @@ function formatShortDate(dateStr: string | null | undefined): string {
                     <span class="truncate">{{ $t('instance.detail.actions.syncStatus') }}</span>
                   </button>
 
+                  <!-- 兑换资源 -->
+                  <button
+                    v-if="!isAdminEntry && (instance as any).enableResourcePool === true"
+                    type="button"
+                    :disabled="isOperationDisabled"
+                    class="kawaii-menu-item w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-xl text-[var(--text-primary)] hover:bg-[var(--bg-surface-soft)] transition-colors cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('instance.detail.info.redeemTitle')"
+                    @click="openRedeemModal(); closeActionMenu()"
+                  >
+                    <Gift class="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
+                    <span class="truncate">{{ $t('instance.detail.info.redeem') }}</span>
+                  </button>
+
                   <!-- 移转 -->
                   <button
                     v-if="!isAdminEntry && canTransfer && !showPaidSubscriptionCard"
@@ -2852,12 +2884,19 @@ function formatShortDate(dateStr: string | null | undefined): string {
             <!-- Paid Subscription Card (only for paid instances) -->
             <Card
               v-if="showPaidSubscriptionCard"
-              padding="md"
+              padding="sm"
             >
-              <div class="flex flex-col gap-5">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="flex flex-col gap-3">
+                <!-- Header: Plan + Badges on left, Price + Promo on right -->
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)] truncate">
+                        {{ (instance as any).planName }}
+                      </h3>
+                      <span v-if="(instance as any).packageName" class="text-xs text-[var(--text-secondary)] truncate">
+                        · {{ (instance as any).packageName }}
+                      </span>
                       <Badge variant="default" size="sm">
                         {{ $t('instance.subscription.premium') }}
                       </Badge>
@@ -2874,144 +2913,130 @@ function formatShortDate(dateStr: string | null | undefined): string {
                         {{ subscriptionAutoRenewEnabled ? $t('instance.subscription.autoRenewOn') : $t('instance.subscription.autoRenewOff') }}
                       </Badge>
                     </div>
-
-                    <div class="mt-4 min-w-0">
-                      <h3 class="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--text-primary)] truncate">
-                        {{ (instance as any).planName }}
-                      </h3>
-                      <p class="mt-1 text-sm text-[var(--text-secondary)] truncate">
-                        {{ (instance as any).packageName }}
-                      </p>
-                    </div>
                   </div>
 
-                  <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 lg:min-w-[220px]">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="min-w-0">
-                        <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
-                          {{ configStore.freeSiteMode ? freeSiteCopy.renewPrice : $t('instance.subscription.renewPrice') }}
-                        </div>
-                        <div class="mt-1.5 flex items-end gap-1.5">
-                          <span class="text-3xl font-semibold leading-none tracking-tight tabular-nums text-[var(--text-primary)]">
-                            <span class="align-[0.14em] text-[0.62em] font-medium text-[var(--text-tertiary)]">¥</span>{{ getRenewPrice(instance).toFixed(2) }}
-                          </span>
-                          <span class="pb-0.5 text-xs text-[var(--text-tertiary)]">
-                            {{ getBillingCycleShort((instance as any).billingCycle) }}
-                          </span>
-                        </div>
-                        <div v-if="hasAffDiscount(instance) && getOriginalRenewPrice(instance) > getRenewPrice(instance)" class="mt-1 text-xs text-[var(--text-tertiary)]">
-                          <span class="line-through">¥{{ getOriginalRenewPrice(instance).toFixed(2) }}</span>
-                        </div>
-                      </div>
+                  <div class="flex items-center gap-2.5 shrink-0">
+                    <div class="flex items-baseline gap-1">
+                      <span class="text-xs text-[var(--text-tertiary)] mr-0.5">
+                        {{ configStore.freeSiteMode ? freeSiteCopy.renewPrice : $t('instance.subscription.renewPrice') }}
+                      </span>
+                      <span class="text-xl font-semibold leading-none tracking-tight tabular-nums text-[var(--text-primary)]">
+                        <span class="text-xs font-medium text-[var(--text-tertiary)]">¥</span>{{ getRenewPrice(instance).toFixed(2) }}
+                      </span>
+                      <span class="text-xs text-[var(--text-tertiary)]">
+                        {{ getBillingCycleShort((instance as any).billingCycle) }}
+                      </span>
+                      <span v-if="hasAffDiscount(instance) && getOriginalRenewPrice(instance) > getRenewPrice(instance)" class="text-xs line-through text-[var(--text-tertiary)] ml-1">
+                        ¥{{ getOriginalRenewPrice(instance).toFixed(2) }}
+                      </span>
+                    </div>
 
-                      <Badge
-                        v-if="hasAffDiscount(instance)"
-                        variant="success"
-                        size="sm"
-                      >
-                        {{ getAffDiscountText(instance) }}
-                      </Badge>
-                      <Button
-                        v-else-if="canApplyAffCode(instance)"
-                        variant="secondary"
-                        size="sm"
-                        @click="showApplyAffModal = true"
-                      >
-                        {{ $t('instance.subscription.applyAffShort') }}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
-                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
-                      {{ $t('instance.subscription.expiresAt') }}
-                    </div>
-                    <div class="mt-1.5 text-sm font-semibold tabular-nums text-[var(--text-primary)]">
-                      {{ formatShortDate(instance.expires_at) }}
-                    </div>
-                  </div>
-
-                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
-                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
-                      {{ $t('instance.subscription.expiresIn') }}
-                    </div>
-                    <div class="mt-1.5 text-sm font-semibold tabular-nums" :class="subscriptionRemainingDisplay.className">
-                      {{ subscriptionRemainingDisplay.text }}
-                    </div>
-                  </div>
-
-                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
-                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
-                      {{ configStore.freeSiteMode ? freeSiteCopy.billingCycle : $t('instance.subscription.billingCycle') }}
-                    </div>
-                    <div class="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
-                      {{ getBillingCycleText((instance as any).billingCycle) }}
-                    </div>
-                  </div>
-
-                  <div class="min-h-[84px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 flex flex-col justify-between">
-                    <div class="text-xs uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
-                      {{ $t('instance.subscription.autoRenew') }}
-                    </div>
-                    <div
-                      class="mt-1.5 text-sm font-semibold"
-                      :class="subscriptionAutoRenewEnabled ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'"
+                    <Badge
+                      v-if="hasAffDiscount(instance)"
+                      variant="success"
+                      size="sm"
                     >
-                      {{ subscriptionAutoRenewEnabled ? $t('instance.subscription.autoRenewEnabled') : $t('instance.subscription.autoRenewDisabled') }}
-                    </div>
+                      {{ getAffDiscountText(instance) }}
+                    </Badge>
+                    <Button
+                      v-else-if="canApplyAffCode(instance)"
+                      variant="secondary"
+                      size="sm"
+                      @click="showApplyAffModal = true"
+                    >
+                      {{ $t('instance.subscription.applyAffShort') }}
+                    </Button>
                   </div>
                 </div>
 
-                <div
-                  v-if="!isHostOwnerOnly"
-                  class="border-t border-[var(--border-color)] pt-4"
-                >
-                  <div class="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
-                        :disabled="isOperationDisabled"
-                        @click="showRenewModal = true"
-                      >
-                        {{ $t('instance.subscription.renew') }}
-                      </Button>
-
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
-                        :disabled="isOperationDisabled"
-                        @click="showAutoRenewModal = true"
-                      >
-                        {{ $t('instance.subscription.autoRenew') }}
-                      </Button>
-
-                      <Button
-                        v-if="instance.package_id && (instance as any).planId"
-                        variant="secondary"
-                        size="sm"
-                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
-                        :disabled="isOperationDisabled"
-                        @click="showChangePlanModal = true"
-                      >
-                        {{ $t('billing.changePlan') }}
-                      </Button>
-
-                      <Button
-                        v-if="!isAdminEntry && canTransfer"
-                        variant="secondary"
-                        size="sm"
-                        class="w-full justify-center sm:w-auto sm:min-w-[110px]"
-                        :disabled="isOperationDisabled"
-                        @click="handleTransferBtnClick"
-                      >
-                        {{ $t('transfer.actions.transfer') }}
-                      </Button>
+                <!-- Compact 4-column Metadata Strip + Actions -->
+                <div class="flex flex-col gap-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4 flex-1">
+                    <div>
+                      <div class="text-[11px] font-medium text-[var(--text-tertiary)]">
+                        {{ $t('instance.subscription.expiresAt') }}
+                      </div>
+                      <div class="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                        {{ formatShortDate(instance.expires_at) }}
+                      </div>
                     </div>
+
+                    <div>
+                      <div class="text-[11px] font-medium text-[var(--text-tertiary)]">
+                        {{ $t('instance.subscription.expiresIn') }}
+                      </div>
+                      <div class="text-sm font-semibold tabular-nums" :class="subscriptionRemainingDisplay.className">
+                        {{ subscriptionRemainingDisplay.text }}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="text-[11px] font-medium text-[var(--text-tertiary)]">
+                        {{ configStore.freeSiteMode ? freeSiteCopy.billingCycle : $t('instance.subscription.billingCycle') }}
+                      </div>
+                      <div class="text-sm font-semibold text-[var(--text-primary)]">
+                        {{ getBillingCycleText((instance as any).billingCycle) }}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="text-[11px] font-medium text-[var(--text-tertiary)]">
+                        {{ $t('instance.subscription.autoRenew') }}
+                      </div>
+                      <div
+                        class="text-sm font-semibold"
+                        :class="subscriptionAutoRenewEnabled ? 'text-[var(--success)]' : 'text-[var(--text-secondary)]'"
+                      >
+                        {{ subscriptionAutoRenewEnabled ? $t('instance.subscription.autoRenewEnabled') : $t('instance.subscription.autoRenewDisabled') }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="!isHostOwnerOnly"
+                    class="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border-color)] sm:flex sm:flex-wrap lg:pt-0 lg:border-t-0 lg:pl-4 lg:border-l lg:shrink-0"
+                  >
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="w-full justify-center sm:w-auto"
+                      :disabled="isOperationDisabled"
+                      @click="showRenewModal = true"
+                    >
+                      {{ $t('instance.subscription.renew') }}
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="w-full justify-center sm:w-auto"
+                      :disabled="isOperationDisabled"
+                      @click="showAutoRenewModal = true"
+                    >
+                      {{ $t('instance.subscription.autoRenew') }}
+                    </Button>
+
+                    <Button
+                      v-if="instance.package_id && (instance as any).planId"
+                      variant="secondary"
+                      size="sm"
+                      class="w-full justify-center sm:w-auto"
+                      :disabled="isOperationDisabled"
+                      @click="showChangePlanModal = true"
+                    >
+                      {{ $t('billing.changePlan') }}
+                    </Button>
+
+                    <Button
+                      v-if="!isAdminEntry && canTransfer"
+                      variant="secondary"
+                      size="sm"
+                      class="w-full justify-center sm:w-auto"
+                      :disabled="isOperationDisabled"
+                      @click="handleTransferBtnClick"
+                    >
+                      {{ $t('transfer.actions.transfer') }}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -3026,19 +3051,20 @@ function formatShortDate(dateStr: string | null | undefined): string {
               :traffic-loading="trafficLoading"
               :show-password="showPassword"
               :instance-password="instancePassword"
-              :can-edit-config="instance.isHostOwner === true"
+              :can-edit-config="isAdminEntry && instance.isHostOwner === true"
               :enable-resource-pool="!isAdminEntry && (instance as any).enableResourcePool === true"
               :copied="copied"
               :reassign-ipv6-loading="reassignIpv6Loading"
               :last-ipv6-reassign-at="(instance as any).last_ipv6_reassign_at"
               :is-instance-owner="!isHostOwnerOnly"
+              :gpu-refresh-key="gpuRefreshKey"
               @toggle-password="togglePasswordVisibility"
+              @copy-password="copyInstancePassword"
               @copy="copyToClipboard"
               @edit-config="openConfigEditModal"
               @redeem="openRedeemModal"
               @reassign-ipv6="requestReassignIpv6"
             />
-            <InstanceGpuInfo :instance-id="instance.id" :refresh-key="gpuRefreshKey" />
           </div>
 
           <!-- Network (Port Mappings + Traffic) Tab -->

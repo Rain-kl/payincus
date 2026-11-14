@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import api from '@/api'
 import { formatCpu, formatMemory, formatDisk, formatDate } from '@/utils/formatters'
-import type { Instance, PortMapping } from '@/types/api'
+import type { Instance, InstanceGpuInfo, PortMapping } from '@/types/api'
 import FlagIcon from '@/components/FlagIcon.vue'
 
 const { t } = useI18n()
@@ -39,10 +40,12 @@ interface Props {
   reassignIpv6Loading?: boolean
   lastIpv6ReassignAt?: string | null
   isInstanceOwner?: boolean
+  gpuRefreshKey?: number
 }
 
 interface Emits {
   (e: 'toggle-password', instanceId: number): void
+  (e: 'copy-password', instanceId: number): void
   (e: 'copy', text: string, key?: string): void
   (e: 'edit-config'): void
   (e: 'redeem'): void
@@ -51,6 +54,33 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+const gpuInfo = ref<InstanceGpuInfo | null>(null)
+let gpuGeneration = 0
+watch(() => [props.instance.id, props.gpuRefreshKey] as const, async ([id]) => {
+  const current = ++gpuGeneration
+  gpuInfo.value = null
+  try {
+    const data = await api.instances.getGpu(id)
+    if (current === gpuGeneration) gpuInfo.value = data.gpu
+  } catch {
+    if (current === gpuGeneration) gpuInfo.value = null
+  }
+}, { immediate: true })
+
+const gpuSummary = computed<string | null>(() => {
+  const g = gpuInfo.value
+  if (!g) return null
+  const devices = g.devices && g.devices.length > 0
+    ? g.devices
+    : [{ name: g.name, memoryTotalMiB: g.memoryTotalMiB, count: g.count || 1 }]
+  return devices.map((d) => {
+    const gib = d.memoryTotalMiB ? `${Number((d.memoryTotalMiB / 1024).toFixed(1))} GiB` : ''
+    const count = d.count || g.count || 1
+    const countStr = count > 1 ? ` ×${count}` : ''
+    return [d.name, gib].filter(Boolean).join(' ') + countStr
+  }).join(' / ')
+})
 
 const isRunning = computed<boolean>(() => {
   const s = props.instance?.status?.toLowerCase()
@@ -480,20 +510,28 @@ const canReassignIpv6 = computed(() => {
               <span
                 :id="'pwd-' + instance.id"
                 class="font-mono"
-              >{{ showPassword[instance.id] && instancePassword?.[instance.id] ? instancePassword[instance.id] : '••••••••' }}</span>
+              >{{ showPassword[instance.id] ? (instancePassword?.[instance.id] || '-') : '••••••••' }}</span>
               <button
-                class="text-xs text-themed-muted hover:text-themed transition-colors"
+                type="button"
+                class="text-xs text-themed-muted hover:text-themed transition-colors focus:outline-none"
                 @click="emit('toggle-password', instance.id)"
               >
                 {{ showPassword[instance.id] ? t('instance.detail.info.hide') : t('instance.detail.info.show') }}
               </button>
               <button
-                v-if="showPassword[instance.id] && instancePassword?.[instance.id]"
-                class="text-xs text-themed-muted hover:text-themed transition-colors"
-                @click="emit('copy', instancePassword[instance.id] || '')"
+                type="button"
+                class="text-xs text-themed-muted hover:text-themed transition-colors focus:outline-none"
+                @click="emit('copy-password', instance.id)"
               >
-                {{ t('instance.detail.info.copy') }}
+                {{ copied === 'password' ? t('common.copied') : t('instance.detail.info.copy') }}
               </button>
+            </dd>
+          </div>
+
+          <div v-if="gpuSummary" class="flex justify-between items-center gap-3">
+            <dt class="text-themed-muted shrink-0">{{ t('gpu.specLabel') }}</dt>
+            <dd class="text-themed font-medium text-right">
+              {{ gpuSummary }}
             </dd>
           </div>
 
@@ -538,20 +576,9 @@ const canReassignIpv6 = computed(() => {
           </h2>
           <div class="flex items-center gap-2">
             <button
-              v-if="props.enableResourcePool"
+              v-if="canEditConfig"
               class="btn btn-secondary btn-sm"
-              @click="emit('redeem')"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-              </svg>
-              <span>{{ t('instance.detail.info.redeem') }}</span>
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              :disabled="!canEditConfig"
-              :title="canEditConfig ? '' : t('instance.detail.info.cannotEditConfig')"
-              @click="canEditConfig && emit('edit-config')"
+              @click="emit('edit-config')"
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
