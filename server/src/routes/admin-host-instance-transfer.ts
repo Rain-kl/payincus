@@ -45,6 +45,55 @@ function getNodeProgressStageKey(progress: string): string {
     .trim()
 }
 
+async function resolveHostImportStoragePool(
+  hostId: number,
+  client: Awaited<ReturnType<typeof getIncusClient>>,
+  requestedPool?: string
+): Promise<{ pool?: string; error?: { code: number; message: string } }> {
+  const explicit = requestedPool?.trim() || ''
+  const [incusPools, defaultProfile] = await Promise.all([
+    client.request<Array<{ name?: string }>>('GET', '/1.0/storage-pools?recursion=1').catch(() => null),
+    explicit
+      ? Promise.resolve(null)
+      : client.request<{ devices?: Record<string, Record<string, string>> }>('GET', '/1.0/profiles/default').catch(() => null)
+  ])
+  const nodePools = Array.isArray(incusPools)
+    ? incusPools.map(p => (typeof p?.name === 'string' ? p.name.trim() : '')).filter(Boolean)
+    : []
+
+  if (explicit) {
+    if (Array.isArray(incusPools) && !nodePools.includes(explicit)) {
+      return { error: { code: 400, message: `目标存储池 "${explicit}" 在该宿主机上不存在` } }
+    }
+    return { pool: explicit }
+  }
+
+  const devices = Object.values(defaultProfile?.devices || {})
+  const hasDefaultRoot = devices.some(dev => dev?.type === 'disk' && dev?.path === '/')
+  if (hasDefaultRoot) return {}
+
+  const dbPools = await prisma.storagePool.findMany({
+    where: { hostId },
+    select: { name: true, purpose: true },
+    orderBy: [{ purpose: 'asc' }, { createdAt: 'asc' }]
+  }).catch(() => [])
+  const availableOnNode = (name: string) => !Array.isArray(incusPools) || nodePools.includes(name)
+  const candidates = [
+    dbPools.find(p => p.purpose === 'instance_data' && p.name === 'default' && availableOnNode(p.name))?.name,
+    dbPools.find(p => p.purpose === 'instance_data' && availableOnNode(p.name))?.name,
+    dbPools.find(p => availableOnNode(p.name))?.name,
+    nodePools.includes('default') ? 'default' : undefined,
+    nodePools[0]
+  ]
+  const resolved = candidates.find((name): name is string => Boolean(name))
+  if (resolved) return { pool: resolved }
+
+  if (Array.isArray(incusPools) && nodePools.length === 0) {
+    return { error: { code: 409, message: '宿主机尚未配置可用存储池，且默认配置无根磁盘设备，请先在「存储」标签页创建存储池' } }
+  }
+  return {}
+}
+
 function formatNodeBackupError(task: NodeBackupTask): string | null {
   const itemErr = task.items?.find(i => i.error)?.error
   if (itemErr && task.error && !task.error.includes(itemErr)) return `${task.error}: ${itemErr}`
@@ -56,9 +105,10 @@ async function trackNodeTransferTask(params: {
   instanceName: string
   kind: 'instance_export' | 'instance_import'
   targetPath: string
+  storagePool?: string
   task: NodeBackupTask
 }) {
-  const { hostId, instanceName, kind, targetPath, task } = params
+  const { hostId, instanceName, kind, targetPath, storagePool, task } = params
   const actionLabel = kind === 'instance_export' ? '导出' : '导入'
   const initialStatus = task.status === 'running' ? 'running' : task.status === 'success' ? 'success' : 'failed'
   const opTask = await prisma.operationTask.create({
@@ -73,12 +123,13 @@ async function trackNodeTransferTask(params: {
   }).catch(() => null)
   if (!opTask) return null
 
+  const poolDetail = storagePool ? `，目标存储池 ${storagePool}` : ''
   await prisma.operationTaskLog.create({
     data: {
       taskId: opTask.id,
       source: 'server',
       level: initialStatus === 'failed' ? 'error' : 'info',
-      message: `开始${actionLabel}实例 ${instanceName}（节点任务 ${task.id}，路径 ${targetPath}）`
+      message: `开始${actionLabel}实例 ${instanceName}（节点任务 ${task.id}，路径 ${targetPath}${poolDetail}）`
     }
   }).catch(() => {})
 
@@ -410,12 +461,17 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         if ('error' in res && res.error) return reply.code(res.error.code).send({ error: res.error.message })
         if (!res.supported) return reply.code(409).send({ error: '节点程序版本暂不支持实例导入，请先升级节点程序包' })
 
+        const poolResolution = await resolveHostImportStoragePool(hostId, res.client, req.body.storagePool)
+        if (poolResolution.error) {
+          return reply.code(poolResolution.error.code).send({ error: poolResolution.error.message })
+        }
+
         const payload: Record<string, string> = {
           id: req.body.id || generateTaskId(),
           filePath: req.body.filePath.trim()
         }
         if (req.body.name?.trim()) payload.name = req.body.name.trim()
-        if (req.body.storagePool?.trim()) payload.storagePool = req.body.storagePool.trim()
+        if (poolResolution.pool) payload.storagePool = poolResolution.pool
 
         const task = await res.client.request<NodeBackupTask>('POST', IMPORT_ENDPOINT, payload)
         const operationTaskId = await trackNodeTransferTask({
@@ -423,6 +479,7 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
           instanceName: payload.name || payload.filePath,
           kind: 'instance_import',
           targetPath: payload.filePath,
+          storagePool: payload.storagePool,
           task
         })
         await prisma.log.create({

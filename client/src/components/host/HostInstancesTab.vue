@@ -1352,8 +1352,46 @@ const showImportModal = ref(false)
 const importFilePath = ref('')
 const importNewName = ref('')
 const importStoragePool = ref('')
+const importPools = ref<Array<{ name: string; driver: string; purpose?: 'instance_data' | 'instance_storage' | null }>>([])
+const importPoolsLoading = ref(false)
 const importSubmitting = ref(false)
 const importCreatedTask = ref<CreatedTransferTaskView | null>(null)
+
+const importPoolOptions = computed(() => {
+  if (!importPools.value.length) return []
+  return [
+    { value: '', label: t('admin.hosts.importStoragePoolPlaceholder') },
+    ...importPools.value.map(pool => ({
+      value: pool.name,
+      label: `${pool.name} (${pool.driver})`
+    }))
+  ]
+})
+
+async function loadImportPools(hostId: number) {
+  importPoolsLoading.value = true
+  try {
+    const res = await api.hosts.getStoragePools(hostId)
+    if (props.hostId !== hostId) return
+    const pools = (res.pools || []).slice().sort((a, b) => {
+      const aData = a.purpose === 'instance_storage' ? 1 : 0
+      const bData = b.purpose === 'instance_storage' ? 1 : 0
+      if (aData !== bData) return aData - bData
+      if (a.name === 'default' && b.name !== 'default') return -1
+      if (b.name === 'default' && a.name !== 'default') return 1
+      return a.name.localeCompare(b.name)
+    })
+    importPools.value = pools
+    if (!importStoragePool.value) {
+      const preferred = pools.find(p => p.purpose !== 'instance_storage') || pools[0]
+      if (preferred) importStoragePool.value = preferred.name
+    }
+  } catch {
+    importPools.value = []
+  } finally {
+    importPoolsLoading.value = false
+  }
+}
 
 function openImportModal() {
   importFilePath.value = ''
@@ -1361,6 +1399,7 @@ function openImportModal() {
   importStoragePool.value = ''
   importCreatedTask.value = null
   showImportModal.value = true
+  void loadImportPools(props.hostId)
 }
 
 async function submitImport() {
@@ -2273,9 +2312,16 @@ async function submitAssign() {
                 <label class="block text-sm font-medium text-[var(--text-primary)]">
                   {{ t('admin.hosts.importStoragePool') }}
                 </label>
-                <Input
+                <Select
+                  v-if="importPoolOptions.length > 0"
                   v-model="importStoragePool"
-                  :disabled="importSubmitting"
+                  :options="importPoolOptions"
+                  :disabled="importSubmitting || importPoolsLoading"
+                />
+                <Input
+                  v-else
+                  v-model="importStoragePool"
+                  :disabled="importSubmitting || importPoolsLoading"
                   :placeholder="t('admin.hosts.importStoragePoolPlaceholder')"
                 />
               </div>
