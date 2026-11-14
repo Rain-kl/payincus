@@ -11,6 +11,7 @@ import { useToast } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
 import { useReveal } from '@/composables/useReveal'
 import { hostCreatePath, hostDetailPath, isAdminEntry } from '@/utils/app-paths'
+import { formatCpu } from '@/utils/formatters'
 import MyHostCreateView from './MyHostCreateView.vue'
 import HostDiagnosticModal from '@/components/host/HostDiagnosticModal.vue'
 import type { HostDiagnosticResult } from '@/types/api'
@@ -411,7 +412,7 @@ void getStatusClass
           <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2">
               <div class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('admin.hosts.cpu') }}</div>
-              <div class="mt-1 font-mono font-semibold tabular-nums text-[var(--text-primary)]">{{ host.cpuAllowanceMax || 0 }}%</div>
+              <div class="mt-1 font-mono font-semibold tabular-nums text-[var(--text-primary)]">{{ formatCpu(host.cpuAllowanceMax) }}</div>
             </div>
             <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2">
               <div class="text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ t('admin.hosts.memory') }}</div>
@@ -474,7 +475,7 @@ void getStatusClass
               </td>
               <td class="px-4 py-3.5 text-[var(--text-secondary)] whitespace-nowrap">
                 <div class="font-mono text-xs tabular-nums">
-                  {{ t('admin.hosts.cpu') }}: <span class="text-[var(--text-primary)] font-medium">{{ host.cpuAllowanceMax || 0 }}%</span>
+                  {{ t('admin.hosts.cpu') }}: <span class="text-[var(--text-primary)] font-medium">{{ formatCpu(host.cpuAllowanceMax) }}</span>
                 </div>
                 <div class="font-mono text-xs tabular-nums">
                   {{ t('admin.hosts.memory') }}: <span class="text-[var(--text-primary)] font-medium">{{ formatMemory(host.memoryMax || 0) }}</span>

@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { translateError } from '@/utils/errorHandler'
 import type { Package, Host } from '@/types/api'
 import { instanceCreatePath, isAdminEntry } from '@/utils/app-paths'
+import { formatCpu } from '@/utils/formatters'
 import PackageFormView from './PackageFormView.vue'
 import {
   Badge,
@@ -999,7 +1000,7 @@ function getBillingCycleLabel(months: number): string {
                     </Badge>
                   </div>
                   <p v-if="plansPackage" class="text-xs text-[var(--text-secondary)] mt-0.5">
-                    {{ plansPackage.name }} · {{ plansPackage.cpu_max }}% CPU · {{ formatMemory(plansPackage.memory_max) }}
+                    {{ plansPackage.name }} · {{ formatCpu(plansPackage.cpu_max) }} CPU · {{ formatMemory(plansPackage.memory_max) }}
                   </p>
                 </div>
               </div>
@@ -1049,7 +1050,7 @@ function getBillingCycleLabel(months: number): string {
                       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                         <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
                           <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('admin.packages.cpu') }}</span>
-                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ plan.cpu }}%</span>
+                          <span class="font-mono font-medium text-[var(--text-primary)] mt-0.5 block">{{ formatCpu(plan.cpu) }}</span>
                         </div>
                         <div class="rounded-xl bg-[var(--bg-surface-soft)] p-2 border border-[var(--border-color)]">
                           <span class="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] block">{{ t('admin.packages.memory') }}</span>

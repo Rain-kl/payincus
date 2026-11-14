@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import type { Instance, Package, UserQuota } from '@/types/api'
+import { formatCpu } from '@/utils/formatters'
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
@@ -296,7 +297,7 @@ function handleClose() {
                       {{ t('instance.configEdit.cpu') }}
                     </td>
                     <td class="py-4 px-4 text-sm" :class="themeStore.isDark ? 'text-gray-400' : 'text-gray-600'">
-                      {{ instance?.cpu || 0 }}%
+                      {{ formatCpu(instance?.cpu) }}
                     </td>
                     <td class="py-4 px-4">
                       <div class="flex items-center gap-2">

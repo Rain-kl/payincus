@@ -1875,7 +1875,7 @@ async function confirmBatchDestroy(): Promise<void> {
               <div class="p-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
                 <div class="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">CPU</div>
                 <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
-                  {{ formatCpuCores(instance.cpu) }} {{ $t('instance.mobileCard.cpuCore') }}
+                  {{ formatCpuCores(instance.cpu) }}{{ $t('instance.mobileCard.cpuCore') }}
                 </div>
               </div>
               <div class="p-2 rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
@@ -2114,7 +2114,7 @@ async function confirmBatchDestroy(): Promise<void> {
               <div class="p-1.5 rounded-lg bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
                 <div class="text-[9px] uppercase font-semibold tracking-wider text-[var(--text-tertiary)]">CPU</div>
                 <div class="mt-0.5 text-xs font-mono font-semibold text-[var(--text-primary)] tabular-nums">
-                  {{ formatCpuCores(instance.cpu) }} {{ $t('instance.mobileCard.cpuCore') }}
+                  {{ formatCpuCores(instance.cpu) }}{{ $t('instance.mobileCard.cpuCore') }}
                 </div>
               </div>
               <div class="p-1.5 rounded-lg bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">

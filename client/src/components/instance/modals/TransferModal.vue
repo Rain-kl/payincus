@@ -5,6 +5,7 @@ import api from '@/api'
 import { useToast } from '@/stores/toast'
 import { useConfigStore } from '@/stores/config'
 import { translateError } from '@/utils/errorHandler'
+import { formatCpu } from '@/utils/formatters'
 
 const props = defineProps<{
   show: boolean
@@ -176,7 +177,7 @@ function formatDisk(mb: number) {
             <div class="p-3 rounded-lg border border-themed bg-themed-secondary">
               <div class="font-medium">{{ instance.name }}</div>
               <div class="text-sm text-themed-muted mt-1">
-                {{ instance.cpu }}% CPU · {{ formatMemory(instance.memory) }} · {{ formatDisk(instance.disk) }}
+                {{ formatCpu(instance.cpu) }} CPU · {{ formatMemory(instance.memory) }} · {{ formatDisk(instance.disk) }}
               </div>
             </div>
 

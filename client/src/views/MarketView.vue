@@ -20,6 +20,7 @@ import {
 } from '@/utils/publicCatalog'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 import { instanceCreatePath, loginPath } from '@/utils/app-paths'
+import { formatCpu } from '@/utils/formatters'
 import { useReveal } from '@/composables/useReveal'
 import {
   Badge,
@@ -896,7 +897,7 @@ onUnmounted(() => {
 
                       <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px] font-mono tabular-nums">
                         <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">
-                          CPU {{ plan.cpu }}%
+                          CPU {{ formatCpu(plan.cpu) }}
                         </span>
                         <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">
                           {{ formatMemory(plan.memory) }}
@@ -949,7 +950,7 @@ onUnmounted(() => {
               </div>
 
               <div class="mt-3 flex flex-wrap gap-1.5 font-mono text-[11px] tabular-nums">
-                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">CPU {{ selectedPlan.cpu }}%</span>
+                <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">CPU {{ formatCpu(selectedPlan.cpu) }}</span>
                 <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ formatMemory(selectedPlan.memory) }}</span>
                 <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ formatDisk(selectedPlan.disk) }}</span>
                 <span class="rounded-md border border-[var(--border-color)] bg-[var(--bg-surface)] px-2 py-0.5 text-[var(--text-secondary)]">{{ formatTraffic(selectedPlan.trafficLimit) }}</span>

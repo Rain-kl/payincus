@@ -19,6 +19,7 @@ import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import FlagIcon from '@/components/FlagIcon.vue'
 import { useToast } from '@/stores/toast'
+import { formatCpu } from '@/utils/formatters'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -858,7 +859,7 @@ function getNetworkModeText(mode: string | null | undefined) {
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-sm">
           <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
             <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">CPU</div>
-            <div class="font-mono font-semibold text-[var(--text-primary)]">{{ selectedTransfer.snapshot?.cpu ?? '-' }}%</div>
+            <div class="font-mono font-semibold text-[var(--text-primary)]">{{ selectedTransfer.snapshot?.cpu != null ? formatCpu(selectedTransfer.snapshot.cpu) : '-' }}</div>
           </div>
           <div class="rounded-xl bg-[var(--bg-surface-soft)] p-3 border border-[var(--border-color)]">
             <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">{{ $t('instance.detail.info.memory') }}</div>

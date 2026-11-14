@@ -3,6 +3,15 @@
  */
 
 /**
+ * 格式化 CPU 配额 (以 C 为单位，1C = 1 核；100% -> 1C、150% -> 1.5C)
+ */
+export function formatCpu(cpu: number | null | undefined): string {
+    if (!cpu) return '0C'
+    const cores = cpu / 100
+    return cores % 1 === 0 ? `${cores}C` : `${cores.toFixed(1)}C`
+}
+
+/**
  * 格式化内存大小 (MB -> 可读格式，1024进制)
  */
 export function formatMemory(mb: number | null | undefined): string {

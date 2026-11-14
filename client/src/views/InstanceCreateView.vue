@@ -1623,6 +1623,7 @@ async function handleSubmit(): Promise<void> {
 
                   <GpuSpecification
                     v-if="selectedPlan.gpuShared ?? selectedPackage?.gpu_shared"
+                    variant="card"
                     class="col-span-2"
                     :configurations="selectedPlan.gpuConfigurations"
                     :host-id="form.hostId"

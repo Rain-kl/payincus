@@ -8,6 +8,7 @@ import type { ChangePlanPreview } from '@/types/api'
 import { calculateDailyPrice } from '@/utils/billing'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel } from '@/utils/freeSiteFun'
 import { walletPath } from '@/utils/app-paths'
+import { formatCpu } from '@/utils/formatters'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -396,7 +397,7 @@ function handleClose() {
                       <div>
                         <div class="font-medium text-themed">{{ plan.name }}</div>
                         <div class="text-xs mt-1 text-themed-muted">
-                          {{ plan.cpu }}% CPU · {{ formatMemory(plan.memory) }} · {{ formatDisk(plan.disk) }}
+                          {{ formatCpu(plan.cpu) }} CPU · {{ formatMemory(plan.memory) }} · {{ formatDisk(plan.disk) }}
                         </div>
                         <div
                           v-if="props.instanceType !== 'vm' && plan.swapSize > 0"
@@ -508,7 +509,7 @@ function handleClose() {
                 <!-- 新配置 -->
                 <div class="mt-3 pt-3 border-t border-themed text-xs text-themed-muted">
                   {{ t('billing.newConfig') }}:
-                  {{ preview.newConfig.cpu }}% CPU ·
+                  {{ formatCpu(preview.newConfig.cpu) }} CPU ·
                   {{ formatMemory(preview.newConfig.memory) }} ·
                   {{ formatDisk(preview.newConfig.disk) }}
                 </div>

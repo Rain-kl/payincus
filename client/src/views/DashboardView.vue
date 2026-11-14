@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import api, { type VipLevelProgress, type VipProgressCondition, type VipProgressMetric } from '@/api'
 import Skeleton from '@/components/Skeleton.vue'
-import { formatMemory, formatDisk, getStatusInfo } from '@/utils/formatters'
+import { formatCpu, formatMemory, formatDisk, getStatusInfo } from '@/utils/formatters'
 import type { Instance, UserBalance } from '@/types/api'
 import DistroIcon from '@/components/icons/DistroIcon.vue'
 import FlagIcon from '@/components/FlagIcon.vue'
@@ -843,7 +843,7 @@ const greetingText = computed(() => t('dashboard.greeting.full', {
               <div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--text-secondary)]">
                 <span class="font-mono truncate max-w-[14rem] sm:max-w-[20rem]">{{ formatImageName(instance.image, (instance as any).imageName) }}</span>
                 <span class="text-[var(--text-tertiary)]">•</span>
-                <span class="font-mono text-[var(--text-primary)]">CPU {{ instance.cpu }}%</span>
+                <span class="font-mono text-[var(--text-primary)]">CPU {{ formatCpu(instance.cpu) }}</span>
                 <span class="text-[var(--text-tertiary)]">•</span>
                 <span class="font-mono text-[var(--text-primary)]">{{ formatMemory(instance.memory) }}</span>
                 <span class="text-[var(--text-tertiary)]">•</span>

@@ -12,12 +12,22 @@ import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 
 import api from '@/api'
-import { hostTransferApi, type ImportStoragePoolOption, type UnassignedHostInstance } from '@/api/host-transfer'
+import {
+  buildPackageBindingPayload,
+  hostTransferApi,
+  PACKAGE_NONE_SENTINEL,
+  type ImportPackageOption,
+  type ImportPackagePreset,
+  type ImportStoragePoolOption,
+  type UnassignedHostInstance
+} from '@/api/host-transfer'
 import { Badge, Button, Card, EmptyState, Input, Pagination, Select } from '@/components/ui'
+import { formatCpu } from '@/utils/formatters'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import BatchConfigModal from '@/components/host/BatchConfigModal.vue'
 import MigrateHostModal from '@/components/host/MigrateHostModal.vue'
 import HostInstancesList from '@/components/host/HostInstancesList.vue'
+import PackageBindingFields from '@/components/host/PackageBindingFields.vue'
 import RecreateModal from '@/components/instance/modals/RecreateModal.vue'
 import type { InstanceConfigResponse } from '@/types/api'
 import { translateError } from '@/utils/errorHandler'
@@ -125,6 +135,8 @@ interface Instance {
     percentage: number
   } | null
   // 付费实例标识
+  packageId?: number | null
+  packageName?: string | null
   packagePlanId?: number | null
   // 实例类型：容器或虚拟机
   instanceType?: 'container' | 'vm'
@@ -1046,7 +1058,7 @@ function getTrafficBarClass(instance: Instance): string {
 
 function getSummaryMeta(instance: Instance): string[] {
   const meta = [
-    `CPU ${instance.cpu}%`,
+    `CPU ${formatCpu(instance.cpu)}`,
     formatMemory(instance.memory),
     formatDisk(instance.disk)
   ]
@@ -1284,6 +1296,7 @@ interface CreatedTransferTaskView {
   status: 'running' | 'success'
   path: string
   instanceName?: string
+  packageSummary?: string
 }
 
 function formatTransferError(task: TransferTaskSummary, fallback: string): string {
@@ -1347,16 +1360,119 @@ async function submitExport() {
   }
 }
 
+// 可挂载套餐目录（导入弹窗 / 分配用户弹窗 / 已导入实例补挂弹窗共用）
+const importPackages = ref<ImportPackageOption[]>([])
+const importPackagesLoading = ref(false)
+const importPackagesLoadFailed = ref(false)
+
+async function loadImportPackages(hostId: number) {
+  importPackagesLoading.value = true
+  importPackagesLoadFailed.value = false
+  try {
+    const res = await hostTransferApi.getImportPackages(hostId)
+    if (props.hostId !== hostId) return
+    importPackages.value = res.packages || []
+    // 若通过历史实例打开补挂窗口且仅有 packageName 时按名称匹配回显
+    if (showBindPackageModal.value && bindPackageTarget.value && !bindPackageChoice.value && bindPackageTarget.value.packageName) {
+      const matched = importPackages.value.find(p => p.name === bindPackageTarget.value?.packageName)
+      if (matched) {
+        bindPackageChoice.value = String(matched.id)
+        if (!bindPackageTarget.value.packagePlanId && matched.plans.length > 0) {
+          const defaultPlan = matched.plans.find(p => p.isActive) ?? matched.plans[0]
+          bindPlanChoice.value = defaultPlan ? String(defaultPlan.id) : PACKAGE_NONE_SENTINEL
+        }
+      }
+    }
+  } catch {
+    if (props.hostId !== hostId) return
+    importPackages.value = []
+    importPackagesLoadFailed.value = true
+  } finally {
+    if (props.hostId === hostId) importPackagesLoading.value = false
+  }
+}
+
+function isPackageSelectionReady(packageChoice: string, instanceType?: 'container' | 'vm' | null): boolean {
+  if (importPackagesLoadFailed.value) return true
+  const filtered = instanceType
+    ? importPackages.value.filter(pkg => pkg.instanceType === instanceType)
+    : importPackages.value
+  if (filtered.length === 0) return !importPackagesLoading.value
+  return packageChoice !== ''
+}
+
+function formatPackageSummary(packageChoice: string, planChoice: string): string | null {
+  if (!packageChoice || packageChoice === PACKAGE_NONE_SENTINEL) return null
+  const pkg = importPackages.value.find(p => p.id === Number(packageChoice))
+  if (!pkg) return `#${packageChoice}`
+  if (planChoice && planChoice !== PACKAGE_NONE_SENTINEL) {
+    const plan = pkg.plans.find(p => p.id === Number(planChoice))
+    if (plan) return `${pkg.name} / ${plan.name}`
+  }
+  return pkg.name
+}
+
+function formatPresetBadgeText(preset?: ImportPackagePreset | null): string {
+  if (!preset?.packageId) return ''
+  const base = preset.packageName
+    ? `${preset.packageName}${preset.planName ? ` / ${preset.planName}` : ''}`
+    : `#${preset.packageId}`
+  if (preset.validDays) {
+    return `${base} (${t('admin.hosts.unassignedPresetDays', { days: preset.validDays })})`
+  }
+  return base
+}
+
+type UserCatalogOption = { id: number; username: string; email: string }
+
+async function searchUsersCatalog(
+  searchText: string,
+  targetOptions: { value: UserCatalogOption[] },
+  targetLoading: { value: boolean }
+) {
+  targetLoading.value = true
+  try {
+    const res = await hostTransferApi.searchUsers({
+      search: searchText.trim() || undefined,
+      pageSize: 20
+    })
+    targetOptions.value = (res.users || []).map(u => ({
+      id: u.id,
+      username: u.username,
+      email: u.email
+    }))
+  } catch {
+    targetOptions.value = []
+  } finally {
+    targetLoading.value = false
+  }
+}
+
 // 导入实例弹窗
 const showImportModal = ref(false)
 const importFilePath = ref('')
 const importNewName = ref('')
 const importStoragePool = ref('')
+const importPackageChoice = ref('')
+const importPlanChoice = ref(PACKAGE_NONE_SENTINEL)
+const importValidDays = ref('')
+const importUserSearch = ref('')
+const importUserOptions = ref<UserCatalogOption[]>([])
+const importUserLoading = ref(false)
+const importSelectedUserId = ref<number | null>(null)
 const importPools = ref<ImportStoragePoolOption[]>([])
 const importPoolsLoading = ref(false)
 const importPoolsLoadFailed = ref(false)
 const importSubmitting = ref(false)
 const importCreatedTask = ref<CreatedTransferTaskView | null>(null)
+
+const importCanSubmit = computed(() =>
+  Boolean(importFilePath.value.trim()) && isPackageSelectionReady(importPackageChoice.value)
+)
+
+const importSelectedUser = computed(() =>
+  importUserOptions.value.find(u => u.id === importSelectedUserId.value) ?? null
+)
 
 const importPoolOptions = computed(() => {
   if (importPoolsLoading.value) {
@@ -1398,24 +1514,45 @@ async function loadImportPools(hostId: number) {
   }
 }
 
+async function searchImportUsers() {
+  await searchUsersCatalog(importUserSearch.value, importUserOptions, importUserLoading)
+}
+
 function openImportModal() {
   importFilePath.value = ''
   importNewName.value = ''
   importStoragePool.value = ''
+  importPackageChoice.value = ''
+  importPlanChoice.value = PACKAGE_NONE_SENTINEL
+  importValidDays.value = ''
+  importUserSearch.value = ''
+  importSelectedUserId.value = null
   importCreatedTask.value = null
   showImportModal.value = true
-  void loadImportPools(props.hostId)
+  void Promise.all([
+    loadImportPools(props.hostId),
+    loadImportPackages(props.hostId),
+    searchImportUsers()
+  ])
 }
 
 async function submitImport() {
-  if (!importFilePath.value.trim() || importSubmitting.value) return
+  if (!importCanSubmit.value || importSubmitting.value) return
   importSubmitting.value = true
   importCreatedTask.value = null
   try {
+    const binding = buildPackageBindingPayload(
+      importPackageChoice.value,
+      importPlanChoice.value,
+      importValidDays.value
+    )
+    const pkgSummary = formatPackageSummary(importPackageChoice.value, importPlanChoice.value)
     const task = await hostTransferApi.importInstance(props.hostId, {
       filePath: importFilePath.value.trim(),
       name: importNewName.value.trim() || undefined,
-      storagePool: importStoragePool.value.trim() || undefined
+      storagePool: importStoragePool.value.trim() || undefined,
+      userId: importSelectedUserId.value ?? undefined,
+      ...binding
     })
     const inPath = task.filePath || importFilePath.value.trim()
     if (task.status === 'running' || task.status === 'success') {
@@ -1423,11 +1560,17 @@ async function submitImport() {
         operationTaskId: task.operationTaskId ?? null,
         status: task.status,
         path: inPath,
-        instanceName: task.instance || importNewName.value.trim() || undefined
+        instanceName: task.instance || importNewName.value.trim() || undefined,
+        packageSummary: pkgSummary ?? undefined
       }
       if (task.status === 'success') {
         toast.success(t('admin.hosts.importSuccess', { name: task.instance || importNewName.value || '-' }))
-        void loadUnassignedInstances()
+        await Promise.all([
+          loadUnassignedInstances(),
+          importSelectedUserId.value ? loadInstances() : Promise.resolve()
+        ])
+      } else if (pkgSummary) {
+        toast.success(t('admin.hosts.importSuccessWithPackage', { pkg: pkgSummary }))
       }
     } else {
       toast.error(formatTransferError(task, t('admin.hosts.importFailed')))
@@ -1443,29 +1586,22 @@ async function submitImport() {
 const showAssignModal = ref(false)
 const assignTarget = ref<UnassignedHostInstance | null>(null)
 const assignUserSearch = ref('')
-const assignUserOptions = ref<Array<{ id: number; username: string; email: string }>>([])
+const assignUserOptions = ref<UserCatalogOption[]>([])
 const assignUserLoading = ref(false)
 const assignSelectedUserId = ref<number | null>(null)
 const assignDisplayName = ref('')
+const assignPackageChoice = ref('')
+const assignPlanChoice = ref(PACKAGE_NONE_SENTINEL)
+const assignValidDays = ref('')
 const assignSubmitting = ref(false)
 
+const assignCanSubmit = computed(() =>
+  Boolean(assignSelectedUserId.value) &&
+  isPackageSelectionReady(assignPackageChoice.value, assignTarget.value?.instanceType ?? null)
+)
+
 async function searchAssignUsers() {
-  assignUserLoading.value = true
-  try {
-    const res = await hostTransferApi.searchUsers({
-      search: assignUserSearch.value.trim() || undefined,
-      pageSize: 20
-    })
-    assignUserOptions.value = (res.users || []).map(u => ({
-      id: u.id,
-      username: u.username,
-      email: u.email
-    }))
-  } catch {
-    assignUserOptions.value = []
-  } finally {
-    assignUserLoading.value = false
-  }
+  await searchUsersCatalog(assignUserSearch.value, assignUserOptions, assignUserLoading)
 }
 
 function openAssignModal(item: UnassignedHostInstance) {
@@ -1473,18 +1609,31 @@ function openAssignModal(item: UnassignedHostInstance) {
   assignUserSearch.value = ''
   assignSelectedUserId.value = null
   assignDisplayName.value = item.incusName
+  const preset = item.preset
+  assignPackageChoice.value = preset?.packageId ? String(preset.packageId) : ''
+  assignPlanChoice.value = preset?.planId ? String(preset.planId) : PACKAGE_NONE_SENTINEL
+  assignValidDays.value = preset?.validDays ? String(preset.validDays) : ''
   showAssignModal.value = true
-  void searchAssignUsers()
+  void Promise.all([
+    loadImportPackages(props.hostId),
+    searchAssignUsers()
+  ])
 }
 
 async function submitAssign() {
-  if (!assignTarget.value || !assignSelectedUserId.value || assignSubmitting.value) return
+  if (!assignTarget.value || !assignCanSubmit.value || !assignSelectedUserId.value || assignSubmitting.value) return
   assignSubmitting.value = true
   try {
     const targetUser = assignUserOptions.value.find(u => u.id === assignSelectedUserId.value)
+    const binding = buildPackageBindingPayload(
+      assignPackageChoice.value,
+      assignPlanChoice.value,
+      assignValidDays.value
+    )
     await hostTransferApi.assignUnassignedInstance(props.hostId, assignTarget.value.incusName, {
       userId: assignSelectedUserId.value,
-      name: assignDisplayName.value.trim() || undefined
+      name: assignDisplayName.value.trim() || undefined,
+      ...binding
     })
     showAssignModal.value = false
     toast.success(t('admin.hosts.assignSuccess', {
@@ -1496,6 +1645,51 @@ async function submitAssign() {
     toast.error(translateError(err) || t('admin.hosts.assignFailed'))
   } finally {
     assignSubmitting.value = false
+  }
+}
+
+// 已纳管实例补挂 / 更换套餐弹窗
+const showBindPackageModal = ref(false)
+const bindPackageTarget = ref<Instance | null>(null)
+const bindPackageChoice = ref('')
+const bindPlanChoice = ref(PACKAGE_NONE_SENTINEL)
+const bindValidDays = ref('')
+const bindPackageSubmitting = ref(false)
+
+const bindPackageCanSubmit = computed(() =>
+  isPackageSelectionReady(bindPackageChoice.value, bindPackageTarget.value?.instanceType ?? null)
+)
+
+function openBindPackageModal(instance: Instance) {
+  bindPackageTarget.value = instance
+  bindPackageChoice.value = instance.packageId ? String(instance.packageId) : ''
+  bindPlanChoice.value = instance.packagePlanId ? String(instance.packagePlanId) : PACKAGE_NONE_SENTINEL
+  bindValidDays.value = ''
+  showBindPackageModal.value = true
+  void loadImportPackages(props.hostId)
+}
+
+async function submitBindPackage() {
+  if (!bindPackageTarget.value || !bindPackageCanSubmit.value || bindPackageSubmitting.value) return
+  bindPackageSubmitting.value = true
+  try {
+    const target = bindPackageTarget.value
+    const binding = buildPackageBindingPayload(
+      bindPackageChoice.value,
+      bindPlanChoice.value,
+      bindValidDays.value
+    )
+    const res = await hostTransferApi.bindInstancePackage(props.hostId, target.id, binding)
+    const pkgText = res.instance.packageName
+      ? `${res.instance.packageName}${res.instance.planName ? ` / ${res.instance.planName}` : ''}`
+      : t('admin.hosts.importPackageNoneOption')
+    showBindPackageModal.value = false
+    toast.success(t('admin.hosts.bindPackageSuccess', { name: target.name, pkg: pkgText }))
+    await loadInstances()
+  } catch (err) {
+    toast.error(translateError(err) || t('admin.hosts.bindPackageFailed'))
+  } finally {
+    bindPackageSubmitting.value = false
   }
 }
 </script>
@@ -1582,9 +1776,15 @@ async function submitAssign() {
                 <span class="rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">
                   {{ item.status }}
                 </span>
+                <span
+                  v-if="item.preset?.packageId"
+                  class="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--accent)]"
+                >
+                  {{ t('admin.hosts.unassignedPresetBadge', { pkg: formatPresetBadgeText(item.preset) }) }}
+                </span>
               </div>
               <div class="flex flex-wrap items-center gap-3 text-xs text-[var(--text-secondary)]">
-                <span>CPU {{ item.cpu }}%</span>
+                <span>CPU {{ formatCpu(item.cpu) }}</span>
                 <span>{{ formatMemory(item.memory) }}</span>
                 <span>{{ formatDisk(item.disk) }}</span>
                 <span v-if="item.ipv4" class="font-mono">{{ item.ipv4 }}</span>
@@ -1722,6 +1922,7 @@ async function submitAssign() {
         @toggle-swap="(instance) => { void toggleInstanceSwap(instance as Instance) }"
         @open-single-config="openSingleConfigModal"
         @open-price="openPriceModal"
+        @open-bind-package="(instance) => openBindPackageModal(instance as Instance)"
         @open-reset-traffic="openResetTrafficModal"
         @open-recreate="(instance) => { void openRecreateModal(instance as Instance) }"
         @open-export="(instance) => openExportModal(instance as Instance)"
@@ -2259,7 +2460,7 @@ async function submitAssign() {
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
         @click.self="!importSubmitting && (showImportModal = false)"
       >
-        <div class="w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
+        <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
           <div>
             <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
               {{ t('admin.hosts.importTitle') }}
@@ -2280,6 +2481,9 @@ async function submitAssign() {
               </div>
               <p class="text-sm text-[var(--text-primary)] break-all">
                 {{ importCreatedTask.status === 'success' ? t('admin.hosts.importSuccess', { name: importCreatedTask.instanceName || '-' }) : t('admin.hosts.importTaskQueuedDesc', { path: importCreatedTask.path }) }}
+              </p>
+              <p v-if="importCreatedTask.packageSummary" class="text-xs text-[var(--accent)]">
+                {{ t('admin.hosts.importSuccessWithPackage', { pkg: importCreatedTask.packageSummary }) }}
               </p>
             </div>
             <div class="flex justify-end gap-2 pt-2">
@@ -2333,12 +2537,78 @@ async function submitAssign() {
                   :disabled="importSubmitting || importPoolsLoading"
                 />
               </div>
+
+              <PackageBindingFields
+                v-model:package-choice="importPackageChoice"
+                v-model:plan-choice="importPlanChoice"
+                v-model:valid-days="importValidDays"
+                :packages="importPackages"
+                :loading="importPackagesLoading"
+                :load-failed="importPackagesLoadFailed"
+                :disabled="importSubmitting"
+                @retry="loadImportPackages(props.hostId)"
+              />
+
+              <div class="space-y-1.5 pt-2 border-t border-[var(--border-color)]">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="block text-sm font-medium text-[var(--text-primary)]">
+                    {{ t('admin.hosts.importUserLabel') }}
+                  </label>
+                  <button
+                    v-if="importSelectedUserId !== null"
+                    type="button"
+                    class="text-xs text-[var(--accent)] hover:underline cursor-pointer"
+                    @click="importSelectedUserId = null"
+                  >
+                    {{ t('admin.hosts.importUserNoneOption') }}
+                  </button>
+                </div>
+                <div class="flex gap-2">
+                  <Input
+                    v-model="importUserSearch"
+                    class="flex-1"
+                    :disabled="importSubmitting"
+                    :placeholder="t('admin.hosts.assignSearchUser')"
+                    @enter="searchImportUsers"
+                  />
+                  <Button variant="secondary" :loading="importUserLoading" :disabled="importSubmitting" @click="searchImportUsers">
+                    {{ t('admin.hosts.search') }}
+                  </Button>
+                </div>
+                <div class="max-h-36 overflow-y-auto rounded-xl border border-[var(--border-color)] divide-y divide-[var(--border-color)]">
+                  <button
+                    type="button"
+                    class="w-full flex items-center justify-between px-3 py-2 text-left text-xs transition-colors"
+                    :class="importSelectedUserId === null ? 'bg-[var(--accent-soft)] text-[var(--accent)] font-medium' : 'hover:bg-[var(--bg-surface-soft)] text-[var(--text-secondary)]'"
+                    @click="importSelectedUserId = null"
+                  >
+                    <span>{{ t('admin.hosts.importUserNoneOption') }}</span>
+                  </button>
+                  <div v-if="importUserOptions.length === 0" class="px-3 py-3 text-center text-xs text-[var(--text-tertiary)]">
+                    {{ t('admin.hosts.assignNoUserFound') }}
+                  </div>
+                  <button
+                    v-for="user in importUserOptions"
+                    :key="user.id"
+                    type="button"
+                    class="w-full flex items-center justify-between px-3 py-2 text-left text-sm transition-colors"
+                    :class="importSelectedUserId === user.id ? 'bg-[var(--accent-soft)] text-[var(--accent)] font-medium' : 'hover:bg-[var(--bg-surface-soft)] text-[var(--text-primary)]'"
+                    @click="importSelectedUserId = user.id"
+                  >
+                    <span>{{ user.username }} <span class="text-xs text-[var(--text-tertiary)]">#{{ user.id }}</span></span>
+                    <span class="text-xs text-[var(--text-secondary)] truncate max-w-[180px]">{{ user.email }}</span>
+                  </button>
+                </div>
+                <p class="text-xs text-[var(--text-tertiary)]">
+                  <template v-if="importSelectedUser">{{ importSelectedUser.username }} (#{{ importSelectedUser.id }}) — </template>{{ t('admin.hosts.importUserHint') }}
+                </p>
+              </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
               <Button variant="ghost" :disabled="importSubmitting" @click="showImportModal = false">
                 {{ t('common.cancel') }}
               </Button>
-              <Button variant="primary" :loading="importSubmitting" :disabled="!importFilePath.trim()" @click="submitImport">
+              <Button variant="primary" :loading="importSubmitting" :disabled="!importCanSubmit" @click="submitImport">
                 {{ importSubmitting ? t('admin.hosts.importRunning') : t('admin.hosts.importInstance') }}
               </Button>
             </div>
@@ -2356,7 +2626,7 @@ async function submitAssign() {
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
         @click.self="!assignSubmitting && (showAssignModal = false)"
       >
-        <div class="w-full max-w-lg rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
+        <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
           <div>
             <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
               {{ t('admin.hosts.assignTitle') }}
@@ -2404,13 +2674,68 @@ async function submitAssign() {
               </label>
               <Input v-model="assignDisplayName" :disabled="assignSubmitting" />
             </div>
+
+            <PackageBindingFields
+              v-model:package-choice="assignPackageChoice"
+              v-model:plan-choice="assignPlanChoice"
+              v-model:valid-days="assignValidDays"
+              :packages="importPackages"
+              :loading="importPackagesLoading"
+              :load-failed="importPackagesLoadFailed"
+              :instance-type="assignTarget.instanceType"
+              :disabled="assignSubmitting"
+              @retry="loadImportPackages(props.hostId)"
+            />
           </div>
           <div class="flex justify-end gap-2 pt-2">
             <Button variant="ghost" :disabled="assignSubmitting" @click="showAssignModal = false">
               {{ t('common.cancel') }}
             </Button>
-            <Button variant="primary" :loading="assignSubmitting" :disabled="!assignSelectedUserId" @click="submitAssign">
+            <Button variant="primary" :loading="assignSubmitting" :disabled="!assignCanSubmit" @click="submitAssign">
               {{ t('common.confirm') }}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
+  <!-- 已纳管实例挂载 / 调整套餐弹窗 -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div
+        v-if="showBindPackageModal && bindPackageTarget"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="!bindPackageSubmitting && (showBindPackageModal = false)"
+      >
+        <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 shadow-xl space-y-4">
+          <div>
+            <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              {{ t('admin.hosts.bindPackageTitle') }}
+            </h3>
+            <p class="mt-1 text-sm text-[var(--text-secondary)]">
+              {{ t('admin.hosts.bindPackageDesc', { name: bindPackageTarget.name }) }}
+            </p>
+          </div>
+
+          <PackageBindingFields
+            v-model:package-choice="bindPackageChoice"
+            v-model:plan-choice="bindPlanChoice"
+            v-model:valid-days="bindValidDays"
+            :packages="importPackages"
+            :loading="importPackagesLoading"
+            :load-failed="importPackagesLoadFailed"
+            :instance-type="bindPackageTarget.instanceType ?? null"
+            :disabled="bindPackageSubmitting"
+            @retry="loadImportPackages(props.hostId)"
+          />
+
+          <div class="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" :disabled="bindPackageSubmitting" @click="showBindPackageModal = false">
+              {{ t('common.cancel') }}
+            </Button>
+            <Button variant="primary" :loading="bindPackageSubmitting" :disabled="!bindPackageCanSubmit" @click="submitBindPackage">
+              {{ t('admin.hosts.bindPackageSubmit') }}
             </Button>
           </div>
         </div>

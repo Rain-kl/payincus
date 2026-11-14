@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { ChevronDown, RefreshCw, DollarSign, AlertCircle } from 'lucide-vue-next'
 import type { InstanceConfigResponse } from '@/types/api'
 import { Badge, Button, Card } from '@/components/ui'
+import { formatCpu } from '@/utils/formatters'
 import UserAvatar from '@/components/UserAvatar.vue'
 import InstanceDisplayIcon from '@/components/InstanceDisplayIcon.vue'
 
@@ -105,6 +106,7 @@ const emit = defineEmits<{
   (e: 'toggle-swap', instance: any): void
   (e: 'open-single-config', instanceId: number): void
   (e: 'open-price', instance: any): void
+  (e: 'open-bind-package', instance: any): void
   (e: 'open-reset-traffic', instance: any): void
   (e: 'open-recreate', instance: any): void
   (e: 'open-export', instance: any): void
@@ -282,6 +284,9 @@ function isStatusPulsing(status: string): boolean {
               <Button variant="secondary" size="sm" @click="emit('open-single-config', instance.id)">
                 {{ t('host.batchConfig.button') }}
               </Button>
+              <Button v-if="props.canExport" variant="secondary" size="sm" @click="emit('open-bind-package', instance)">
+                {{ t('admin.hosts.bindPackageAction') }}
+              </Button>
               <Button v-if="props.canExport" variant="secondary" size="sm" @click="emit('open-export', instance)">
                 {{ t('admin.hosts.exportInstance') }}
               </Button>
@@ -351,7 +356,7 @@ function isStatusPulsing(status: string): boolean {
             <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4">
               <div class="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-tertiary)]">{{ t('admin.hosts.resources') }}</div>
               <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2.5"><div class="text-[11px] text-[var(--text-tertiary)]">{{ t('admin.hosts.resources') }}</div><div class="mt-1 space-y-1 text-sm font-mono tabular-nums text-[var(--text-primary)]"><div>CPU {{ instance.cpu }}%</div><div>{{ props.formatMemory(instance.memory) }}</div><div>{{ props.formatDisk(instance.disk) }}</div><div>SWAP {{ props.getSwapDisplay(instance) }}</div></div></div>
+                <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2.5"><div class="text-[11px] text-[var(--text-tertiary)]">{{ t('admin.hosts.resources') }}</div><div class="mt-1 space-y-1 text-sm font-mono tabular-nums text-[var(--text-primary)]"><div>CPU {{ formatCpu(instance.cpu) }}</div><div>{{ props.formatMemory(instance.memory) }}</div><div>{{ props.formatDisk(instance.disk) }}</div><div>SWAP {{ props.getSwapDisplay(instance) }}</div></div></div>
                 <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2.5"><div class="text-[11px] text-[var(--text-tertiary)]">{{ t('admin.hosts.trafficUsage') }}</div><div class="mt-1 space-y-1 text-sm font-mono tabular-nums text-[var(--text-primary)]"><div>{{ props.getTrafficSummary(instance) }}</div><div>{{ props.formatBandwidth(props.getDetailConfig(instance.id)?.config.limits_ingress) }}</div><div>{{ props.formatBandwidth(props.getDetailConfig(instance.id)?.config.limits_egress) }}</div></div></div>
                 <div v-for="item in props.getQuotaItems(instance)" :key="item.label" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2.5"><div class="text-[11px] text-[var(--text-tertiary)]">{{ item.label }}</div><div class="mt-1 text-sm font-medium font-mono tabular-nums text-[var(--text-primary)]">{{ props.formatQuotaValue(item.value) }}</div></div>
                 <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3 py-2.5"><div class="text-[11px] text-[var(--text-tertiary)]">IP</div><div class="mt-1 space-y-1 text-sm font-mono text-[var(--text-primary)]"><div>{{ props.getDisplayIp(instance).ipv4 || '-' }}</div><div class="truncate" :title="props.getDisplayIp(instance).ipv6 || ''">{{ props.getDisplayIp(instance).ipv6 || '-' }}</div></div></div>
@@ -404,6 +409,9 @@ function isStatusPulsing(status: string): boolean {
                 </Button>
                 <Button v-if="instance.packagePlanId" variant="secondary" size="sm" @click="emit('open-price', instance)">
                   {{ t('host.price.editPrice') }}
+                </Button>
+                <Button v-if="props.canExport" variant="secondary" size="sm" @click="emit('open-bind-package', instance)">
+                  {{ t('admin.hosts.bindPackageAction') }}
                 </Button>
                 <Button
                   v-if="props.canRecreateInstance(instance)"

@@ -6,6 +6,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 import FlagIcon from '@/components/FlagIcon.vue'
 import type { ChangeHostOption, ChangeHostOptionsResponse, ChangeHostUnavailableReason } from '@/types/api'
+import { formatCpu } from '@/utils/formatters'
 
 const props = defineProps<{
   instanceId: number
@@ -284,7 +285,7 @@ watch(() => [props.instanceId, props.canChangeHost, props.instanceStatus], () =>
                     <div class="mb-1 flex items-center justify-between text-xs">
                       <span class="text-themed-muted">CPU</span>
                       <span :class="themeStore.isDark ? 'text-gray-300' : 'text-gray-700'">
-                        {{ host.resources.cpuAvailable }}% / {{ host.resources.cpuAllowanceMax }}%
+                        {{ formatCpu(host.resources.cpuAvailable) }} / {{ formatCpu(host.resources.cpuAllowanceMax) }}
                       </span>
                     </div>
                     <div class="h-1.5 overflow-hidden rounded-full" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-100'">
