@@ -514,7 +514,7 @@
   }
 
   .kawaii-app-shell .btn-primary:not(.kawaii-action-button) {
-    border: 1px solid var(--kawaii-line) !important;
+    border: 0 !important;
     border-radius: var(--radius-btn);
     background: var(--accent) !important;
     color: var(--bg-surface) !important;
@@ -531,7 +531,7 @@
   }
 
   .kawaii-auth-shell .btn-primary {
-    border: 1px solid var(--kawaii-line) !important;
+    border: 0 !important;
     border-radius: var(--radius-btn);
     background: var(--accent) !important;
     color: var(--bg-surface) !important;
@@ -539,21 +539,43 @@
   }
 
   .kawaii-app-shell .btn-secondary,
-  .kawaii-app-shell .btn-ghost,
   .kawaii-app-shell .btn-outline {
     border-radius: var(--radius-btn);
-    border: 1px solid var(--border-strong) !important;
-    background: var(--bg-surface) !important;
+    border: 0 !important;
+    background: var(--btn-secondary-bg) !important;
     color: var(--text-primary) !important;
     box-shadow: none !important;
   }
 
-  .dark .kawaii-app-shell .btn-secondary,
-  .dark .kawaii-app-shell .btn-ghost,
-  .dark .kawaii-app-shell .btn-outline {
-    border: 1px solid var(--border-color) !important;
-    background: var(--bg-surface) !important;
+  .kawaii-app-shell .btn-secondary:hover:not(:disabled),
+  .kawaii-app-shell .btn-outline:hover:not(:disabled) {
+    background: var(--btn-secondary-hover-bg) !important;
+  }
+
+  .kawaii-app-shell .btn-ghost {
+    border-radius: var(--radius-btn);
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--text-secondary) !important;
+    box-shadow: none !important;
+  }
+
+  .kawaii-app-shell .btn-ghost:hover:not(:disabled) {
+    background: var(--btn-secondary-bg) !important;
     color: var(--text-primary) !important;
+  }
+
+  .dark .kawaii-app-shell .btn-secondary,
+  .dark .kawaii-app-shell .btn-outline {
+    border: 0 !important;
+    background: var(--btn-secondary-bg) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .dark .kawaii-app-shell .btn-ghost {
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--text-secondary) !important;
   }
 
   .kawaii-app-shell [role='menu'],
@@ -652,18 +674,26 @@
   }
 
   .modal-content .btn-primary {
-    border-color: var(--kawaii-line) !important;
-    background: linear-gradient(135deg, var(--kawaii-primary), var(--kawaii-lavender)) !important;
+    border: 0 !important;
+    border-radius: var(--radius-btn);
+    background: var(--accent) !important;
     color: var(--topbar-text) !important;
     box-shadow: none;
   }
 
   .modal-content .btn-secondary,
-  .modal-content .btn-ghost,
   .modal-content .btn-outline {
-    border-color: var(--kawaii-line) !important;
-    background: var(--kawaii-surface) !important;
-    color: var(--kawaii-text) !important;
+    border: 0 !important;
+    border-radius: var(--radius-btn);
+    background: var(--btn-secondary-bg) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .modal-content .btn-ghost {
+    border: 0 !important;
+    border-radius: var(--radius-btn);
+    background: transparent !important;
+    color: var(--text-secondary) !important;
   }
 
   :where([class*='fixed'][class*='inset-0'][class*='bg-black/30'], [class*='fixed'][class*='inset-0'][class*='bg-black/40'], [class*='fixed'][class*='inset-0'][class*='bg-black/45'], [class*='fixed'][class*='inset-0'][class*='bg-black/50'], [class*='fixed'][class*='inset-0'][class*='bg-black/60']),
@@ -3124,7 +3154,7 @@
   .kawaii-app-shell :where(.btn-secondary, .btn-ghost, .btn-outline):not(.btn-danger):hover:not(:disabled),
   .kawaii-public-shell :where(.kawaii-secondary-button):hover:not(:disabled),
   .modal-content :where(.btn-secondary, .btn-ghost, .btn-outline):not(.btn-danger):hover:not(:disabled) {
-    border-color: var(--kawaii-line-strong) !important;
+    border-color: transparent !important;
     box-shadow: none;
     transform: translateY(-1px);
   }

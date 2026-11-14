@@ -93,8 +93,14 @@
     --radius-card-lg: 8px;       /* 3. 突出大卡片/横幅展示卡 (对齐 xl: 8px) */
     --radius-modal: 8px;         /* 4. 浮层弹窗/对话框/抽屉 (对齐 xl: 8px) */
     --radius-panel: 6px;         /* 5. 侧边功能面板/抽屉容器 (对齐 lg: 6px) */
-    --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
+    --radius-btn: 9999px;        /* 6. 操作按钮/控制按键 (统一胶囊圆角) */
     --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
+
+    /* ---- 统一胶囊按钮语义 Token (对齐 Apple 浅底无边框风格) ---- */
+    --btn-secondary-bg: rgba(255, 255, 255, 0.1);
+    --btn-secondary-hover-bg: rgba(255, 255, 255, 0.16);
+    --btn-danger-bg: color-mix(in srgb, var(--error) 16%, transparent);
+    --btn-danger-hover-bg: color-mix(in srgb, var(--error) 24%, transparent);
     --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
     --radius-chip: 4px;          /* 9. 状态标签/元信息 Chip (对齐 md: 4px) */
     --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
@@ -211,8 +217,14 @@
     --radius-card-lg: 8px;       /* 3. 突出大卡片/横幅展示卡 (对齐 xl: 8px) */
     --radius-modal: 8px;         /* 4. 浮层弹窗/对话框/抽屉 (对齐 xl: 8px) */
     --radius-panel: 6px;         /* 5. 侧边功能面板/抽屉容器 (对齐 lg: 6px) */
-    --radius-btn: 4px;           /* 6. 操作按钮/控制按键 (对齐 md: 4px) */
+    --radius-btn: 9999px;        /* 6. 操作按钮/控制按键 (统一胶囊圆角) */
     --radius-input: 4px;         /* 7. 输入框/下拉选择/文本域 (对齐 md: 4px) */
+
+    /* ---- 统一胶囊按钮语义 Token (对齐 Apple 浅底无边框风格) ---- */
+    --btn-secondary-bg: rgba(0, 0, 0, 0.06);
+    --btn-secondary-hover-bg: rgba(0, 0, 0, 0.1);
+    --btn-danger-bg: color-mix(in srgb, var(--error) 13%, transparent);
+    --btn-danger-hover-bg: color-mix(in srgb, var(--error) 20%, transparent);
     --radius-table: 4px;         /* 8. 列表行/表格行容器 (对齐 md: 4px) */
     --radius-badge: 4px;         /* 10. 徽章/标签 (对齐 md: 4px) */
 

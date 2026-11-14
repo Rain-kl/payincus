@@ -37,17 +37,17 @@ const handleClick = (event: MouseEvent) => {
 
 const variantClasses = computed(() => {
   if (props.disabled) {
-    return 'border'
+    return 'border-0'
   }
   switch (props.variant) {
     case 'primary':
       return 'bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)] border-0 focus-visible:ring-[var(--accent)]'
     case 'secondary':
-      return 'bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-color)] hover:bg-[var(--bg-surface-soft)] hover:border-[var(--border-hover)] focus-visible:ring-[var(--accent)]'
+      return 'bg-[var(--btn-secondary-bg)] text-[var(--text-primary)] border-0 hover:bg-[var(--btn-secondary-hover-bg)] focus-visible:ring-[var(--accent)]'
     case 'ghost':
-      return 'bg-[var(--bg-surface)] text-[var(--text-primary)] border-0 hover:bg-[var(--bg-surface-soft)] focus-visible:ring-[var(--accent)]'
+      return 'bg-transparent text-[var(--text-secondary)] border-0 hover:bg-[var(--btn-secondary-bg)] hover:text-[var(--text-primary)] focus-visible:ring-[var(--accent)]'
     case 'danger':
-      return 'bg-[var(--error)] text-white hover:brightness-105 active:brightness-95 border-0 focus-visible:ring-[var(--error)]'
+      return 'bg-[var(--btn-danger-bg)] text-[var(--error)] border-0 hover:bg-[var(--btn-danger-hover-bg)] focus-visible:ring-[var(--error)]'
     default:
       return 'bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)] border-0 focus-visible:ring-[var(--accent)]'
   }
@@ -67,7 +67,7 @@ const sizeClasses = computed(() => {
 
 const stateClasses = computed(() => {
   if (props.disabled) {
-    return 'cursor-not-allowed text-[var(--text-tertiary)] bg-[var(--bg-surface-soft)] border-[var(--border-color)] pointer-events-none'
+    return 'cursor-not-allowed text-[var(--text-tertiary)] bg-[var(--btn-secondary-bg)] opacity-60 pointer-events-none'
   }
   if (props.loading) {
     return 'cursor-wait pointer-events-none'

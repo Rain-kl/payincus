@@ -393,12 +393,7 @@ function goToNextPage() {
         <!-- 批量删除按钮 -->
         <button
           v-if="selectedIds.size > 0"
-          :class="[
-            'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
-            themeStore.isDark
-              ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
-              : 'bg-red-50 text-red-600 hover:bg-red-100'
-          ]"
+          class="btn-danger btn-sm"
           @click="openDeleteModal"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -410,12 +405,7 @@ function goToNextPage() {
 
       <!-- 创建按钮 -->
       <button
-        :class="[
-          'flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-          themeStore.isDark
-            ? 'bg-accent text-white dark:text-black hover:opacity-90'
-            : 'bg-accent text-white dark:text-black hover:opacity-90'
-        ]"
+        class="btn-primary"
         @click="openCreateModal"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -738,25 +728,14 @@ function goToNextPage() {
 
             <div class="modal-footer">
               <button
-                :class="[
-                  'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                  themeStore.isDark
-                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                ]"
+                class="btn-secondary"
                 @click="showCreateModal = false"
               >
                 {{ t('common.cancel') }}
               </button>
               <button
                 :disabled="creating"
-                :class="[
-                  'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                  creating ? 'opacity-50 cursor-not-allowed' : '',
-                  themeStore.isDark
-                    ? 'bg-accent text-white dark:text-black hover:opacity-90'
-                    : 'bg-accent text-white dark:text-black hover:opacity-90'
-                ]"
+                class="btn-primary"
                 @click="handleCreate"
               >
                 <span v-if="creating" class="flex items-center gap-2">
@@ -904,25 +883,14 @@ function goToNextPage() {
 
             <div class="modal-footer">
               <button
-                :class="[
-                  'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                  themeStore.isDark
-                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                ]"
+                class="btn-secondary flex-1"
                 @click="showDeleteModal = false"
               >
                 {{ t('common.cancel') }}
               </button>
               <button
                 :disabled="deleting"
-                :class="[
-                  'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                  deleting ? 'opacity-50 cursor-not-allowed' : '',
-                  themeStore.isDark
-                    ? 'bg-red-600 text-white hover:bg-red-500'
-                    : 'bg-red-600 text-white hover:bg-red-700'
-                ]"
+                class="btn-danger flex-1"
                 @click="confirmDelete"
               >
                 {{ deleting ? t('common.deleting') : t('common.delete') }}

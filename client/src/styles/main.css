@@ -64,78 +64,56 @@
 
 @layer components {
 
-  /* ============ 按钮 - OCI 经典风格 ============ */
+  /* ============ 按钮 - 统一 Apple 胶囊无边框风格 ============ */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-3.5 py-1.5 text-sm font-medium rounded transition-all duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-1.5 text-sm font-medium rounded-full border-0 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--accent)] disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98];
   }
 
   /* 主按钮 */
   .btn-primary {
-    @apply btn;
+    @apply btn bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)];
   }
 
-  .dark .btn-primary {
-    @apply bg-white text-gray-900 hover:bg-gray-100;
-    --tw-ring-offset-color: var(--bg-primary);
-  }
-
-  .light .btn-primary {
-    @apply bg-[var(--nav-active)] text-white hover:bg-[var(--border-strong)];
-    --tw-ring-offset-color: var(--bg-surface);
-  }
-
-  /* 次要按钮 - 对标参考截图「资源浏览器」白底黑线小圆角 */
+  /* 次要按钮 - 浅底无边框胶囊 */
   .btn-secondary {
-    @apply btn;
-  }
-
-  .dark .btn-secondary {
-    @apply bg-[var(--bg-surface)] text-gray-100 border border-[var(--border-color)] hover:border-[var(--border-hover)] hover:bg-[var(--bg-tertiary)];
-  }
-
-  .light .btn-secondary {
-    @apply bg-white text-[var(--text-primary)] border border-[var(--topbar-bg)] hover:bg-[var(--bg-tertiary)];
+    @apply btn bg-[var(--btn-secondary-bg)] text-[var(--text-primary)] hover:bg-[var(--btn-secondary-hover-bg)];
   }
 
   /* 幽灵按钮 */
   .btn-ghost {
-    @apply btn;
+    @apply btn bg-transparent text-[var(--text-secondary)] hover:bg-[var(--btn-secondary-bg)] hover:text-[var(--text-primary)];
   }
 
-  .dark .btn-ghost {
-    @apply bg-[var(--bg-surface)] text-gray-400 hover:text-gray-100 hover:bg-gray-800;
-  }
-
-  .light .btn-ghost {
-    @apply bg-[var(--bg-surface)] text-gray-600 hover:text-gray-900 hover:bg-gray-100;
-  }
-
-  /* 危险按钮 */
+  /* 危险按钮 - 浅红底红字无边框胶囊 */
   .btn-danger {
-    @apply btn bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_30%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--error)_20%,var(--bg-surface))];
+    @apply btn bg-[var(--btn-danger-bg)] text-[var(--error)] hover:bg-[var(--btn-danger-hover-bg)];
   }
 
   /* 警告按钮 */
   .btn-warning {
-    @apply btn bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] border border-[color-mix(in_srgb,var(--warning)_30%,var(--bg-surface))] hover:bg-[color-mix(in_srgb,var(--warning)_20%,var(--bg-surface))];
+    @apply btn bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] text-[var(--warning)] hover:bg-[color-mix(in_srgb,var(--warning)_22%,transparent)];
+  }
+
+  .btn-xs {
+    @apply px-3 py-1 text-xs min-h-[28px];
   }
 
   .btn-sm {
-    @apply px-3 py-1.5 text-xs;
+    @apply px-3.5 py-1 text-xs min-h-[32px];
   }
 
   .btn-lg {
-    @apply px-5 py-2.5 text-base;
+    @apply px-6 py-2.5 text-base min-h-[44px];
   }
 
-  /* ============ 表格操作图标按钮（shadcn 风格：扁平、无边框、hover 才浮出浅底） ============ */
+  /* ============ 表格操作图标按钮（扁平、无边框、hover 才浮出浅底） ============ */
   /* 表格 <td> 操作列唯一允许的按钮形态，见 AGENTS.md §2.13 / THEME.md §5 */
   .icon-btn {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-md bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500;
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full border-0 bg-transparent text-[var(--text-secondary)] transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)];
   }
 
   .icon-btn:hover:not(:disabled) {
-    @apply bg-[var(--bg-tertiary)] text-[var(--text-primary)];
+    @apply bg-[var(--btn-secondary-bg)] text-[var(--text-primary)];
   }
 
   .icon-btn:disabled {
@@ -147,7 +125,7 @@
   }
 
   .icon-btn-danger:hover:not(:disabled) {
-    @apply bg-[var(--bg-tertiary)] text-[var(--error)];
+    @apply bg-[var(--btn-danger-bg)] text-[var(--error)];
   }
 
   /* ============ 输入框 ============ */
@@ -751,31 +729,31 @@
   }
 }
 
-/* 按钮规范: 确认按钮使用黑色, 取消按钮使用白色 */
+/* 按钮规范: 确认按钮使用主题强调色, 取消按钮使用浅底胶囊 */
 .modal-footer .btn-primary,
 .modal-footer button[type="submit"]:not(.btn-secondary):not(.btn-ghost):not(.btn-danger),
 .modal-footer button.btn-primary {
-  background-color: var(--drawer-btn-confirm-bg) !important;
-  color: var(--drawer-btn-confirm-text) !important;
-  border: 1px solid var(--drawer-btn-confirm-border) !important;
+  background-color: var(--accent) !important;
+  color: var(--topbar-text) !important;
+  border: 0 !important;
 }
 
 .modal-footer .btn-secondary,
 .modal-footer .btn-ghost,
 .modal-footer button.btn-secondary {
-  background-color: var(--drawer-btn-cancel-bg) !important;
-  color: var(--drawer-btn-cancel-text) !important;
-  border: 1px solid var(--drawer-btn-cancel-border) !important;
+  background-color: var(--btn-secondary-bg) !important;
+  color: var(--text-primary) !important;
+  border: 0 !important;
 }
 
 .modal-footer .btn-primary:hover,
 .modal-footer button[type="submit"]:not(.btn-secondary):not(.btn-ghost):not(.btn-danger):hover {
-  filter: brightness(1.15);
+  background-color: var(--accent-strong) !important;
 }
 
 .modal-footer .btn-secondary:hover,
 .modal-footer .btn-ghost:hover {
-  background-color: var(--drawer-header-bg) !important;
+  background-color: var(--btn-secondary-hover-bg) !important;
 }
 
 .modal-footer .btn-primary,

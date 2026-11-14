@@ -92,7 +92,7 @@ onUnmounted(() => { generation++; clearInterval(timer) })
     <div v-if="overview?.recoveryTask" class="rounded-lg border border-themed p-3 space-y-1 text-sm text-themed" role="status">
       <p>恢复任务 #{{ overview.recoveryTask.id }}：{{ recoveryStatus }}</p>
       <p v-if="overview.recoveryTask.error">{{ overview.recoveryTask.error }}</p>
-      <RouterLink class="text-themed underline" :to="{ path: '/admin/tasks', query: { task: overview.recoveryTask.id } }">查看恢复任务日志</RouterLink>
+      <RouterLink class="btn-secondary btn-sm inline-flex" :to="{ path: '/admin/tasks', query: { task: overview.recoveryTask.id } }">查看恢复任务日志</RouterLink>
     </div>
     <div class="flex flex-wrap gap-3 text-sm text-themed">
       <span>安全模式：{{ state?.enabled ? '已开启' : '未开启' }}</span>

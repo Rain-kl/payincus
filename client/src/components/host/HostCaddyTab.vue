@@ -295,7 +295,7 @@ async function uninstallCaddy() {
         <div class="flex gap-3 pt-2 border-t" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
           <button
             :disabled="uninstalling"
-            class="btn-ghost text-red-600 hover:text-red-700"
+            class="btn-danger"
             @click="uninstallCaddy"
           >
             <span v-if="uninstalling" class="flex items-center gap-2">

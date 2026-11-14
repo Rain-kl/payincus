@@ -465,7 +465,7 @@ function formatBytes(bytes: number): string {
           {{ t('admin.hosts.resources') }}
         </h2>
         <button
-          class="btn-ghost btn-xs flex items-center gap-1"
+          class="btn-secondary btn-xs flex items-center gap-1"
           :disabled="recalculating"
           :title="t('admin.hosts.recalculateResourcesTip')"
           @click="recalculateResources"
@@ -587,7 +587,7 @@ function formatBytes(bytes: number): string {
       </div>
       <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
         <button
-          class="btn-ghost btn-xs flex items-center gap-1"
+          class="btn-secondary btn-xs flex items-center gap-1"
           :disabled="agentStatusRefreshing"
           @click="refreshAgentStatus"
         >
