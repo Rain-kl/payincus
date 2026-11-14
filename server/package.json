@@ -207,6 +207,7 @@
     "test:package-egress:db": "RUN_PACKAGE_EGRESS_DB_TESTS=1 node --import tsx scripts/test-package-egress.ts",
     "test:storage-encryption": "node --import tsx scripts/test-storage-encryption.ts && node --import tsx scripts/test-storage-provision.ts && node --import tsx scripts/test-storage-delete.ts && node --import tsx scripts/test-storage-lock.ts && node --import tsx scripts/test-storage-import.ts && node --import tsx scripts/test-storage-locked-capacity.ts",
     "test:host-instance-backups": "node --import tsx scripts/test-host-instance-backups.ts",
+    "test:instance-import-package-binding": "node --import tsx scripts/test-instance-import-package-binding.ts",
     "test:node-security": "node --import tsx scripts/test-node-security.ts && node --import tsx scripts/test-node-security-startup.ts && node --import tsx scripts/test-node-security-routes.ts && node --import tsx scripts/test-node-security-transport.ts && node --import tsx scripts/test-node-security-recovery.ts && node --import tsx scripts/test-node-security-async.ts && node --import tsx scripts/test-host-service-status.ts",
     "test:node-security:db": "node --import tsx scripts/test-node-security-db.ts",
     "test:storage-pool-directory": "node --import tsx scripts/test-storage-pool-directory-guards.ts",

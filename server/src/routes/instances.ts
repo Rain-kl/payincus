@@ -850,6 +850,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           created_at: string
           expires_at: string | null
           auto_renew?: boolean
+          package_id?: number | null
           package_name: string | null
           package_plan_id: number | null
           icon_badge_id: string | null
@@ -893,6 +894,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           userAvatarStyle?: string | null
           userId?: number
           hostId?: number
+          packageId?: number | null
           packageName?: string | null
           packagePlanId?: number | null
           billingPrice?: number | null
@@ -940,6 +942,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
           expires_at: instance.expires_at,
           autoRenew: instance.auto_renew ?? false,
           iconBadgeId: (instance as { icon_badge_id?: string | null }).icon_badge_id ?? null,
+          packageId: instance.package_id || null,
           packageName: instance.package_name || null,
           packagePlanId: instance.package_plan_id || null,
           billingPrice: instance.billing_price || null,

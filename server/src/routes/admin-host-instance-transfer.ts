@@ -7,6 +7,21 @@ import { getIncusClient } from '../lib/incus/incus-pool.js'
 import { getInstance, getInstanceState, listInstances } from '../lib/incus/incus-instances.js'
 import { clearGpuDevices, extractResourceGpuPciAddresses, listIncusGpuDevices, sanitizeMissingHostGpuDevices } from '../lib/gpu.js'
 import { redactTaskLog, setOperationTaskProgress } from '../lib/operation-task-log.js'
+import {
+  PackageBindingError,
+  consumePendingImportTaskPreset,
+  consumeUnassignedInstancePreset,
+  getUnassignedInstancePreset,
+  listImportablePackagesForHost,
+  listUnassignedInstancePresetsForHost,
+  rebindInstancePackage,
+  registerImportedHostInstance,
+  savePendingImportTaskPreset,
+  saveUnassignedInstancePreset,
+  validatePackageBindingSelection,
+  type ExtractedIncusMetrics,
+  type PackageBindingInput
+} from '../lib/instance-package-binding.js'
 import type { IncusInstance } from '../types/incus.js'
 
 const TRANSFER_EXT = 'incus_instance_transfer_v1'
@@ -157,8 +172,9 @@ async function trackNodeTransferTask(params: {
   targetPath: string
   storagePool?: string
   task: NodeBackupTask
+  auditUserId?: number
 }) {
-  const { hostId, instanceName, importedInstanceName, kind, targetPath, storagePool, task } = params
+  const { hostId, instanceName, importedInstanceName, kind, targetPath, storagePool, task, auditUserId } = params
   const actionLabel = kind === 'instance_export' ? '导出' : '导入'
   const initialStatus = task.status === 'running' ? 'running' : task.status === 'success' ? 'success' : 'failed'
   const opTask = await prisma.operationTask.create({
@@ -193,8 +209,19 @@ async function trackNodeTransferTask(params: {
         message: initialStatus === 'success' ? `${actionLabel}完成：${task.filePath || targetPath}` : (errText || `${actionLabel}失败`)
       }
     }).catch(() => {})
-    if (initialStatus === 'success' && kind === 'instance_import') {
-      await logImportedGpuSanitization(opTask.id, hostId, task.instance?.trim() || importedInstanceName)
+    if (kind === 'instance_import') {
+      const resolvedName = task.instance?.trim() || importedInstanceName
+      if (initialStatus === 'success') {
+        await logImportedGpuSanitization(opTask.id, hostId, resolvedName)
+      }
+      await finalizeImportedInstancePreset({
+        opTaskId: opTask.id,
+        hostId,
+        nodeTaskId: task.id,
+        finalStatus: initialStatus === 'success' ? 'success' : 'failed',
+        incusName: resolvedName,
+        auditUserId
+      })
     }
     return opTask.id
   }
@@ -222,6 +249,7 @@ async function trackNodeTransferTask(params: {
       const host = await prisma.host.findUnique({ where: { id: hostId } })
       if (!host) {
         setOperationTaskProgress(opTask.id, null)
+        if (kind === 'instance_import') await consumePendingImportTaskPreset(task.id).catch(() => null)
         await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'failed', error: '宿主机不存在', finishedAt: new Date() } })
         return
       }
@@ -231,6 +259,7 @@ async function trackNodeTransferTask(params: {
       if (!found) {
         if (attempts >= 5) {
           setOperationTaskProgress(opTask.id, null)
+          if (kind === 'instance_import') await consumePendingImportTaskPreset(task.id).catch(() => null)
           await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'interrupted', error: '节点未返回该任务状态', finishedAt: new Date() } })
           return
         }
@@ -246,8 +275,20 @@ async function trackNodeTransferTask(params: {
             message: finalStatus === 'success' ? `${actionLabel}完成：${found.filePath || targetPath}` : (errText || `${actionLabel}失败`)
           }
         }).catch(() => {})
-        if (finalStatus === 'success' && kind === 'instance_import') {
-          await logImportedGpuSanitization(opTask.id, hostId, found.instance?.trim() || importedInstanceName, client)
+        if (kind === 'instance_import') {
+          const resolvedName = found.instance?.trim() || importedInstanceName
+          if (finalStatus === 'success') {
+            await logImportedGpuSanitization(opTask.id, hostId, resolvedName, client)
+          }
+          await finalizeImportedInstancePreset({
+            opTaskId: opTask.id,
+            hostId,
+            nodeTaskId: task.id,
+            finalStatus,
+            incusName: resolvedName,
+            client,
+            auditUserId
+          })
         }
         await prisma.operationTask.updateMany({
           where: { id: opTask.id, status: 'running' },
@@ -385,6 +426,130 @@ function mapIncusStatus(status: string): 'running' | 'stopped' {
   return status.toLowerCase() === 'running' ? 'running' : 'stopped'
 }
 
+function extractSnapshotFromIncus(
+  incusInst: IncusInstance,
+  incusState: Awaited<ReturnType<typeof getInstanceState>> | null
+): ExtractedIncusMetrics {
+  const config = (incusInst.expanded_config ?? incusInst.config ?? {}) as Record<string, unknown>
+  const { disk, storagePoolName } = extractDiskMB(incusInst)
+  const { ipv4, ipv6, networkMode } = extractNetworkDetails(incusInst, incusState)
+  return {
+    cpu: parseCpuPercentage(config),
+    memory: parseSizeToMB(config['limits.memory'], 512),
+    disk,
+    storagePoolName,
+    ipv4,
+    ipv6,
+    networkMode,
+    image: String(config['image.description'] || config['image.os'] || 'imported'),
+    status: mapIncusStatus(incusInst.status),
+    instanceType: incusInst.type === 'virtual-machine' ? 'vm' : 'container'
+  }
+}
+
+async function finalizeImportedInstancePreset(params: {
+  opTaskId: number
+  hostId: number
+  nodeTaskId: string
+  finalStatus: 'success' | 'failed'
+  incusName?: string
+  client?: Awaited<ReturnType<typeof getIncusClient>>
+  auditUserId?: number
+}) {
+  const preset = await consumePendingImportTaskPreset(params.nodeTaskId).catch(() => null)
+  if (params.finalStatus !== 'success' || !preset) return
+
+  const cleanName = params.incusName?.trim()
+  if (!cleanName) {
+    if (preset.packageId || preset.userId) {
+      await prisma.operationTaskLog.create({
+        data: {
+          taskId: params.opTaskId,
+          source: 'server',
+          level: 'warn',
+          message: '导入已完成，但节点未返回实例名称，无法自动绑定套餐或用户；请前往未分配实例列表手动处理'
+        }
+      }).catch(() => {})
+    }
+    return
+  }
+
+  if (preset.userId) {
+    try {
+      const client = params.client ?? await (async () => {
+        const host = await prisma.host.findUnique({ where: { id: params.hostId } })
+        return host ? getIncusClient(host) : null
+      })()
+      if (!client) throw new Error('宿主机不存在')
+
+      const [incusInst, incusState] = await Promise.all([
+        getInstance(client, cleanName),
+        getInstanceState(client, cleanName).catch(() => null)
+      ])
+      const metrics = extractSnapshotFromIncus(incusInst, incusState)
+      const reg = await registerImportedHostInstance({
+        hostId: params.hostId,
+        client,
+        incusName: cleanName,
+        userId: preset.userId,
+        displayName: preset.displayName ?? undefined,
+        binding: {
+          packageId: preset.packageId,
+          planId: preset.planId,
+          validDays: preset.validDays,
+          expiresAt: preset.expiresAt
+        },
+        metrics,
+        auditUserId: params.auditUserId ?? preset.userId,
+        auditSource: 'import_auto',
+        throwIfAlreadyAssigned: false
+      })
+      if (!reg.alreadyAssigned && reg.instance) {
+        const pkgText = reg.instance.packageName
+          ? `，已绑定套餐 ${reg.instance.packageName}${reg.instance.planName ? ` / ${reg.instance.planName}` : ''}`
+          : '（未选择套餐，按免费实例处理）'
+        await prisma.operationTaskLog.create({
+          data: {
+            taskId: params.opTaskId,
+            source: 'server',
+            level: 'info',
+            message: `导入后已自动分配给用户 #${preset.userId}${pkgText}`
+          }
+        }).catch(() => {})
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
+      if (preset.packageId || preset.planId || preset.validDays || preset.expiresAt) {
+        await saveUnassignedInstancePreset({ hostId: params.hostId, incusName: cleanName, preset }).catch(() => {})
+      }
+      await prisma.operationTaskLog.create({
+        data: {
+          taskId: params.opTaskId,
+          source: 'server',
+          level: 'warn',
+          message: `导入成功，但自动分配用户/绑定套餐失败（${reason}）；已保留预设，请在未分配实例列表手动分配`
+        }
+      }).catch(() => {})
+    }
+    return
+  }
+
+  if (preset.packageId || preset.planId || preset.validDays || preset.expiresAt) {
+    await saveUnassignedInstancePreset({ hostId: params.hostId, incusName: cleanName, preset }).catch(() => {})
+    const pkgLabel = preset.packageName
+      ? `${preset.packageName}${preset.planName ? ` / ${preset.planName}` : ''}`
+      : (preset.packageId ? `套餐 #${preset.packageId}` : '未挂载套餐')
+    await prisma.operationTaskLog.create({
+      data: {
+        taskId: params.opTaskId,
+        source: 'server',
+        level: 'info',
+        message: `已保存目标套餐预设（${pkgLabel}），请在未分配实例列表分配用户时生效`
+      }
+    }).catch(() => {})
+  }
+}
+
 async function ensureHostTransferSupport(hostId: number) {
   const host = await prisma.host.findUnique({ where: { id: hostId } })
   if (!host) return { error: { code: 404, message: '节点不存在' } as const }
@@ -490,9 +655,39 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
   })
 
   // 从宿主机指定文件路径导入实例
+  // 查询宿主机可用于实例导入绑定/挂载的套餐与方案列表
+  app.get<{ Params: { hostId: number } }>('/api/admin/hosts/:hostId/import-packages', {
+    onRequest: [app.authenticate, app.requireAdmin],
+    schema: { params: hostIdParams },
+    handler: async (req, reply) => {
+      reply.header('Cache-Control', 'no-store')
+      try {
+        const packages = await listImportablePackagesForHost(req.params.hostId)
+        return { packages }
+      } catch (error) {
+        if (error instanceof PackageBindingError) {
+          return reply.code(error.statusCode).send({ error: error.message })
+        }
+        return reply.code(500).send({ error: '获取可挂载套餐列表失败' })
+      }
+    }
+  })
+
+  // 提交异步导入实例任务（可预设挂载套餐/方案/到期时间与可选目标用户）
   app.post<{
     Params: { hostId: number }
-    Body: { id?: string; filePath: string; name?: string; storagePool?: string }
+    Body: {
+      id?: string
+      filePath: string
+      name?: string
+      storagePool?: string
+      packageId?: number | null
+      planId?: number | null
+      validDays?: number | null
+      expiresAt?: string | null
+      userId?: number | null
+      displayName?: string | null
+    }
   }>('/api/admin/hosts/:hostId/instances/import', {
     onRequest: auth,
     schema: {
@@ -505,7 +700,13 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
           id: { type: 'string', pattern: '^[0-9a-f]{32}$' },
           filePath: { type: 'string', minLength: 2, maxLength: 4096, pattern: '^/[^\\u0000\\r\\n]+$' },
           name: { type: 'string', minLength: 1, maxLength: 63, pattern: '^[a-zA-Z0-9][a-zA-Z0-9-]*$' },
-          storagePool: { type: 'string', minLength: 1, maxLength: 64 }
+          storagePool: { type: 'string', minLength: 1, maxLength: 64 },
+          packageId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          planId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          validDays: { type: ['integer', 'null'], minimum: 1, maximum: 36500 },
+          expiresAt: { type: ['string', 'null'], maxLength: 64 },
+          userId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          displayName: { type: ['string', 'null'], minLength: 1, maxLength: 64 }
         }
       }
     },
@@ -522,6 +723,20 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
           return reply.code(poolResolution.error.code).send({ error: poolResolution.error.message })
         }
 
+        const hostInstanceType = res.host.instanceType === 'container' || res.host.instanceType === 'vm'
+          ? res.host.instanceType
+          : null
+
+        const validatedBinding = await validatePackageBindingSelection({
+          hostId,
+          packageId: req.body.packageId,
+          planId: req.body.planId,
+          validDays: req.body.validDays,
+          expiresAt: req.body.expiresAt,
+          instanceType: hostInstanceType,
+          userId: req.body.userId
+        })
+
         const payload: Record<string, string> = {
           id: req.body.id || generateTaskId(),
           filePath: req.body.filePath.trim()
@@ -530,6 +745,30 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         if (poolResolution.pool) payload.storagePool = poolResolution.pool
 
         const task = await res.client.request<NodeBackupTask>('POST', IMPORT_ENDPOINT, payload)
+        const taskId = task.id || payload.id
+        const shouldSavePreset = Boolean(
+          req.body.packageId || req.body.userId || req.body.validDays || req.body.expiresAt?.trim()
+        )
+        if (shouldSavePreset && taskId) {
+          await savePendingImportTaskPreset({
+            taskId,
+            hostId,
+            incusName: payload.name || task.instance?.trim() || null,
+            filePath: payload.filePath,
+            preset: {
+              packageId: req.body.packageId ?? null,
+              planId: req.body.planId === undefined ? validatedBinding.resolvedPlanId : req.body.planId,
+              packageName: validatedBinding.packageName,
+              planName: validatedBinding.planName,
+              validDays: req.body.validDays ?? null,
+              expiresAt: req.body.expiresAt?.trim() || null,
+              userId: req.body.userId ?? null,
+              displayName: req.body.displayName?.trim() || null,
+              createdAt: new Date().toISOString()
+            }
+          })
+        }
+
         const operationTaskId = await trackNodeTransferTask({
           hostId,
           instanceName: payload.name || payload.filePath,
@@ -537,19 +776,26 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
           kind: 'instance_import',
           targetPath: payload.filePath,
           storagePool: payload.storagePool,
-          task
+          task,
+          auditUserId: req.user.id
         })
+        const pkgAuditNote = validatedBinding.packageName
+          ? `，预设套餐 ${validatedBinding.packageName}${validatedBinding.planName ? ` / ${validatedBinding.planName}` : ''}`
+          : ''
         await prisma.log.create({
           data: {
             userId: req.user.id,
             module: LogModule.HOST,
             action: 'host.instance.import',
-            content: `节点 #${hostId} 管理员从路径 ${payload.filePath} 导入实例${payload.name ? ` (${payload.name})` : ''}`,
+            content: `节点 #${hostId} 管理员从路径 ${payload.filePath} 导入实例${payload.name ? ` (${payload.name})` : ''}${pkgAuditNote}`,
             result: LogResult.SUCCESS
           }
         })
         return { ...task, operationTaskId }
       } catch (error) {
+        if (error instanceof PackageBindingError) {
+          return reply.code(error.statusCode).send({ error: error.message })
+        }
         const status = error instanceof IncusApiError && [400, 403, 404, 409, 503].includes(error.statusCode) ? error.statusCode : 502
         return reply.code(status).send({ error: nodeErrorDetail(error, '导入实例失败') })
       }
@@ -637,7 +883,7 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         ])
         const managedNames = new Set(dbInstances.map(i => i.incusId))
 
-        const unassigned = incusInstances
+        const unassignedBase = incusInstances
           .filter(inst => !managedNames.has(inst.name))
           .map(inst => {
             const config = (inst.expanded_config ?? inst.config ?? {}) as Record<string, unknown>
@@ -659,6 +905,16 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
             }
           })
 
+        const presets = await listUnassignedInstancePresetsForHost(
+          hostId,
+          unassignedBase.map(item => item.incusName)
+        ).catch(() => ({} as Record<string, unknown>))
+
+        const unassigned = unassignedBase.map(item => ({
+          ...item,
+          preset: presets[item.incusName] ?? null
+        }))
+
         return { instances: unassigned }
       } catch (error) {
         const status = error instanceof IncusApiError && [400, 403, 404, 409, 503].includes(error.statusCode) ? error.statusCode : 502
@@ -670,7 +926,14 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
   // 将宿主机上的无归属实例分配给指定用户
   app.post<{
     Params: { hostId: number; incusName: string }
-    Body: { userId: number; name?: string }
+    Body: {
+      userId: number
+      name?: string
+      packageId?: number | null
+      planId?: number | null
+      validDays?: number | null
+      expiresAt?: string | null
+    }
   }>('/api/admin/hosts/:hostId/unassigned-instances/:incusName/assign', {
     onRequest: auth,
     schema: {
@@ -688,7 +951,11 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         required: ['userId'],
         properties: {
           userId: { type: 'integer', minimum: 1, maximum: 2147483647 },
-          name: { type: 'string', minLength: 1, maxLength: 64 }
+          name: { type: 'string', minLength: 1, maxLength: 64 },
+          packageId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          planId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          validDays: { type: ['integer', 'null'], minimum: 1, maximum: 36500 },
+          expiresAt: { type: ['string', 'null'], maxLength: 64 }
         }
       }
     },
@@ -696,15 +963,31 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
       const { hostId, incusName } = req.params
       const { userId } = req.body
 
-      const [host, targetUser, existing] = await Promise.all([
+      const [host, targetUser, existing, savedPreset] = await Promise.all([
         prisma.host.findUnique({ where: { id: hostId } }),
         prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true, email: true } }),
-        prisma.instance.findFirst({ where: { hostId, incusId: incusName, status: { not: 'deleted' } } })
+        prisma.instance.findFirst({ where: { hostId, incusId: incusName, status: { not: 'deleted' } } }),
+        getUnassignedInstancePreset(hostId, incusName).catch(() => null)
       ])
 
       if (!host) return reply.code(404).send({ error: '节点不存在' })
       if (!targetUser) return reply.code(404).send({ error: '目标用户不存在' })
       if (existing) return reply.code(409).send({ error: '该实例已归属于面板用户，无需重复分配' })
+
+      const hasExplicitPackageInput = req.body.packageId !== undefined
+      const effectiveBinding: PackageBindingInput = hasExplicitPackageInput
+        ? {
+            packageId: req.body.packageId,
+            planId: req.body.planId,
+            validDays: req.body.validDays,
+            expiresAt: req.body.expiresAt
+          }
+        : {
+            packageId: savedPreset?.packageId ?? null,
+            planId: savedPreset?.planId ?? null,
+            validDays: req.body.validDays !== undefined ? req.body.validDays : (savedPreset?.validDays ?? null),
+            expiresAt: req.body.expiresAt !== undefined ? req.body.expiresAt : (savedPreset?.expiresAt ?? null)
+          }
 
       try {
         const client = await getIncusClient(host)
@@ -713,66 +996,107 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
           getInstanceState(client, incusName).catch(() => null)
         ])
 
-        const config = (incusInst.expanded_config ?? incusInst.config ?? {}) as Record<string, unknown>
-        const cpu = parseCpuPercentage(config)
-        const memory = parseSizeToMB(config['limits.memory'], 512)
-        const { disk, storagePoolName } = extractDiskMB(incusInst)
-        const { ipv4, ipv6, networkMode } = extractNetworkDetails(incusInst, incusState)
-        const status = mapIncusStatus(incusInst.status)
-        const displayName = req.body.name?.trim() || incusName
-        const image = String(config['image.description'] || config['image.os'] || 'imported')
+        const metrics = extractSnapshotFromIncus(incusInst, incusState)
+        await validatePackageBindingSelection({
+          hostId,
+          packageId: effectiveBinding.packageId,
+          planId: effectiveBinding.planId,
+          validDays: effectiveBinding.validDays,
+          expiresAt: effectiveBinding.expiresAt,
+          instanceType: metrics.instanceType
+        })
+
         const cleanedGpuDevices = listIncusGpuDevices(incusInst)
         if (clearGpuDevices(incusInst)) {
           await client.request('PUT', `/1.0/instances/${encodeURIComponent(incusName)}`, incusInst)
         }
         const cleanedNote = cleanedGpuDevices.length
           ? `（已清理未登记 GPU 设备: ${cleanedGpuDevices.map(d => (d.pci ? `${d.name}(${d.pci})` : d.name)).join(', ')}）`
-          : ''
+          : undefined
 
-        const created = await prisma.$transaction(async (tx) => {
-          const dup = await tx.instance.findFirst({
-            where: { hostId, incusId: incusName, status: { not: 'deleted' } }
-          })
-          if (dup) throw new Error('ALREADY_ASSIGNED')
-
-          const createdInstance = await tx.instance.create({
-            data: {
-              incusId: incusName,
-              name: displayName,
-              userId: targetUser.id,
-              hostId,
-              storagePoolName,
-              image,
-              status,
-              cpu,
-              memory,
-              disk,
-              ipv4,
-              ipv6,
-              networkMode
-            }
-          })
-
-          await tx.log.create({
-            data: {
-              userId: req.user.id,
-              module: LogModule.HOST,
-              action: 'host.instance.assign',
-              content: `节点 #${hostId} 管理员将无归属实例 ${incusName} 分配给用户 ${targetUser.username} (#${targetUser.id})${cleanedNote}`,
-              result: LogResult.SUCCESS
-            }
-          })
-
-          return createdInstance
+        const registered = await registerImportedHostInstance({
+          hostId,
+          client,
+          incusName,
+          userId: targetUser.id,
+          displayName: req.body.name,
+          binding: effectiveBinding,
+          metrics,
+          auditUserId: req.user.id,
+          auditSource: 'manual_assign',
+          auditNote: cleanedNote,
+          throwIfAlreadyAssigned: true
         })
 
-        return { instance: created }
+        await consumeUnassignedInstancePreset(hostId, incusName).catch(() => null)
+
+        return { instance: registered.instance }
       } catch (error) {
+        if (error instanceof PackageBindingError) {
+          if (error.code === 'ALREADY_ASSIGNED') {
+            return reply.code(409).send({ error: '该实例已归属于面板用户' })
+          }
+          return reply.code(error.statusCode).send({ error: error.message })
+        }
         if (error instanceof Error && error.message === 'ALREADY_ASSIGNED') {
           return reply.code(409).send({ error: '该实例已归属于面板用户' })
         }
         const status = error instanceof IncusApiError && [400, 403, 404, 409, 503].includes(error.statusCode) ? error.statusCode : 502
         return reply.code(status).send({ error: nodeErrorDetail(error, '分配无归属实例失败') })
+      }
+    }
+  })
+
+  // 为已纳管实例绑定或调整所属套餐与方案（不计费）
+  app.put<{
+    Params: { hostId: number; instanceId: number }
+    Body: {
+      packageId?: number | null
+      planId?: number | null
+      validDays?: number | null
+      expiresAt?: string | null
+    }
+  }>('/api/admin/hosts/:hostId/instances/:instanceId/package', {
+    onRequest: [app.authenticate, app.requireAdmin],
+    schema: {
+      params: {
+        type: 'object',
+        required: ['hostId', 'instanceId'],
+        properties: {
+          hostId: { type: 'integer', minimum: 1, maximum: 2147483647 },
+          instanceId: { type: 'integer', minimum: 1, maximum: 2147483647 }
+        }
+      },
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          packageId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          planId: { type: ['integer', 'null'], minimum: 1, maximum: 2147483647 },
+          validDays: { type: ['integer', 'null'], minimum: 1, maximum: 36500 },
+          expiresAt: { type: ['string', 'null'], maxLength: 64 }
+        }
+      }
+    },
+    handler: async (req, reply) => {
+      try {
+        const instance = await rebindInstancePackage({
+          hostId: req.params.hostId,
+          instanceId: req.params.instanceId,
+          binding: {
+            packageId: req.body.packageId ?? null,
+            planId: req.body.planId,
+            validDays: req.body.validDays,
+            expiresAt: req.body.expiresAt
+          },
+          auditUserId: req.user.id
+        })
+        return { instance }
+      } catch (error) {
+        if (error instanceof PackageBindingError) {
+          return reply.code(error.statusCode).send({ error: error.message })
+        }
+        return reply.code(500).send({ error: '绑定实例套餐失败' })
       }
     }
   })

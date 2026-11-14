@@ -1673,9 +1673,38 @@ const api = {
       http.post(`/admin/hosts/${hostId}/instances/${instanceId}/export`, data, { timeout: 0 }),
     importInstanceFromHost: (
       hostId: number,
-      data: { id?: string; filePath: string; name?: string; storagePool?: string }
+      data: {
+        id?: string
+        filePath: string
+        name?: string
+        storagePool?: string
+        packageId?: number | null
+        planId?: number | null
+        validDays?: number | null
+        expiresAt?: string | null
+        userId?: number | null
+        displayName?: string | null
+      }
     ): Promise<HostInstanceBackupTask & { kind?: 'import'; instance?: string; filePath?: string }> =>
       http.post(`/admin/hosts/${hostId}/instances/import`, data, { timeout: 0 }),
+    getImportPackages: (hostId: number): Promise<{
+      packages: Array<{
+        id: number
+        name: string
+        description: string | null
+        instanceType: string
+        networkMode: string
+        isActive: boolean
+        boundToHost: boolean
+        plans: Array<{
+          id: number
+          name: string
+          billingCycle: number
+          price: number
+          isActive: boolean
+        }>
+      }>
+    }> => http.get(`/admin/hosts/${hostId}/import-packages`),
     getUnassignedInstances: (hostId: number): Promise<{
       instances: Array<{
         incusName: string
@@ -1690,14 +1719,45 @@ const api = {
         networkMode: string
         image: string
         createdAt: string | null
+        preset?: {
+          packageId?: number | null
+          planId?: number | null
+          packageName?: string | null
+          planName?: string | null
+          validDays?: number | null
+          expiresAt?: string | null
+        } | null
       }>
     }> => http.get(`/admin/hosts/${hostId}/unassigned-instances`),
     assignUnassignedInstance: (
       hostId: number,
       incusName: string,
-      data: { userId: number; name?: string }
-    ): Promise<{ instance: { id: number; name: string; incusId: string; userId: number } }> =>
+      data: {
+        userId: number
+        name?: string
+        packageId?: number | null
+        planId?: number | null
+        validDays?: number | null
+        expiresAt?: string | null
+      }
+    ): Promise<{ instance: { id: number; name: string; incusId: string; userId: number; packageId?: number | null; packagePlanId?: number | null } }> =>
       http.post(`/admin/hosts/${hostId}/unassigned-instances/${encodeURIComponent(incusName)}/assign`, data),
+    bindInstancePackage: (
+      hostId: number,
+      instanceId: number,
+      data: { packageId?: number | null; planId?: number | null; validDays?: number | null; expiresAt?: string | null }
+    ): Promise<{
+      instance: {
+        id: number
+        packageId: number | null
+        packagePlanId: number | null
+        packageName: string | null
+        planName: string | null
+        billingPrice: number | null
+        billingCycle: number | null
+        expiresAt: string | null
+      }
+    }> => http.put(`/admin/hosts/${hostId}/instances/${instanceId}/package`, data),
     opsDiscover: (hostId: number): Promise<{
       managed: Array<{ incusName: string; incusType: string; incusStatus: string; dbId: number; dbStatus: string; userId: number }>
       orphaned: Array<{ incusName: string; incusType: string; incusStatus: string }>
