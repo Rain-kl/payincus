@@ -20,15 +20,17 @@ interface StoragePool {
   config: Record<string, string>
   pendingImport?: boolean
   usedBy: number
-  space?: { used: number; total: number } | null
+  space?: { used: number; total: number; available?: number } | null
 }
 
 interface Props {
   hostId: number
+  refreshTrigger?: number
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{ updated: [] }>()
+const syncingBaseline = ref(false)
 
 const encryption = ref<Record<string, StorageEncryptionState>>({})
 const encryptionErrors = ref<Record<string, string>>({})
@@ -251,7 +253,15 @@ async function refreshEncryption(hostId: number, generation: number) {
   if (encryptionRefreshing) return
   encryptionRefreshing = true
   try {
-    await Promise.all(pools.value.filter(pool => pool.driver === 'zfs').map(async pool => {
+    const activeZfsPools = pools.value.filter(pool => pool.driver === 'zfs' && pool.status !== 'missing')
+    const activeNames = new Set(activeZfsPools.map(pool => pool.name))
+    for (const pool of pools.value) {
+      if (!activeNames.has(pool.name)) {
+        delete encryption.value[pool.name]
+        delete encryptionErrors.value[pool.name]
+      }
+    }
+    await Promise.all(activeZfsPools.map(async pool => {
       try {
         const state = await api.hosts.getStorageEncryption(hostId, pool.name)
         if (generation === loadGeneration) {
@@ -273,6 +283,30 @@ const encryptionTimer = setInterval(() => {
   }
 }, 10000)
 onUnmounted(() => clearInterval(encryptionTimer))
+
+watch(() => props.refreshTrigger, () => {
+  void loadPools()
+})
+
+async function syncBaseline() {
+  if (syncingBaseline.value) return
+  syncingBaseline.value = true
+  const hostId = props.hostId
+  try {
+    await api.hosts.opsBaselineSync(hostId)
+    if (hostId !== props.hostId) return
+    await loadPools()
+    emit('updated')
+    toast.success(t('admin.hosts.storage.syncBaselineSuccess'))
+  } catch (err: unknown) {
+    if (hostId === props.hostId) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(`${t('admin.hosts.storage.syncBaselineFailed')}: ${msg}`)
+    }
+  } finally {
+    syncingBaseline.value = false
+  }
+}
 
 async function loadPools() {
   loading.value = pools.value.length === 0
@@ -439,6 +473,14 @@ function getUsagePercent(pool: StoragePool): number {
   return Math.round((pool.space!.used / pool.space!.total) * 100)
 }
 
+function remainingSpaceBytes(pool: StoragePool): number | null {
+  if (!hasValidSpaceInfo(pool) || !pool.space) return null
+  if (typeof pool.space.available === 'number' && !isNaN(pool.space.available) && pool.space.available >= 0) {
+    return pool.space.available
+  }
+  return Math.max(0, pool.space.total - pool.space.used)
+}
+
 // 打开编辑模态框
 function openEditModal(pool: StoragePool) {
   editForm.value = {
@@ -489,6 +531,9 @@ async function submitEdit() {
         <p class="text-sm text-themed-secondary mt-1">{{ t('admin.hosts.storage.subtitle') }}</p>
       </div>
       <div class="flex gap-2">
+        <button class="btn-secondary" :disabled="syncingBaseline || loading" @click="syncBaseline">
+          {{ syncingBaseline ? t('common.loading') : t('admin.hosts.storage.syncBaseline') }}
+        </button>
         <button class="btn-secondary" :disabled="loading" @click="loadPools">刷新存储</button>
         <button class="btn-primary" @click="openCreateModal">
           <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -546,18 +591,41 @@ async function submitEdit() {
               <span
                 :class="[
                   'w-2 h-2 rounded-full',
-                  pool.status === 'ready' ? 'bg-green-500' : 'bg-gray-400'
+                  pool.status === 'ready'
+                    ? 'bg-[var(--success)]'
+                    : pool.status === 'missing'
+                      ? 'bg-[var(--error)]'
+                      : pool.status === 'pending' || pool.status === 'locked'
+                        ? 'bg-[var(--warning)]'
+                        : 'bg-[var(--text-tertiary)]'
                 ]"
               ></span>
-              <span class="text-xs text-themed-muted">{{ poolStatusLabel(pool.status) }}</span>
+              <span
+                :class="[
+                  'text-xs',
+                  pool.status === 'missing' ? 'text-[var(--error)] font-medium' : 'text-themed-muted'
+                ]"
+              >{{ poolStatusLabel(pool.status) }}</span>
             </div>
             <p v-if="pool.description" class="text-sm text-themed-secondary mt-1">{{ pool.description }}</p>
+            <p
+              v-if="pool.status === 'missing'"
+              class="text-xs text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--error)_25%,var(--bg-surface))] rounded-lg px-2.5 py-1.5 mt-2"
+              role="status"
+            >
+              {{ t('admin.hosts.storage.missingPoolNotice') }}
+            </p>
             
             <p v-if="encryptionErrors[pool.name]" class="text-xs text-themed-muted mt-2" role="status">{{ encryptionErrors[pool.name] }}</p>
             <!-- 使用量 -->
             <div v-if="hasValidSpaceInfo(pool)" class="mt-3">
               <div class="flex items-center justify-between text-xs text-themed-muted mb-1">
-                <span>{{ formatBytes(pool.space?.used) }} / {{ formatBytes(pool.space?.total) }}</span>
+                <span>
+                  {{ formatBytes(pool.space?.used) }} / {{ formatBytes(pool.space?.total) }}
+                  <template v-if="remainingSpaceBytes(pool) !== null">
+                    · {{ t('admin.hosts.storage.remainingSpace') }} {{ formatBytes(remainingSpaceBytes(pool)) }}
+                  </template>
+                </span>
                 <span>{{ getUsagePercent(pool) }}%</span>
               </div>
               <div class="h-1.5 rounded-full overflow-hidden" :class="themeStore.isDark ? 'bg-gray-700' : 'bg-gray-200'">
@@ -601,7 +669,7 @@ async function submitEdit() {
             <button
               class="btn-secondary btn-sm"
               :aria-label="`编辑存储池 ${pool.name}`"
-              :disabled="pool.pendingImport"
+              :disabled="pool.pendingImport || pool.status === 'missing'"
               @click="openEditModal(pool)"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1006,7 +1074,7 @@ async function submitEdit() {
     <DrawerModal :show="!!deleteTarget" :title="deleteTarget?.pendingImport ? '移除待导入存储' : '删除存储池'" :closable="!deleting" :close-on-backdrop="!deleting" @close="deleteTarget = null">
       <form class="space-y-4" @submit.prevent="submitDelete">
         <p class="text-sm text-themed">存储池：{{ deleteTarget?.name }}</p>
-        <p class="text-sm text-themed">{{ deleteTarget?.pendingImport ? '仅移除尚未绑定的导入记录，外部数据集和已有托管密钥将保留。' : '此操作将删除此池中的存储数据及对应的托管密钥，无法撤销。有实例或卷正在使用时会拒绝删除。' }}</p>
+        <p class="text-sm text-themed">{{ deleteTarget?.pendingImport ? '仅移除尚未绑定的导入记录，外部数据集和已有托管密钥将保留。' : deleteTarget?.status === 'missing' ? t('admin.hosts.storage.missingDeleteHint') : '此操作将删除此池中的存储数据及对应的托管密钥，无法撤销。有实例或卷正在使用时会拒绝删除。' }}</p>
         <p v-if="deleteError" class="text-sm text-themed" role="alert">{{ deleteError }}</p>
         <div class="flex justify-end gap-2">
           <button type="button" class="btn-secondary" :disabled="!!deleting" @click="deleteTarget = null">取消</button>

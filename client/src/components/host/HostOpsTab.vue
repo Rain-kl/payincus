@@ -7,7 +7,7 @@ import IconButton from '@/components/IconButton.vue'
 import { useAuthStore } from '@/stores/auth'
 const HostInstanceBackups = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostInstanceBackups.vue')) : null
 const HostNodeSecurity = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostNodeSecurity.vue')) : null
-import type { SshKey, SystemImage } from '@/types/api'
+import type { HostBaselineSyncResult, SshKey, SystemImage } from '@/types/api'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 
@@ -54,20 +54,6 @@ interface DiscoverResult {
     managedCount: number
     orphanedCount: number
     missingCount: number
-  }
-}
-
-interface BaselineSyncResult {
-  message: string
-  resources: {
-    cpuUsed: number
-    memoryUsed: number
-    diskUsed: number
-  }
-  instanceSync: {
-    total: number
-    synced: number
-    ipChanged: number
   }
 }
 
@@ -298,7 +284,7 @@ const lastAction = ref<'discover' | 'baseline' | 'network' | 'preview' | 'instan
 const lastRunAt = ref<string>('')
 
 const discoverResult = ref<DiscoverResult | null>(null)
-const baselineResult = ref<BaselineSyncResult | null>(null)
+const baselineResult = ref<HostBaselineSyncResult | null>(null)
 const networkResult = ref<NetworkRepairResult | null>(null)
 const previewResult = ref<InstanceOpsPreview | null>(null)
 const latestInstanceActionResult = ref<InstanceOpsActionResult | null>(null)
@@ -1979,6 +1965,27 @@ async function runAuditKillProcess() {
             <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.changes') }}</div>
             <div class="text-xl font-semibold mt-1 text-themed">{{ baselineResult.instanceSync.ipChanged }}</div>
           </div>
+        </div>
+        <div
+          v-if="baselineResult?.storageSync"
+          class="mt-3 rounded-xl p-4 flex flex-wrap items-center gap-3 text-xs"
+          :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'"
+        >
+          <span class="font-medium text-themed">
+            {{ t('admin.hosts.storage.title') }}：{{ baselineResult.storageSync.poolCount }}
+          </span>
+          <span
+            v-if="baselineResult.storageSync.missingPools.length > 0"
+            class="px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] font-medium"
+          >
+            {{ t('admin.hosts.storage.statusMissing') }}：{{ baselineResult.storageSync.missingPools.join(', ') }}
+          </span>
+          <span
+            v-if="baselineResult.storageSync.untrackedPools.length > 0"
+            class="px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] font-medium"
+          >
+            未纳入：{{ baselineResult.storageSync.untrackedPools.join(', ') }}
+          </span>
         </div>
 
         <div v-if="networkResult" class="overflow-hidden rounded-xl border" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">

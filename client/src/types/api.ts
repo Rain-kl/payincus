@@ -2375,3 +2375,55 @@ export interface GpuConfiguration {
   devices: GpuModelSummary[]
   count: number
 }
+
+export type HostDiagnosticItemStatus = 'pass' | 'warn' | 'fail' | 'skipped'
+
+export interface HostDiagnosticCheckItem {
+  key: 'agentHeartbeat' | 'reverseTunnel' | 'incusMtls' | 'nodeSecurity' | 'storageBaseline'
+  label: string
+  status: HostDiagnosticItemStatus
+  ok: boolean
+  latencyMs?: number | null
+  detail: string
+  meta?: Record<string, unknown>
+}
+
+export interface HostDiagnosticResult {
+  hostId: number
+  hostName: string
+  checkedAt: string
+  ok: boolean
+  overallStatus: 'healthy' | 'warning' | 'error'
+  summary: string
+  needsBaselineSync: boolean
+  checks: {
+    agentHeartbeat: HostDiagnosticCheckItem
+    reverseTunnel: HostDiagnosticCheckItem
+    incusMtls: HostDiagnosticCheckItem
+    nodeSecurity: HostDiagnosticCheckItem
+    storageBaseline: HostDiagnosticCheckItem
+  }
+}
+
+export interface HostBaselineSyncResult {
+  message: string
+  resources: {
+    cpuUsed: number
+    memoryUsed: number
+    diskUsed: number
+  }
+  storageSync?: {
+    usedBaselineEndpoint: boolean
+    storageAccepted: boolean
+    locked: boolean
+    poolCount: number
+    missingPools: string[]
+    untrackedPools: string[]
+    nodeSecuritySynced: boolean
+  }
+  instanceSync: {
+    total: number
+    synced: number
+    ipChanged: number
+  }
+}

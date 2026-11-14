@@ -12,6 +12,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useReveal } from '@/composables/useReveal'
 import { hostCreatePath, hostDetailPath, isAdminEntry } from '@/utils/app-paths'
 import MyHostCreateView from './MyHostCreateView.vue'
+import HostDiagnosticModal from '@/components/host/HostDiagnosticModal.vue'
+import type { HostDiagnosticResult } from '@/types/api'
 import { Badge, Button, Card, EmptyState, Input, PageHeader, Pagination } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
 
@@ -139,16 +141,44 @@ function goToDetail(host: any) {
   router.push(hostDetailPath(host.id))
 }
 
+// 连接诊断弹窗
+const diagnosticHost = ref<any | null>(null)
+const showDiagnosticModal = ref(false)
+const diagnosticLoading = ref(false)
+const diagnosticSyncingBaseline = ref(false)
+const diagnosticResult = ref<HostDiagnosticResult | null>(null)
+const diagnosticError = ref('')
+
 // 测试宿主机连接
 async function testHost(host: any) {
+  diagnosticHost.value = host
+  showDiagnosticModal.value = true
+  diagnosticLoading.value = true
+  diagnosticError.value = ''
+  diagnosticResult.value = null
   try {
-    const res: any = await api.hosts.test(host.id)
-    if (res.success) {
-      toast.success(t('admin.hosts.testSuccess'))
-    }
+    const res = await api.hosts.diagnose(host.id)
+    diagnosticResult.value = res
     loadHosts()
   } catch (err: any) {
-    toast.error(t('admin.hosts.testFailed') + ': ' + err.message)
+    diagnosticError.value = err?.message || String(err)
+    toast.error(t('admin.hosts.testFailed') + ': ' + diagnosticError.value)
+  } finally {
+    diagnosticLoading.value = false
+  }
+}
+
+async function runDiagnosticBaselineSync() {
+  if (!diagnosticHost.value || diagnosticSyncingBaseline.value) return
+  diagnosticSyncingBaseline.value = true
+  try {
+    await api.hosts.opsBaselineSync(diagnosticHost.value.id)
+    toast.success(t('admin.hosts.ops.runSuccess'))
+    await testHost(diagnosticHost.value)
+  } catch (err: any) {
+    toast.error(t('admin.hosts.ops.runFailed') + ': ' + (err?.message || String(err)))
+  } finally {
+    diagnosticSyncingBaseline.value = false
   }
 }
 
@@ -491,6 +521,19 @@ void getStatusClass
   <MyHostCreateView
     v-model:show="showCreateDrawer"
     @created="loadHosts"
+  />
+
+  <!-- 连接诊断弹窗 -->
+  <HostDiagnosticModal
+    :show="showDiagnosticModal"
+    :host-name="diagnosticHost?.name || ''"
+    :loading="diagnosticLoading"
+    :syncing-baseline="diagnosticSyncingBaseline"
+    :diagnostic="diagnosticResult"
+    :error="diagnosticError"
+    @close="showDiagnosticModal = false"
+    @recheck="diagnosticHost && testHost(diagnosticHost)"
+    @baseline-sync="runDiagnosticBaselineSync"
   />
 </template>
 

@@ -7,7 +7,7 @@ import type { HostGpu, InstanceGpuInfo } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { buildApiUrl } from '@/utils/api-url'
-import type { LoginRequest, LoginResponse, UpdateUserResponse, GenerateInviteRequest, InviteListResponse, User, BadgeCatalogItem, BadgeSeriesItem, UserQuota, UpdateUserRequest, Instance, InstanceWithDetails, InstanceStats, CreateInstanceRequest, CreateInstanceResponse, UpdateInstanceRequest, ChangeHostOptionsResponse, PortMapping, CreatePortMappingRequest, IpAddress, Ipv6Subnet, HostAgentStatusResponse, HostAgentInstallCommandResponse, Snapshot, Backup, CreateSnapshotRequest, CreateBackupRequest, SnapshotPolicy, BackupPolicy, UpdateSnapshotPolicyRequest, UpdateBackupPolicyRequest, Host, HostWithDetails, AvailableHost, CreateHostRequest, UpdateHostRequest, Package, CreatePackageRequest, UpdatePackageRequest, SshKey, CreateSshKeyRequest, NotificationChannel, CreateNotificationChannelRequest, UpdateNotificationChannelRequest, OAuthConfig, UserOAuthBinding, UpdateOAuthConfigRequest, OAuthClientApp, AdminOAuthAuthorization, UpsertOAuthClientAppRequest, HelpArticle, CreateHelpArticleRequest, UpdateHelpArticleRequest, HostImagePolicy, SystemImage, CreateSystemImageRequest, UpdateSystemImageRequest, Log, PaginatedResponse, Ticket, TicketMessage, TicketStatus, TicketObjectLink, TicketObjectLinkType, TicketSupportContext, TicketInternalNote, CreateTicketRequest, PaginatedTickets, PaginatedTicketMessages, TerminalSavedCommand, CreateTerminalSavedCommandRequest, UpdateTerminalSavedCommandRequest, TelegramBindingStatus, TelegramBindTokenResponse, TelegramAdminBindingsResponse, TelegramWebhookDeleteResponse, TelegramWebhookInfoResponse, TelegramWebhookSetupResponse, VersionMetadata, SystemUpdateCheckResult, SystemUpdateTask, PublicApiScopeMetadata, CreateGiftCardBatchRequest, CreateGiftCardRequest, GiftCardListResponse, GiftCardRecord, GiftCardStats } from '@/types/api.js'
+import type { LoginRequest, LoginResponse, UpdateUserResponse, GenerateInviteRequest, InviteListResponse, User, BadgeCatalogItem, BadgeSeriesItem, UserQuota, UpdateUserRequest, Instance, InstanceWithDetails, InstanceStats, CreateInstanceRequest, CreateInstanceResponse, UpdateInstanceRequest, ChangeHostOptionsResponse, PortMapping, CreatePortMappingRequest, IpAddress, Ipv6Subnet, HostAgentStatusResponse, HostAgentInstallCommandResponse, HostDiagnosticResult, HostBaselineSyncResult, Snapshot, Backup, CreateSnapshotRequest, CreateBackupRequest, SnapshotPolicy, BackupPolicy, UpdateSnapshotPolicyRequest, UpdateBackupPolicyRequest, Host, HostWithDetails, AvailableHost, CreateHostRequest, UpdateHostRequest, Package, CreatePackageRequest, UpdatePackageRequest, SshKey, CreateSshKeyRequest, NotificationChannel, CreateNotificationChannelRequest, UpdateNotificationChannelRequest, OAuthConfig, UserOAuthBinding, UpdateOAuthConfigRequest, OAuthClientApp, AdminOAuthAuthorization, UpsertOAuthClientAppRequest, HelpArticle, CreateHelpArticleRequest, UpdateHelpArticleRequest, HostImagePolicy, SystemImage, CreateSystemImageRequest, UpdateSystemImageRequest, Log, PaginatedResponse, Ticket, TicketMessage, TicketStatus, TicketObjectLink, TicketObjectLinkType, TicketSupportContext, TicketInternalNote, CreateTicketRequest, PaginatedTickets, PaginatedTicketMessages, TerminalSavedCommand, CreateTerminalSavedCommandRequest, UpdateTerminalSavedCommandRequest, TelegramBindingStatus, TelegramBindTokenResponse, TelegramAdminBindingsResponse, TelegramWebhookDeleteResponse, TelegramWebhookInfoResponse, TelegramWebhookSetupResponse, VersionMetadata, SystemUpdateCheckResult, SystemUpdateTask, PublicApiScopeMetadata, CreateGiftCardBatchRequest, CreateGiftCardRequest, GiftCardListResponse, GiftCardRecord, GiftCardStats } from '@/types/api.js'
 
 export type VipRuleType = 'user'
 export type VipConditionMode = 'any' | 'all'
@@ -1361,8 +1361,10 @@ const api = {
     update: (id: number, data: UpdateHostRequest): Promise<Host> =>
       http.patch(`/hosts/${id}`, data),
     delete: (id: number): Promise<void> => http.delete(`/hosts/${id}`),
-    test: (id: number): Promise<{ success: boolean; message?: string }> =>
-      http.post(`/hosts/${id}/test`, {}, { timeout: TIMEOUT.LONG }),
+    diagnose: (id: number): Promise<HostDiagnosticResult & { success: boolean; status: string; message: string }> =>
+      http.post(`/hosts/${id}/diagnose`, {}, { timeout: TIMEOUT.MEDIUM }),
+    test: (id: number): Promise<{ success: boolean; status?: string; message?: string; diagnostic?: HostDiagnosticResult }> =>
+      http.post(`/hosts/${id}/test`, {}, { timeout: TIMEOUT.MEDIUM }),
     verify: (id: number): Promise<{ success: boolean; message?: string; resources?: { cpuTotal: number; memoryTotalGB: number; diskTotalGB: number } }> =>
       http.post(`/hosts/${id}/verify`, {}, { timeout: TIMEOUT.MEDIUM }),
     regenerateInstall: (id: number): Promise<{ success: boolean; installCommand: string; installToken?: string; message: string }> =>
@@ -1379,7 +1381,7 @@ const api = {
     lockStorage: (id: number, poolName: string): Promise<StorageEncryptionState> => http.put(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`, {}, { timeout: TIMEOUT.LONG }),
     unlockStorage: (id: number, poolName: string, key?: string): Promise<StorageEncryptionState> => http.post(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption`, key ? { key } : {}, { timeout: TIMEOUT.LONG }),
     revealStorageKey: (id: number, poolName: string): Promise<{ key: string; fingerprint: string; dataset: string }> => http.post(`/hosts/${id}/storage-pools/${encodeURIComponent(poolName)}/encryption/reveal`, {}),
-    getStoragePools: (id: number): Promise<{ pools: Array<{ name: string; driver: string; description: string; status: string; purpose?: 'instance_data' | 'instance_storage' | null; config: Record<string, string>; usedBy: number; space?: { used: number; total: number } | null }> }> =>
+    getStoragePools: (id: number): Promise<{ pools: Array<{ name: string; driver: string; description: string; status: string; purpose?: 'instance_data' | 'instance_storage' | null; config: Record<string, string>; usedBy: number; space?: { used: number; total: number; available?: number } | null }> }> =>
       http.get(`/hosts/${id}/storage-pools`),
     createStoragePool: (id: number, data: {
       name: string
@@ -1707,19 +1709,7 @@ const api = {
         missingCount: number
       }
     }> => http.post(`/hosts/${hostId}/ops/discover`),
-    opsBaselineSync: (hostId: number): Promise<{
-      message: string
-      resources: {
-        cpuUsed: number
-        memoryUsed: number
-        diskUsed: number
-      }
-      instanceSync: {
-        total: number
-        synced: number
-        ipChanged: number
-      }
-    }> => http.post(`/hosts/${hostId}/ops/baseline-sync`),
+    opsBaselineSync: (hostId: number): Promise<HostBaselineSyncResult> => http.post(`/hosts/${hostId}/ops/baseline-sync`),
     opsNetworkRepair: (hostId: number): Promise<{
       message: string
       results: Array<{

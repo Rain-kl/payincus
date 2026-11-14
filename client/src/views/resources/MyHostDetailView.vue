@@ -19,7 +19,9 @@ import HostAgentLogsTab from '@/components/host/HostAgentLogsTab.vue'
 import HostRedeemCodesTab from '@/components/host/HostRedeemCodesTab.vue'
 import HostCreateInstanceTab from '@/components/host/HostCreateInstanceTab.vue'
 import HostOpsTab from '@/components/host/HostOpsTab.vue'
+import HostDiagnosticModal from '@/components/host/HostDiagnosticModal.vue'
 import FlagIcon from '@/components/FlagIcon.vue'
+import type { HostDiagnosticResult } from '@/types/api'
 import { hostsPath } from '@/utils/app-paths'
 import { useTabQuery } from '@/composables/useTabQuery'
 import { useReveal } from '@/composables/useReveal'
@@ -120,6 +122,14 @@ interface Host {
 const host = ref<Host | null>(null)
 const loading = ref(true)
 const actionLoading = ref('')
+const storageRefreshKey = ref(0)
+
+// 连接诊断弹窗
+const showDiagnosticModal = ref(false)
+const diagnosticLoading = ref(false)
+const diagnosticSyncingBaseline = ref(false)
+const diagnosticResult = ref<HostDiagnosticResult | null>(null)
+const diagnosticError = ref('')
 
 // 删除确认弹窗
 const showDeleteModal = ref(false)
@@ -236,17 +246,37 @@ async function retryLoadHost() {
 
 async function testConnection() {
   if (!host.value) return
+  const hostId = host.value.id
+  showDiagnosticModal.value = true
+  diagnosticLoading.value = true
+  diagnosticError.value = ''
   actionLoading.value = 'test'
   try {
-    const res = await api.hosts.test(host.value.id)
-    if (res.success) {
-      toast.success(res.message || t('admin.hosts.testSuccess'))
-    }
+    const res = await api.hosts.diagnose(hostId)
+    diagnosticResult.value = res
     await loadHost()
   } catch (err: any) {
-    toast.error(t('admin.hosts.testFailed') + ': ' + (err?.message || String(err)))
+    diagnosticError.value = err?.message || String(err)
+    toast.error(t('admin.hosts.testFailed') + ': ' + diagnosticError.value)
   } finally {
+    diagnosticLoading.value = false
     actionLoading.value = ''
+  }
+}
+
+async function runDiagnosticBaselineSync() {
+  if (!host.value || diagnosticSyncingBaseline.value) return
+  diagnosticSyncingBaseline.value = true
+  try {
+    await api.hosts.opsBaselineSync(host.value.id)
+    toast.success(t('admin.hosts.ops.runSuccess'))
+    storageRefreshKey.value++
+    await loadHost()
+    await testConnection()
+  } catch (err: any) {
+    toast.error(t('admin.hosts.ops.runFailed') + ': ' + (err?.message || String(err)))
+  } finally {
+    diagnosticSyncingBaseline.value = false
   }
 }
 
@@ -614,7 +644,7 @@ watch(tabs, (list) => {
         <MyHostConfigTab v-if="activeTab === 'config'" :host="host" @saved="onConfigSaved" />
         <HostFirewallTab v-if="activeTab === 'firewall' && isAdmin" :host-id="host.id" />
         <HostImagesTab v-if="activeTab === 'images'" :host-id="host.id" :host-name="host.name" />
-        <HostStorageTab v-if="activeTab === 'storage'" :host-id="host.id" @updated="loadHost" />
+        <HostStorageTab v-if="activeTab === 'storage'" :host-id="host.id" :refresh-trigger="storageRefreshKey" @updated="loadHost" />
         <HostPublicIpv4Tab v-if="activeTab === 'publicIpv4'" :host-id="host.id" />
         <HostCaddyTab v-if="activeTab === 'caddy'" :host-id="host.id" />
         <HostAgentLogsTab v-if="activeTab === 'agentLogs'" :host-id="host.id" />
@@ -864,6 +894,19 @@ watch(tabs, (list) => {
           </div>
         </Transition>
       </Teleport>
+
+      <!-- 连接诊断弹窗 -->
+      <HostDiagnosticModal
+        :show="showDiagnosticModal"
+        :host-name="host.name"
+        :loading="diagnosticLoading"
+        :syncing-baseline="diagnosticSyncingBaseline"
+        :diagnostic="diagnosticResult"
+        :error="diagnosticError"
+        @close="showDiagnosticModal = false"
+        @recheck="testConnection"
+        @baseline-sync="runDiagnosticBaselineSync"
+      />
     </template>
 
     <!-- 兜底态：既不在 loading、host 又为空时给出明确状态与重试操作 -->
