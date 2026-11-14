@@ -3018,7 +3018,6 @@ function formatShortDate(dateStr: string | null | undefined): string {
             </Card>
 
             <!-- Original Info Tab Content -->
-            <InstanceGpuInfo :instance-id="instance.id" :refresh-key="gpuRefreshKey" />
             <InstanceInfoTab
               :instance="instance"
               :stats="stats"
@@ -3039,15 +3038,18 @@ function formatShortDate(dateStr: string | null | undefined): string {
               @redeem="openRedeemModal"
               @reassign-ipv6="requestReassignIpv6"
             />
+            <InstanceGpuInfo :instance-id="instance.id" :refresh-key="gpuRefreshKey" />
           </div>
 
-          <!-- Network (Port Mappings) Tab -->
+          <!-- Network (Port Mappings + Traffic) Tab -->
           <InstanceNetworkTab
             v-if="activeTab === 'network' && instance"
             :instance="instance"
             :copied="copied"
             :can-manage-ports="canManagePorts"
             :delete-ports-loading="deletePortsLoading"
+            :traffic-data="trafficData"
+            :traffic-loading="trafficLoading"
             @copy="copyToClipboard"
             @add-port="requestAddPort"
             @delete-port="deletePort"

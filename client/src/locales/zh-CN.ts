@@ -1913,7 +1913,7 @@ export default {
             loadFailed: '加载实例失败',
             tabs: {
                 info: '信息',
-                network: '端口映射',
+                network: '网络',
                 traffic: '流量',
                 quota: '配额',
                 snapshots: '快照',

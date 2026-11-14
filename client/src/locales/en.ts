@@ -1733,7 +1733,7 @@ export default {
             loadFailed: 'Failed to load instance',
             tabs: {
                 info: 'Info',
-                network: 'Port Mappings',
+                network: 'Network',
                 traffic: 'Traffic',
                 quota: 'Quota',
                 snapshots: 'Snapshots',

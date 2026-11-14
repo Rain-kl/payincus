@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import api from '@/api'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
+import TrafficStats from '@/components/instance/TrafficStats.vue'
 import type { Instance } from '@/types/api'
 
 const { t } = useI18n()
@@ -26,11 +27,19 @@ function getPrivatePort(m: PortMapping): number {
   return m.privatePort ?? m.private_port ?? 0
 }
 
+interface TrafficData {
+  monthlyUsedFormatted: string
+  monthlyLimitFormatted?: string | null
+  percentage: number
+}
+
 interface Props {
   instance: Instance
   copied: string
   canManagePorts?: boolean  // AUTH004: 节点所有者不能管理端口映射
   deletePortsLoading?: boolean  // 批量删除加载状态
+  trafficData?: TrafficData | null
+  trafficLoading?: boolean
 }
 
 interface Emits {
@@ -43,6 +52,44 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const themeStore = useThemeStore()
+
+const trafficProgressBarClass = computed(() => {
+  if (!props.trafficData) return 'bg-blue-500'
+  if (props.trafficData.percentage >= 100) return 'bg-red-500'
+  if (props.trafficData.percentage >= 80) return 'bg-yellow-500'
+  return 'bg-blue-500'
+})
+
+function formatBandwidth(bandwidth: string | null | undefined): string {
+  const value = String(bandwidth || '').trim()
+  if (!value || value === '0') return t('traffic.unlimited')
+
+  const unitMatch = value.match(/^(\d+(?:\.\d+)?)\s*(m|g)?(?:bit|bps)$/i)
+  if (unitMatch) {
+    const numeric = Number(unitMatch[1])
+    if (!Number.isFinite(numeric) || numeric <= 0) return t('traffic.unlimited')
+    const multiplier = unitMatch[2]?.toLowerCase() === 'g' ? 1024 : 1
+    const mbps = numeric * multiplier
+    return `${Number.isInteger(mbps) ? mbps.toFixed(0) : mbps.toFixed(1)} Mbps`
+  }
+
+  if (/^\d+$/.test(value)) {
+    const bytes = BigInt(value)
+    const GB = BigInt(1024 * 1024 * 1024)
+    const MB = BigInt(1024 * 1024)
+
+    if (bytes >= GB) {
+      const gbps = Number(bytes / GB)
+      return `${gbps * 1024} Mbps`
+    }
+    if (bytes >= MB) {
+      return `${Number(bytes / MB)} Mbps`
+    }
+    return t('traffic.unlimited')
+  }
+
+  return value
+}
 const egress = ref<Awaited<ReturnType<typeof api.egress.instance>> | null>(null)
 const egressError = ref(false)
 async function loadEgress() { try { egress.value = await api.egress.instance(props.instance.id); egressError.value = false } catch { egressError.value = true } }
@@ -441,5 +488,59 @@ watch(portMappings, (newMappings) => {
         </div>
       </template>
     </div>
+
+    <!-- Monthly Traffic & Bandwidth Limits -->
+    <div class="card p-5 space-y-4">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-2 text-sm font-medium text-themed">
+          <svg class="w-4 h-4 text-themed-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+          </svg>
+          <span>{{ t('traffic.monthlyUsage') }}</span>
+        </div>
+        <div class="text-sm font-medium text-themed tabular-nums">
+          <template v-if="trafficLoading">
+            <span class="text-xs text-themed-secondary">{{ t('common.loading') }}</span>
+          </template>
+          <template v-else-if="trafficData">
+            {{ trafficData.monthlyUsedFormatted }}
+            <template v-if="trafficData.monthlyLimitFormatted">
+              / {{ trafficData.monthlyLimitFormatted }}
+            </template>
+            <template v-else>
+              / {{ t('traffic.unlimited') }}
+            </template>
+            <span class="text-xs text-themed-muted ml-1">
+              ({{ (trafficData.percentage || 0).toFixed(1) }}%)
+            </span>
+          </template>
+          <template v-else>
+            <span class="text-xs text-themed-secondary">{{ t('traffic.noData') }}</span>
+          </template>
+        </div>
+      </div>
+
+      <div
+        class="h-2 rounded-full overflow-hidden bg-themed/20"
+        :class="{ 'opacity-0': !trafficData || trafficLoading }"
+      >
+        <div
+          :class="['h-full rounded-full transition-all duration-500', trafficProgressBarClass]"
+          :style="{ width: Math.min(Math.max(trafficData?.percentage || 0, 0), 100) + '%' }"
+        ></div>
+      </div>
+
+      <div class="pt-2 border-t border-themed/20 flex flex-wrap items-center justify-between gap-2 text-xs text-themed-muted">
+        <span>
+          {{ t('instance.detail.info.ingressLimit') }}: {{ formatBandwidth(instance.limitsIngress) }}
+        </span>
+        <span>
+          {{ t('instance.detail.info.egressLimit') }}: {{ formatBandwidth(instance.limitsEgress) }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Detailed Traffic Stats -->
+    <TrafficStats :instance-id="instance.id" />
   </div>
 </template>
