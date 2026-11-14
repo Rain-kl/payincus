@@ -5,6 +5,7 @@ export interface InstanceTransferTask extends HostInstanceBackupTask {
   kind?: 'export' | 'import'
   instance?: string
   filePath?: string
+  operationTaskId?: number | null
 }
 
 export interface UnassignedHostInstance {

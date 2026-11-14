@@ -13,7 +13,7 @@ import { useToast } from '@/stores/toast'
 
 import api from '@/api'
 import { hostTransferApi, type UnassignedHostInstance } from '@/api/host-transfer'
-import { Button, Card, EmptyState, Input, Pagination, Select } from '@/components/ui'
+import { Badge, Button, Card, EmptyState, Input, Pagination, Select } from '@/components/ui'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import BatchConfigModal from '@/components/host/BatchConfigModal.vue'
 import MigrateHostModal from '@/components/host/MigrateHostModal.vue'
@@ -1279,6 +1279,13 @@ interface TransferTaskSummary {
   items?: Array<{ error?: string }>
 }
 
+interface CreatedTransferTaskView {
+  operationTaskId: number | null
+  status: 'running' | 'success'
+  path: string
+  instanceName?: string
+}
+
 function formatTransferError(task: TransferTaskSummary, fallback: string): string {
   const itemErr = task.items?.find(i => i.error)?.error
   if (itemErr && task.error && !task.error.includes(itemErr)) {
@@ -1287,19 +1294,13 @@ function formatTransferError(task: TransferTaskSummary, fallback: string): strin
   return task.error || itemErr || fallback
 }
 
-function pollTransferTask(taskId: string, onDone: (task: TransferTaskSummary) => void) {
-  const timer = window.setInterval(async () => {
-    try {
-      const res = await hostTransferApi.getTransferTasks(props.hostId)
-      const found = (res.tasks || []).find(item => item.id === taskId)
-      if (!found || found.status === 'running') return
-      window.clearInterval(timer)
-      onDone(found)
-    } catch {
-      window.clearInterval(timer)
-      onDone({ status: 'failed', error: '查询任务状态失败' })
-    }
-  }, 1500)
+function goToOperationTask(operationTaskId?: number | null) {
+  showExportModal.value = false
+  showImportModal.value = false
+  void router.push({
+    name: 'admin-tasks',
+    query: operationTaskId ? { task: String(operationTaskId) } : undefined
+  })
 }
 
 // 导出实例弹窗
@@ -1307,49 +1308,42 @@ const showExportModal = ref(false)
 const exportTargetInstance = ref<Instance | null>(null)
 const exportTargetPath = ref('/var/backups')
 const exportSubmitting = ref(false)
-const exportResultPath = ref<string | null>(null)
+const exportCreatedTask = ref<CreatedTransferTaskView | null>(null)
 
 function openExportModal(instance: Instance) {
   exportTargetInstance.value = instance
   exportTargetPath.value = `/var/backups/${instance.incusId || instance.name}.tar.gz`
-  exportResultPath.value = null
+  exportCreatedTask.value = null
   showExportModal.value = true
 }
 
 async function submitExport() {
   if (!exportTargetInstance.value || !exportTargetPath.value.trim() || exportSubmitting.value) return
   exportSubmitting.value = true
-  exportResultPath.value = null
+  exportCreatedTask.value = null
   try {
     const task = await hostTransferApi.exportInstance(
       props.hostId,
       exportTargetInstance.value.id,
       { targetPath: exportTargetPath.value.trim() }
     )
-    if (task.status === 'running') {
-      pollTransferTask(task.id, (doneTask) => {
-        exportSubmitting.value = false
-        if (doneTask.status === 'success') {
-          const outPath = doneTask.filePath || exportTargetPath.value.trim()
-          exportResultPath.value = outPath
-          toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
-        } else {
-          toast.error(formatTransferError(doneTask, t('admin.hosts.exportFailed')))
-        }
-      })
-    } else {
-      exportSubmitting.value = false
-      if (task.status === 'success') {
-        const outPath = task.filePath || exportTargetPath.value.trim()
-        exportResultPath.value = outPath
-        toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
-      } else {
-        toast.error(formatTransferError(task, t('admin.hosts.exportFailed')))
+    const outPath = task.filePath || exportTargetPath.value.trim()
+    if (task.status === 'running' || task.status === 'success') {
+      exportCreatedTask.value = {
+        operationTaskId: task.operationTaskId ?? null,
+        status: task.status,
+        path: outPath
       }
+      if (task.status === 'success') {
+        toast.success(t('admin.hosts.exportSuccess', { path: outPath }))
+      }
+    } else {
+      toast.error(formatTransferError(task, t('admin.hosts.exportFailed')))
     }
   } catch (err) {
-    exportSubmitting.value = false
     toast.error(translateError(err) || t('admin.hosts.exportFailed'))
+  } finally {
+    exportSubmitting.value = false
   }
 }
 
@@ -1359,47 +1353,45 @@ const importFilePath = ref('')
 const importNewName = ref('')
 const importStoragePool = ref('')
 const importSubmitting = ref(false)
+const importCreatedTask = ref<CreatedTransferTaskView | null>(null)
 
 function openImportModal() {
   importFilePath.value = ''
   importNewName.value = ''
   importStoragePool.value = ''
+  importCreatedTask.value = null
   showImportModal.value = true
 }
 
 async function submitImport() {
   if (!importFilePath.value.trim() || importSubmitting.value) return
   importSubmitting.value = true
+  importCreatedTask.value = null
   try {
     const task = await hostTransferApi.importInstance(props.hostId, {
       filePath: importFilePath.value.trim(),
       name: importNewName.value.trim() || undefined,
       storagePool: importStoragePool.value.trim() || undefined
     })
-    if (task.status === 'running') {
-      pollTransferTask(task.id, async (doneTask) => {
-        importSubmitting.value = false
-        if (doneTask.status === 'success') {
-          showImportModal.value = false
-          toast.success(t('admin.hosts.importSuccess', { name: doneTask.instance || importNewName.value || '-' }))
-          await loadUnassignedInstances()
-        } else {
-          toast.error(doneTask.error || t('admin.hosts.importFailed'))
-        }
-      })
-    } else {
-      importSubmitting.value = false
-      if (task.status === 'success') {
-        showImportModal.value = false
-        toast.success(t('admin.hosts.importSuccess', { name: task.instance || importNewName.value || '-' }))
-        await loadUnassignedInstances()
-      } else {
-        toast.error(task.error || t('admin.hosts.importFailed'))
+    const inPath = task.filePath || importFilePath.value.trim()
+    if (task.status === 'running' || task.status === 'success') {
+      importCreatedTask.value = {
+        operationTaskId: task.operationTaskId ?? null,
+        status: task.status,
+        path: inPath,
+        instanceName: task.instance || importNewName.value.trim() || undefined
       }
+      if (task.status === 'success') {
+        toast.success(t('admin.hosts.importSuccess', { name: task.instance || importNewName.value || '-' }))
+        void loadUnassignedInstances()
+      }
+    } else {
+      toast.error(formatTransferError(task, t('admin.hosts.importFailed')))
     }
   } catch (err) {
-    importSubmitting.value = false
     toast.error(translateError(err) || t('admin.hosts.importFailed'))
+  } finally {
+    importSubmitting.value = false
   }
 }
 
@@ -2164,33 +2156,52 @@ async function submitAssign() {
               {{ t('admin.hosts.exportDesc', { name: exportTargetInstance.name }) }}
             </p>
           </div>
-          <div class="space-y-1.5">
-            <label class="block text-sm font-medium text-[var(--text-primary)]">
-              {{ t('admin.hosts.exportTargetPath') }}
-            </label>
-            <Input
-              v-model="exportTargetPath"
-              :disabled="exportSubmitting"
-              :placeholder="t('admin.hosts.exportTargetPathPlaceholder')"
-            />
-            <p class="text-xs text-[var(--text-tertiary)]">
-              {{ t('admin.hosts.exportTargetPathHint') }}
-            </p>
-          </div>
-          <div
-            v-if="exportResultPath"
-            class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs font-mono text-[var(--text-primary)] break-all"
-          >
-            {{ exportResultPath }}
-          </div>
-          <div class="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" :disabled="exportSubmitting" @click="showExportModal = false">
-              {{ t('common.close') }}
-            </Button>
-            <Button variant="primary" :loading="exportSubmitting" :disabled="!exportTargetPath.trim()" @click="submitExport">
-              {{ exportSubmitting ? t('admin.hosts.exportRunning') : t('admin.hosts.exportInstance') }}
-            </Button>
-          </div>
+          <template v-if="exportCreatedTask">
+            <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <Badge :variant="exportCreatedTask.status === 'success' ? 'success' : 'warning'">
+                  {{ exportCreatedTask.status === 'success' ? t('admin.hosts.transferTaskSuccessTitle') : t('admin.hosts.transferTaskQueuedTitle') }}
+                </Badge>
+                <span v-if="exportCreatedTask.operationTaskId" class="text-xs font-mono text-[var(--text-tertiary)]">
+                  #{{ exportCreatedTask.operationTaskId }}
+                </span>
+              </div>
+              <p class="text-sm text-[var(--text-primary)] break-all">
+                {{ exportCreatedTask.status === 'success' ? t('admin.hosts.exportSuccess', { path: exportCreatedTask.path }) : t('admin.hosts.exportTaskQueuedDesc', { path: exportCreatedTask.path }) }}
+              </p>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" @click="showExportModal = false">
+                {{ t('admin.hosts.transferBack') }}
+              </Button>
+              <Button variant="primary" @click="goToOperationTask(exportCreatedTask.operationTaskId)">
+                {{ t('admin.hosts.transferGoToTasks') }}
+              </Button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="space-y-1.5">
+              <label class="block text-sm font-medium text-[var(--text-primary)]">
+                {{ t('admin.hosts.exportTargetPath') }}
+              </label>
+              <Input
+                v-model="exportTargetPath"
+                :disabled="exportSubmitting"
+                :placeholder="t('admin.hosts.exportTargetPathPlaceholder')"
+              />
+              <p class="text-xs text-[var(--text-tertiary)]">
+                {{ t('admin.hosts.exportTargetPathHint') }}
+              </p>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" :disabled="exportSubmitting" @click="showExportModal = false">
+                {{ t('common.close') }}
+              </Button>
+              <Button variant="primary" :loading="exportSubmitting" :disabled="!exportTargetPath.trim()" @click="submitExport">
+                {{ exportSubmitting ? t('admin.hosts.exportRunning') : t('admin.hosts.exportInstance') }}
+              </Button>
+            </div>
+          </template>
         </div>
       </div>
     </Transition>
@@ -2213,46 +2224,71 @@ async function submitAssign() {
               {{ t('admin.hosts.importDesc') }}
             </p>
           </div>
-          <div class="space-y-3">
-            <div class="space-y-1.5">
-              <label class="block text-sm font-medium text-[var(--text-primary)]">
-                {{ t('admin.hosts.importFilePath') }}
-              </label>
-              <Input
-                v-model="importFilePath"
-                :disabled="importSubmitting"
-                :placeholder="t('admin.hosts.importFilePathPlaceholder')"
-              />
+          <template v-if="importCreatedTask">
+            <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <Badge :variant="importCreatedTask.status === 'success' ? 'success' : 'warning'">
+                  {{ importCreatedTask.status === 'success' ? t('admin.hosts.transferTaskSuccessTitle') : t('admin.hosts.transferTaskQueuedTitle') }}
+                </Badge>
+                <span v-if="importCreatedTask.operationTaskId" class="text-xs font-mono text-[var(--text-tertiary)]">
+                  #{{ importCreatedTask.operationTaskId }}
+                </span>
+              </div>
+              <p class="text-sm text-[var(--text-primary)] break-all">
+                {{ importCreatedTask.status === 'success' ? t('admin.hosts.importSuccess', { name: importCreatedTask.instanceName || '-' }) : t('admin.hosts.importTaskQueuedDesc', { path: importCreatedTask.path }) }}
+              </p>
             </div>
-            <div class="space-y-1.5">
-              <label class="block text-sm font-medium text-[var(--text-primary)]">
-                {{ t('admin.hosts.importNewName') }}
-              </label>
-              <Input
-                v-model="importNewName"
-                :disabled="importSubmitting"
-                :placeholder="t('admin.hosts.importNewNamePlaceholder')"
-              />
+            <div class="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" @click="showImportModal = false">
+                {{ t('admin.hosts.transferBack') }}
+              </Button>
+              <Button variant="primary" @click="goToOperationTask(importCreatedTask.operationTaskId)">
+                {{ t('admin.hosts.transferGoToTasks') }}
+              </Button>
             </div>
-            <div class="space-y-1.5">
-              <label class="block text-sm font-medium text-[var(--text-primary)]">
-                {{ t('admin.hosts.importStoragePool') }}
-              </label>
-              <Input
-                v-model="importStoragePool"
-                :disabled="importSubmitting"
-                :placeholder="t('admin.hosts.importStoragePoolPlaceholder')"
-              />
+          </template>
+          <template v-else>
+            <div class="space-y-3">
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium text-[var(--text-primary)]">
+                  {{ t('admin.hosts.importFilePath') }}
+                </label>
+                <Input
+                  v-model="importFilePath"
+                  :disabled="importSubmitting"
+                  :placeholder="t('admin.hosts.importFilePathPlaceholder')"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium text-[var(--text-primary)]">
+                  {{ t('admin.hosts.importNewName') }}
+                </label>
+                <Input
+                  v-model="importNewName"
+                  :disabled="importSubmitting"
+                  :placeholder="t('admin.hosts.importNewNamePlaceholder')"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium text-[var(--text-primary)]">
+                  {{ t('admin.hosts.importStoragePool') }}
+                </label>
+                <Input
+                  v-model="importStoragePool"
+                  :disabled="importSubmitting"
+                  :placeholder="t('admin.hosts.importStoragePoolPlaceholder')"
+                />
+              </div>
             </div>
-          </div>
-          <div class="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" :disabled="importSubmitting" @click="showImportModal = false">
-              {{ t('common.cancel') }}
-            </Button>
-            <Button variant="primary" :loading="importSubmitting" :disabled="!importFilePath.trim()" @click="submitImport">
-              {{ importSubmitting ? t('admin.hosts.importRunning') : t('admin.hosts.importInstance') }}
-            </Button>
-          </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" :disabled="importSubmitting" @click="showImportModal = false">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button variant="primary" :loading="importSubmitting" :disabled="!importFilePath.trim()" @click="submitImport">
+                {{ importSubmitting ? t('admin.hosts.importRunning') : t('admin.hosts.importInstance') }}
+              </Button>
+            </div>
+          </template>
         </div>
       </div>
     </Transition>
