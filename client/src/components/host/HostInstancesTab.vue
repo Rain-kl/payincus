@@ -12,7 +12,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 
 import api from '@/api'
-import { hostTransferApi, type UnassignedHostInstance } from '@/api/host-transfer'
+import { hostTransferApi, type ImportStoragePoolOption, type UnassignedHostInstance } from '@/api/host-transfer'
 import { Badge, Button, Card, EmptyState, Input, Pagination, Select } from '@/components/ui'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import BatchConfigModal from '@/components/host/BatchConfigModal.vue'
@@ -1352,44 +1352,49 @@ const showImportModal = ref(false)
 const importFilePath = ref('')
 const importNewName = ref('')
 const importStoragePool = ref('')
-const importPools = ref<Array<{ name: string; driver: string; purpose?: 'instance_data' | 'instance_storage' | null }>>([])
+const importPools = ref<ImportStoragePoolOption[]>([])
 const importPoolsLoading = ref(false)
+const importPoolsLoadFailed = ref(false)
 const importSubmitting = ref(false)
 const importCreatedTask = ref<CreatedTransferTaskView | null>(null)
 
 const importPoolOptions = computed(() => {
-  if (!importPools.value.length) return []
+  if (importPoolsLoading.value) {
+    return [{ value: '', label: t('admin.hosts.importStoragePoolLoading') }]
+  }
+  if (importPoolsLoadFailed.value && !importPools.value.length) {
+    return [{ value: '', label: t('admin.hosts.importStoragePoolLoadFailed') }]
+  }
+  if (!importPools.value.length) {
+    return [{ value: '', label: t('admin.hosts.importStoragePoolEmpty') }]
+  }
   return [
-    { value: '', label: t('admin.hosts.importStoragePoolPlaceholder') },
+    { value: '', label: t('admin.hosts.importStoragePoolAuto') },
     ...importPools.value.map(pool => ({
       value: pool.name,
-      label: `${pool.name} (${pool.driver})`
+      label: `${pool.name} (${pool.driver}${pool.purpose === 'instance_storage' ? ` · ${t('admin.hosts.importStoragePoolPurposeStorage')}` : ''})`
     }))
   ]
 })
 
 async function loadImportPools(hostId: number) {
   importPoolsLoading.value = true
+  importPoolsLoadFailed.value = false
   try {
-    const res = await api.hosts.getStoragePools(hostId)
+    const res = await hostTransferApi.getImportStoragePools(hostId)
     if (props.hostId !== hostId) return
-    const pools = (res.pools || []).slice().sort((a, b) => {
-      const aData = a.purpose === 'instance_storage' ? 1 : 0
-      const bData = b.purpose === 'instance_storage' ? 1 : 0
-      if (aData !== bData) return aData - bData
-      if (a.name === 'default' && b.name !== 'default') return -1
-      if (b.name === 'default' && a.name !== 'default') return 1
-      return a.name.localeCompare(b.name)
-    })
+    const pools = res.pools || []
     importPools.value = pools
     if (!importStoragePool.value) {
       const preferred = pools.find(p => p.purpose !== 'instance_storage') || pools[0]
       if (preferred) importStoragePool.value = preferred.name
     }
   } catch {
+    if (props.hostId !== hostId) return
     importPools.value = []
+    importPoolsLoadFailed.value = true
   } finally {
-    importPoolsLoading.value = false
+    if (props.hostId === hostId) importPoolsLoading.value = false
   }
 }
 
@@ -2309,20 +2314,23 @@ async function submitAssign() {
                 />
               </div>
               <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-[var(--text-primary)]">
-                  {{ t('admin.hosts.importStoragePool') }}
-                </label>
+                <div class="flex items-center justify-between gap-2">
+                  <label class="block text-sm font-medium text-[var(--text-primary)]">
+                    {{ t('admin.hosts.importStoragePool') }}
+                  </label>
+                  <button
+                    v-if="importPoolsLoadFailed"
+                    type="button"
+                    class="text-xs text-[var(--accent)] hover:underline cursor-pointer"
+                    @click="loadImportPools(props.hostId)"
+                  >
+                    {{ t('common.retry') }}
+                  </button>
+                </div>
                 <Select
-                  v-if="importPoolOptions.length > 0"
                   v-model="importStoragePool"
                   :options="importPoolOptions"
                   :disabled="importSubmitting || importPoolsLoading"
-                />
-                <Input
-                  v-else
-                  v-model="importStoragePool"
-                  :disabled="importSubmitting || importPoolsLoading"
-                  :placeholder="t('admin.hosts.importStoragePoolPlaceholder')"
                 />
               </div>
             </div>

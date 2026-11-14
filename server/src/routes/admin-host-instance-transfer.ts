@@ -499,6 +499,66 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
     }
   })
 
+  // 获取宿主机可用于实例导入的目标存储池列表（优先结合实时 Incus 池与面板登记用途）
+  app.get<{ Params: { hostId: number } }>('/api/admin/hosts/:hostId/import-storage-pools', {
+    onRequest: auth,
+    schema: { params: hostIdParams },
+    handler: async (req, reply) => {
+      reply.header('Cache-Control', 'no-store')
+      const { hostId } = req.params
+      const host = await prisma.host.findUnique({ where: { id: hostId } })
+      if (!host) return reply.code(404).send({ error: '节点不存在' })
+
+      const dbPools = await prisma.storagePool.findMany({
+        where: { hostId },
+        select: { name: true, driver: true, purpose: true, status: true },
+        orderBy: [{ purpose: 'asc' }, { createdAt: 'asc' }]
+      })
+      const dbMap = new Map(dbPools.map(p => [p.name, p]))
+
+      let livePools: Array<{ name?: string; driver?: string; status?: string }> | null = null
+      try {
+        const client = await getIncusClient(host)
+        const res = await client.request<Array<{ name?: string; driver?: string; status?: string }>>('GET', '/1.0/storage-pools?recursion=1')
+        if (Array.isArray(res)) livePools = res
+      } catch (error) {
+        if (dbPools.length === 0) {
+          const status = error instanceof IncusApiError && [400, 403, 404, 409, 503].includes(error.statusCode) ? error.statusCode : 502
+          return reply.code(status).send({ error: nodeErrorDetail(error, '获取宿主机存储池失败') })
+        }
+      }
+
+      const rawList = livePools
+        ? livePools
+            .map(pool => {
+              const name = typeof pool?.name === 'string' ? pool.name.trim() : ''
+              if (!name) return null
+              const db = dbMap.get(name)
+              return {
+                name,
+                driver: (typeof pool.driver === 'string' && pool.driver.trim()) || db?.driver || 'unknown',
+                purpose: db?.purpose ?? null,
+                status: (typeof pool.status === 'string' && pool.status.trim()) || db?.status || 'Created'
+              }
+            })
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        : dbPools
+            .filter(p => p.status !== 'missing')
+            .map(p => ({ name: p.name, driver: p.driver, purpose: p.purpose, status: p.status }))
+
+      rawList.sort((a, b) => {
+        const aScore = a.purpose === 'instance_storage' ? 1 : 0
+        const bScore = b.purpose === 'instance_storage' ? 1 : 0
+        if (aScore !== bScore) return aScore - bScore
+        if (a.name === 'default' && b.name !== 'default') return -1
+        if (b.name === 'default' && a.name !== 'default') return 1
+        return a.name.localeCompare(b.name)
+      })
+
+      return { pools: rawList }
+    }
+  })
+
   // 获取宿主机上无归属（未纳入面板数据库）的实例列表
   app.get<{ Params: { hostId: number } }>('/api/admin/hosts/:hostId/unassigned-instances', {
     onRequest: auth,

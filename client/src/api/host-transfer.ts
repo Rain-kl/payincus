@@ -23,9 +23,19 @@ export interface UnassignedHostInstance {
   createdAt: string | null
 }
 
+export interface ImportStoragePoolOption {
+  name: string
+  driver: string
+  purpose?: 'instance_data' | 'instance_storage' | null
+  status?: string
+}
+
 export const hostTransferApi = {
   getTransferTasks: (hostId: number): Promise<{ supported: boolean; tasks: InstanceTransferTask[] }> =>
     http.get(`/admin/hosts/${hostId}/instance-transfer`, { timeout: 0 }),
+
+  getImportStoragePools: (hostId: number): Promise<{ pools: ImportStoragePoolOption[] }> =>
+    http.get(`/admin/hosts/${hostId}/import-storage-pools`),
 
   exportInstance: (
     hostId: number,
