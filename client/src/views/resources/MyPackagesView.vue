@@ -1155,15 +1155,6 @@ function getBillingCycleLabel(months: number): string {
             <div class="modal-body space-y-4 max-h-[70vh] overflow-y-auto p-6">
               <!-- 基本信息 -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <GpuSharingFields
-                  v-if="plansPackage"
-                  v-model="planForm.gpuShared"
-                  v-model:device-ids="planForm.gpuDeviceIds"
-                  class="sm:col-span-2"
-                  :host-ids="plansPackage.host_ids || []"
-                  :allowed="plansPackage.instance_type !== 'vm' && !plansPackage.privileged"
-                  nullable
-                />
                 <div>
                   <Input
                     v-model="planForm.name"
@@ -1281,6 +1272,15 @@ function getBillingCycleLabel(months: number): string {
                   </div>
                 </div>
               </div>
+
+              <GpuSharingFields
+                v-if="plansPackage"
+                v-model="planForm.gpuShared"
+                v-model:device-ids="planForm.gpuDeviceIds"
+                :host-ids="plansPackage.host_ids || []"
+                :allowed="plansPackage.instance_type !== 'vm' && !plansPackage.privileged"
+                nullable
+              />
 
               <!-- 计费配置 -->
               <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
