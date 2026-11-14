@@ -7,15 +7,27 @@ import { hostTunnelManager } from './incus/tunnel-manager.js'
 interface TaskContext { nodeLogs?: boolean; id: number; hostId: number; name: string; queue: Promise<void>; count: number; nodeAck: boolean; pending: number; dropped: number; cancel?: () => Promise<void>; stopping?: boolean; cancelled?: boolean }
 const context = new AsyncLocalStorage<TaskContext>()
 const active = new Map<number, TaskContext>()
+const progressMap = new Map<number, string>()
 const MAX_LOGS = 5000
 export const currentOperationTask = () => context.getStore()
 export const hasActiveOperationTask = (hostId: number, name: string) => [...active.values()].some(ctx => ctx.hostId === hostId && ctx.name === name)
+
+export function setOperationTaskProgress(id: number, progress: string | null): void {
+  const trimmed = typeof progress === 'string' ? redactTaskLog(progress).trim().slice(0, 500) : ''
+  if (trimmed) progressMap.set(id, trimmed)
+  else progressMap.delete(id)
+}
 
 // Only expose cancellation while an actual node operation is attached. Cleanup is
 // deliberately not cancellable: it must finish releasing the failed instance.
 export function operationTaskControl(id: number) {
   const ctx = active.get(id)
-  return { canStop: Boolean(ctx?.cancel && !ctx.stopping && !ctx.cancelled), stopping: Boolean(ctx?.stopping || ctx?.cancelled) }
+  const progress = progressMap.get(id) || null
+  return {
+    canStop: Boolean(ctx?.cancel && !ctx.stopping && !ctx.cancelled),
+    stopping: Boolean(ctx?.stopping || ctx?.cancelled),
+    ...(progress ? { progress } : {})
+  }
 }
 
 export function bindOperationCancellation(cancel: () => Promise<void>): () => void {

@@ -5,11 +5,14 @@ import { LogModule, LogResult } from '../db/logs.js'
 import { IncusApiError, nodeErrorDetail } from '../lib/incus/incus-client.js'
 import { getIncusClient } from '../lib/incus/incus-pool.js'
 import { getInstance, getInstanceState, listInstances } from '../lib/incus/incus-instances.js'
+import { redactTaskLog, setOperationTaskProgress } from '../lib/operation-task-log.js'
 import type { IncusInstance } from '../types/incus.js'
 
 const TRANSFER_EXT = 'incus_instance_transfer_v1'
 const BACKUPS_ENDPOINT = '/1.0/agent/instance-backups'
 const IMPORT_ENDPOINT = '/1.0/agent/instance-import'
+
+const PROGRESS_LOG_INTERVAL_MS = 5000
 
 const hostIdParams = {
   type: 'object',
@@ -30,8 +33,16 @@ interface NodeBackupTask {
   filePath?: string
   directory?: string
   status: string
+  progress?: string
   error?: string
   items?: Array<{ name?: string; status?: string; error?: string; file?: string; bytes?: number }>
+}
+
+function getNodeProgressStageKey(progress: string): string {
+  return progress
+    .replace(/[\d.,]+\s*(?:[KMGTPE]?i?B|%)(?:\/s)?/gi, '')
+    .replace(/\d+/g, '')
+    .trim()
 }
 
 function formatNodeBackupError(task: NodeBackupTask): string | null {
@@ -84,6 +95,21 @@ async function trackNodeTransferTask(params: {
     return opTask.id
   }
 
+  let lastProgress = typeof task.progress === 'string' ? task.progress.trim() : ''
+  let lastProgressLogAt = 0
+  if (initialStatus === 'running' && lastProgress) {
+    setOperationTaskProgress(opTask.id, lastProgress)
+    lastProgressLogAt = Date.now()
+    await prisma.operationTaskLog.create({
+      data: {
+        taskId: opTask.id,
+        source: 'node',
+        level: 'info',
+        message: redactTaskLog(lastProgress)
+      }
+    }).catch(() => {})
+  }
+
   let attempts = 0
   const maxAttempts = 3600
   const poll = async () => {
@@ -91,6 +117,7 @@ async function trackNodeTransferTask(params: {
     try {
       const host = await prisma.host.findUnique({ where: { id: hostId } })
       if (!host) {
+        setOperationTaskProgress(opTask.id, null)
         await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'failed', error: '宿主机不存在', finishedAt: new Date() } })
         return
       }
@@ -99,10 +126,12 @@ async function trackNodeTransferTask(params: {
       const found = (data.tasks || []).find(t => t.id === task.id)
       if (!found) {
         if (attempts >= 5) {
+          setOperationTaskProgress(opTask.id, null)
           await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'interrupted', error: '节点未返回该任务状态', finishedAt: new Date() } })
           return
         }
       } else if (found.status !== 'running') {
+        setOperationTaskProgress(opTask.id, null)
         const finalStatus = found.status === 'success' ? 'success' : 'failed'
         const errText = formatNodeBackupError(found)
         await prisma.operationTaskLog.create({
@@ -118,11 +147,32 @@ async function trackNodeTransferTask(params: {
           data: { status: finalStatus, error: finalStatus === 'success' ? null : (errText || `${actionLabel}失败`), finishedAt: new Date() }
         })
         return
+      } else {
+        const progressText = typeof found.progress === 'string' ? found.progress.trim() : ''
+        setOperationTaskProgress(opTask.id, progressText || null)
+        const nowMs = Date.now()
+        if (
+          progressText &&
+          progressText !== lastProgress &&
+          (nowMs - lastProgressLogAt >= PROGRESS_LOG_INTERVAL_MS || getNodeProgressStageKey(progressText) !== getNodeProgressStageKey(lastProgress))
+        ) {
+          lastProgress = progressText
+          lastProgressLogAt = nowMs
+          await prisma.operationTaskLog.create({
+            data: {
+              taskId: opTask.id,
+              source: 'node',
+              level: 'info',
+              message: redactTaskLog(progressText)
+            }
+          }).catch(() => {})
+        }
       }
     } catch {
       // Transient poll failure; keep waiting until maxAttempts
     }
     if (attempts >= maxAttempts) {
+      setOperationTaskProgress(opTask.id, null)
       await prisma.operationTask.updateMany({ where: { id: opTask.id, status: 'running' }, data: { status: 'interrupted', error: '轮询超时，请检查节点实际状态', finishedAt: new Date() } }).catch(() => {})
       return
     }

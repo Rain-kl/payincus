@@ -4154,8 +4154,9 @@ export interface OperationTask {
   hostId: number
   hostName?: string | null
   instanceName: string
-  kind: 'create' | 'destroy' | 'node_recover'
+  kind: 'create' | 'destroy' | 'node_recover' | 'instance_export' | 'instance_import'
   status: 'running' | 'success' | 'failed' | 'cancelled' | 'interrupted'
+  progress?: string | null
   error: string | null
   createdAt: string
   finishedAt: string | null

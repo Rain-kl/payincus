@@ -138,6 +138,14 @@ function duration(task: OperationTask) {
   return `${Math.floor(seconds / 3600).toString().padStart(2, '0')}:${Math.floor(seconds / 60 % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
 }
 
+function progressPercent(progress?: string | null): number | null {
+  if (!progress) return null
+  const match = progress.match(/\b(\d{1,3})%\b/)
+  if (!match) return null
+  const value = Number.parseInt(match[1], 10)
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null
+}
+
 function askStop(task: OperationTask) {
   stopError.value = ''
   stopTarget.value = task
@@ -502,6 +510,17 @@ onUnmounted(() => {
             <div class="flex items-center gap-2 mt-0.5">
               <span class="font-mono text-xs text-[var(--text-tertiary)]">#{{ task.id }}</span>
             </div>
+            <div v-if="task.status === 'running' && task.progress" class="mt-1 min-w-0 max-w-full">
+              <button
+                type="button"
+                class="flex items-center gap-1.5 w-full max-w-full min-w-0 text-xs font-mono text-[var(--accent)] text-left hover:underline cursor-pointer"
+                :title="task.progress"
+                @click="open(task)"
+              >
+                <Loader2 class="w-3 h-3 animate-spin shrink-0" />
+                <span class="min-w-0 flex-1 truncate">{{ task.progress }}</span>
+              </button>
+            </div>
             <div v-if="task.error" class="mt-1 min-w-0 max-w-full">
               <button
                 type="button"
@@ -629,6 +648,15 @@ onUnmounted(() => {
             </div>
 
             <div
+              v-if="task.status === 'running' && task.progress"
+              class="rounded-xl bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--accent)_20%,var(--bg-surface))] p-2.5 text-xs font-mono text-[var(--accent)] flex items-center gap-2 cursor-pointer"
+              @click="open(task)"
+            >
+              <Loader2 class="w-3.5 h-3.5 animate-spin shrink-0" />
+              <span class="min-w-0 flex-1 break-words">{{ task.progress }}</span>
+            </div>
+
+            <div
               v-if="task.error"
               class="rounded-xl bg-[color-mix(in_srgb,var(--error)_8%,var(--bg-surface))] border border-[color-mix(in_srgb,var(--error)_20%,var(--bg-surface))] p-2.5 text-xs text-[var(--error)] break-words cursor-pointer"
               @click="open(task)"
@@ -748,6 +776,26 @@ onUnmounted(() => {
               <span class="font-mono tabular-nums font-medium text-[var(--text-primary)] mt-0.5 block">
                 {{ duration(selected) }}
               </span>
+            </div>
+          </div>
+
+          <!-- 实时执行进度 -->
+          <div
+            v-if="selected.status === 'running' && selected.progress"
+            class="rounded-xl border border-[color-mix(in_srgb,var(--accent)_28%,var(--bg-surface))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-surface))] p-3 space-y-2 text-xs text-[var(--accent)]"
+          >
+            <div class="flex items-center gap-2 font-mono break-all">
+              <Loader2 class="w-4 h-4 animate-spin shrink-0" />
+              <span class="flex-1">{{ selected.progress }}</span>
+            </div>
+            <div
+              v-if="progressPercent(selected.progress) !== null"
+              class="h-1.5 w-full rounded-full bg-[color-mix(in_srgb,var(--accent)_18%,var(--bg-surface))] overflow-hidden"
+            >
+              <div
+                class="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+                :style="{ width: `${progressPercent(selected.progress)}%` }"
+              />
             </div>
           </div>
 
