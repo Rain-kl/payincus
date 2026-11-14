@@ -8,7 +8,6 @@ import { useAuthStore } from '@/stores/auth'
 const HostInstanceBackups = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostInstanceBackups.vue')) : null
 const HostNodeSecurity = import.meta.env.VITE_APP_ENTRY === 'admin' ? defineAsyncComponent(() => import('./HostNodeSecurity.vue')) : null
 import type { HostBaselineSyncResult, SshKey, SystemImage } from '@/types/api'
-import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/stores/toast'
 
 defineOptions({
@@ -275,7 +274,6 @@ const props = defineProps<Props>()
 const nodeSecurityAdmin = computed(() => useAuthStore().user?.role === 'admin')
 
 const { t } = useI18n()
-const themeStore = useThemeStore()
 const toast = useToast()
 
 const activeOpsMenu = ref<'actions' | 'audit' | 'backups'>('actions')
@@ -1255,208 +1253,277 @@ async function runAuditKillProcess() {
 <template>
   <div class="space-y-6">
     <component :is="HostNodeSecurity" v-if="nodeSecurityAdmin && HostNodeSecurity" :host-id="hostId" @refresh="emit('refresh')" />
-    <div class="card p-5 space-y-4">
-      <div>
-        <h3 class="text-lg font-semibold text-themed">{{ t('admin.hosts.ops.title') }}</h3>
-        <p class="text-sm text-themed-muted mt-1">{{ t('admin.hosts.ops.description') }}</p>
-      </div>
 
-      <div class="inline-flex rounded-lg border p-1" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-        <button
-          type="button"
-          class="px-4 py-2 text-sm rounded-md transition"
-          :class="activeOpsMenu === 'actions' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'"
-          @click="activeOpsMenu = 'actions'"
-        >
-          实例操作
-        </button>
-        <button
-          type="button"
-          class="px-4 py-2 text-sm rounded-md transition"
-          :class="activeOpsMenu === 'audit' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'"
-          @click="activeOpsMenu = 'audit'"
-        >
-          实例审查
-        </button>
-        <button
-          v-if="nodeSecurityAdmin"
-          type="button"
-          class="min-h-[44px] px-4 py-2 text-sm rounded-full font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] motion-reduce:transition-none"
-          :class="activeOpsMenu === 'backups' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'"
-          @click="activeOpsMenu = 'backups'"
-        >实例备份</button>
-      </div>
+    <!-- 运维主控卡片 -->
+    <Card padding="md">
+      <template #header>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
+          <div class="flex items-start gap-3.5 min-w-0">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-soft)] border border-[var(--border-color)] text-[var(--accent)]">
+              <Activity class="w-5 h-5 stroke-[1.8]" />
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                {{ t('admin.hosts.ops.title') }}
+              </h3>
+              <p class="text-sm text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                {{ t('admin.hosts.ops.description') }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Apple 胶囊分段控制器 -->
+          <div class="inline-flex items-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-1 self-start lg:self-auto shrink-0">
+            <button
+              type="button"
+              class="min-h-[36px] px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] cursor-pointer"
+              :class="activeOpsMenu === 'actions'
+                ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+              @click="activeOpsMenu = 'actions'"
+            >
+              实例操作
+            </button>
+            <button
+              type="button"
+              class="min-h-[36px] px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] cursor-pointer"
+              :class="activeOpsMenu === 'audit'
+                ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+              @click="activeOpsMenu = 'audit'"
+            >
+              实例审查
+            </button>
+            <button
+              v-if="nodeSecurityAdmin"
+              type="button"
+              class="min-h-[36px] px-4 py-1.5 text-sm font-medium rounded-full transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] cursor-pointer"
+              :class="activeOpsMenu === 'backups'
+                ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+              @click="activeOpsMenu = 'backups'"
+            >
+              实例备份
+            </button>
+          </div>
+        </div>
+      </template>
 
       <div v-if="activeOpsMenu === 'actions'" class="grid gap-4 lg:grid-cols-3">
-        <div class="rounded-xl border p-4 space-y-3" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900/40' : 'border-gray-200 bg-gray-50'">
+        <div class="flex flex-col justify-between rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-5 space-y-4 transition-colors hover:border-[var(--border-hover)]">
           <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-sm font-medium text-themed">{{ t('admin.hosts.ops.discover') }}</div>
-              <div class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.discoverHint') }}</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <Search class="w-4 h-4 text-[var(--accent)] shrink-0" />
+                <span>{{ t('admin.hosts.ops.discover') }}</span>
+              </div>
+              <p class="text-xs text-[var(--text-secondary)] leading-relaxed">{{ t('admin.hosts.ops.discoverHint') }}</p>
             </div>
-            <span class="badge badge-info">Incus</span>
+            <Badge variant="info" size="sm">Incus</Badge>
           </div>
-          <button class="btn-primary btn-sm w-full" :disabled="loadingAction !== ''" @click="runDiscover">
-            <span>{{ loadingAction === 'discover' ? '...' : t('admin.hosts.ops.discover') }}</span>
-          </button>
+          <Button variant="primary" size="sm" block :loading="loadingAction === 'discover'" :disabled="loadingAction !== ''" @click="runDiscover">
+            {{ loadingAction === 'discover' ? t('common.loading') : t('admin.hosts.ops.discover') }}
+          </Button>
         </div>
 
-        <div class="rounded-xl border p-4 space-y-3" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900/40' : 'border-gray-200 bg-gray-50'">
+        <div class="flex flex-col justify-between rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-5 space-y-4 transition-colors hover:border-[var(--border-hover)]">
           <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-sm font-medium text-themed">{{ t('admin.hosts.ops.baselineSync') }}</div>
-              <div class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.baselineHint') }}</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <RefreshCw class="w-4 h-4 text-[var(--accent)] shrink-0" />
+                <span>{{ t('admin.hosts.ops.baselineSync') }}</span>
+              </div>
+              <p class="text-xs text-[var(--text-secondary)] leading-relaxed">{{ t('admin.hosts.ops.baselineHint') }}</p>
             </div>
-            <span class="badge badge-warning">Safe</span>
+            <Badge variant="warning" size="sm">Safe</Badge>
           </div>
-          <button class="btn-secondary btn-sm w-full" :disabled="loadingAction !== ''" @click="runBaselineSync">
-            <span>{{ loadingAction === 'baseline' ? '...' : t('admin.hosts.ops.baselineSync') }}</span>
-          </button>
+          <Button variant="secondary" size="sm" block :loading="loadingAction === 'baseline'" :disabled="loadingAction !== ''" @click="runBaselineSync">
+            {{ loadingAction === 'baseline' ? t('common.loading') : t('admin.hosts.ops.baselineSync') }}
+          </Button>
         </div>
 
-        <div class="rounded-xl border p-4 space-y-3" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900/40' : 'border-gray-200 bg-gray-50'">
+        <div class="flex flex-col justify-between rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-5 space-y-4 transition-colors hover:border-[var(--border-hover)]">
           <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-sm font-medium text-themed">{{ t('admin.hosts.ops.networkRepair') }}</div>
-              <div class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.networkHint') }}</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                <Network class="w-4 h-4 text-[var(--accent)] shrink-0" />
+                <span>{{ t('admin.hosts.ops.networkRepair') }}</span>
+              </div>
+              <p class="text-xs text-[var(--text-secondary)] leading-relaxed">{{ t('admin.hosts.ops.networkHint') }}</p>
             </div>
-            <span class="badge badge-success">IP</span>
+            <Badge variant="success" size="sm">IP</Badge>
           </div>
-          <button class="btn-secondary btn-sm w-full" :disabled="loadingAction !== ''" @click="runNetworkRepair">
-            <span>{{ loadingAction === 'network' ? '...' : t('admin.hosts.ops.networkRepair') }}</span>
-          </button>
+          <Button variant="secondary" size="sm" block :loading="loadingAction === 'network'" :disabled="loadingAction !== ''" @click="runNetworkRepair">
+            {{ loadingAction === 'network' ? t('common.loading') : t('admin.hosts.ops.networkRepair') }}
+          </Button>
         </div>
       </div>
-    </div>
+
+      <p v-else-if="activeOpsMenu === 'audit'" class="text-xs text-[var(--text-secondary)]">
+        人工扫描实例进程、网络连接与启动项，发现可疑项后由运维人员手动处置。
+      </p>
+      <p v-else-if="activeOpsMenu === 'backups'" class="text-xs text-[var(--text-secondary)]">
+        通过宿主机本地目录或已挂载 NAS 创建并管理全量实例备份任务。
+      </p>
+    </Card>
 
     <component :is="HostInstanceBackups" v-if="activeOpsMenu === 'backups' && nodeSecurityAdmin && HostInstanceBackups" :host-id="hostId" />
 
-    <div v-if="activeOpsMenu === 'actions' && discoverResult" class="card p-5 space-y-4">
-      <div class="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h3 class="text-base font-semibold text-themed">{{ t('admin.hosts.ops.sectionInventory') }}</h3>
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.selectInstanceHint') }}</p>
+    <!-- 节点资产发现结果 -->
+    <Card v-if="activeOpsMenu === 'actions' && discoverResult" padding="md" :title="t('admin.hosts.ops.sectionInventory')" :subtitle="t('admin.hosts.ops.selectInstanceHint')">
+      <div class="space-y-5">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.totalIncus') }}</div>
+            <div class="text-2xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ discoverResult.summary.totalIncus }}</div>
+          </div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.totalDb') }}</div>
+            <div class="text-2xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ discoverResult.summary.totalDb }}</div>
+          </div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.managedCount') }}</div>
+            <div class="text-2xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ discoverResult.summary.managedCount }}</div>
+          </div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.orphanedCount') }}</div>
+            <div class="text-2xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ discoverResult.summary.orphanedCount }}</div>
+          </div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.missingCount') }}</div>
+            <div class="text-2xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ discoverResult.summary.missingCount }}</div>
+          </div>
         </div>
-      </div>
 
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-          <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.totalIncus') }}</div>
-          <div class="text-2xl font-semibold mt-1 text-themed">{{ discoverResult.summary.totalIncus }}</div>
-        </div>
-        <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-          <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.totalDb') }}</div>
-          <div class="text-2xl font-semibold mt-1 text-themed">{{ discoverResult.summary.totalDb }}</div>
-        </div>
-        <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-          <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.managedCount') }}</div>
-          <div class="text-2xl font-semibold mt-1 text-themed">{{ discoverResult.summary.managedCount }}</div>
-        </div>
-        <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-          <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.orphanedCount') }}</div>
-          <div class="text-2xl font-semibold mt-1 text-themed">{{ discoverResult.summary.orphanedCount }}</div>
-        </div>
-        <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-          <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.missingCount') }}</div>
-          <div class="text-2xl font-semibold mt-1 text-themed">{{ discoverResult.summary.missingCount }}</div>
-        </div>
-      </div>
+        <div class="grid gap-4 xl:grid-cols-3">
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.hosts.ops.managed') }}</span>
+              <Badge size="sm" class="font-mono tabular-nums">{{ discoverResult.managed.length }}</Badge>
+            </div>
+            <div v-if="discoverResult.managed.length" class="space-y-2 max-h-96 overflow-auto pr-1">
+              <button
+                v-for="item in discoverResult.managed"
+                :key="`${item.dbId}-${item.incusName}`"
+                type="button"
+                class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm border transition-all duration-200 cursor-pointer"
+                :class="selectedManagedDbId === item.dbId
+                  ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] ring-1 ring-[var(--accent)]/30'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] hover:border-[var(--border-hover)]'"
+                @click="selectedManagedDbId = item.dbId"
+              >
+                <div class="font-medium text-[var(--text-primary)]">{{ item.incusName }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-1">
+                  {{ t('admin.hosts.ops.instanceType') }}: {{ localizeType(item.incusType) }} · {{ t('admin.hosts.ops.incusStatus') }}: {{ localizeStatus(item.incusStatus) }} · {{ t('admin.hosts.ops.dbStatus') }}: {{ localizeStatus(item.dbStatus) }} · 用户 ID: {{ item.userId }}
+                </div>
+              </button>
+            </div>
+            <div v-else class="text-sm text-[var(--text-tertiary)] py-4 text-center">{{ t('admin.hosts.ops.noManaged') }}</div>
+          </div>
 
-      <div class="grid gap-4 xl:grid-cols-3">
-        <div class="rounded-xl border p-4 space-y-3" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-          <div class="font-medium text-themed">{{ t('admin.hosts.ops.managed') }}</div>
-          <div v-if="discoverResult.managed.length" class="space-y-2 max-h-96 overflow-auto">
-            <button
-              v-for="item in discoverResult.managed"
-              :key="`${item.dbId}-${item.incusName}`"
-              type="button"
-              class="w-full rounded-lg px-3 py-2 text-left text-sm border transition"
-              :class="selectedManagedDbId === item.dbId
-                ? (themeStore.isDark ? 'border-blue-500 bg-blue-500/10' : 'border-blue-500 bg-blue-50')
-                : (themeStore.isDark ? 'border-gray-800 bg-gray-900 hover:border-gray-700' : 'border-gray-200 bg-gray-50 hover:border-gray-300')"
-              @click="selectedManagedDbId = item.dbId"
-            >
-              <div class="font-medium text-themed">{{ item.incusName }}</div>
-              <div class="text-xs text-themed-muted mt-1">
-                {{ t('admin.hosts.ops.instanceType') }}: {{ localizeType(item.incusType) }} · {{ t('admin.hosts.ops.incusStatus') }}: {{ localizeStatus(item.incusStatus) }} · {{ t('admin.hosts.ops.dbStatus') }}: {{ localizeStatus(item.dbStatus) }} · 用户 ID: {{ item.userId }}
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.hosts.ops.orphaned') }}</span>
+              <Badge size="sm" class="font-mono tabular-nums">{{ discoverResult.orphaned.length }}</Badge>
+            </div>
+            <div v-if="discoverResult.orphaned.length" class="space-y-2 max-h-96 overflow-auto pr-1">
+              <div v-for="item in discoverResult.orphaned" :key="item.incusName" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm">
+                <div class="font-medium text-[var(--text-primary)]">{{ item.incusName }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-1">{{ t('admin.hosts.ops.instanceType') }}: {{ localizeType(item.incusType) }} · {{ t('admin.hosts.ops.incusStatus') }}: {{ localizeStatus(item.incusStatus) }}</div>
               </div>
-            </button>
-          </div>
-          <div v-else class="text-sm text-themed-muted">{{ t('admin.hosts.ops.noManaged') }}</div>
-        </div>
-
-        <div class="rounded-xl border p-4" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-          <div class="font-medium text-themed mb-3">{{ t('admin.hosts.ops.orphaned') }}</div>
-          <div v-if="discoverResult.orphaned.length" class="space-y-2 max-h-96 overflow-auto">
-            <div v-for="item in discoverResult.orphaned" :key="item.incusName" class="rounded-lg px-3 py-2 text-sm" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-              <div class="font-medium text-themed">{{ item.incusName }}</div>
-              <div class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.instanceType') }}: {{ localizeType(item.incusType) }} · {{ t('admin.hosts.ops.incusStatus') }}: {{ localizeStatus(item.incusStatus) }}</div>
             </div>
+            <div v-else class="text-sm text-[var(--text-tertiary)] py-4 text-center">{{ t('admin.hosts.ops.noOrphaned') }}</div>
           </div>
-          <div v-else class="text-sm text-themed-muted">{{ t('admin.hosts.ops.noOrphaned') }}</div>
-        </div>
 
-        <div class="rounded-xl border p-4" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-          <div class="font-medium text-themed mb-3">{{ t('admin.hosts.ops.missing') }}</div>
-          <div v-if="discoverResult.missing.length" class="space-y-2 max-h-96 overflow-auto">
-            <div v-for="item in discoverResult.missing" :key="`${item.dbId}-${item.incusId}`" class="rounded-lg px-3 py-2 text-sm" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-              <div class="font-medium text-themed">{{ item.dbName }}</div>
-              <div class="text-xs text-themed-muted mt-1">ID #{{ item.dbId }} · Incus: {{ item.incusId }} · {{ t('admin.hosts.ops.dbStatus') }}: {{ item.dbStatus }}</div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-[var(--text-primary)]">{{ t('admin.hosts.ops.missing') }}</span>
+              <Badge size="sm" class="font-mono tabular-nums">{{ discoverResult.missing.length }}</Badge>
             </div>
+            <div v-if="discoverResult.missing.length" class="space-y-2 max-h-96 overflow-auto pr-1">
+              <div v-for="item in discoverResult.missing" :key="`${item.dbId}-${item.incusId}`" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-sm">
+                <div class="font-medium text-[var(--text-primary)]">{{ item.dbName }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-1 font-mono">ID #{{ item.dbId }} · Incus: {{ item.incusId }} · {{ t('admin.hosts.ops.dbStatus') }}: {{ item.dbStatus }}</div>
+              </div>
+            </div>
+            <div v-else class="text-sm text-[var(--text-tertiary)] py-4 text-center">{{ t('admin.hosts.ops.noMissing') }}</div>
           </div>
-          <div v-else class="text-sm text-themed-muted">{{ t('admin.hosts.ops.noMissing') }}</div>
         </div>
       </div>
-    </div>
+    </Card>
 
-    <div v-if="activeOpsMenu === 'actions' && selectedManaged" class="grid gap-6 xl:grid-cols-2">
-      <div class="card p-5 space-y-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 class="text-base font-semibold text-themed">{{ t('admin.hosts.ops.instancePanel') }}</h3>
-            <p class="text-xs text-themed-muted mt-1">{{ selectedManaged.incusName }} · #{{ selectedManaged.dbId }}</p>
+    <!-- 单实例操作面板 + 危险操作区 -->
+    <div v-if="activeOpsMenu === 'actions' && selectedManaged" class="grid gap-6 xl:grid-cols-2 items-start">
+      <Card padding="md" :title="t('admin.hosts.ops.instancePanel')" :subtitle="`${selectedManaged.incusName} · #${selectedManaged.dbId}`">
+        <template #extra>
+          <Button variant="ghost" size="sm" :disabled="loadingAction !== ''" @click="loadPreview">
+            <RefreshCw class="w-4 h-4" />
+            {{ t('admin.hosts.ops.loadPreview') }}
+          </Button>
+        </template>
+
+        <div class="space-y-4">
+          <div v-if="previewResult" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 space-y-2.5">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div>
+                <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.dbStatus') }}</div>
+                <div class="font-medium text-[var(--text-primary)] mt-0.5">{{ localizeStatus(previewResult.instanceStatus) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.suggestedAction') }}</div>
+                <div class="font-medium text-[var(--text-primary)] mt-0.5">{{ localizeSuggestedAction(previewResult.risk.suggestedAction) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.activeTask') }}</div>
+                <div class="font-medium font-mono text-[var(--text-primary)] mt-0.5">{{ previewResult.activeTask ? `${previewResult.activeTask.taskType} #${previewResult.activeTask.id}` : '-' }}</div>
+              </div>
+            </div>
+            <ul v-if="previewResult.risk.notes?.length" class="text-xs text-[var(--text-secondary)] list-disc pl-5 space-y-1 pt-2 border-t border-[var(--border-color)]">
+              <li v-for="note in previewResult.risk.notes" :key="note">{{ note }}</li>
+            </ul>
           </div>
-          <button class="btn-ghost btn-sm" :disabled="loadingAction !== ''" @click="loadPreview">{{ t('admin.hosts.ops.loadPreview') }}</button>
-        </div>
 
-        <div v-if="previewResult" class="rounded-xl p-4 space-y-2" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-          <div class="text-sm text-themed"><strong>{{ t('admin.hosts.ops.dbStatus') }}:</strong> {{ localizeStatus(previewResult.instanceStatus) }}</div>
-          <div class="text-sm text-themed"><strong>{{ t('admin.hosts.ops.suggestedAction') }}:</strong> {{ localizeSuggestedAction(previewResult.risk.suggestedAction) }}</div>
-          <div class="text-sm text-themed"><strong>{{ t('admin.hosts.ops.activeTask') }}:</strong> {{ previewResult.activeTask ? `${previewResult.activeTask.taskType} #${previewResult.activeTask.id}` : '-' }}</div>
-          <ul class="text-xs text-themed-muted list-disc pl-5 space-y-1">
-            <li v-for="note in previewResult.risk.notes" :key="note">{{ note }}</li>
-          </ul>
+          <div class="grid gap-3 sm:grid-cols-3">
+            <Button variant="secondary" size="sm" block :loading="loadingAction === 'instanceSync'" :disabled="loadingAction !== '' || !previewResult?.canSync" @click="runInstanceSync">
+              {{ t('admin.hosts.ops.syncInstance') }}
+            </Button>
+            <Button variant="secondary" size="sm" block :loading="loadingAction === 'instanceRestart'" :disabled="loadingAction !== '' || !previewResult?.canRestart" @click="runInstanceRestart(false)">
+              {{ t('admin.hosts.ops.safeRestart') }}
+            </Button>
+            <Button variant="secondary" size="sm" block :loading="loadingAction === 'instanceRestart'" :disabled="loadingAction !== '' || !previewResult?.canForceRestart" @click="runInstanceRestart(true)">
+              {{ t('admin.hosts.ops.forceRestart') }}
+            </Button>
+          </div>
         </div>
+      </Card>
 
-        <div class="grid gap-3 sm:grid-cols-3">
-          <button class="btn-secondary btn-sm" :disabled="loadingAction !== '' || !previewResult?.canSync" @click="runInstanceSync">{{ t('admin.hosts.ops.syncInstance') }}</button>
-          <button class="btn-secondary btn-sm" :disabled="loadingAction !== '' || !previewResult?.canRestart" @click="runInstanceRestart(false)">{{ t('admin.hosts.ops.safeRestart') }}</button>
-          <button class="btn-secondary btn-sm" :disabled="loadingAction !== '' || !previewResult?.canForceRestart" @click="runInstanceRestart(true)">{{ t('admin.hosts.ops.forceRestart') }}</button>
-        </div>
-      </div>
-
-      <div class="card p-5 space-y-4">
-        <div>
-          <h3 class="text-base font-semibold text-themed">{{ t('admin.hosts.ops.dangerZone') }}</h3>
-          <p class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.dangerHint') }}</p>
-        </div>
-
+      <Card padding="md" :title="t('admin.hosts.ops.dangerZone')" :subtitle="t('admin.hosts.ops.dangerHint')">
         <div v-if="previewResult" class="space-y-4">
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="rounded-xl border p-3 cursor-pointer" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-              <input v-model="dangerousAction" type="radio" class="mr-2" value="rebuild" :disabled="!previewResult.canRebuild" />
-              {{ t('admin.hosts.ops.rebuild') }}
+            <label
+              class="flex items-center gap-2.5 rounded-xl border p-3.5 text-sm font-medium cursor-pointer transition-colors"
+              :class="dangerousAction === 'rebuild'
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] text-[var(--text-primary)]'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-secondary)]'"
+            >
+              <input v-model="dangerousAction" type="radio" class="text-[var(--accent)] focus:ring-[var(--accent)]" value="rebuild" :disabled="!previewResult.canRebuild" />
+              <span>{{ t('admin.hosts.ops.rebuild') }}</span>
             </label>
-            <label class="rounded-xl border p-3 cursor-pointer" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-              <input v-model="dangerousAction" type="radio" class="mr-2" value="recreate" :disabled="!previewResult.canRecreate" />
-              {{ t('admin.hosts.ops.recreate') }}
+            <label
+              class="flex items-center gap-2.5 rounded-xl border p-3.5 text-sm font-medium cursor-pointer transition-colors"
+              :class="dangerousAction === 'recreate'
+                ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] text-[var(--text-primary)]'
+                : 'border-[var(--border-color)] bg-[var(--bg-surface-soft)] text-[var(--text-secondary)]'"
+            >
+              <input v-model="dangerousAction" type="radio" class="text-[var(--accent)] focus:ring-[var(--accent)]" value="recreate" :disabled="!previewResult.canRecreate" />
+              <span>{{ t('admin.hosts.ops.recreate') }}</span>
             </label>
           </div>
 
           <!-- 镜像选择下拉 -->
           <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ops.selectImage') }}</label>
-            <div v-if="loadingImages" class="text-xs text-themed-muted">{{ t('admin.hosts.ops.loadingImages') }}</div>
+            <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">{{ t('admin.hosts.ops.selectImage') }}</label>
+            <div v-if="loadingImages" class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.loadingImages') }}</div>
             <select
               v-else
               v-model="selectedImageId"
@@ -1467,637 +1534,675 @@ async function runAuditKillProcess() {
                 {{ simplifyImageLabel(img) }}
               </option>
             </select>
-            <div v-if="availableImages.length === 0 && !loadingImages" class="text-xs text-themed-muted mt-1">
+            <div v-if="availableImages.length === 0 && !loadingImages" class="text-xs text-[var(--text-tertiary)] mt-1">
               {{ t('admin.hosts.ops.noImagesAvailable') }}
             </div>
           </div>
 
           <!-- 可选恢复参数 -->
           <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ops.selectSshKey') }}</label>
-            <div v-if="loadingSshKeys" class="text-xs text-themed-muted">{{ t('admin.hosts.ops.loadingSshKeys') }}</div>
+            <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">{{ t('admin.hosts.ops.selectSshKey') }}</label>
+            <div v-if="loadingSshKeys" class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.loadingSshKeys') }}</div>
             <select v-else v-model="selectedSshKeyId" class="input">
               <option :value="null">{{ t('admin.hosts.ops.sshKeyPlaceholder') }}</option>
               <option v-for="key in availableSshKeys" :key="key.id" :value="key.id">
                 {{ key.name }}{{ key.fingerprint ? ` (${key.fingerprint})` : '' }}
               </option>
             </select>
-            <div class="text-xs text-themed-muted mt-1">
+            <div class="text-xs text-[var(--text-tertiary)] mt-1">
               {{ availableSshKeys.length === 0 && !loadingSshKeys ? t('admin.hosts.ops.noSshKeysAvailable') : t('admin.hosts.ops.sshKeyOptionalHint') }}
             </div>
           </div>
 
           <div>
-            <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ops.selectInitCommands') }}</label>
-            <div v-if="loadingInitCommands" class="text-xs text-themed-muted">{{ t('admin.hosts.ops.loadingInitCommands') }}</div>
-            <div v-else-if="availableInitCommands.length > 0" class="space-y-2 max-h-48 overflow-auto rounded-xl border p-2" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
+            <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">{{ t('admin.hosts.ops.selectInitCommands') }}</label>
+            <div v-if="loadingInitCommands" class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.loadingInitCommands') }}</div>
+            <div v-else-if="availableInitCommands.length > 0" class="space-y-2 max-h-48 overflow-auto rounded-2xl border border-[var(--border-color)] p-2">
               <label
                 v-for="cmd in availableInitCommands"
                 :key="cmd.id"
-                class="flex items-start gap-3 rounded-lg px-3 py-2 text-sm cursor-pointer transition"
+                class="flex items-start gap-3 rounded-xl px-3 py-2 text-sm cursor-pointer transition-colors"
                 :class="selectedCustomInitCommandIds.includes(cmd.id)
-                  ? (themeStore.isDark ? 'bg-blue-500/10' : 'bg-blue-50')
-                  : (themeStore.isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-50')"
+                  ? 'bg-[color-mix(in_srgb,var(--accent)_10%,var(--bg-surface))]'
+                  : 'hover:bg-[var(--bg-surface-soft)]'"
               >
                 <input
                   type="checkbox"
-                  class="mt-0.5 rounded"
+                  class="mt-0.5 rounded border-[var(--border-color)] text-[var(--accent)] focus:ring-[var(--accent)]"
                   :checked="selectedCustomInitCommandIds.includes(cmd.id)"
                   @change="toggleInitCommand(cmd.id)"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="block font-medium text-themed">{{ cmd.name }}</span>
-                  <span class="block text-xs text-themed-muted mt-0.5">
+                  <span class="block font-medium text-[var(--text-primary)]">{{ cmd.name }}</span>
+                  <span class="block text-xs text-[var(--text-secondary)] mt-0.5">
                     {{ t('extensions.initCommands.lineCount', { count: cmd.commandLineCount }) }}
                     <span v-if="cmd.distros.length"> · {{ cmd.distros.map(getDistroName).join(', ') }}</span>
                   </span>
-                  <span v-if="cmd.description" class="block text-xs text-themed-muted mt-0.5 truncate">{{ cmd.description }}</span>
+                  <span v-if="cmd.description" class="block text-xs text-[var(--text-tertiary)] mt-0.5 truncate">{{ cmd.description }}</span>
                 </span>
               </label>
             </div>
-            <div v-else class="text-xs text-themed-muted">{{ t('admin.hosts.ops.noInitCommandsAvailable') }}</div>
-            <div class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.optionalField') }}</div>
+            <div v-else class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.noInitCommandsAvailable') }}</div>
+            <div class="text-xs text-[var(--text-tertiary)] mt-1">{{ t('admin.hosts.ops.optionalField') }}</div>
           </div>
 
-          <div class="rounded-xl border p-4 space-y-3" :class="themeStore.isDark ? 'border-red-900 bg-red-950/20' : 'border-red-200 bg-red-50'">
-            <div class="text-sm font-medium text-red-500">{{ t('admin.hosts.ops.confirmDangerTitle') }}</div>
-            <label class="flex items-start gap-2 text-sm text-themed">
-              <input v-model="riskAccepted" type="checkbox" class="mt-0.5" />
+          <div class="rounded-2xl border border-[color-mix(in_srgb,var(--error)_30%,var(--border-color))] bg-[color-mix(in_srgb,var(--error)_6%,var(--bg-surface))] p-4 space-y-3">
+            <div class="flex items-center gap-2 text-sm font-semibold text-[var(--error)]">
+              <ShieldAlert class="w-4 h-4 shrink-0" />
+              <span>{{ t('admin.hosts.ops.confirmDangerTitle') }}</span>
+            </div>
+            <label class="flex items-start gap-2.5 text-sm text-[var(--text-primary)] cursor-pointer">
+              <input v-model="riskAccepted" type="checkbox" class="mt-0.5 rounded border-[var(--border-color)] text-[var(--error)] focus:ring-[var(--error)]" />
               <span>{{ t('admin.hosts.ops.riskCheckbox') }}</span>
             </label>
             <div>
-              <label class="block text-xs text-themed-muted mb-1.5">{{ t('admin.hosts.ops.confirmTextHint') }}</label>
-              <input v-model="confirmationText" type="text" class="input" :placeholder="confirmationExpectedText" />
+              <label class="block text-xs text-[var(--text-secondary)] mb-1.5">{{ t('admin.hosts.ops.confirmTextHint') }}</label>
+              <input v-model="confirmationText" type="text" class="input font-mono" :placeholder="confirmationExpectedText" />
             </div>
             <div class="flex justify-end">
-              <button
-                class="btn-danger btn-sm"
-                type="button"
+              <Button
+                variant="danger"
+                size="sm"
                 :disabled="loadingAction !== '' || !isDangerFormValid"
                 @click="openDangerConfirm"
               >
                 {{ t('admin.hosts.ops.executeDangerAction') }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
 
     <div v-if="activeOpsMenu === 'audit'" class="space-y-6">
-      <div class="inline-flex rounded-lg border p-1" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-        <button type="button" class="px-3 py-1.5 rounded-md text-sm font-medium transition" :class="auditPanel === 'scan' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'" @click="auditPanel = 'scan'">审查扫描</button>
-        <button type="button" class="px-3 py-1.5 rounded-md text-sm font-medium transition" :class="auditPanel === 'rules' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'" @click="auditPanel = 'rules'">规则库</button>
-        <button type="button" class="px-3 py-1.5 rounded-md text-sm font-medium transition" :class="auditPanel === 'whitelist' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'" @click="auditPanel = 'whitelist'">白名单</button>
-        <button type="button" class="px-3 py-1.5 rounded-md text-sm font-medium transition" :class="auditPanel === 'history' ? 'bg-accent text-white dark:text-black' : 'text-themed-muted hover:text-themed'" @click="auditPanel = 'history'">审查历史</button>
+      <div class="inline-flex flex-wrap items-center rounded-full border border-[var(--border-color)] bg-[var(--bg-surface)] p-1 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <button
+          type="button"
+          class="min-h-[36px] px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer"
+          :class="auditPanel === 'scan' ? 'bg-[var(--bg-surface-soft)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+          @click="auditPanel = 'scan'"
+        >
+          审查扫描
+        </button>
+        <button
+          type="button"
+          class="min-h-[36px] px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer"
+          :class="auditPanel === 'rules' ? 'bg-[var(--bg-surface-soft)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+          @click="auditPanel = 'rules'"
+        >
+          规则库
+        </button>
+        <button
+          type="button"
+          class="min-h-[36px] px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer"
+          :class="auditPanel === 'whitelist' ? 'bg-[var(--bg-surface-soft)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+          @click="auditPanel = 'whitelist'"
+        >
+          白名单
+        </button>
+        <button
+          type="button"
+          class="min-h-[36px] px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] cursor-pointer"
+          :class="auditPanel === 'history' ? 'bg-[var(--bg-surface-soft)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+          @click="auditPanel = 'history'"
+        >
+          审查历史
+        </button>
       </div>
 
-      <div v-if="auditPanel === 'scan'" class="card p-5 space-y-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 class="text-base font-semibold text-themed">实例审查</h3>
-            <p class="text-xs text-themed-muted mt-1">人工扫描进程、网络连接和启动项，发现可疑项后由运维人员手动处置。</p>
-          </div>
-          <button class="btn-secondary btn-sm" :disabled="loadingAction !== ''" @click="runDiscover">
-            {{ loadingAction === 'discover' ? '...' : '刷新实例列表' }}
-          </button>
-        </div>
+      <Card v-if="auditPanel === 'scan'" padding="md" title="实例审查" subtitle="人工扫描进程、网络连接和启动项，发现可疑项后由运维人员手动处置。">
+        <template #extra>
+          <Button variant="secondary" size="sm" :loading="loadingAction === 'discover'" :disabled="loadingAction !== ''" @click="runDiscover">
+            <RefreshCw v-if="loadingAction !== 'discover'" class="w-4 h-4" />
+            {{ loadingAction === 'discover' ? '刷新中...' : '刷新实例列表' }}
+          </Button>
+        </template>
 
-        <div v-if="discoverResult" class="grid gap-4 xl:grid-cols-[minmax(260px,360px)_1fr]">
-          <div class="rounded-xl border p-4 space-y-3" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-            <div class="font-medium text-themed">选择审查实例</div>
-            <div v-if="discoverResult.managed.length" class="space-y-2 max-h-96 overflow-auto">
+        <div v-if="discoverResult" class="grid gap-5 xl:grid-cols-[minmax(260px,340px)_1fr]">
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 space-y-3">
+            <div class="text-sm font-semibold text-[var(--text-primary)]">选择审查实例</div>
+            <div v-if="discoverResult.managed.length" class="space-y-2 max-h-96 overflow-auto pr-1">
               <button
                 v-for="item in discoverResult.managed"
                 :key="`audit-${item.dbId}-${item.incusName}`"
                 type="button"
-                class="w-full rounded-lg px-3 py-2 text-left text-sm border transition"
+                class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm border transition-all duration-200 cursor-pointer"
                 :class="selectedManagedDbId === item.dbId
-                  ? (themeStore.isDark ? 'border-blue-500 bg-blue-500/10' : 'border-blue-500 bg-blue-50')
-                  : (themeStore.isDark ? 'border-gray-800 bg-gray-900 hover:border-gray-700' : 'border-gray-200 bg-gray-50 hover:border-gray-300')"
+                  ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_8%,var(--bg-surface))] ring-1 ring-[var(--accent)]/30'
+                  : 'border-[var(--border-color)] bg-[var(--bg-surface)] hover:border-[var(--border-hover)]'"
                 @click="selectedManagedDbId = item.dbId"
               >
-                <div class="font-medium text-themed">{{ item.incusName }}</div>
-                <div class="text-xs text-themed-muted mt-1">
+                <div class="font-medium text-[var(--text-primary)]">{{ item.incusName }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-1">
                   {{ localizeType(item.incusType) }} · {{ localizeStatus(item.incusStatus) }} · 用户 ID: {{ item.userId }}
                 </div>
               </button>
             </div>
-            <div v-else class="text-sm text-themed-muted">当前没有已纳管实例。</div>
+            <div v-else class="text-sm text-[var(--text-tertiary)] py-4 text-center">当前没有已纳管实例。</div>
           </div>
 
-          <div class="rounded-xl border p-4 space-y-4" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-5 space-y-5">
             <div class="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <div class="font-medium text-themed">{{ selectedManaged?.incusName || '未选择实例' }}</div>
-                <div class="text-xs text-themed-muted mt-1">扫描不会自动封禁，也不会自动停止进程。</div>
+                <div class="text-base font-semibold text-[var(--text-primary)]">{{ selectedManaged?.incusName || '未选择实例' }}</div>
+                <div class="text-xs text-[var(--text-secondary)] mt-0.5">扫描不会自动封禁，也不会自动停止进程。</div>
               </div>
-              <button class="btn-primary btn-sm" :disabled="loadingAction !== '' || !selectedManaged" @click="runAuditScan">
+              <Button variant="primary" size="sm" :loading="loadingAction === 'auditScan'" :disabled="loadingAction !== '' || !selectedManaged" @click="runAuditScan">
+                <Search v-if="loadingAction !== 'auditScan'" class="w-4 h-4" />
                 {{ loadingAction === 'auditScan' ? '扫描中...' : '开始审查扫描' }}
-              </button>
+              </Button>
             </div>
 
             <div v-if="auditResult" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div class="rounded-xl p-3" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-                <div class="text-xs text-themed-muted">风险等级</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <div class="text-xs text-[var(--text-tertiary)]">风险等级</div>
                 <div class="text-lg font-semibold mt-1" :class="severityClass(auditResult.summary.riskLevel)">{{ localizeSeverity(auditResult.summary.riskLevel) }}</div>
               </div>
-              <div class="rounded-xl p-3" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-                <div class="text-xs text-themed-muted">发现项</div>
-                <div class="text-lg font-semibold mt-1 text-themed">{{ auditResult.summary.findingCount }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <div class="text-xs text-[var(--text-tertiary)]">发现项</div>
+                <div class="text-lg font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ auditResult.summary.findingCount }}</div>
               </div>
-              <div class="rounded-xl p-3" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-                <div class="text-xs text-themed-muted">进程</div>
-                <div class="text-lg font-semibold mt-1 text-themed">{{ auditResult.summary.processCount }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <div class="text-xs text-[var(--text-tertiary)]">进程</div>
+                <div class="text-lg font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ auditResult.summary.processCount }}</div>
               </div>
-              <div class="rounded-xl p-3" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-                <div class="text-xs text-themed-muted">连接</div>
-                <div class="text-lg font-semibold mt-1 text-themed">{{ auditResult.summary.connectionCount }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <div class="text-xs text-[var(--text-tertiary)]">连接</div>
+                <div class="text-lg font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ auditResult.summary.connectionCount }}</div>
               </div>
-              <div class="rounded-xl p-3" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-                <div class="text-xs text-themed-muted">监听端口</div>
-                <div class="text-lg font-semibold mt-1 text-themed">{{ auditResult.summary.listeningCount }}</div>
+              <div class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3.5">
+                <div class="text-xs text-[var(--text-tertiary)]">监听端口</div>
+                <div class="text-lg font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ auditResult.summary.listeningCount }}</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div v-else class="rounded-xl border border-dashed p-8 text-center text-sm text-themed-muted" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-          请先刷新实例列表，选择一个已纳管实例后再进行人工审查。
-        </div>
-      </div>
+        <EmptyState
+          v-else
+          title="尚未加载实例列表"
+          description="请先刷新实例列表，选择一个已纳管实例后再进行人工审查。"
+        >
+          <template #icon>
+            <ShieldCheck class="w-7 h-7 stroke-[1.5]" />
+          </template>
+          <template #action>
+            <Button variant="primary" size="sm" :loading="loadingAction === 'discover'" @click="runDiscover">
+              刷新实例列表
+            </Button>
+          </template>
+        </EmptyState>
+      </Card>
 
-      <div v-if="auditPanel === 'scan' && auditResult" class="grid gap-6 xl:grid-cols-2">
-        <div class="card p-5 space-y-4">
-          <div>
-            <h3 class="text-base font-semibold text-themed">可疑发现</h3>
-            <p class="text-xs text-themed-muted mt-1">结果只作为人工判断线索，处置前请结合进程参数和业务背景确认。</p>
-          </div>
-          <div v-if="auditResult.findings.length" class="space-y-3 max-h-[32rem] overflow-auto">
-            <div v-for="finding in auditResult.findings" :key="finding.id" class="rounded-xl border p-3 text-sm" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
+      <div v-if="auditPanel === 'scan' && auditResult" class="grid gap-6 xl:grid-cols-2 items-start">
+        <Card padding="md" title="可疑发现" subtitle="结果只作为人工判断线索，处置前请结合进程参数和业务背景确认。">
+          <div v-if="auditResult.findings.length" class="space-y-3 max-h-[32rem] overflow-auto pr-1">
+            <div v-for="finding in auditResult.findings" :key="finding.id" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm space-y-2">
               <div class="flex items-center justify-between gap-3">
-                <div class="font-medium text-themed">{{ localizeAuditText(finding.title) }}</div>
-                <span class="text-xs font-semibold" :class="severityClass(finding.severity)">{{ localizeSeverity(finding.severity) }}</span>
+                <div class="font-semibold text-[var(--text-primary)]">{{ localizeAuditText(finding.title) }}</div>
+                <span class="text-xs font-semibold shrink-0" :class="severityClass(finding.severity)">{{ localizeSeverity(finding.severity) }}</span>
               </div>
-              <div class="text-xs text-themed-muted mt-1">{{ localizeFindingDetail(finding.detail) }}</div>
-              <div class="mt-2 grid gap-2 text-xs sm:grid-cols-2">
-                <div class="text-themed-muted">规则：{{ localizeAuditText(finding.ruleName || finding.ruleId) }} / {{ localizeRuleSource(finding.ruleSource) }}</div>
-                <div class="text-themed-muted">分类：{{ localizeAuditCategory(finding.category) }} / 命中：{{ finding.matchedText || '-' }}</div>
-                <div v-if="finding.recommendation" class="text-themed-muted sm:col-span-2">建议：{{ localizeAuditText(finding.recommendation) }}</div>
-                <div v-if="finding.ignored" class="text-blue-500 sm:col-span-2">已被白名单忽略：{{ finding.ignoreReason || '-' }}</div>
+              <div class="text-xs text-[var(--text-secondary)] leading-relaxed">{{ localizeFindingDetail(finding.detail) }}</div>
+              <div class="grid gap-1.5 text-xs sm:grid-cols-2 text-[var(--text-tertiary)]">
+                <div>规则：{{ localizeAuditText(finding.ruleName || finding.ruleId) }} / {{ localizeRuleSource(finding.ruleSource) }}</div>
+                <div>分类：{{ localizeAuditCategory(finding.category) }} / 命中：{{ finding.matchedText || '-' }}</div>
+                <div v-if="finding.recommendation" class="sm:col-span-2 text-[var(--text-secondary)]">建议：{{ localizeAuditText(finding.recommendation) }}</div>
+                <div v-if="finding.ignored" class="text-[var(--accent)] sm:col-span-2">已被白名单忽略：{{ finding.ignoreReason || '-' }}</div>
               </div>
-              <div class="mt-2 flex justify-between gap-2">
-                <button class="btn-ghost btn-sm" @click="toggleAuditEvidence(finding.id)">
+              <div class="pt-1 flex justify-between gap-2">
+                <Button variant="ghost" size="sm" @click="toggleAuditEvidence(finding.id)">
                   {{ isAuditEvidenceExpanded(finding.id) ? '收起原始证据' : '查看原始证据' }}
-                </button>
-                <button v-if="!finding.ignored" class="btn-ghost btn-sm" @click="addIgnoreFromFinding(finding)">加入白名单</button>
+                </Button>
+                <Button v-if="!finding.ignored" variant="secondary" size="sm" @click="addIgnoreFromFinding(finding)">加入白名单</Button>
               </div>
-              <pre v-if="isAuditEvidenceExpanded(finding.id)" class="mt-2 text-xs whitespace-pre-wrap break-all text-themed-muted rounded-lg p-3" :class="themeStore.isDark ? 'bg-gray-950' : 'bg-white'">{{ finding.evidence }}</pre>
+              <pre v-if="isAuditEvidenceExpanded(finding.id)" class="mt-2 text-xs whitespace-pre-wrap break-all font-mono text-[var(--text-secondary)] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3">{{ finding.evidence }}</pre>
             </div>
           </div>
-          <div v-else class="text-sm text-themed-muted">未命中当前启用的审查规则。</div>
-        </div>
+          <EmptyState v-else title="未命中当前启用的审查规则" />
+        </Card>
 
-        <div class="card p-5 space-y-4">
-          <div>
-            <h3 class="text-base font-semibold text-themed">手动停止进程</h3>
-            <p class="text-xs text-themed-muted mt-1">仅对选中的 PID 发送信号，不会自动封禁实例或用户。</p>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="block text-xs text-themed-muted mb-1.5">PID</label>
-              <input v-model.number="selectedAuditPid" type="number" min="2" class="input" placeholder="选择或输入 PID" />
+        <Card padding="md" title="手动停止进程" subtitle="仅对选中的 PID 发送信号，不会自动封禁实例或用户。">
+          <div class="space-y-4">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">PID</label>
+                <input v-model.number="selectedAuditPid" type="number" min="2" class="input font-mono" placeholder="选择或输入 PID" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">信号</label>
+                <select v-model="auditSignal" class="input">
+                  <option value="TERM">安全停止（TERM）</option>
+                  <option value="KILL">强制停止（KILL）</option>
+                </select>
+              </div>
             </div>
             <div>
-              <label class="block text-xs text-themed-muted mb-1.5">信号</label>
-              <select v-model="auditSignal" class="input">
-                <option value="TERM">安全停止（TERM）</option>
-                <option value="KILL">强制停止（KILL）</option>
-              </select>
+              <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">处置原因</label>
+              <textarea v-model="auditReason" class="input min-h-20" placeholder="记录判断依据，便于后续追溯" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold tracking-wide text-[var(--text-secondary)] mb-1.5">确认实例名称</label>
+              <input v-model="auditConfirmationText" type="text" class="input font-mono" :placeholder="selectedManaged?.incusName || ''" />
+            </div>
+            <div class="flex justify-end">
+              <Button variant="danger" size="sm" :loading="loadingAction === 'auditKill'" :disabled="loadingAction !== '' || !selectedAuditPid || auditConfirmationText.trim() !== selectedManaged?.incusName" @click="runAuditKillProcess">
+                {{ loadingAction === 'auditKill' ? '处理中...' : '发送停止信号' }}
+              </Button>
             </div>
           </div>
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">处置原因</label>
-            <textarea v-model="auditReason" class="input min-h-20" placeholder="记录判断依据，便于后续追溯" />
-          </div>
-          <div>
-            <label class="block text-xs text-themed-muted mb-1.5">确认实例名称</label>
-            <input v-model="auditConfirmationText" type="text" class="input" :placeholder="selectedManaged?.incusName || ''" />
-          </div>
-          <div class="flex justify-end">
-            <button class="btn-danger btn-sm" :disabled="loadingAction !== '' || !selectedAuditPid || auditConfirmationText.trim() !== selectedManaged?.incusName" @click="runAuditKillProcess">
-              {{ loadingAction === 'auditKill' ? '处理中...' : '发送停止信号' }}
-            </button>
-          </div>
-        </div>
+        </Card>
       </div>
 
-      <div v-if="auditPanel === 'scan' && auditResult" class="card p-5 space-y-4">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 class="text-base font-semibold text-themed">进程列表</h3>
-            <p class="text-xs text-themed-muted mt-1">优先显示命中规则或 CPU 较高的进程。</p>
-          </div>
-          <button class="btn-ghost btn-sm" :disabled="loadingAction !== '' || !selectedManaged" @click="runAuditScan">
+      <Card v-if="auditPanel === 'scan' && auditResult" padding="md" title="进程列表" subtitle="优先显示命中规则或 CPU 较高的进程。">
+        <template #extra>
+          <Button variant="ghost" size="sm" :loading="loadingAction === 'auditScan'" :disabled="loadingAction !== '' || !selectedManaged" @click="runAuditScan">
+            <RefreshCw v-if="loadingAction !== 'auditScan'" class="w-4 h-4" />
             {{ loadingAction === 'auditScan' ? '刷新中...' : '刷新进程' }}
-          </button>
-        </div>
-        <div class="overflow-hidden rounded-xl border" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
+          </Button>
+        </template>
+        <div class="overflow-hidden rounded-2xl border border-[var(--border-color)]">
           <table class="w-full table-fixed text-sm">
-            <thead :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
+            <colgroup>
+              <col class="w-[10%]" />
+              <col class="w-[12%]" />
+              <col class="w-[10%]" />
+              <col class="w-[10%]" />
+              <col class="w-[46%]" />
+              <col class="w-[12%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
               <tr>
-                <th class="px-4 py-3 text-left font-medium text-themed">PID</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">用户</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">CPU</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">内存</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">命令</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">操作</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">PID</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">用户</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">CPU</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">内存</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">命令</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">操作</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="process in auditResult.processes" :key="process.pid" class="border-t" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-                <td class="px-4 py-3 font-mono text-themed">{{ process.pid }}</td>
-                <td class="px-4 py-3 text-themed-muted">{{ process.user }}</td>
-                <td class="px-4 py-3 text-themed-muted">{{ process.cpuPercent ?? '-' }}</td>
-                <td class="px-4 py-3 text-themed-muted">{{ process.memoryPercent ?? '-' }}</td>
-                <td class="px-4 py-3">
-                  <div class="font-medium text-themed">{{ process.command }}</div>
-                  <div class="text-xs text-themed-muted max-w-xl truncate">{{ process.args }}</div>
-                  <div v-if="process.findings.length" class="text-xs text-amber-500 mt-1">{{ localizeProcessFindings(process.findings) }}</div>
+            <tbody class="divide-y divide-[var(--border-color)] bg-[var(--bg-surface)]">
+              <tr v-for="process in auditResult.processes" :key="process.pid" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors">
+                <td class="px-4 py-3 font-mono tabular-nums text-[var(--text-primary)]">{{ process.pid }}</td>
+                <td class="px-4 py-3 text-[var(--text-secondary)] truncate">{{ process.user }}</td>
+                <td class="px-4 py-3 font-mono tabular-nums text-[var(--text-secondary)]">{{ process.cpuPercent ?? '-' }}</td>
+                <td class="px-4 py-3 font-mono tabular-nums text-[var(--text-secondary)]">{{ process.memoryPercent ?? '-' }}</td>
+                <td class="px-4 py-3 min-w-0">
+                  <div class="font-medium text-[var(--text-primary)] truncate">{{ process.command }}</div>
+                  <div class="text-xs font-mono text-[var(--text-tertiary)] truncate" :title="process.args">{{ process.args }}</div>
+                  <div v-if="process.findings.length" class="text-xs text-[var(--warning)] mt-1 break-words">{{ localizeProcessFindings(process.findings) }}</div>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-3 text-right">
                   <IconButton :label="t('common.select')" @click="selectAuditProcess(process)"><Check /></IconButton>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
       <div v-if="auditPanel === 'scan' && auditResult" class="grid gap-6 xl:grid-cols-2">
-        <div class="card p-5 space-y-4">
-          <h3 class="text-base font-semibold text-themed">网络连接</h3>
-          <div class="space-y-2 max-h-96 overflow-auto">
-            <div v-for="(connection, index) in auditResult.connections" :key="`${connection.raw}-${index}`" class="rounded-lg px-3 py-2 text-xs" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-              <div class="font-mono text-themed">{{ connection.protocol }} {{ connection.state }} {{ connection.local }} -> {{ connection.peer }}</div>
-              <div v-if="connection.process" class="text-themed-muted mt-1">{{ connection.process }}</div>
+        <Card padding="md" title="网络连接">
+          <div class="space-y-2 max-h-96 overflow-auto pr-1">
+            <div v-for="(connection, index) in auditResult.connections" :key="`${connection.raw}-${index}`" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs">
+              <div class="font-mono text-[var(--text-primary)] break-all">{{ connection.protocol }} {{ connection.state }} {{ connection.local }} -> {{ connection.peer }}</div>
+              <div v-if="connection.process" class="text-[var(--text-secondary)] mt-1">{{ connection.process }}</div>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div class="card p-5 space-y-4">
-          <h3 class="text-base font-semibold text-themed">启动项摘要</h3>
-          <div class="space-y-2 max-h-96 overflow-auto">
-            <div v-for="(item, index) in auditResult.startupItems" :key="`${item.source}-${index}`" class="rounded-lg px-3 py-2 text-xs" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-              <div class="text-themed-muted">{{ item.source }}</div>
-              <div class="font-mono text-themed break-all">{{ item.command }}</div>
-              <div v-if="item.findings.length" class="text-amber-500 mt-1">{{ localizeProcessFindings(item.findings) }}</div>
+        <Card padding="md" title="启动项摘要">
+          <div class="space-y-2 max-h-96 overflow-auto pr-1">
+            <div v-for="(item, index) in auditResult.startupItems" :key="`${item.source}-${index}`" class="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] px-3.5 py-2.5 text-xs">
+              <div class="text-[var(--text-tertiary)]">{{ item.source }}</div>
+              <div class="font-mono text-[var(--text-primary)] break-all mt-0.5">{{ item.command }}</div>
+              <div v-if="item.findings.length" class="text-[var(--warning)] mt-1">{{ localizeProcessFindings(item.findings) }}</div>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div v-if="auditPanel === 'rules'" class="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
-        <div class="card p-5 space-y-4">
-          <div>
-            <h3 class="text-base font-semibold text-themed">规则编辑</h3>
-            <p class="text-xs text-themed-muted mt-1">
-              {{ auditRuleForm.builtinRuleId ? '正在调整系统内置规则的本节点覆盖配置，只影响当前节点。' : '节点所有者可创建当前节点规则，管理员还可以创建全局规则。' }}
-            </p>
-          </div>
-          <div class="rounded-xl border p-3 space-y-2" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-            <div class="text-xs font-medium text-themed">快速模板</div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="template in auditRuleTemplates"
-                :key="template.name"
-                type="button"
-                class="btn-ghost btn-sm"
-                @click="applyAuditRuleTemplate(template)"
-              >
-                {{ template.name }}
-              </button>
-            </div>
-          </div>
-          <div class="grid gap-3">
-            <input v-model="auditRuleForm.name" class="input" placeholder="规则名称" />
-            <div class="grid gap-3 sm:grid-cols-2">
-              <select v-model="auditRuleForm.scope" class="input" :disabled="!!auditRuleForm.builtinRuleId">
-                <option value="host">当前节点</option>
-                <option value="global">管理员全局</option>
-              </select>
-              <select v-model="auditRuleForm.severity" class="input">
-                <option value="info">信息</option>
-                <option value="low">低</option>
-                <option value="medium">中</option>
-                <option value="high">高</option>
-              </select>
-            </div>
-            <input v-model="auditRuleForm.category" class="input" placeholder="分类，例如 网络滥用、代理面板" />
-            <div class="flex flex-wrap gap-2">
-              <label class="inline-flex items-center gap-2 text-sm text-themed-muted"><input type="checkbox" :checked="auditRuleForm.targetTypes.includes('process')" @change="toggleRuleTarget('process')" />进程</label>
-              <label class="inline-flex items-center gap-2 text-sm text-themed-muted"><input type="checkbox" :checked="auditRuleForm.targetTypes.includes('network')" @change="toggleRuleTarget('network')" />网络</label>
-              <label class="inline-flex items-center gap-2 text-sm text-themed-muted"><input type="checkbox" :checked="auditRuleForm.targetTypes.includes('startup')" @change="toggleRuleTarget('startup')" />启动项</label>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <select v-model="auditRuleForm.matchType" class="input">
-                <option value="contains">包含关键词</option>
-                <option value="regex">正则表达式</option>
-                <option value="exact">精确匹配</option>
-              </select>
-              <label class="inline-flex items-center gap-2 text-sm text-themed-muted"><input v-model="auditRuleForm.caseSensitive" type="checkbox" />区分大小写</label>
-            </div>
-            <textarea v-model="auditRuleForm.pattern" class="input min-h-20" placeholder="匹配内容或正则" />
-            <textarea v-model="auditRuleForm.recommendation" class="input min-h-20" placeholder="处理建议，可选" />
-            <label class="inline-flex items-center gap-2 text-sm text-themed-muted"><input v-model="auditRuleForm.enabled" type="checkbox" />启用规则</label>
-          </div>
-          <div class="flex justify-between gap-3">
-            <button class="btn-ghost btn-sm" @click="resetAuditRuleForm">清空</button>
-            <button class="btn-primary btn-sm" :disabled="loadingAuditMeta" @click="saveAuditRule">
-              {{ auditRuleForm.builtinRuleId ? '保存本节点覆盖' : (auditRuleForm.id ? '保存修改' : '新增规则') }}
-            </button>
-          </div>
-        </div>
-
-        <div class="card p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold text-themed">规则库</h3>
-            <button class="btn-ghost btn-sm" :disabled="loadingAuditMeta" @click="loadAuditRules">刷新</button>
-          </div>
-          <div class="space-y-3 max-h-[42rem] overflow-auto">
-            <div v-for="rule in auditRules" :key="`${rule.source}-${rule.id}`" class="rounded-xl border p-3 text-sm" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-              <div class="flex items-center justify-between gap-3">
-                <div class="font-medium text-themed">{{ localizeAuditText(rule.name) }}</div>
-                <span class="text-xs font-semibold" :class="severityClass(rule.severity)">{{ localizeSeverity(rule.severity) }}</span>
+      <div v-if="auditPanel === 'rules'" class="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr] items-start">
+        <Card padding="md" title="规则编辑" :subtitle="auditRuleForm.builtinRuleId ? '正在调整系统内置规则的本节点覆盖配置，只影响当前节点。' : '节点所有者可创建当前节点规则，管理员还可以创建全局规则。'">
+          <div class="space-y-4">
+            <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-3.5 space-y-2">
+              <div class="text-xs font-semibold text-[var(--text-primary)]">快速模板</div>
+              <div class="flex flex-wrap gap-1.5">
+                <Button
+                  v-for="template in auditRuleTemplates"
+                  :key="template.name"
+                  variant="ghost"
+                  size="sm"
+                  @click="applyAuditRuleTemplate(template)"
+                >
+                  {{ template.name }}
+                </Button>
               </div>
-              <div class="text-xs text-themed-muted mt-1">
+            </div>
+            <div class="grid gap-3">
+              <input v-model="auditRuleForm.name" class="input" placeholder="规则名称" />
+              <div class="grid gap-3 sm:grid-cols-2">
+                <select v-model="auditRuleForm.scope" class="input" :disabled="!!auditRuleForm.builtinRuleId">
+                  <option value="host">当前节点</option>
+                  <option value="global">管理员全局</option>
+                </select>
+                <select v-model="auditRuleForm.severity" class="input">
+                  <option value="info">信息</option>
+                  <option value="low">低</option>
+                  <option value="medium">中</option>
+                  <option value="high">高</option>
+                </select>
+              </div>
+              <input v-model="auditRuleForm.category" class="input" placeholder="分类，例如 网络滥用、代理面板" />
+              <div class="flex flex-wrap gap-4">
+                <label class="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" :checked="auditRuleForm.targetTypes.includes('process')" @change="toggleRuleTarget('process')" />进程</label>
+                <label class="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" :checked="auditRuleForm.targetTypes.includes('network')" @change="toggleRuleTarget('network')" />网络</label>
+                <label class="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer"><input type="checkbox" :checked="auditRuleForm.targetTypes.includes('startup')" @change="toggleRuleTarget('startup')" />启动项</label>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <select v-model="auditRuleForm.matchType" class="input">
+                  <option value="contains">包含关键词</option>
+                  <option value="regex">正则表达式</option>
+                  <option value="exact">精确匹配</option>
+                </select>
+                <label class="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer"><input v-model="auditRuleForm.caseSensitive" type="checkbox" />区分大小写</label>
+              </div>
+              <textarea v-model="auditRuleForm.pattern" class="input min-h-20 font-mono" placeholder="匹配内容或正则" />
+              <textarea v-model="auditRuleForm.recommendation" class="input min-h-20" placeholder="处理建议，可选" />
+              <label class="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer"><input v-model="auditRuleForm.enabled" type="checkbox" />启用规则</label>
+            </div>
+            <div class="flex justify-between gap-3 pt-2 border-t border-[var(--border-color)]">
+              <Button variant="ghost" size="sm" @click="resetAuditRuleForm">清空</Button>
+              <Button variant="primary" size="sm" :loading="loadingAuditMeta" :disabled="loadingAuditMeta" @click="saveAuditRule">
+                {{ auditRuleForm.builtinRuleId ? '保存本节点覆盖' : (auditRuleForm.id ? '保存修改' : '新增规则') }}
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card padding="md" title="规则库">
+          <template #extra>
+            <Button variant="ghost" size="sm" :loading="loadingAuditMeta" :disabled="loadingAuditMeta" @click="loadAuditRules">
+              <RefreshCw v-if="!loadingAuditMeta" class="w-4 h-4" />
+              刷新
+            </Button>
+          </template>
+          <div class="space-y-3 max-h-[42rem] overflow-auto pr-1">
+            <div v-for="rule in auditRules" :key="`${rule.source}-${rule.id}`" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm space-y-2">
+              <div class="flex items-center justify-between gap-3">
+                <div class="font-semibold text-[var(--text-primary)]">{{ localizeAuditText(rule.name) }}</div>
+                <span class="text-xs font-semibold shrink-0" :class="severityClass(rule.severity)">{{ localizeSeverity(rule.severity) }}</span>
+              </div>
+              <div class="text-xs text-[var(--text-secondary)]">
                 {{ localizeRuleSource(rule.source) }} / {{ localizeRuleScope(rule.scope) }} / {{ localizeAuditCategory(rule.category) }} / {{ localizeAuditMatchType(rule.matchType) }}
               </div>
-              <div class="text-xs mt-1" :class="rule.enabled ? 'text-emerald-500' : 'text-red-500'">
-                {{ rule.enabled ? '当前启用' : '当前已停用' }}{{ rule.overridden ? ' / 本节点已覆盖' : '' }}
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge :variant="rule.enabled ? 'success' : 'error'" size="sm">
+                  {{ rule.enabled ? '当前启用' : '当前已停用' }}
+                </Badge>
+                <Badge v-if="rule.overridden" variant="warning" size="sm">本节点已覆盖</Badge>
+                <span class="text-xs text-[var(--text-tertiary)]">检查对象：{{ localizeAuditTargets(rule.targetTypes) }}</span>
               </div>
-              <div class="text-xs text-themed-muted mt-1">检查对象：{{ localizeAuditTargets(rule.targetTypes) }}</div>
-              <div class="text-xs font-mono text-themed-muted mt-2 break-all">{{ rule.pattern }}</div>
-              <div v-if="rule.recommendation" class="text-xs text-themed-muted mt-2">建议：{{ localizeAuditText(rule.recommendation) }}</div>
-              <div class="mt-3 flex justify-end gap-2">
-                <button v-if="rule.source === 'builtin'" class="btn-ghost btn-sm" @click="editBuiltinRuleOverride(rule)">调整本节点</button>
-                <button v-if="rule.source === 'builtin' && rule.overridden" class="btn-ghost btn-sm" @click="resetBuiltinRuleOverride(rule)">恢复默认</button>
-                <button v-if="!rule.readOnly" class="btn-ghost btn-sm" @click="editAuditRule(rule)">编辑</button>
-                <button class="btn-ghost btn-sm" @click="createRuleFromExisting(rule)">基于此规则新建</button>
-                <button v-if="!rule.readOnly" class="btn-danger btn-sm" @click="deleteAuditRule(rule)">删除</button>
-              </div>
-            </div>
-            <div v-if="!auditRules.length" class="text-sm text-themed-muted">暂无规则，点击刷新加载系统内置规则。</div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="auditPanel === 'whitelist'" class="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr]">
-        <div class="card p-5 space-y-4">
-          <h3 class="text-base font-semibold text-themed">新增白名单</h3>
-          <select v-model="ignoreForm.scope" class="input">
-            <option value="instance">当前实例</option>
-            <option value="host">当前节点</option>
-          </select>
-          <input v-model="ignoreForm.ruleId" class="input" placeholder="规则编号，例如 proxy-core 或 custom:1" />
-          <select v-model="ignoreForm.targetType" class="input">
-            <option value="">所有目标</option>
-            <option value="process">进程</option>
-            <option value="network">网络</option>
-            <option value="startup">启动项</option>
-          </select>
-          <input v-model="ignoreForm.matchText" class="input" placeholder="匹配文本，可选" />
-          <textarea v-model="ignoreForm.reason" class="input min-h-20" placeholder="忽略原因" />
-          <input v-model.number="ignoreForm.expiresInDays" type="number" min="0" max="365" class="input" placeholder="有效天数，0 表示永久" />
-          <button class="btn-primary btn-sm" :disabled="loadingAuditMeta" @click="saveAuditIgnore">保存白名单</button>
-        </div>
-
-        <div class="card p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold text-themed">白名单列表</h3>
-            <button class="btn-ghost btn-sm" :disabled="loadingAuditMeta" @click="loadAuditIgnores">刷新</button>
-          </div>
-          <div class="space-y-3">
-            <div v-for="ignore in auditIgnores" :key="ignore.id" class="rounded-xl border p-3 text-sm" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-              <div class="font-medium text-themed">{{ localizeRuleScope(ignore.scope) }} / {{ ignore.ruleId || '任意规则' }}</div>
-              <div class="text-xs text-themed-muted mt-1">目标：{{ localizeAuditTarget(ignore.targetType) }} / 文本：{{ ignore.matchText || '-' }}</div>
-              <div class="text-xs text-themed-muted mt-1">原因：{{ ignore.reason || '-' }}</div>
-              <div class="text-xs text-themed-muted mt-1">到期：{{ ignore.expiresAt ? new Date(ignore.expiresAt).toLocaleString() : '永久' }}</div>
-              <div class="mt-3 flex justify-end">
-                <button class="btn-danger btn-sm" @click="deleteAuditIgnore(ignore)">停用</button>
+              <div class="text-xs font-mono text-[var(--text-secondary)] break-all bg-[var(--bg-surface)] rounded-lg px-3 py-2 border border-[var(--border-color)]">{{ rule.pattern }}</div>
+              <div v-if="rule.recommendation" class="text-xs text-[var(--text-secondary)]">建议：{{ localizeAuditText(rule.recommendation) }}</div>
+              <div class="pt-1 flex flex-wrap justify-end gap-1.5">
+                <Button v-if="rule.source === 'builtin'" variant="ghost" size="sm" @click="editBuiltinRuleOverride(rule)">调整本节点</Button>
+                <Button v-if="rule.source === 'builtin' && rule.overridden" variant="ghost" size="sm" @click="resetBuiltinRuleOverride(rule)">恢复默认</Button>
+                <Button v-if="!rule.readOnly" variant="ghost" size="sm" @click="editAuditRule(rule)">编辑</Button>
+                <Button variant="ghost" size="sm" @click="createRuleFromExisting(rule)">基于此规则新建</Button>
+                <Button v-if="!rule.readOnly" variant="danger" size="sm" @click="deleteAuditRule(rule)">删除</Button>
               </div>
             </div>
-            <div v-if="!auditIgnores.length" class="text-sm text-themed-muted">暂无白名单。</div>
+            <EmptyState v-if="!auditRules.length" title="暂无规则" description="点击右上角刷新加载系统内置规则。" />
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div v-if="auditPanel === 'history'" class="grid gap-6 xl:grid-cols-2">
-        <div class="card p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold text-themed">扫描历史</h3>
-            <button class="btn-ghost btn-sm" :disabled="loadingAuditMeta" @click="loadAuditHistory">刷新</button>
-          </div>
+      <div v-if="auditPanel === 'whitelist'" class="grid gap-6 xl:grid-cols-[minmax(320px,420px)_1fr] items-start">
+        <Card padding="md" title="新增白名单">
           <div class="space-y-3">
-            <div v-for="scan in auditHistory.scans" :key="scan.id" class="rounded-xl border p-3 text-sm" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
+            <select v-model="ignoreForm.scope" class="input">
+              <option value="instance">当前实例</option>
+              <option value="host">当前节点</option>
+            </select>
+            <input v-model="ignoreForm.ruleId" class="input font-mono" placeholder="规则编号，例如 proxy-core 或 custom:1" />
+            <select v-model="ignoreForm.targetType" class="input">
+              <option value="">所有目标</option>
+              <option value="process">进程</option>
+              <option value="network">网络</option>
+              <option value="startup">启动项</option>
+            </select>
+            <input v-model="ignoreForm.matchText" class="input" placeholder="匹配文本，可选" />
+            <textarea v-model="ignoreForm.reason" class="input min-h-20" placeholder="忽略原因" />
+            <input v-model.number="ignoreForm.expiresInDays" type="number" min="0" max="365" class="input font-mono" placeholder="有效天数，0 表示永久" />
+            <Button variant="primary" size="sm" :loading="loadingAuditMeta" :disabled="loadingAuditMeta" @click="saveAuditIgnore">保存白名单</Button>
+          </div>
+        </Card>
+
+        <Card padding="md" title="白名单列表">
+          <template #extra>
+            <Button variant="ghost" size="sm" :loading="loadingAuditMeta" :disabled="loadingAuditMeta" @click="loadAuditIgnores">
+              <RefreshCw v-if="!loadingAuditMeta" class="w-4 h-4" />
+              刷新
+            </Button>
+          </template>
+          <div class="space-y-3">
+            <div v-for="ignore in auditIgnores" :key="ignore.id" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm space-y-1.5">
+              <div class="font-semibold text-[var(--text-primary)]">{{ localizeRuleScope(ignore.scope) }} / {{ ignore.ruleId || '任意规则' }}</div>
+              <div class="text-xs text-[var(--text-secondary)]">目标：{{ localizeAuditTarget(ignore.targetType) }} / 文本：{{ ignore.matchText || '-' }}</div>
+              <div class="text-xs text-[var(--text-secondary)]">原因：{{ ignore.reason || '-' }}</div>
+              <div class="text-xs text-[var(--text-tertiary)]">到期：{{ ignore.expiresAt ? new Date(ignore.expiresAt).toLocaleString() : '永久' }}</div>
+              <div class="pt-2 flex justify-end">
+                <Button variant="danger" size="sm" @click="deleteAuditIgnore(ignore)">停用</Button>
+              </div>
+            </div>
+            <EmptyState v-if="!auditIgnores.length" title="暂无白名单" />
+          </div>
+        </Card>
+      </div>
+
+      <div v-if="auditPanel === 'history'" class="grid gap-6 xl:grid-cols-2 items-start">
+        <Card padding="md" title="扫描历史">
+          <template #extra>
+            <Button variant="ghost" size="sm" :loading="loadingAuditMeta" :disabled="loadingAuditMeta" @click="loadAuditHistory">
+              <RefreshCw v-if="!loadingAuditMeta" class="w-4 h-4" />
+              刷新
+            </Button>
+          </template>
+          <div class="space-y-3">
+            <div v-for="scan in auditHistory.scans" :key="scan.id" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm space-y-1">
               <div class="flex justify-between gap-3">
-                <div class="font-medium text-themed">#{{ scan.id }} / {{ localizeAuditStatus(scan.status) }}</div>
-                <span :class="severityClass(scan.riskLevel)">{{ localizeSeverity(scan.riskLevel) }}</span>
+                <div class="font-semibold text-[var(--text-primary)] font-mono">#{{ scan.id }} · {{ localizeAuditStatus(scan.status) }}</div>
+                <span class="text-xs font-semibold" :class="severityClass(scan.riskLevel)">{{ localizeSeverity(scan.riskLevel) }}</span>
               </div>
-              <div class="text-xs text-themed-muted mt-1">{{ new Date(scan.createdAt).toLocaleString() }} / {{ scan.user?.username || scan.userId }}</div>
-              <div class="text-xs text-themed-muted mt-1">发现 {{ scan.findingCount }}，忽略 {{ scan.ignoredCount }}，进程 {{ scan.processCount }}，连接 {{ scan.connectionCount }}</div>
+              <div class="text-xs text-[var(--text-tertiary)]">{{ new Date(scan.createdAt).toLocaleString() }} · {{ scan.user?.username || scan.userId }}</div>
+              <div class="text-xs text-[var(--text-secondary)]">发现 {{ scan.findingCount }}，忽略 {{ scan.ignoredCount }}，进程 {{ scan.processCount }}，连接 {{ scan.connectionCount }}</div>
             </div>
-            <div v-if="!auditHistory.scans.length" class="text-sm text-themed-muted">暂无扫描历史。</div>
+            <EmptyState v-if="!auditHistory.scans.length" title="暂无扫描历史" />
           </div>
-        </div>
+        </Card>
 
-        <div class="card p-5 space-y-4">
-          <h3 class="text-base font-semibold text-themed">处置历史</h3>
+        <Card padding="md" title="处置历史">
           <div class="space-y-3">
-            <div v-for="action in auditHistory.actions" :key="action.id" class="rounded-xl border p-3 text-sm" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-              <div class="font-medium text-themed">#{{ action.id }} / {{ localizeAuditActionType(action.actionType) }} / {{ localizeAuditActionResult(action.result) }}</div>
-              <div class="text-xs text-themed-muted mt-1">{{ new Date(action.createdAt).toLocaleString() }} / {{ action.user?.username || action.userId }}</div>
-              <div class="text-xs text-themed-muted mt-1">PID {{ action.pid || '-' }} / {{ localizeAuditSignal(action.signal) }}</div>
-              <div class="text-xs text-themed-muted mt-1">原因：{{ action.reason }}</div>
-              <div v-if="action.processCommand" class="text-xs font-mono text-themed-muted mt-1 break-all">{{ action.processCommand }}</div>
+            <div v-for="action in auditHistory.actions" :key="action.id" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm space-y-1">
+              <div class="font-semibold text-[var(--text-primary)]">#{{ action.id }} · {{ localizeAuditActionType(action.actionType) }} · {{ localizeAuditActionResult(action.result) }}</div>
+              <div class="text-xs text-[var(--text-tertiary)]">{{ new Date(action.createdAt).toLocaleString() }} · {{ action.user?.username || action.userId }}</div>
+              <div class="text-xs text-[var(--text-secondary)]">PID {{ action.pid || '-' }} · {{ localizeAuditSignal(action.signal) }}</div>
+              <div class="text-xs text-[var(--text-secondary)]">原因：{{ action.reason }}</div>
+              <div v-if="action.processCommand" class="text-xs font-mono text-[var(--text-tertiary)] mt-1 break-all">{{ action.processCommand }}</div>
             </div>
-            <div v-if="!auditHistory.actions.length" class="text-sm text-themed-muted">暂无处置历史。</div>
+            <EmptyState v-if="!auditHistory.actions.length" title="暂无处置历史" />
           </div>
-        </div>
+        </Card>
       </div>
     </div>
 
-    <div v-if="activeOpsMenu === 'actions'" class="card p-5 space-y-4">
-      <div class="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h3 class="text-base font-semibold text-themed">{{ resultTitle() }}</h3>
-          <p v-if="lastRunAt" class="text-xs text-themed-muted mt-1">{{ t('admin.hosts.ops.lastRunAt') }}：{{ lastRunAt }}</p>
-        </div>
-        <button class="btn-ghost btn-sm" :disabled="!lastAction || loadingAction !== ''" @click="refreshLastResult">{{ t('admin.hosts.ops.refresh') }}</button>
-      </div>
-
-      <template v-if="!hasResult">
-        <div class="rounded-xl border border-dashed p-8 text-center text-sm text-themed-muted" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-          {{ t('admin.hosts.ops.empty') }}
-        </div>
+    <!-- 执行结果卡片 -->
+    <Card v-if="activeOpsMenu === 'actions'" padding="md" :title="resultTitle()" :subtitle="lastRunAt ? `${t('admin.hosts.ops.lastRunAt')}：${lastRunAt}` : undefined">
+      <template #extra>
+        <Button variant="ghost" size="sm" :disabled="!lastAction || loadingAction !== ''" @click="refreshLastResult">
+          <RefreshCw class="w-4 h-4" />
+          {{ t('admin.hosts.ops.refresh') }}
+        </Button>
       </template>
 
-      <template v-else>
+      <EmptyState v-if="!hasResult" :title="t('admin.hosts.ops.empty')" />
+
+      <div v-else class="space-y-4">
         <div v-if="baselineResult" class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-            <div class="text-xs text-themed-muted">已用 CPU</div>
-            <div class="text-xl font-semibold mt-1 text-themed">{{ baselineResult.resources.cpuUsed }}</div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">已用 CPU</div>
+            <div class="text-xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ baselineResult.resources.cpuUsed }}</div>
           </div>
-          <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-            <div class="text-xs text-themed-muted">已用内存</div>
-            <div class="text-xl font-semibold mt-1 text-themed">{{ baselineResult.resources.memoryUsed }}</div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">已用内存</div>
+            <div class="text-xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ baselineResult.resources.memoryUsed }}</div>
           </div>
-          <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-            <div class="text-xs text-themed-muted">已用磁盘</div>
-            <div class="text-xl font-semibold mt-1 text-themed">{{ baselineResult.resources.diskUsed }}</div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">已用磁盘</div>
+            <div class="text-xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ baselineResult.resources.diskUsed }}</div>
           </div>
-          <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-            <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.synced') }}</div>
-            <div class="text-xl font-semibold mt-1 text-themed">{{ baselineResult.instanceSync.synced }} / {{ baselineResult.instanceSync.total }}</div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.synced') }}</div>
+            <div class="text-xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ baselineResult.instanceSync.synced }} / {{ baselineResult.instanceSync.total }}</div>
           </div>
-          <div class="rounded-xl p-4" :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
-            <div class="text-xs text-themed-muted">{{ t('admin.hosts.ops.changes') }}</div>
-            <div class="text-xl font-semibold mt-1 text-themed">{{ baselineResult.instanceSync.ipChanged }}</div>
+          <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4">
+            <div class="text-xs text-[var(--text-tertiary)]">{{ t('admin.hosts.ops.changes') }}</div>
+            <div class="text-xl font-semibold font-mono tabular-nums mt-1 text-[var(--text-primary)]">{{ baselineResult.instanceSync.ipChanged }}</div>
           </div>
         </div>
         <div
           v-if="baselineResult?.storageSync"
-          class="mt-3 rounded-xl p-4 flex flex-wrap items-center gap-3 text-xs"
-          :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'"
+          class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 flex flex-wrap items-center gap-3 text-xs"
         >
-          <span class="font-medium text-themed">
+          <span class="font-medium text-[var(--text-primary)]">
             {{ t('admin.hosts.storage.title') }}：{{ baselineResult.storageSync.poolCount }}
           </span>
-          <span
-            v-if="baselineResult.storageSync.missingPools.length > 0"
-            class="px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--error)_12%,var(--bg-surface))] text-[var(--error)] font-medium"
-          >
+          <Badge v-if="baselineResult.storageSync.missingPools.length > 0" variant="error" size="sm">
             {{ t('admin.hosts.storage.statusMissing') }}：{{ baselineResult.storageSync.missingPools.join(', ') }}
-          </span>
-          <span
-            v-if="baselineResult.storageSync.untrackedPools.length > 0"
-            class="px-2 py-0.5 rounded-full bg-[color-mix(in_srgb,var(--warning)_12%,var(--bg-surface))] text-[var(--warning)] font-medium"
-          >
+          </Badge>
+          <Badge v-if="baselineResult.storageSync.untrackedPools.length > 0" variant="warning" size="sm">
             未纳入：{{ baselineResult.storageSync.untrackedPools.join(', ') }}
-          </span>
+          </Badge>
         </div>
 
-        <div v-if="networkResult" class="overflow-hidden rounded-xl border" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
+        <div v-if="networkResult" class="overflow-hidden rounded-2xl border border-[var(--border-color)]">
           <table class="w-full table-fixed text-sm">
-            <thead :class="themeStore.isDark ? 'bg-gray-900' : 'bg-gray-50'">
+            <colgroup>
+              <col class="w-[8%]" />
+              <col class="w-[18%]" />
+              <col class="w-[12%]" />
+              <col class="w-[22%]" />
+              <col class="w-[22%]" />
+              <col class="w-[18%]" />
+            </colgroup>
+            <thead class="bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
               <tr>
-                <th class="px-4 py-3 text-left font-medium text-themed">ID</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">{{ t('admin.hosts.ops.instanceName') }}</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">{{ t('admin.hosts.ops.dbStatus') }}</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">{{ t('admin.hosts.ops.ipv4') }}</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">{{ t('admin.hosts.ops.ipv6') }}</th>
-                <th class="px-4 py-3 text-left font-medium text-themed">{{ t('admin.hosts.ops.details') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">ID</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">{{ t('admin.hosts.ops.instanceName') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">{{ t('admin.hosts.ops.dbStatus') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">{{ t('admin.hosts.ops.ipv4') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">{{ t('admin.hosts.ops.ipv6') }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold tracking-wider text-[var(--text-secondary)] uppercase">{{ t('admin.hosts.ops.details') }}</th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="row in networkResult.results" :key="row.id" class="border-t" :class="themeStore.isDark ? 'border-gray-800' : 'border-gray-200'">
-                <td class="px-4 py-3 text-themed">{{ row.id }}</td>
-                <td class="px-4 py-3 text-themed">{{ row.name }}</td>
-                <td class="px-4 py-3 text-themed">{{ row.newStatus || row.oldStatus || '-' }}</td>
-                <td class="px-4 py-3 text-themed-muted">{{ row.ipv4Changed ? `${formatValue(row.oldIpv4)} → ${formatValue(row.newIpv4)}` : '-' }}</td>
-                <td class="px-4 py-3 text-themed-muted">{{ row.ipv6Changed ? `${formatValue(row.oldIpv6)} → ${formatValue(row.newIpv6)}` : '-' }}</td>
-                <td class="px-4 py-3">
-                  <span v-if="row.success" class="text-xs text-themed-muted">{{ row.statusChanged ? `${formatValue(row.oldStatus)} → ${formatValue(row.newStatus)}` : '-' }}</span>
-                  <span v-else class="text-xs text-red-500">{{ row.error }}</span>
+            <tbody class="divide-y divide-[var(--border-color)] bg-[var(--bg-surface)]">
+              <tr v-for="row in networkResult.results" :key="row.id" class="hover:bg-[var(--bg-surface-soft)]/60 transition-colors">
+                <td class="px-4 py-3 font-mono tabular-nums text-[var(--text-primary)]">{{ row.id }}</td>
+                <td class="px-4 py-3 font-medium text-[var(--text-primary)] truncate">{{ row.name }}</td>
+                <td class="px-4 py-3 text-[var(--text-primary)] truncate">{{ row.newStatus || row.oldStatus || '-' }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-[var(--text-secondary)] break-all">{{ row.ipv4Changed ? `${formatValue(row.oldIpv4)} → ${formatValue(row.newIpv4)}` : '-' }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-[var(--text-secondary)] break-all">{{ row.ipv6Changed ? `${formatValue(row.oldIpv6)} → ${formatValue(row.newIpv6)}` : '-' }}</td>
+                <td class="px-4 py-3 min-w-0">
+                  <span v-if="row.success" class="text-xs text-[var(--text-secondary)] break-words">{{ row.statusChanged ? `${formatValue(row.oldStatus)} → ${formatValue(row.newStatus)}` : '-' }}</span>
+                  <span v-else class="text-xs text-[var(--error)] break-words">{{ row.error }}</span>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div v-if="latestInstanceActionResult" class="rounded-xl border p-4 text-sm" :class="themeStore.isDark ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'">
-          <div class="font-medium text-themed mb-2">{{ t('admin.hosts.ops.latestInstanceAction') }}</div>
-          <div class="space-y-1 text-themed-muted">
+        <div v-if="latestInstanceActionResult" class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 text-sm space-y-1.5">
+          <div class="font-semibold text-[var(--text-primary)]">{{ t('admin.hosts.ops.latestInstanceAction') }}</div>
+          <div class="space-y-1 text-xs text-[var(--text-secondary)]">
             <div v-if="latestInstanceActionResult.message">{{ latestInstanceActionResult.message }}</div>
-            <div v-if="latestInstanceActionResult.taskId">Task #{{ latestInstanceActionResult.taskId }}</div>
+            <div v-if="latestInstanceActionResult.taskId" class="font-mono">Task #{{ latestInstanceActionResult.taskId }}</div>
             <div v-if="latestInstanceActionResult.currentStatus">{{ t('admin.hosts.ops.dbStatus') }}: {{ latestInstanceActionResult.currentStatus }}</div>
-            <div v-if="latestInstanceActionResult.from || latestInstanceActionResult.to">{{ formatValue(latestInstanceActionResult.from) }} → {{ formatValue(latestInstanceActionResult.to) }}</div>
+            <div v-if="latestInstanceActionResult.from || latestInstanceActionResult.to" class="font-mono">{{ formatValue(latestInstanceActionResult.from) }} → {{ formatValue(latestInstanceActionResult.to) }}</div>
           </div>
         </div>
-      </template>
-    </div>
+      </div>
+    </Card>
 
     <!-- 二次确认弹窗 -->
     <div
       v-if="showDangerConfirmModal"
       class="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
-      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="cancelDangerConfirm" />
-      <div
-        class="relative w-full max-w-md rounded-2xl p-6 space-y-5 shadow-2xl"
-        :class="themeStore.isDark ? 'bg-gray-900 border border-gray-800' : 'bg-white border border-gray-200'"
-      >
+      <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="cancelDangerConfirm" />
+      <div class="relative w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-6 space-y-5 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
         <!-- 警告图标 -->
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
+          <div class="w-10 h-10 rounded-full bg-[color-mix(in_srgb,var(--error)_14%,var(--bg-surface))] flex items-center justify-center shrink-0">
+            <AlertTriangle class="w-5 h-5 text-[var(--error)]" />
           </div>
           <div>
-            <div class="font-semibold text-themed">
+            <div class="font-semibold text-[var(--text-primary)]">
               {{ dangerConfirmStep === 1 ? t('admin.hosts.ops.dangerConfirm1Title') : t('admin.hosts.ops.dangerConfirm2Title') }}
             </div>
-            <div class="text-xs text-themed-muted mt-0.5">
+            <div class="text-xs text-[var(--text-secondary)] mt-0.5">
               {{ dangerConfirmStep === 1 ? t('admin.hosts.ops.dangerConfirm1Hint') : t('admin.hosts.ops.dangerConfirm2Hint') }}
             </div>
           </div>
         </div>
 
         <!-- 操作摘要 -->
-        <div class="rounded-xl p-4 space-y-1.5 text-sm" :class="themeStore.isDark ? 'bg-gray-800' : 'bg-gray-50'">
-          <div class="flex items-center justify-between">
-            <span class="text-themed-muted">{{ t('admin.hosts.ops.instanceName') }}</span>
-            <span class="font-mono font-medium text-themed">{{ previewResult?.instanceName }}</span>
+        <div class="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface-soft)] p-4 space-y-2 text-sm">
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-[var(--text-secondary)]">{{ t('admin.hosts.ops.instanceName') }}</span>
+            <span class="font-mono font-medium text-[var(--text-primary)]">{{ previewResult?.instanceName }}</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-themed-muted">{{ t('admin.hosts.ops.dangerActionType') }}</span>
-            <span class="font-medium text-red-500">{{ dangerousAction === 'rebuild' ? t('admin.hosts.ops.rebuild') : t('admin.hosts.ops.recreate') }}</span>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-[var(--text-secondary)]">{{ t('admin.hosts.ops.dangerActionType') }}</span>
+            <span class="font-medium text-[var(--error)]">{{ dangerousAction === 'rebuild' ? t('admin.hosts.ops.rebuild') : t('admin.hosts.ops.recreate') }}</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-themed-muted">{{ t('admin.hosts.ops.selectImage') }}</span>
-            <span class="text-themed text-xs font-mono">{{ selectedImageAlias }}</span>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-[var(--text-secondary)]">{{ t('admin.hosts.ops.selectImage') }}</span>
+            <span class="text-[var(--text-primary)] text-xs font-mono truncate">{{ selectedImageAlias }}</span>
           </div>
         </div>
 
         <!-- 步骤指示 -->
-        <div class="flex items-center gap-2">
-          <div class="flex-1 h-1.5 rounded-full" :class="dangerConfirmStep >= 1 ? 'bg-red-500' : (themeStore.isDark ? 'bg-gray-700' : 'bg-gray-200')" />
-          <div class="flex-1 h-1.5 rounded-full" :class="dangerConfirmStep >= 2 ? 'bg-red-500' : (themeStore.isDark ? 'bg-gray-700' : 'bg-gray-200')" />
-        </div>
-        <div class="text-xs text-themed-muted text-center">
-          {{ t('admin.hosts.ops.dangerConfirmStep', { step: dangerConfirmStep, total: 2 }) }}
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 rounded-full transition-colors" :class="dangerConfirmStep >= 1 ? 'bg-[var(--error)]' : 'bg-[var(--bg-tertiary)]'" />
+            <div class="flex-1 h-1.5 rounded-full transition-colors" :class="dangerConfirmStep >= 2 ? 'bg-[var(--error)]' : 'bg-[var(--bg-tertiary)]'" />
+          </div>
+          <div class="text-xs text-[var(--text-tertiary)] text-center">
+            {{ t('admin.hosts.ops.dangerConfirmStep', { step: dangerConfirmStep, total: 2 }) }}
+          </div>
         </div>
 
         <!-- 操作按钮 -->
         <div class="flex gap-3 justify-end">
-          <button class="btn-ghost btn-sm" @click="cancelDangerConfirm">{{ t('common.cancel') }}</button>
-          <button
+          <Button variant="ghost" size="sm" @click="cancelDangerConfirm">{{ t('common.cancel') }}</Button>
+          <Button
             v-if="dangerConfirmStep === 1"
-            class="btn-danger btn-sm"
+            variant="danger"
+            size="sm"
             @click="advanceDangerConfirm"
           >
             {{ t('admin.hosts.ops.dangerConfirm1Btn') }}
-          </button>
-          <button
+          </Button>
+          <Button
             v-else
-            class="btn-danger btn-sm"
+            variant="danger"
+            size="sm"
+            :loading="loadingAction === 'instanceDanger'"
             :disabled="loadingAction !== ''"
             @click="executeDangerConfirmed"
           >
-            {{ loadingAction === 'instanceDanger' ? '...' : t('admin.hosts.ops.dangerConfirm2Btn') }}
-          </button>
+            {{ loadingAction === 'instanceDanger' ? t('common.processing') : t('admin.hosts.ops.dangerConfirm2Btn') }}
+          </Button>
         </div>
       </div>
     </div>
