@@ -1584,19 +1584,16 @@ async function handleSubmit(): Promise<void> {
                   </Badge>
                 </div>
 
-                <div
-                  class="grid grid-cols-2 gap-3 text-center"
-                  :class="(selectedPlan.gpuShared ?? selectedPackage?.gpu_shared) ? 'sm:grid-cols-5' : 'sm:grid-cols-4'"
-                >
-                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                <div class="grid grid-cols-2 gap-2.5 text-center">
+                  <div class="p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex flex-col justify-center">
+                    <div class="text-base font-mono font-semibold tabular-nums whitespace-nowrap text-[var(--text-primary)]">
                       {{ formatCpu(selectedPlan.cpu) }}
                     </div>
                     <div class="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">CPU</div>
                   </div>
 
-                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                  <div class="p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex flex-col justify-center">
+                    <div class="text-base font-mono font-semibold tabular-nums whitespace-nowrap text-[var(--text-primary)]">
                       {{ formatMemory(selectedPlan.memory) }}
                     </div>
                     <div class="text-xs text-[var(--text-secondary)] leading-tight mt-0.5 font-medium">
@@ -1608,27 +1605,28 @@ async function handleSubmit(): Promise<void> {
                     </div>
                   </div>
 
-                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                  <div class="p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex flex-col justify-center">
+                    <div class="text-base font-mono font-semibold tabular-nums whitespace-nowrap text-[var(--text-primary)]">
                       {{ formatDisk(selectedPlan.disk) }}
                     </div>
                     <div class="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">{{ $t('instance.disk') }}</div>
                   </div>
 
-                  <GpuSpecification
-                    v-if="selectedPlan.gpuShared ?? selectedPackage?.gpu_shared"
-                    :configurations="selectedPlan.gpuConfigurations"
-                    :host-id="form.hostId"
-                  />
-
-                  <div class="p-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)]">
-                    <div class="text-lg font-mono font-semibold tabular-nums text-[var(--text-primary)]">
+                  <div class="p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex flex-col justify-center">
+                    <div class="text-base font-mono font-semibold tabular-nums whitespace-nowrap text-[var(--text-primary)]">
                       {{ formatTraffic(selectedPlan.trafficLimit) }}
                     </div>
                     <div class="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
                       {{ $t('billing.traffic') }} <span class="opacity-60">({{ $t('billing.trafficBidirectional') }})</span>
                     </div>
                   </div>
+
+                  <GpuSpecification
+                    v-if="selectedPlan.gpuShared ?? selectedPackage?.gpu_shared"
+                    class="col-span-2"
+                    :configurations="selectedPlan.gpuConfigurations"
+                    :host-id="form.hostId"
+                  />
                 </div>
 
                 <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 mt-3 pt-3 border-t border-[var(--border-color)] text-xs text-[var(--text-secondary)]">
@@ -1704,7 +1702,8 @@ async function handleSubmit(): Promise<void> {
           </Card>
 
           <!-- 提交区 -->
-          <Card padding="md" class="mt-4 rounded-2xl space-y-4">
+          <Card padding="md" class="mt-4 rounded-2xl">
+            <div class="space-y-4">
             <!-- 实例名称 -->
             <div>
               <div
@@ -1858,6 +1857,7 @@ async function handleSubmit(): Promise<void> {
             >
               {{ submitting ? $t('instance.createPage.creating') : $t('instance.create') }}
             </Button>
+            </div>
           </Card>
         </div><!-- end right col -->
       </div><!-- end grid -->

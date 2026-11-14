@@ -12,17 +12,17 @@ function memory(mib: number): string {
 </script>
 
 <template>
-  <div class="min-w-0 text-center" data-gpu-spec>
-    <div class="mb-0.5 text-xs text-themed-muted">{{ t('gpu.specLabel') }}</div>
+  <div class="min-w-0 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-center flex flex-col items-center justify-center" data-gpu-spec>
+    <div class="mb-1 text-xs font-medium text-[var(--text-secondary)]">{{ t('gpu.specLabel') }}</div>
     <template v-if="configurations.length">
       <div v-for="(configuration, index) in configurations" :key="configuration.hostIds.join(',')">
-        <p v-if="index" class="my-1 text-xs text-themed-muted">{{ t('gpu.or') }}</p>
-        <div v-for="device in configuration.devices" :key="`${device.name}:${device.memoryTotalMiB}`" class="break-words text-sm font-semibold leading-snug text-themed">
-          <div>{{ device.name }}</div>
-          <div class="text-xs font-medium text-themed-secondary" :title="t('gpu.perCardMemory')">{{ memory(device.memoryTotalMiB) }}<span v-if="device.count > 1"> ×{{ device.count }}</span></div>
+        <p v-if="index" class="my-1 text-xs text-[var(--text-tertiary)]">{{ t('gpu.or') }}</p>
+        <div v-for="device in configuration.devices" :key="`${device.name}:${device.memoryTotalMiB}`" class="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 text-sm font-semibold leading-snug text-[var(--text-primary)]">
+          <span>{{ device.name }}</span>
+          <span class="text-xs font-mono font-medium text-[var(--text-secondary)] whitespace-nowrap" :title="t('gpu.perCardMemory')">{{ memory(device.memoryTotalMiB) }}<span v-if="device.count > 1"> ×{{ device.count }}</span></span>
         </div>
       </div>
     </template>
-    <p v-else class="text-sm text-themed-secondary">{{ t('gpu.unknown') }}</p>
+    <p v-else class="text-sm text-[var(--text-secondary)]">{{ t('gpu.unknown') }}</p>
   </div>
 </template>
