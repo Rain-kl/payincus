@@ -17,16 +17,35 @@ let pending=identities.map(i=>({...i}))
 const statuses:Record<string,string>={running:'Stopped',frozen:'Stopped',vm:'Stopped',suspended:'Stopped'}
 const starts:string[]=[]
 Object.assign(hostTunnelManager, { requestHeartbeatAndWait: async () => {} })
-Object.assign(prisma.storagePool, { updateMany:async()=>({count:1}), findUnique: async () => ({ driver: 'zfs', config: {}, telemetry: { encryption: { encrypted: true, state: available ? 'unlocked' : 'locked', dataset, encryptionRoot: dataset, keyFormat: 'hex', manualLocked: manual, lockPending: manual && !complete, pendingRecovery: pending.length } } }) })
-Object.assign(prisma.host,{findUnique:async()=>({id:4,userId:10,url:'https://node.invalid'})})
+Object.assign(prisma.storagePool, {
+ updateMany: async () => ({ count: 1 }),
+ findMany: async () => [{ id: 1, hostId: 4, name: 'data', driver: 'zfs', purpose: 'instance_data', description: '', config: { 'zfs.pool_name': dataset }, status: available ? 'ready' : 'locked', totalBytes: 1000n, usedBytes: 100n, createdAt: new Date(0), reportedAt: null, telemetry: { encryption: { encrypted: true, state: available ? 'unlocked' : 'locked', dataset, encryptionRoot: dataset, keyFormat: 'hex', manualLocked: manual, lockPending: manual && !complete, pendingRecovery: pending.length } } }],
+ findUnique: async () => ({ driver: 'zfs', config: {}, telemetry: { encryption: { encrypted: true, state: available ? 'unlocked' : 'locked', dataset, encryptionRoot: dataset, keyFormat: 'hex', manualLocked: manual, lockPending: manual && !complete, pendingRecovery: pending.length } } })
+})
+Object.assign(prisma.host,{findUnique:async()=>({id:4,userId:10,url:'https://node.invalid'}),findMany:async()=>[]})
 Object.assign(prisma.nodeSecurityState,{findUnique:async()=>({serverFingerprint:'a'.repeat(64)})})
 Object.assign(prisma.nodeStorageKey,{findUnique:async()=>saved,upsert:async()=>saved,updateMany:async()=>({count:1})})
 Object.assign(prisma.log,{create:async()=>{if(failAudit)throw new Error('audit unavailable');return {id:1}}})
-Object.assign(prisma.instance,{findFirst:async({where}:any)=>({status:where.incusId==='suspended'?'suspended':'stopped',expiresAt:null})})
+Object.assign(prisma.instance,{findFirst:async({where}:any)=>({status:where.incusId==='suspended'?'suspended':'stopped',expiresAt:null}),findMany:async()=>[]})
 Object.assign(IncusClient.prototype,{
  connect:async()=>{},close:async()=>{},
  request:async(method:string,path:string,body?:any)=>{
   if(path==='/1.0/agent')return {api_extensions:['incus_storage_encryption_v1']}
+  if(path==='/1.0/agent/baseline')return {
+   storage:{
+    available:true,
+    complete:true,
+    pools:[{
+     name:'data',
+     driver:'zfs',
+     status:available?'ready':'locked',
+     usedBy:0,
+     config:{'zfs.pool_name':dataset},
+     space:{total:1000,used:100,available:900},
+     encryption:{encrypted:true,state:available?'unlocked':'locked',source:dataset,encryptionRoot:dataset,manualLocked:manual,lockPending:manual&&!complete,pendingRecovery:pending.length,nodeLocked:globalLocked,keyFormat:'hex'}
+    }]
+   }
+  }
   if(path==='/1.0/storage-pools/data')return {driver:'zfs',config:{'zfs.pool_name':dataset}}
   if(path==='/1.0/storage-pools/moved')return {driver:'zfs',config:{'zfs.pool_name':'other/incus'}}
   if(path==='/1.0/agent/storage')return {datasets:[{dataset,encryptionRoot:dataset,algorithm:'aes-256-gcm',keyStatus:available?'available':'unavailable',keyFormat:'hex'}],locks:{[dataset]:{locked:manual,complete,resumeInstances:pending}}}

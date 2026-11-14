@@ -1,7 +1,7 @@
 import type { Prisma, StoragePool } from '@prisma/client'
 import { prisma } from '../db/prisma.js'
 import { evaluateHostService } from './host-service-status.js'
-import { storageHeadroomMB, storageReportMaxAgeMs } from './storage-capacity-policy.js'
+import { storageHeadroomMB } from './storage-capacity-policy.js'
 
 type Client = Prisma.TransactionClient | typeof prisma
 const MIB = 1024 * 1024
@@ -43,8 +43,7 @@ export async function getStorageCapacity(hostId: number, options: {
   const selected = options.poolName || binding?.storagePoolName
   const candidates = selected ? pools.filter(p => p.name === selected) : pools
   if (!candidates.length) return empty('storage_pool_missing')
-  const maxAge = storageReportMaxAgeMs(host.agent?.lastReport)
-  const ready = (pool: StoragePool) => pool.status === 'ready' && !!pool.reportedAt && Date.now() - pool.reportedAt.getTime() <= maxAge &&
+  const ready = (pool: StoragePool) => pool.status === 'ready' && !!pool.reportedAt &&
     !(pool.config as Record<string, unknown> | null)?._payincusImport && !(pool.config as Record<string, unknown> | null)?._payincusDeletion && pool.totalBytes > 0n
   const unassigned = Math.max(0, host.diskUsed - instances.reduce((sum, i) => sum + i.disk, 0))
   const choices = candidates.map(pool => {

@@ -22,10 +22,18 @@ const pools={
  upsert:async({create,update}:any)=>{record=record?{...record,...update}:create;return record},
  deleteMany:async()=>{record=null;return {count:1}}
 }
+const withinDataset = (ds: string, root: string) => ds === root || ds.startsWith(root + '/')
+let securityTargets: Array<{ dataset: string; guid: string }> = [{ dataset: source, guid: '123' }, { dataset: 'pool/other', guid: '456' }]
+let agentDatasets: Array<{ dataset: string }> = []
 const keyDb={
  findUnique:async({where}:any)=>keys.find(k=>k.id===where.id)||null,
  findMany:async()=>keys.filter(k=>k.dataset===source||k.dataset.startsWith(source+'/')).map(({id,dataset,fingerprint})=>({id,dataset,fingerprint})),
- delete:async({where}:any)=>{keys=keys.filter(k=>k.id!==where.id)}
+ delete:async({where}:any)=>{keys=keys.filter(k=>k.id!==where.id)},
+ deleteMany:async({where}:any)=>{
+  const root=where?.OR?.[0]?.dataset
+  if(root) keys=keys.filter(k=>!(k.hostId===where.hostId&&withinDataset(k.dataset,root)))
+  return {count:1}
+ }
 }
 Object.assign(prisma.storagePool,pools)
 Object.assign(prisma.nodeStorageKey,keyDb)
@@ -40,7 +48,8 @@ Object.assign(IncusClient.prototype,{
   if(path==='/1.0/agent')return {api_extensions:['incus_storage_encryption_v1']}
   if(path==='/1.0/storage-pools')return exists?['/1.0/storage-pools/data']:[]
   if(path==='/1.0/storage-pools/data'&&method==='GET')return {driver:'zfs',config:{'zfs.pool_name':actualSource}}
-  if(path==='/1.0/agent/security')return {targets:[{dataset:source,guid:'123'},{dataset:'pool/other',guid:'456'}]}
+  if(path==='/1.0/agent/security')return {targets:securityTargets}
+  if(path==='/1.0/agent/storage')return {datasets:agentDatasets}
   if(method==='DELETE'){
    assert.ok(record.config._payincusDeletion,'remote delete preceded durable checkpoint')
    deletes++;if(remoteFailure)throw new Error('fixture deletion refused')
@@ -84,3 +93,15 @@ console.log('Storage deletion: checkpoint-before-delete, key retention on failur
 
 reset();exists=false;record.config._payincusImport={source,encryptionRoot:source}
 const removed=await deleteManagedZfsPool(4,'data');assert.match(removed.message,/外部数据集/);assert.equal(record,null);assert.equal(deletes,0);assert.equal(keys.length,2)
+
+// Node rebuild / pool missing on node: allow deletion cleanly and remove orphan keys when dataset is gone, preserve keys if dataset remains.
+reset();exists=false;securityTargets=[{dataset:'pool/other',guid:'456'}];agentDatasets=[]
+const cleanedMissing=await deleteManagedZfsPool(4,'data')
+assert.equal((cleanedMissing as any).missingOnNode,true)
+assert.equal(record,null);assert.equal(deletes,0);assert.equal(keys.length,1);assert.equal(keys[0].dataset,'pool/other')
+
+reset();exists=false;securityTargets=[];agentDatasets=[{dataset:source}]
+const preservedKeyMissing=await deleteManagedZfsPool(4,'data')
+assert.equal((preservedKeyMissing as any).missingOnNode,true)
+assert.equal(record,null);assert.equal(deletes,0);assert.equal(keys.length,2)
+console.log('Missing-pool tolerant deletion passed: cleans orphaned keys when dataset absent and retains keys if dataset remains')

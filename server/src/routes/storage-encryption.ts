@@ -1,5 +1,5 @@
 import { storedPoolEncryption } from '../lib/storage/read-model.js'
-import { hostTunnelManager } from '../lib/incus/tunnel-manager.js'
+import { syncHostStorageBaseline } from '../services/storage-baseline-sync.js'
 import { IncusApiError, nodeErrorDetail } from '../lib/incus/incus-client.js'
 import { unlockAndBindPool } from '../lib/storage/import.js'
 import type { FastifyInstance } from 'fastify'
@@ -28,18 +28,25 @@ export default async function storageEncryptionRoutes(app: FastifyInstance) {
         if (req.user.role !== 'admin' && req.user.id !== host.userId) return reply.code(403).send({ error: '无权管理此节点存储' })
         try {
           if (method === 'GET') return await storedPoolEncryption(hostId, req.params.poolName)
-          const result = await withStorageSession(hostId, true, async (node, vault) => method === 'PUT'
-            ? lockPool(node, req.params.poolName, vault, req.user.id, hostId)
-            : unlockAndBindPool(node, hostId, req.params.poolName, vault, req.body?.key))
-          // The node has already confirmed the new key state, but the persisted
-          // telemetry the list view reads is written by the next heartbeat. Wait
-          // for it so the caller never reports success while the pool still reads
-          // as locked, and surface a real failure when confirmation never lands.
+          let syncError: unknown = null
+          const result = await withStorageSession(hostId, true, async (node, vault) => {
+            const res = method === 'PUT'
+              ? await lockPool(node, req.params.poolName, vault, req.user.id, hostId)
+              : await unlockAndBindPool(node, hostId, req.params.poolName, vault, req.body?.key)
+            if (method === 'POST') {
+              try {
+                await syncHostStorageBaseline(hostId, node, { skipPoolReload: true })
+              } catch (err) {
+                syncError = err
+              }
+            }
+            return res
+          })
+          // 解锁操作已在节点完成；通过同一 mTLS 连接立即同步存储基线，无需再等 5 秒心跳。
           if (method === 'POST') {
-            try { await hostTunnelManager.requestHeartbeatAndWait(hostId, 30_000) }
-            catch (error) {
-              req.log.warn({ hostId, error }, 'Storage unlock completed but heartbeat confirmation did not arrive')
-              return reply.code(504).send({ error: '节点已加载密钥，但未能确认最新存储状态；请点击节点测试立即上报后刷新' })
+            if (syncError) {
+              req.log.warn({ hostId, error: syncError }, 'Storage unlock completed but baseline confirmation failed')
+              return reply.code(504).send({ error: '节点已加载密钥，但未能同步确认最新存储基线；请点击「基线同步」后刷新' })
             }
             const confirmed = await storedPoolEncryption(hostId, req.params.poolName)
             if (confirmed?.encrypted && confirmed.state !== 'unlocked') {
@@ -47,7 +54,6 @@ export default async function storageEncryptionRoutes(app: FastifyInstance) {
             }
             return confirmed
           }
-          hostTunnelManager.requestHeartbeat(hostId)
           return result
         } catch (error) {
           if (error instanceof StorageEncryptionError) return reply.code(error.statusCode).send({ error: error.message })

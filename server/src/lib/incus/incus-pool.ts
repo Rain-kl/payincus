@@ -68,7 +68,7 @@ function ensureCleanupStarted(): void {
         console.log(`[IncusPool] Closed expired connection: ${key}`)
       }
     }
-  }, 5 * 60 * 1000) // 每5分钟检查一次
+  }, 5 * 60 * 1000).unref() // 每5分钟检查一次
 }
 
 /**

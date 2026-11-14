@@ -16,7 +16,13 @@ export async function processAgentStorageReport(hostId: number, payload: unknown
     if (!record(item) || typeof item.name !== 'string' || byName.has(item.name)) return false
     byName.set(item.name, item)
   }
-  const pools = await prisma.storagePool.findMany({ where: { hostId } })
+  const [pools, activeInstances] = await Promise.all([
+    prisma.storagePool.findMany({ where: { hostId } }),
+    typeof prisma.instance?.findMany === 'function'
+      ? prisma.instance.findMany({ where: { hostId, status: { not: 'deleted' }, storagePoolName: { not: null } }, select: { storagePoolName: true } })
+      : Promise.resolve([])
+  ])
+  const poolsWithInstances = new Set(activeInstances.map(i => i.storagePoolName).filter((name): name is string => typeof name === 'string' && name.length > 0))
   let accepted = true
   for (const pool of pools) {
     if (sampledAt < pool.createdAt || (pool.reportedAt && sampledAt <= pool.reportedAt)) { accepted = false; continue }
@@ -33,12 +39,21 @@ export async function processAgentStorageReport(hostId: number, payload: unknown
       }
     }
     if (!item && payload.available === true && payload.complete !== true) continue
-    const data: Prisma.StoragePoolUpdateManyMutationInput = { reportedAt: sampledAt, status: item ? 'unavailable' : payload.available === true ? 'missing' : 'unavailable' }
     const source = config['zfs.pool_name'] || config.source
     const actualSource = item?.config?.['zfs.pool_name'] || item?.config?.source
     const matchingSource = !source || String(source).startsWith('/') || source === actualSource
+    const hasAttachedInstances = poolsWithInstances.has(pool.name)
+    const fallbackStatus = !item
+      ? (payload.available === true ? 'missing' : 'unavailable')
+      : (!matchingSource || item.driver !== pool.driver) && hasAttachedInstances
+        ? 'missing'
+        : 'unavailable'
+    const data: Prisma.StoragePoolUpdateManyMutationInput = { reportedAt: sampledAt, status: fallbackStatus }
     if (item && item.driver === pool.driver && matchingSource) {
       const validSpace = record(item.space) && bytes(item.space.total) && item.space.total > 0 && bytes(item.space.used) && item.space.used <= item.space.total
+      const spaceAvailable = validSpace
+        ? (bytes(item.space.available) ? Math.min(item.space.available, item.space.total) : Math.max(0, item.space.total - item.space.used))
+        : null
       data.status = config._payincusImport ? 'pending' : item.status === 'locked' ? 'locked' : item.status === 'ready' && validSpace ? 'ready' : 'unavailable'
       if (pool.driver === 'zfs' && !record(item.encryption)) data.status = 'unavailable'
       if (item.encryption?.encrypted === true && item.encryption?.state !== 'unlocked') data.status = 'locked'
@@ -60,7 +75,7 @@ export async function processAgentStorageReport(hostId: number, payload: unknown
       // Never store arbitrary node fields (especially key material) in pool telemetry.
       const backing = record(item.backing) && bytes(item.backing.sizeBytes) && bytes(item.backing.availableBytes) && typeof item.backing.id === 'string'
         ? { sizeBytes: item.backing.sizeBytes, availableBytes: item.backing.availableBytes, id: item.backing.id.slice(0, 100) } : null
-      data.telemetry = { usedBy: Number.isSafeInteger(item.usedBy) ? item.usedBy : 0, encryption, backing,
+      data.telemetry = { usedBy: Number.isSafeInteger(item.usedBy) ? item.usedBy : 0, spaceAvailable, encryption, backing,
         filesystemId: typeof item.filesystemId === 'string' ? item.filesystemId.slice(0, 100) : null }
       if (record(item.config) && Object.values(item.config).every(v => typeof v === 'string')) data.config = { ...config, ...item.config } as Prisma.InputJsonObject
     }

@@ -36,7 +36,10 @@ import {
   tryAdvisoryTransactionLock
 } from '../db/advisory-locks.js'
 import { IncusClient, getIncusClient, removeIncusClient } from '../lib/incus/index.js'
+import { IncusApiError } from '../lib/incus/incus-client.js'
 import { HeartbeatTestError, deriveEffectiveHostStatus, hostTunnelManager } from '../lib/incus/tunnel-manager.js'
+import { syncHostStorageBaseline } from '../services/storage-baseline-sync.js'
+import { runHostDiagnostics } from '../services/host-diagnostics.js'
 import { getInstance, updateInstance } from '../lib/incus/incus-instances.js'
 import { selectBindableIpv4ListenAddress } from '../lib/network-address.js'
 import { createStoragePool, deleteStoragePool, updateStoragePool } from '../lib/incus/incus-storage.js'
@@ -1170,6 +1173,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         await client.close()
         autoConnected = true
         hostTunnelManager.requestHeartbeat(hostId)
+        await syncHostStorageBaseline(hostId).catch(() => {})
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.warn(`自动连接节点 ${name} 失败: ${errorMessage}`)
@@ -1512,6 +1516,50 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
   })
 
+  const syncHostReachabilityFromDiagnostic = async (
+    hostId: number,
+    host: { status: string },
+    diagnostic: Awaited<ReturnType<typeof runHostDiagnostics>>
+  ) => {
+    // 控制端仅在节点完全不可达/恢复可达时维护 online/offline，locked/maintenance 等状态仍以节点上报与管理员设定为准
+    if (diagnostic.checks.incusMtls.ok) {
+      if (host.status === 'offline') {
+        await db.updateHostStatus(hostId, 'online')
+      }
+    } else if (!diagnostic.checks.agentHeartbeat.ok) {
+      if (host.status === 'online') {
+        await db.updateHostStatus(hostId, 'offline')
+      }
+    }
+  }
+
+  // 连接诊断（支持节点所有者）：拆开控制面通道探测与异步遥测，返回逐项状态与延迟
+  fastify.post<{ Params: { id: string } }>('/:id/diagnose', {
+    onRequest: [fastify.authenticate]
+  }, async (request, reply) => {
+    const { user } = request
+    const hostId = parsePositiveRouteId(request.params.id)
+    if (!hostId) {
+      return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
+    }
+    const host = await db.getHostById(hostId)
+    if (!host) {
+      return reply.code(404).send(apiError(ErrorCode.HOST_NOT_FOUND))
+    }
+    if (host.user_id !== user.id && user.role !== 'admin') {
+      return reply.code(403).send(apiError(ErrorCode.FORBIDDEN))
+    }
+
+    const diagnostic = await runHostDiagnostics(hostId)
+    await syncHostReachabilityFromDiagnostic(hostId, host, diagnostic)
+    return {
+      success: diagnostic.ok,
+      status: diagnostic.overallStatus,
+      message: diagnostic.summary,
+      ...diagnostic
+    }
+  })
+
   // 测试宿主机连接（支持节点所有者）
   fastify.post<{ Params: { id: string } }>('/:id/test', {
     onRequest: [fastify.authenticate]
@@ -1536,10 +1584,19 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      await hostTunnelManager.requestHeartbeatAndWait(hostId)
-      return { success: true, message: '测试通过' }
+      const diagnostic = await runHostDiagnostics(hostId)
+      await syncHostReachabilityFromDiagnostic(hostId, host, diagnostic)
+      return {
+        success: diagnostic.ok,
+        status: diagnostic.overallStatus,
+        message: diagnostic.summary,
+        diagnostic
+      }
     } catch (error) {
-      return reply.code(error instanceof HeartbeatTestError ? error.statusCode : 502).send({ success: false, error: error instanceof HeartbeatTestError ? error.message : '节点上报测试失败' })
+      return reply.code(error instanceof HeartbeatTestError ? error.statusCode : 502).send({
+        success: false,
+        error: error instanceof Error ? error.message : '节点连接诊断失败'
+      })
     }
   })
 
@@ -3072,7 +3129,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
             'success'
           )
 
-          hostTunnelManager.requestHeartbeat(hostId)
+          await syncHostStorageBaseline(hostId, client).catch(() => {})
           return reply.code(201).send({ message: '存储池关联成功', name, driver: poolInfo.driver })
         }
 
@@ -3139,7 +3196,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           'success'
         )
 
-        hostTunnelManager.requestHeartbeat(hostId)
+        await syncHostStorageBaseline(hostId, client).catch(() => {})
         return reply.code(201).send({ 
           message: '存储池导入成功', 
           name, 
@@ -3211,7 +3268,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         'success'
       )
 
-      hostTunnelManager.requestHeartbeat(hostId)
+      await syncHostStorageBaseline(hostId, client).catch(() => {})
       return reply.code(201).send({ message: '存储池创建成功', name })
     } catch (err: unknown) {
       if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
@@ -3244,28 +3301,62 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
 
     try {
+      const isIncusPoolNotFound = (err: unknown): boolean => {
+        if (err instanceof IncusApiError && err.statusCode === 404) return true
+        const msg = err instanceof Error ? err.message : String(err)
+        return /\bnot found\b|不存在|does not exist/i.test(msg)
+      }
       const recorded = await db.getStoragePool(hostId, poolName)
       let encryptedDeletion = recorded?.driver === 'zfs'
+      let missingOnNode = false
+      let message = '存储池删除成功'
       if (!encryptedDeletion) {
         const client = await getIncusClient(host)
-        const actual = await client.request<{ driver: string }>('GET', `/1.0/storage-pools/${encodeURIComponent(poolName)}`)
-        encryptedDeletion = actual.driver === 'zfs'
+        let actual: { driver: string } | null = null
+        try {
+          actual = await client.request<{ driver: string }>('GET', `/1.0/storage-pools/${encodeURIComponent(poolName)}`)
+        } catch (err) {
+          if (isIncusPoolNotFound(err) && recorded) {
+            missingOnNode = true
+            message = '节点上已不存在该存储池，已从控制端移除记录'
+          } else {
+            throw err
+          }
+        }
+        if (!missingOnNode && actual) {
+          encryptedDeletion = actual.driver === 'zfs'
+          if (!encryptedDeletion) {
+            try {
+              await deleteStoragePool(client, poolName)
+            } catch (err) {
+              if (isIncusPoolNotFound(err) && recorded) {
+                missingOnNode = true
+                message = '节点上已不存在该存储池，已从控制端移除记录'
+              } else {
+                throw err
+              }
+            }
+          }
+        }
         if (!encryptedDeletion) {
-          await deleteStoragePool(client, poolName)
           await db.deleteStoragePool(hostId, poolName)
         }
       }
-      if (encryptedDeletion) await deleteManagedZfsPool(hostId, poolName)
+      if (encryptedDeletion) {
+        const deleted = await deleteManagedZfsPool(hostId, poolName)
+        missingOnNode = Boolean((deleted as { missingOnNode?: boolean })?.missingOnNode)
+        if (deleted?.message) message = deleted.message
+      }
 
       await createLog(
         user.id,
         'host',
         'storage.delete',
-        `Deleted storage pool "${poolName}" from host "${host.name}"`,
+        `Deleted storage pool "${poolName}" from host "${host.name}"${missingOnNode ? ' (missing on node)' : ''}`,
         'success'
       )
 
-      return { message: '存储池删除成功' }
+      return { message, missingOnNode }
     } catch (err: unknown) {
       if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
       const errorMessage = err instanceof Error ? err.message : String(err)
@@ -3322,13 +3413,13 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     try {
       const pool = await db.getStoragePool(hostId, poolName)
       if (!pool) return reply.code(404).send({ error: '存储池不存在' })
+      let syncClient: Awaited<ReturnType<typeof getIncusClient>> | undefined
       if (size || description !== undefined) {
-        const client = await getIncusClient(host)
+        syncClient = await getIncusClient(host)
         if (size) {
-          await resizeStoragePool(client, poolName, size)
-          await prisma.storagePool.update({ where: { id: pool.id }, data: { status: 'pending', reportedAt: new Date() } })
+          await resizeStoragePool(syncClient, poolName, size)
         }
-        if (description !== undefined) await updateStoragePool(client, poolName, { description })
+        if (description !== undefined) await updateStoragePool(syncClient, poolName, { description })
       }
 
       // 更新数据库中的描述和用途（如果有）
@@ -3347,8 +3438,10 @@ export default async function hostRoutes(fastify: FastifyInstance) {
         'success'
       )
 
-      hostTunnelManager.requestHeartbeat(hostId)
-      return { message: '存储池修改成功，容量将由节点心跳更新' }
+      if (size) {
+        await syncHostStorageBaseline(hostId, syncClient).catch(() => {})
+      }
+      return { message: '存储池修改成功' }
     } catch (err: unknown) {
       if (err instanceof StorageEncryptionError) return reply.code(err.statusCode).send({ error: err.message })
       const errorMessage = err instanceof Error ? err.message : String(err)
@@ -6496,7 +6589,7 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     try {
       const client = await getIncusClient(host)
 
-      hostTunnelManager.requestHeartbeat(hostId)
+      const storageSync = await syncHostStorageBaseline(hostId, client)
 
       const usedResources = await db.calculateHostResourcesFromInstances(hostId)
       await db.updateHostResources(hostId, {
@@ -6567,6 +6660,15 @@ export default async function hostRoutes(fastify: FastifyInstance) {
           cpuUsed: usedResources.cpuUsed,
           memoryUsed: usedResources.memoryUsed,
           diskUsed: usedResources.diskUsed
+        },
+        storageSync: {
+          usedBaselineEndpoint: storageSync.usedBaselineEndpoint,
+          storageAccepted: storageSync.storageAccepted,
+          locked: storageSync.locked,
+          poolCount: storageSync.pools.length,
+          missingPools: storageSync.missingPools,
+          untrackedPools: storageSync.untrackedPools,
+          nodeSecuritySynced: storageSync.nodeSecuritySynced
         },
         instanceSync: {
           total: instances.length,

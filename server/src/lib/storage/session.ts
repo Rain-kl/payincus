@@ -1,19 +1,19 @@
-import { hostTunnelManager } from '../incus/tunnel-manager.js'
 import { prisma } from '../../db/prisma.js'
 import { IncusClient } from '../incus/incus-client.js'
 import { StorageEncryptionError, type StorageKeyVault } from './encryption.js'
+import { syncHostStorageBaseline } from '../../services/storage-baseline-sync.js'
 
 const busy = new Set<number>()
 export async function withStorageSession<T>(hostId: number, write: boolean, fn: (node: IncusClient, vault: StorageKeyVault) => Promise<T>): Promise<T> {
   if (write && busy.has(hostId)) throw new StorageEncryptionError(409, '节点正在执行存储操作，请稍后重试')
   if (write) { busy.add(hostId) }
   let node: IncusClient | undefined
+  let connected = false
   try {
     const host = await prisma.host.findUnique({ where: { id: hostId } })
     if (!host) throw new StorageEncryptionError(404, '节点不存在')
     const identity = await prisma.nodeSecurityState.findUnique({ where: { hostId } })
     if (!identity?.serverFingerprint) throw new StorageEncryptionError(412, '节点身份尚未核验，不能传输存储密钥')
-    if (write) await prisma.storagePool.updateMany({ where: { hostId }, data: { status: 'pending', reportedAt: new Date() } })
     node = new IncusClient({ url: host.url, certPath: host.certPath, keyPath: host.keyPath, hostId, tunnelEnabled: host.tunnelEnabled, targetHost: host.targetHost, targetPort: host.targetPort, serverFingerprint: identity.serverFingerprint })
     const vault: StorageKeyVault = {
       find: dataset => prisma.nodeStorageKey.findUnique({ where: { hostId_dataset: { hostId, dataset } } }),
@@ -25,12 +25,16 @@ export async function withStorageSession<T>(hostId: number, write: boolean, fn: 
       }
     }
     await node.connect()
+    connected = true
     return await fn(node, vault)
   } finally {
-    try { await node?.close() } finally {
-      if (write) {
-        try { await prisma.storagePool.updateMany({ where: { hostId }, data: { status: 'pending', reportedAt: new Date() } }) }
-        finally { busy.delete(hostId); hostTunnelManager.requestHeartbeat(hostId) }
+    try {
+      if (write && connected && node) {
+        await syncHostStorageBaseline(hostId, node, { skipPoolReload: true }).catch(() => {})
+      }
+    } finally {
+      try { await node?.close() } finally {
+        if (write) busy.delete(hostId)
       }
     }
   }

@@ -23,8 +23,10 @@ host.nodeSecurity = null
 host.status = 'offline'
 assert.equal((await read()).reason, 'storage_unavailable')
 host.status = 'online'
-pool.reportedAt = new Date(Date.now() - 121000)
+pool.reportedAt = new Date(Date.now() - 600_000)
+assert.equal((await read()).reason, null)
+pool.reportedAt = null as any
 assert.equal((await read()).reason, 'storage_unavailable')
 pool.reportedAt = new Date()
 assert.equal((await read()).reason, null)
-console.log('Stored capacity rejects offline/locked/unreported/stale pools, preserves totals and performs no node requests')
+console.log('Stored capacity preserves aged baseline across heartbeats, rejects offline/locked/unreported pools and performs no node requests')

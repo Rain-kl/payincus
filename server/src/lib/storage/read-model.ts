@@ -1,23 +1,34 @@
 import { prisma } from '../../db/prisma.js'
 import { StorageEncryptionError } from './encryption.js'
 import { loadHostServiceStatuses } from '../host-service-status.js'
-import { storageReportMaxAgeMs } from '../storage-capacity-policy.js'
 
 export async function storedStoragePools(hostId: number) {
-  const [pools, services, agent] = await Promise.all([
+  const [pools, services] = await Promise.all([
     prisma.storagePool.findMany({ where: { hostId }, orderBy: { createdAt: 'asc' } }),
-    loadHostServiceStatuses([hostId]),
-    prisma.hostAgent.findUnique({ where: { hostId }, select: { lastReport: true } })
+    loadHostServiceStatuses([hostId])
   ])
   return pools.map(pool => {
-    const telemetry = pool.telemetry as { usedBy?: number; backing?: { sizeBytes: number } } | null
+    const telemetry = pool.telemetry as { usedBy?: number; spaceAvailable?: number; backing?: { sizeBytes: number } } | null
     const config = (pool.config || {}) as Record<string, any>
+    const total = Number(pool.totalBytes)
+    const used = Number(pool.usedBytes)
+    const available = typeof telemetry?.spaceAvailable === 'number' && Number.isFinite(telemetry.spaceAvailable) && telemetry.spaceAvailable >= 0
+      ? Math.min(telemetry.spaceAvailable, total)
+      : Math.max(0, total - used)
+    const service = services.get(hostId)
+    const status = pool.status === 'missing'
+      ? 'missing'
+      : service?.status === 'locked'
+        ? 'locked'
+        : pool.status === 'ready' && !service?.available
+          ? 'unavailable'
+          : pool.status
     return { name: pool.name, driver: pool.driver, description: pool.description || '', purpose: pool.purpose,
       config: { ...config, ...(telemetry?.backing?.sizeBytes ? { size: `${telemetry.backing.sizeBytes / 1024 ** 3}GiB` } : {}) },
-      status: services.get(hostId)?.status === 'locked' ? 'locked' : pool.status === 'ready' && (!services.get(hostId)?.available || !pool.reportedAt || Date.now() - pool.reportedAt.getTime() > storageReportMaxAgeMs(agent?.lastReport)) ? 'unavailable' : pool.status,
+      status,
       pendingImport: !!config._payincusImport, usedBy: telemetry?.usedBy || 0,
       reportedAt: pool.reportedAt?.toISOString() || null,
-      space: pool.totalBytes > 0n ? { total: Number(pool.totalBytes), used: Number(pool.usedBytes) } : null }
+      space: pool.totalBytes > 0n ? { total, used, available } : null }
   })
 }
 

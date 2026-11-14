@@ -18,8 +18,13 @@ let failSave = false
 let requests = 0
 let managementDenied = false
 Object.assign(hostTunnelManager, { requestHeartbeatAndWait: async () => {} })
-Object.assign(prisma.storagePool, { updateMany: async () => ({count:1}), findUnique: async () => ({driver:'zfs',config:{},telemetry:{encryption:{encrypted:true,state:available?'unlocked':'locked',dataset:'test/incus',encryptionRoot:'test/incus',keyFormat:'hex'}}}) })
-Object.assign(prisma.host, { findUnique: async () => ({ id: 4, userId: 10, url: 'https://node.invalid', tunnelEnabled: false }) })
+Object.assign(prisma.storagePool, {
+  updateMany: async () => ({ count: 1 }),
+  findMany: async () => [{ id: 1, hostId: 4, name: 'data', driver: 'zfs', purpose: 'instance_data', description: '', config: {}, status: available ? 'ready' : 'locked', totalBytes: 1000n, usedBytes: 100n, createdAt: new Date(0), reportedAt: null, telemetry: { encryption: { encrypted: true, state: available ? 'unlocked' : 'locked', dataset: 'test/incus', encryptionRoot: 'test/incus', keyFormat: 'hex' } } }],
+  findUnique: async () => ({ driver: 'zfs', config: {}, telemetry: { encryption: { encrypted: true, state: available ? 'unlocked' : 'locked', dataset: 'test/incus', encryptionRoot: 'test/incus', keyFormat: 'hex' } } })
+})
+Object.assign(prisma.instance, { findMany: async () => [] })
+Object.assign(prisma.host, { findUnique: async () => ({ id: 4, userId: 10, url: 'https://node.invalid', tunnelEnabled: false }), findMany: async () => [] })
 Object.assign(prisma.nodeSecurityState, { findUnique: async () => ({ serverFingerprint: 'a'.repeat(64) }) })
 Object.assign(prisma.nodeStorageKey, {
   findUnique: async () => stored,
@@ -31,6 +36,33 @@ Object.assign(IncusClient.prototype, {
   request: async (method: string, path: string, body?: any) => {
     requests++
     if (path === '/1.0/agent') return { api_extensions: supported ? ['incus_storage_encryption_v1'] : [] }
+    if (path === '/1.0/agent/baseline') {
+      return {
+        storage: {
+          available: true,
+          complete: true,
+          pools: [{
+            name: 'data',
+            driver: 'zfs',
+            status: 'ready',
+            usedBy: 0,
+            config: { 'zfs.pool_name': 'test/incus' },
+            space: { total: 1000, used: 100, available: 900 },
+            encryption: {
+              encrypted: true,
+              state: available ? 'unlocked' : 'locked',
+              source: 'test/incus',
+              encryptionRoot: 'test/incus',
+              manualLocked: false,
+              lockPending: false,
+              pendingRecovery: 0,
+              nodeLocked,
+              keyFormat: 'hex'
+            }
+          }]
+        }
+      }
+    }
     if (path === '/1.0/storage-pools/data') return { driver: 'zfs', config: { 'zfs.pool_name': 'test/incus', source: '/some/loop.img' } }
     if (path === '/1.0/agent/storage') return { datasets: [{ dataset: 'test/incus', encryptionRoot: 'test/incus', algorithm: 'aes-256-gcm', keyFormat: 'hex', keyStatus: available ? 'available' : 'unavailable' }] }
     if (path === '/1.0/agent/security') return { locked: nodeLocked, targets: registered ? [{ dataset: 'test/incus', fingerprint: fingerprint(key) }] : [] }

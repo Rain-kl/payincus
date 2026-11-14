@@ -2,6 +2,7 @@ import { enqueueNodeRecovery, latestNodeRecovery } from '../lib/node-security/re
 import { currentOperationTask, taskLog } from '../lib/operation-task-log.js'
 import { recordHostSuccess } from '../lib/incus/host-health.js'
 import { INCUS_CLI_COMMANDS, recordReport } from '../lib/node-security/report.js'
+import { clearPolicySyncCooldown, syncDesiredSecurityPolicy } from '../lib/node-security/policy-sync.js'
 import { restoreNodeInstances, type RecoveryState } from '../lib/node-security/recovery.js'
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../db/prisma.js'
@@ -40,8 +41,25 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
     noStore(reply)
     const hostId = req.params.hostId
     if (!await prisma.host.findUnique({ where: { id: hostId }, select: { id: true } })) return reply.code(404).send({ error: '节点不存在' })
-    await prisma.nodeSecurityState.upsert({ where: { hostId }, create: { hostId, report: {}, serverFingerprint: req.body.fingerprint }, update: { serverFingerprint: req.body.fingerprint } })
+    const existing = await prisma.nodeSecurityState.findUnique({ where: { hostId }, select: { serverFingerprint: true, report: true } })
+    const identityChanged = Boolean(existing?.serverFingerprint && existing.serverFingerprint !== req.body.fingerprint)
+    const prevReport = existing?.report && typeof existing.report === 'object' && !Array.isArray(existing.report)
+      ? (existing.report as Record<string, unknown>)
+      : null
+    const desiredEnabled = typeof prevReport?._desiredEnabled === 'boolean' ? prevReport._desiredEnabled : undefined
+    const resetReport = desiredEnabled !== undefined ? { _desiredEnabled: desiredEnabled } : {}
+    await prisma.nodeSecurityState.upsert({
+      where: { hostId },
+      create: { hostId, report: {}, serverFingerprint: req.body.fingerprint },
+      update: identityChanged
+        ? { serverFingerprint: req.body.fingerprint, recoveryBlocked: false, recoveryGeneration: { increment: 1 }, report: resetReport, reportedAt: new Date(0) }
+        : { serverFingerprint: req.body.fingerprint }
+    })
     await createLog(req.user.id, LogModule.SECURITY, 'node.identity', `节点 #${hostId} 更新人工核对的服务端证书指纹`, LogResult.SUCCESS)
+    clearPolicySyncCooldown(hostId)
+    if (desiredEnabled !== undefined) {
+      void syncDesiredSecurityPolicy(hostId, true)
+    }
     return { fingerprint: req.body.fingerprint }
   })
   app.get<{ Params: { hostId: number } }>(base, { onRequest: auth, schema: { params } }, async (req, reply) => {
@@ -56,7 +74,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
     const identity = { serverFingerprint: reported?.serverFingerprint ?? null, recoveryTask }
     try {
       const state = await (await client(hostId)).request('GET', '/1.0/agent/security')
-      await recordReport(hostId, { state, events: [] })
+      await recordReport(hostId, { state, events: [] }, { authoritative: true })
       return { ...identity, state, keys, events: events.map(e => ({ ...e, uid: Number(e.uid) })), reportedAt: reported?.reportedAt }
     }
     catch { return { ...identity, state: reported?.report && typeof reported.report === 'object' && 'locked' in reported.report ? reported.report : null, keys, events: events.map(e => ({ ...e, uid: Number(e.uid) })), reportedAt: reported?.reportedAt, offline: true } }
@@ -82,7 +100,7 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
             const cleared = await prisma.nodeSecurityState.updateMany({ where: { hostId, recoveryGeneration: approval.recoveryGeneration }, data: { recoveryBlocked: false } })
             if (cleared.count !== 1) throw new Error('恢复期间节点状态发生变化，请重新核验并批准')
             recordHostSuccess(hostId, 0)
-            await recordReport(hostId, { state, events: [] })
+            await recordReport(hostId, { state, events: [] }, { authoritative: true })
             try {
               const result = await restoreNodeInstances(node, state, async item => {
                 taskLog('info', `核验恢复目标 ${item.project}/${item.name}`)
@@ -94,11 +112,11 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
                 cancelled: () => { const task = currentOperationTask(); return task?.cancelled === true || task?.stopping === true },
                 progress: (completed, total, failed) => taskLog('info', `恢复进度 ${completed}/${total}，未完成 ${failed}`)
               })
-              await recordReport(hostId, { state: result.state, events: [] })
+              await recordReport(hostId, { state: result.state, events: [] }, { authoritative: true })
               if (result.failed) throw new Error(`部分实例恢复未完成（${result.failed}），请刷新状态后重试`)
             } catch (error) {
               // Cancellation or disconnect leaves the node's unacknowledged identities available for retry.
-              try { await recordReport(hostId, { state: await node.request('GET', '/1.0/agent/security'), events: [] }) }
+              try { await recordReport(hostId, { state: await node.request('GET', '/1.0/agent/security'), events: [] }, { authoritative: true }) }
               catch { taskLog('warn', '无法刷新节点状态，待连接恢复后重新核验') }
               throw error
             }
@@ -106,7 +124,11 @@ export default async function nodeSecurityRoutes(app: FastifyInstance) {
           return reply.code(202).send(task)
         }
         const state = await node.request<RecoveryState>('POST', `/1.0/agent/security/${action}`, req.body)
-        await recordReport(req.params.hostId, { state, events: [] })
+        if (action === 'policy') clearPolicySyncCooldown(req.params.hostId)
+        await recordReport(req.params.hostId, { state, events: [] }, {
+          authoritative: true,
+          ...(action === 'policy' && typeof req.body.enabled === 'boolean' ? { desiredEnabled: req.body.enabled } : {})
+        })
         await createLog(req.user.id, LogModule.SECURITY, `node.${action}`, `节点 #${req.params.hostId} 管理操作 ${action}`, LogResult.SUCCESS)
         return { state }
       } catch (error) { return reply.code(409).send({ error: nodeErrorDetail(error, '节点操作未完成，请刷新状态并检查连接或存储', req.body) }) }

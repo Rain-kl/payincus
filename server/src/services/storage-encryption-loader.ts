@@ -3,7 +3,6 @@ import { poolEncryption, type StorageNode, type StorageKeyVault } from '../lib/s
 import { nodeForPendingPool, unlockAndBindPool } from '../lib/storage/import.js'
 import { withStorageSession } from '../lib/storage/session.js'
 import { evaluateHostService } from '../lib/host-service-status.js'
-import { storageReportMaxAgeMs } from '../lib/storage-capacity-policy.js'
 
 async function automaticStorageNeeded(node: StorageNode, hostId: number, name: string, vault: StorageKeyVault) {
   const security = await node.request<{ locked: boolean; recoveryPending?: boolean }>('GET', '/1.0/agent/security')
@@ -32,7 +31,7 @@ export function startStorageEncryptionLoader() {
       if (stopped) return
       if (pool.config && typeof pool.config === 'object' && '_payincusDeletion' in pool.config) continue
       const reported = (pool.telemetry as { encryption?: { encrypted?: boolean; encryptionRoot?: string; manualLocked?: boolean; state?: string; pendingRecovery?: number } } | null)?.encryption
-      if (!evaluateHostService(pool.host).available || !pool.reportedAt || Date.now() - pool.reportedAt.getTime() > storageReportMaxAgeMs(pool.host.agent?.lastReport) || !reported?.encrypted || reported.manualLocked) continue
+      if (!evaluateHostService(pool.host).available || !reported?.encrypted || reported.manualLocked) continue
       if (reported.state === 'unlocked' && !reported.pendingRecovery && !(pool.config as Record<string, unknown> | null)?._payincusImport) continue
       const identity = `${pool.hostId}/${pool.name}`
       try {

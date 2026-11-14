@@ -21,7 +21,7 @@ const adminSerializer = sectionBetween(
 )
 const statusSerializer = sectionBetween(
   'async function serializeAgentStatus(agent: HostAgentRecord)',
-  'function buildHeartbeatReport(body: AgentHeartbeatBody)'
+  'function buildHeartbeatReport(body: AgentHeartbeatBody'
 )
 
 for (const [label, serializer] of [

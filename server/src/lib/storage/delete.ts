@@ -25,12 +25,40 @@ export async function deleteManagedZfsPool(hostId: number, poolName: string) {
     if (!Array.isArray(paths)) throw new StorageEncryptionError(502, '无法核验节点存储池列表')
     const path = `/1.0/storage-pools/${encodeURIComponent(poolName)}`
     const exists = paths.includes(path)
-    if (!exists && !intent && config[pendingImportMarker]) {
-      await prisma.storagePool.deleteMany({ where: { hostId, name: poolName } })
-      return { message: '已移除待导入记录；外部数据集及已有托管密钥均已保留' }
+    if (!exists && !intent) {
+      if (config[pendingImportMarker]) {
+        await prisma.storagePool.deleteMany({ where: { hostId, name: poolName } })
+        return { message: '已移除待导入记录；外部数据集及已有托管密钥均已保留' }
+      }
+      if (!record) throw new StorageEncryptionError(404, '节点存储池不存在，未删除任何托管密钥')
+      // 节点重建或外部已移除存储池时，允许控制端删除记录并在确认底层无数据集时一并清理过期托管密钥。
+      const sourceHint = String(config['zfs.pool_name'] || config.source || '').trim()
+      const [secState, agentStorage] = await Promise.all([
+        node.request<{ targets?: Array<{ dataset: string; guid: string }> | null }>('GET', '/1.0/agent/security').catch(() => null),
+        node.request<{ datasets?: Array<{ dataset: string }> }>('GET', '/1.0/agent/storage').catch(() => null)
+      ])
+      const targets = Array.isArray(secState?.targets) ? secState.targets : []
+      const datasets = Array.isArray(agentStorage?.datasets) ? agentStorage.datasets : []
+      const stillOnNode = !!sourceHint && (
+        targets.some(t => typeof t?.dataset === 'string' && within(t.dataset, sourceHint)) ||
+        datasets.some(d => typeof d?.dataset === 'string' && within(d.dataset, sourceHint))
+      )
+      await prisma.$transaction(async tx => {
+        if (sourceHint && !stillOnNode && typeof tx.nodeStorageKey?.deleteMany === 'function') {
+          await tx.nodeStorageKey.deleteMany({
+            where: { hostId, OR: [{ dataset: sourceHint }, { dataset: { startsWith: sourceHint + '/' } }] }
+          })
+        }
+        await tx.storagePool.deleteMany({ where: { hostId, name: poolName } })
+      })
+      return {
+        missingOnNode: true,
+        message: stillOnNode
+          ? '节点上已不存在该 Incus 存储池，已清理控制端记录并保留节点数据集托管密钥'
+          : '节点上已不存在该存储池，已清理控制端记录'
+      }
     }
     if (!intent) {
-      if (!exists) throw new StorageEncryptionError(404, '节点存储池不存在，未删除任何托管密钥')
       const pool = await node.request<{ driver: string; description?: string; config: Record<string, string> }>('GET', path)
       const source = pool.config?.['zfs.pool_name'] || pool.config?.source
       if (pool.driver !== 'zfs' || !source || !/^[A-Za-z][A-Za-z0-9_.:-]*(\/[A-Za-z0-9_.:-]+)*$/.test(source) || source.includes('..')) throw new StorageEncryptionError(409, '无法确定待删除 ZFS 数据集身份，未执行删除')

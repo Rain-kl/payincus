@@ -18,15 +18,28 @@ export function parseReport(input: unknown): { state: Prisma.InputJsonObject; ev
   const results = Array.isArray(state.results) ? state.results.slice(0, 256).map((r: any) => ({ target: String(r.target || '').slice(0, 200), success: r.success === true, detail: r.detail === 'complete' || r.detail === 'not_configured' ? r.detail : 'failed' })) : []
   return { state: { enabled: state.enabled, locked: state.locked, recoveryPending: state.recoveryPending === true, startupRecovering: state.startupRecovering === true, revision: Number(state.revision), results, resumeInstances: Array.isArray(state.resumeInstances) ? state.resumeInstances.slice(0, 10000).filter((item: any) => typeof item?.project === 'string' && typeof item?.name === 'string').map((item: any) => ({ project: item.project.slice(0, 255), name: item.name.slice(0, 255) })) : [], reason: typeof state.reason === 'string' && (state.reason === 'startup_verification' || state.reason === 'daemon_restart' || state.reason === 'panel_request' || state.reason === 'state_unavailable' || state.reason === 'audit_unavailable' || /^cli:[a-z_]+$/.test(state.reason)) ? state.reason.slice(0, 64) : '' }, events }
 }
-export async function recordReport(hostId: number, input: unknown): Promise<string[]> {
+export interface RecordReportOptions {
+  authoritative?: boolean
+  desiredEnabled?: boolean
+}
+
+export async function recordReport(hostId: number, input: unknown, options: RecordReportOptions = {}): Promise<string[]> {
   let { state, events } = parseReport(input)
   await prisma.$transaction(async tx => {
     // Serialize this node's reports and preserve a newer durable lock revision during delayed delivery.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(700260, ${hostId})`
     const previous = await tx.nodeSecurityState.findUnique({ where: { hostId } })
+    const prevReport = previous?.report && typeof previous.report === 'object' && !Array.isArray(previous.report)
+      ? (previous.report as Record<string, unknown>)
+      : null
+    const desiredEnabled = typeof options.desiredEnabled === 'boolean'
+      ? options.desiredEnabled
+      : (typeof prevReport?._desiredEnabled === 'boolean' ? prevReport._desiredEnabled : undefined)
     if (previous?.recoveryBlocked) state = { ...state, locked: true, reason: 'startup_verification' }
-    const previousRevision = previous?.report && typeof previous.report === 'object' && !Array.isArray(previous.report) ? Number(previous.report.revision ?? 0) : 0
-    if (Number(state.revision) >= previousRevision || state.reason === 'state_unavailable' || state.reason === 'audit_unavailable') {
+    if (desiredEnabled !== undefined) state = { ...state, _desiredEnabled: desiredEnabled }
+    const hasPreviousRevision = prevReport !== null && typeof prevReport.revision === 'number' && Number.isFinite(prevReport.revision)
+    const previousRevision = hasPreviousRevision ? Number(prevReport.revision) : 0
+    if (options.authoritative || !hasPreviousRevision || Number(state.revision) >= previousRevision || state.reason === 'state_unavailable' || state.reason === 'audit_unavailable') {
       await tx.nodeSecurityState.upsert({ where: { hostId }, create: { hostId, report: state }, update: { report: state, reportedAt: new Date() } })
     }
     await tx.nodeCliEvent.deleteMany({ where: { hostId, receivedAt: { lt: new Date(Date.now() - 30 * 86400000) } } })
@@ -36,4 +49,38 @@ export async function recordReport(hostId: number, input: unknown): Promise<stri
     }
   })
   return events.map(e => e.id)
+}
+
+/**
+ * 同步心跳中携带的 nodeSecurity 状态：完整状态复用严格 recordReport，测试或降级精简载荷安全合并锁定状态。
+ */
+export async function recordHeartbeatSecurityState(hostId: number, rawState: unknown): Promise<{ policyMismatch: boolean }> {
+  if (!rawState || typeof rawState !== 'object' || Array.isArray(rawState)) {
+    return { policyMismatch: false }
+  }
+  const s = rawState as Record<string, unknown>
+  if (typeof s.enabled === 'boolean' && typeof s.locked === 'boolean' && Number.isSafeInteger(s.revision) && Number(s.revision) >= 0) {
+    await recordReport(hostId, { state: s, events: [] })
+    const latest = await prisma.nodeSecurityState.findUnique({ where: { hostId }, select: { report: true, recoveryBlocked: true } })
+    const report = latest?.report && typeof latest.report === 'object' && !Array.isArray(latest.report) ? (latest.report as Record<string, unknown>) : null
+    const mismatch = !latest?.recoveryBlocked && s.locked !== true && typeof report?._desiredEnabled === 'boolean' && report._desiredEnabled !== s.enabled
+    return { policyMismatch: mismatch }
+  }
+  if (typeof s.locked === 'boolean') {
+    await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(700260, ${hostId})`
+      const previous = await tx.nodeSecurityState.findUnique({ where: { hostId } })
+      const prevReport = previous?.report && typeof previous.report === 'object' && !Array.isArray(previous.report)
+        ? (previous.report as Record<string, unknown>)
+        : {}
+      const locked = previous?.recoveryBlocked ? true : Boolean(s.locked)
+      const next = { ...prevReport, locked, ...(previous?.recoveryBlocked ? { reason: 'startup_verification' } : {}) } as Prisma.InputJsonObject
+      await tx.nodeSecurityState.upsert({
+        where: { hostId },
+        create: { hostId, report: next, reportedAt: new Date() },
+        update: { report: next, reportedAt: new Date() }
+      })
+    })
+  }
+  return { policyMismatch: false }
 }

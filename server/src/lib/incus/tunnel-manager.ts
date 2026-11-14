@@ -10,6 +10,8 @@ export interface WebSocketLike {
   close(code?: number, reason?: string): void
   on(event: string, listener: (...args: any[]) => void): this
   removeListener?(event: string, listener: (...args: any[]) => void): this
+  ping?(data?: any, mask?: boolean, cb?: (err?: Error) => void): void
+  terminate?(): void
 }
 
 export interface TunnelTargetConfig {
@@ -54,11 +56,39 @@ export class HostTunnelManager extends EventEmitter {
   private controlCapabilities = new Map<number, Set<string>>()
   private pendingHeartbeats = new Map<string, PendingHeartbeat>()
   private pendingControls = new Map<string, PendingControl>()
+  private lastActivity = new Map<number, number>()
+  private livenessTimer: ReturnType<typeof setInterval> | null = null
+
+  private ensureLivenessMonitor(): void {
+    if (this.livenessTimer) return
+    const timer = setInterval(() => {
+      const now = Date.now()
+      for (const [hostId, ws] of this.activeTunnels) {
+        if (ws.readyState !== WS_OPEN) continue
+        const last = this.lastActivity.get(hostId) ?? now
+        if (now - last > 55_000) {
+          console.warn(`[HostTunnelManager] Tunnel ping timeout for host ${hostId} (${Math.round((now - last) / 1000)}s idle), closing stale socket`)
+          try {
+            if (typeof ws.terminate === 'function') ws.terminate()
+            else ws.close(4000, 'Tunnel ping timeout')
+          } catch { /* ignore */ }
+          this.unregisterTunnel(hostId, ws)
+          continue
+        }
+        if (typeof ws.ping === 'function') {
+          try { ws.ping() } catch { /* ignore */ }
+        }
+      }
+    }, 20_000)
+    timer.unref()
+    this.livenessTimer = timer
+  }
 
   /**
    * 注册在线隧道的 WebSocket 连接
    */
   registerTunnel(hostId: number, ws: WebSocketLike): void {
+    this.ensureLivenessMonitor()
     const existing = this.activeTunnels.get(hostId)
     if (existing && existing !== ws) {
       this.cleanupHostControls(hostId)
@@ -70,11 +100,13 @@ export class HostTunnelManager extends EventEmitter {
     }
 
     this.activeTunnels.set(hostId, ws)
+    this.lastActivity.set(hostId, Date.now())
     this.controlCapabilities.delete(hostId)
     this.emit('tunnel_connected', hostId)
 
     const onMessage = (data: any) => {
       if (this.activeTunnels.get(hostId) !== ws) return
+      this.lastActivity.set(hostId, Date.now())
       let buf: Buffer
       if (Buffer.isBuffer(data)) {
         buf = data
@@ -96,9 +128,17 @@ export class HostTunnelManager extends EventEmitter {
       }
     }
 
+    const onPong = () => {
+      if (this.activeTunnels.get(hostId) === ws) {
+        this.lastActivity.set(hostId, Date.now())
+      }
+    }
+
     const onClose = () => {
+      ws.removeListener?.('pong', onPong)
       if (this.activeTunnels.get(hostId) === ws) {
         this.activeTunnels.delete(hostId)
+        this.lastActivity.delete(hostId)
         this.cleanupHostControls(hostId)
         this.cleanupHostStreams(hostId, new Error(`Host ${hostId} tunnel closed`))
         this.emit('tunnel_disconnected', hostId)
@@ -106,6 +146,7 @@ export class HostTunnelManager extends EventEmitter {
     }
 
     ws.on('message', onMessage)
+    ws.on('pong', onPong)
     ws.on('close', onClose)
     ws.on('error', (err) => {
       console.warn(`[HostTunnelManager] Tunnel socket error for host ${hostId}:`, err?.message || err)
@@ -122,6 +163,7 @@ export class HostTunnelManager extends EventEmitter {
     const current = this.activeTunnels.get(hostId)
     if (!ws || current === ws) {
       this.activeTunnels.delete(hostId)
+      this.lastActivity.delete(hostId)
       this.cleanupHostControls(hostId)
       if (current) {
         try {
@@ -133,6 +175,55 @@ export class HostTunnelManager extends EventEmitter {
       this.cleanupHostStreams(hostId, new Error(`Host ${hostId} tunnel unregistered`))
       this.emit('tunnel_disconnected', hostId)
     }
+  }
+
+  measureTunnelPing(hostId: number, timeoutMs = 4000): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
+    const ws = this.activeTunnels.get(hostId)
+    if (!ws || ws.readyState !== WS_OPEN) {
+      return Promise.resolve({ ok: false, latencyMs: null, error: '反向隧道未连接' })
+    }
+    if (typeof ws.ping !== 'function') {
+      return Promise.resolve({ ok: true, latencyMs: null })
+    }
+    return new Promise(resolve => {
+      const startedAt = Date.now()
+      let settled = false
+      const cleanup = () => {
+        clearTimeout(timer)
+        ws.removeListener?.('pong', onPong)
+        ws.removeListener?.('close', onClose)
+      }
+      const finish = (result: { ok: boolean; latencyMs: number | null; error?: string }) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolve(result)
+      }
+      const onPong = () => {
+        if (this.activeTunnels.get(hostId) === ws) {
+          this.lastActivity.set(hostId, Date.now())
+        }
+        finish({ ok: true, latencyMs: Math.max(0, Date.now() - startedAt) })
+      }
+      const onClose = () => {
+        finish({ ok: false, latencyMs: null, error: '隧道连接在探测期间断开' })
+      }
+      const timer = setTimeout(() => {
+        finish({ ok: false, latencyMs: null, error: `隧道 Ping 超时 (${timeoutMs}ms)` })
+      }, timeoutMs)
+      const pingFn = ws.ping
+      if (typeof pingFn !== 'function') {
+        finish({ ok: true, latencyMs: null })
+        return
+      }
+      ws.on('pong', onPong)
+      ws.on('close', onClose)
+      try {
+        pingFn.call(ws)
+      } catch (err) {
+        finish({ ok: false, latencyMs: null, error: err instanceof Error ? err.message : '发送 Ping 失败' })
+      }
+    })
   }
 
   /**

@@ -2,7 +2,8 @@ import { withStorageSession } from '../lib/storage/session.js'
 import { grantStartupKeys } from '../lib/node-security/startup.js'
 import { processAgentStorageReport } from '../services/agent-storage-report.js'
 import { recordHostSuccess } from '../lib/incus/host-health.js'
-import { recordReport } from '../lib/node-security/report.js'
+import { recordHeartbeatSecurityState, recordReport } from '../lib/node-security/report.js'
+import { syncDesiredSecurityPolicy } from '../lib/node-security/policy-sync.js'
 import { syncHostGpuReport } from '../db/gpus.js'
 import { recordNetworkStatus } from '../lib/egress/sync.js'
 import { pushNetworkPolicy } from '../lib/egress/realtime.js'
@@ -69,7 +70,7 @@ interface AgentHeartbeatBody {
   storage?: Record<string, unknown>
   heartbeatRequestId?: string
   nodeApi?: string
-  nodeSecurity?: { state?: { locked?: boolean } }
+  nodeSecurity?: { state?: Record<string, unknown> }
   networkStatus?: Record<string, unknown>
 }
 
@@ -400,9 +401,14 @@ async function serializeAgentStatus(agent: HostAgentRecord) {
 }
 
 function buildHeartbeatReport(body: AgentHeartbeatBody, previous: unknown): Record<string, unknown> {
-  const resources = { ...(body.resources || {}) }
   const previousResources = isRecord(previous) && isRecord(previous.resources) ? previous.resources : {}
-  if (resources.storageAvailable === false && previousResources.storage) resources.storage = previousResources.storage
+  const incomingResources = isRecord(body.resources) ? body.resources : {}
+  // 轻量心跳不含静态硬件或存储基线字段，保留最近一次基线/上报的硬件快照。
+  const resources: Record<string, unknown> = { ...previousResources, ...incomingResources }
+  if (incomingResources.storageAvailable === false && previousResources.storage) {
+    resources.storage = previousResources.storage
+    resources.storageAvailable = previousResources.storageAvailable ?? false
+  }
   return {
     runtime: body.runtime ?? {},
     incus: body.incus ?? {},
@@ -888,11 +894,23 @@ export default async function agentRoutes(fastify: FastifyInstance) {
     })
     if (request.body.nodeApi !== 'incus_node_v1' && request.body.nodeApi !== 'payincus_node_v1') return reply.code(409).send({ code: 'NODE_API_REQUIRED', error: 'Install the Incus node package' })
     const now = new Date()
+    let policyMismatch = false
+    if (request.body.nodeSecurity?.state !== undefined) {
+      try {
+        const sec = await recordHeartbeatSecurityState(agent.hostId, request.body.nodeSecurity.state)
+        policyMismatch = sec.policyMismatch
+      } catch (error) {
+        request.log.warn({ agentId: agent.agentId, hostId: agent.hostId, error }, 'Failed to persist heartbeat node security state')
+      }
+    }
+    const hasStoragePayload = isRecord(request.body.storage)
     // Locked nodes remain online without turning an intentionally absent inventory into deletions.
     if (request.body.nodeSecurity?.state?.locked === true) {
       await agentModel.update({ where: { agentId: agent.agentId }, data: { status: 'online', version: sanitizeShortString(request.body.version, 128), capabilities: normalizeCapabilities(request.body.capabilities), lastSeenAt: now, lastHeartbeatIp: sanitizeShortString(getAgentHeartbeatIp(request), 128) } })
-      const storageAccepted = await processAgentStorageReport(agent.hostId, request.body.storage, now)
-      reportError = storageAccepted && request.body.storage?.available === true && request.body.storage?.collectionComplete === true ? undefined : '节点已连接，但锁定存储状态采集或保存未完成，测试失败'
+      const storageAccepted = hasStoragePayload ? await processAgentStorageReport(agent.hostId, request.body.storage, now) : true
+      reportError = !hasStoragePayload || (storageAccepted && request.body.storage?.available === true && request.body.storage?.collectionComplete === true)
+        ? undefined
+        : '节点已连接，但锁定存储状态采集或保存未完成，测试失败'
       const connection = await prisma.host.findUnique({ where: { id: agent.hostId }, select: { tunnelEnabled: true, targetHost: true, targetPort: true } })
       return { ok: true, serverTime: now.toISOString(), tunnel: { enabled: connection?.tunnelEnabled === true || (Array.isArray(agent.capabilities) && agent.capabilities.includes('network-control')), targetHost: connection?.targetHost ?? '127.0.0.1', targetPort: connection?.targetPort ?? 8443 } }
     }
@@ -921,16 +939,18 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       }
     })
 
-    await syncHostGpuReport(agent.hostId, request.body.resources?.nvidiaGpu).catch(error => {
-      gpuPersisted = false
-      request.log.warn({ error, hostId: agent.hostId }, 'Failed to update NVIDIA GPU inventory')
-    })
+    if (request.body.resources?.nvidiaGpu !== undefined) {
+      await syncHostGpuReport(agent.hostId, request.body.resources.nvidiaGpu).catch(error => {
+        gpuPersisted = false
+        request.log.warn({ error, hostId: agent.hostId }, 'Failed to update NVIDIA GPU inventory')
+      })
+    }
 
-    const storageAccepted = await processAgentStorageReport(agent.hostId, request.body.storage, now)
+    const storageAccepted = hasStoragePayload ? await processAgentStorageReport(agent.hostId, request.body.storage, now) : true
     reportError = request.body.incus?.available !== true ? '节点已连接，但 Incus 状态采集失败，测试失败'
-      : !storageAccepted || request.body.storage?.available !== true || request.body.storage?.collectionComplete !== true ? '节点存储状态采集或保存失败，测试失败'
+      : hasStoragePayload && (!storageAccepted || request.body.storage?.available !== true || request.body.storage?.collectionComplete !== true) ? '节点存储状态采集或保存失败，测试失败'
       : !instancePersisted || request.body.instances?.available !== true || !instanceReport || instanceReport.errors > 0 ? '节点实例状态采集或保存失败，测试失败'
-      : !gpuPersisted || request.body.resources?.storageAvailable !== true ? '节点硬件状态采集或保存失败，测试失败' : undefined
+      : !gpuPersisted || (hasStoragePayload && request.body.resources?.storageAvailable !== true) ? '节点硬件状态采集或保存失败，测试失败' : undefined
 
     if (request.body.incus?.available === true) {
       await prisma.host.updateMany({ where: { id: agent.hostId, status: 'offline' }, data: { status: 'online' } })
@@ -942,6 +962,9 @@ export default async function agentRoutes(fastify: FastifyInstance) {
       const ipv6 = extractHostPublicIpv6FromResources(request.body.resources || {})
       if (ipv6) await prisma.host.updateMany({ where: { id: agent.hostId, natPublicIpv6: null }, data: { natPublicIpv6: ipv6 } })
       recordHostSuccess(agent.hostId, 0)
+      if (policyMismatch) {
+        void syncDesiredSecurityPolicy(agent.hostId)
+      }
     }
 
     const host = await prisma.host.findUnique({

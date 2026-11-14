@@ -201,6 +201,28 @@ export async function consumeHostAgentInstallToken(token: string): Promise<{
     throw new Error('AGENT_INSTALL_TOKEN_INVALID')
   }
 
+  // Reinstall/re-enrollment resets stale certificate pins and security lock state while preserving desired policy mode.
+  if (typeof prisma.nodeSecurityState?.findUnique === 'function') {
+    const existingSecurity = await prisma.nodeSecurityState.findUnique({
+      where: { hostId: agent.hostId },
+      select: { report: true }
+    })
+    const prevReport = existingSecurity?.report && typeof existingSecurity.report === 'object' && !Array.isArray(existingSecurity.report)
+      ? (existingSecurity.report as Record<string, unknown>)
+      : null
+    const desiredEnabled = typeof prevReport?._desiredEnabled === 'boolean' ? prevReport._desiredEnabled : undefined
+    await prisma.nodeSecurityState.updateMany({
+      where: { hostId: agent.hostId },
+      data: {
+        serverFingerprint: null,
+        recoveryBlocked: false,
+        recoveryGeneration: { increment: 1 },
+        report: desiredEnabled !== undefined ? ({ _desiredEnabled: desiredEnabled } as Prisma.InputJsonObject) : ({} as Prisma.InputJsonObject),
+        reportedAt: new Date(0)
+      }
+    })
+  }
+
   const agentSecret = decryptSensitiveData(agent.secretEncrypted)
   if (!agentSecret) {
     throw new Error('AGENT_SECRET_INVALID')
