@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { applyGpuDevice, isGpuFresh, normalizeGpuInput, resolveGpuPolicy, summarizeGpuConfigurations } from '../src/lib/gpu.js'
+import { applyGpuDevice, clearGpuDevices, extractResourceGpuPciAddresses, isGpuFresh, normalizeGpuInput, resolveGpuPolicy, sanitizeMissingHostGpuDevices, summarizeGpuConfigurations } from '../src/lib/gpu.js'
 
 let checks = 0
 function check(fn: () => void) { fn(); checks++ }
@@ -46,6 +46,40 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 for (const path of ['server/src/routes/instances.ts', 'server/src/routes/admin-billing.ts', 'server/src/routes/hosts.ts']) check(() => assert.ok(readFileSync(resolve(root, path), 'utf8').includes('await reserveInstanceGpu(tx,'), `Missing purchase reservation: ${path}`))
 check(() => assert.ok(readFileSync(resolve(root, 'server/src/workers/instanceTaskWorker.ts'), 'utf8').includes('const gpuPciAddresses = await getInstanceGpuPcis(task.instanceId, host.id)')))
 check(() => {
+  const gpuConfig: Record<string, any> = {
+    type: 'container',
+    profiles: [],
+    config: { 'nvidia.runtime': 'true', 'nvidia.driver.capabilities': 'compute,utility', 'limits.cpu': '2' },
+    devices: { gpu0: { type: 'gpu', gputype: 'physical', pci: '0000:17:00.0' }, root: { type: 'disk', path: '/' } }
+  }
+  assert.deepEqual(extractResourceGpuPciAddresses({ gpu: { cards: [{ pci_address: '0000:3B:00.0' }] } }), new Set(['0000:3b:00.0']))
+  assert.equal(extractResourceGpuPciAddresses({}), null)
+  const clone = structuredClone(gpuConfig)
+  assert.deepEqual(sanitizeMissingHostGpuDevices(clone, new Set(['0000:3b:00.0'])), ['gpu0(0000:17:00.0)'])
+  assert.equal(clone.devices.gpu0, undefined)
+  assert.equal(clone.devices.root.type, 'disk')
+  assert.equal(clone.config['nvidia.runtime'], undefined)
+  assert.equal(clone.config['limits.cpu'], '2')
+  const kept = structuredClone(gpuConfig)
+  assert.deepEqual(sanitizeMissingHostGpuDevices(kept, new Set(['0000:17:00.0'])), [])
+  assert.equal(kept.devices.gpu0.pci, '0000:17:00.0')
+  assert.equal(kept.config['nvidia.runtime'], 'true')
+  assert.equal(clearGpuDevices(kept), true)
+  assert.equal(kept.devices.gpu0, undefined)
+  assert.equal(kept.config['nvidia.runtime'], undefined)
+  assert.equal(clearGpuDevices(kept), false)
+})
+check(() => {
+  const detailView = readFileSync(resolve(root, 'client/src/views/InstanceDetailView.vue'), 'utf8')
+  assert.equal(detailView.includes('api.packages.get('), false, 'InstanceDetailView must not trigger extra /packages/:id fetches')
+  const instancesRoute = readFileSync(resolve(root, 'server/src/routes/instances.ts'), 'utf8')
+  assert.ok(instancesRoute.includes('allow_instance_deletion:'), 'GET /instances/:id must return allow_instance_deletion directly')
+  const transferRoute = readFileSync(resolve(root, 'server/src/routes/admin-host-instance-transfer.ts'), 'utf8')
+  assert.ok(transferRoute.includes('clearGpuDevices(') && transferRoute.includes('sanitizeMissingHostGpuDevices('), 'Transfer import/assign must clean stale GPU devices')
+  const incusInstances = readFileSync(resolve(root, 'server/src/lib/incus/incus-instances.ts'), 'utf8')
+  assert.ok(incusInstances.includes('clearGpuDevices('), 'startInstance must clean unmanaged/stale GPU devices when no DB allocation exists')
+})
+check(() => {
   const createView = readFileSync(resolve(root, 'client/src/views/InstanceCreateView.vue'), 'utf8')
   const zhCn = readFileSync(resolve(root, 'client/src/locales/zh-CN.ts'), 'utf8')
   assert.ok(createView.includes("v-if=\"selectedPlan?.gpuShared ?? selectedPackage?.gpu_shared\""), 'OS guidance must only show when the selected plan/package includes shared GPUs')
@@ -76,7 +110,7 @@ if (process.env.RUN_GPU_DB_TESTS === '1') {
     await migrationClient.end()
   }
   const { prisma } = await import('../src/db/prisma.js')
-  const { syncHostGpuReport, reserveInstanceGpu, findAvailableGpus, countGpuReservations, getGpuPolicy, getInstanceGpuPcis, assertGpuPlanChange, assertGpuMigration, validateGpuSelection } = await import('../src/db/gpus.js')
+  const { syncHostGpuReport, reserveInstanceGpu, findAvailableGpus, countGpuReservations, getGpuPolicy, getInstanceGpuPcis, assertGpuPlanChange, assertGpuMigration, validateGpuSelection, updateInstanceGpuAllocation } = await import('../src/db/gpus.js')
   const { deleteInstance, startInstance } = await import('../src/lib/incus/incus-instances.js')
   const { default: Fastify } = await import('fastify')
   const { default: gpuRoutes } = await import('../src/routes/gpus.js')
@@ -183,6 +217,70 @@ if (process.env.RUN_GPU_DB_TESTS === '1') {
     assert.equal(await findAvailableGpus(prisma, host.id, { gpuShared: true, gpuDeviceIds: [gpus[0].id] }), null)
     await syncHostGpuReport(host.id, { status: 'error' })
     assert.equal(await prisma.hostGpu.count({ where: { hostId: host.id, available: true } }), 0)
+    // Cross-host import / unmanaged GPU cleanup on startInstance + admin GPU assignment/cancellation & route auth
+    await syncHostGpuReport(host.id, report)
+    const importedCpuInstance = await prisma.instance.create({ data: { ...base, gpuDeviceId: null, incusId: randomUUID(), name: 'imported-no-gpu', status: 'stopped' } })
+    const importedCalls: Array<{ method: string; body: any }> = []
+    const staleImportClient = {
+      options: { hostId: host.id },
+      request: async (method: string, _path: string, body: unknown) => {
+        importedCalls.push({ method, body })
+        if (method === 'GET') {
+          return {
+            name: importedCpuInstance.incusId,
+            type: 'container',
+            profiles: [],
+            config: { 'nvidia.runtime': 'true', 'nvidia.driver.capabilities': 'compute,utility' },
+            devices: { gpu0: { type: 'gpu', gputype: 'physical', pci: '0000:17:00.0' }, root: { type: 'disk', path: '/' } }
+          }
+        }
+        return {}
+      }
+    }
+    await startInstance(staleImportClient as any, importedCpuInstance.incusId)
+    const cleanedPut = importedCalls.find(call => call.method === 'PUT' && call.body && 'devices' in call.body)
+    assert.ok(cleanedPut, 'startInstance must strip leftover GPU devices before boot when DB has no GPU allocation')
+    assert.equal(cleanedPut.body.devices.gpu0, undefined)
+    assert.equal(cleanedPut.body.config['nvidia.runtime'], undefined)
+    await updateInstanceGpuAllocation({
+      instanceId: importedCpuInstance.id,
+      gpuShared: true,
+      gpuDeviceIds: [gpus[0].id],
+      liveInstanceType: 'container',
+      livePrivileged: false,
+      syncIncus: async (pcis) => {
+        assert.deepEqual(pcis, ['0000:65:00.0'])
+      }
+    })
+    assert.deepEqual(await getInstanceGpuPcis(importedCpuInstance.id, host.id), ['0000:65:00.0'])
+    const mgrGet = await app.inject({ url: `/api/instances/${importedCpuInstance.id}/gpu` })
+    assert.equal(mgrGet.statusCode, 200)
+    assert.equal(mgrGet.json().management.canManage, true)
+    assert.deepEqual(mgrGet.json().management.allocatedDeviceIds, [gpus[0].id])
+    assert.equal((await app.inject({ method: 'PUT', url: `/api/instances/${importedCpuInstance.id}/gpu`, headers: { 'x-outsider': 'yes' }, payload: { gpuShared: false } })).statusCode, 403)
+    assert.equal((await app.inject({ method: 'PUT', url: `/api/instances/${importedCpuInstance.id}/gpu`, payload: { gpuShared: true, gpuDeviceIds: [] } })).statusCode, 400)
+    await updateInstanceGpuAllocation({
+      instanceId: importedCpuInstance.id,
+      gpuShared: false,
+      gpuDeviceIds: [],
+      liveInstanceType: 'container',
+      livePrivileged: false,
+      syncIncus: async (pcis) => {
+        assert.equal(pcis, null)
+      }
+    })
+    assert.equal(await getInstanceGpuPcis(importedCpuInstance.id, host.id), undefined)
+    await assert.rejects(
+      updateInstanceGpuAllocation({
+        instanceId: importedCpuInstance.id,
+        gpuShared: true,
+        gpuDeviceIds: [gpus[0].id],
+        liveInstanceType: 'vm',
+        livePrivileged: false,
+        syncIncus: async () => {}
+      }),
+      /仅支持非特权 LXC 容器/
+    )
     console.log('GPU PostgreSQL integration passed: concurrent last-seat reservation, independent cards, billing rollback, confirmed deletion, restore binding, lifecycle restrictions, telemetry freshness and API authorization')
   } finally {
     if (app) await app.close()

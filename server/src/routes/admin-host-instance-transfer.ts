@@ -5,6 +5,7 @@ import { LogModule, LogResult } from '../db/logs.js'
 import { IncusApiError, nodeErrorDetail } from '../lib/incus/incus-client.js'
 import { getIncusClient } from '../lib/incus/incus-pool.js'
 import { getInstance, getInstanceState, listInstances } from '../lib/incus/incus-instances.js'
+import { clearGpuDevices, extractResourceGpuPciAddresses, listIncusGpuDevices, sanitizeMissingHostGpuDevices } from '../lib/gpu.js'
 import { redactTaskLog, setOperationTaskProgress } from '../lib/operation-task-log.js'
 import type { IncusInstance } from '../types/incus.js'
 
@@ -100,15 +101,64 @@ function formatNodeBackupError(task: NodeBackupTask): string | null {
   return task.error || itemErr || null
 }
 
+async function sanitizeImportedInstanceGpuDevices(
+  client: Awaited<ReturnType<typeof getIncusClient>>,
+  hostId: number,
+  instanceName: string
+): Promise<string[]> {
+  const live = await getInstance(client, instanceName).catch(() => null)
+  if (!live || !listIncusGpuDevices(live).length) return []
+
+  const resources = await client.getResources().catch(() => null)
+  let hostPcis = extractResourceGpuPciAddresses(resources)
+  if (!hostPcis) {
+    const dbGpus = await prisma.hostGpu.findMany({ where: { hostId, available: true }, select: { pciAddress: true } }).catch(() => [])
+    if (!dbGpus.length && !resources) return []
+    hostPcis = new Set(dbGpus.map(g => g.pciAddress.trim().toLowerCase()).filter(Boolean))
+  }
+
+  const removed = sanitizeMissingHostGpuDevices(live, hostPcis)
+  if (!removed.length) return []
+
+  await client.request('PUT', `/1.0/instances/${encodeURIComponent(instanceName)}`, live)
+  return removed
+}
+
+async function logImportedGpuSanitization(
+  opTaskId: number,
+  hostId: number,
+  targetName: string | undefined,
+  existingClient?: Awaited<ReturnType<typeof getIncusClient>>
+): Promise<void> {
+  const cleanName = targetName?.trim()
+  if (!cleanName) return
+  const client = existingClient ?? await (async () => {
+    const host = await prisma.host.findUnique({ where: { id: hostId } }).catch(() => null)
+    return host ? getIncusClient(host).catch(() => null) : null
+  })()
+  if (!client) return
+  const removed = await sanitizeImportedInstanceGpuDevices(client, hostId, cleanName).catch(() => [])
+  if (!removed.length) return
+  await prisma.operationTaskLog.create({
+    data: {
+      taskId: opTaskId,
+      source: 'server',
+      level: 'warn',
+      message: `已自动清理与当前宿主机不兼容的残留 GPU 设备：${removed.join(', ')}`
+    }
+  }).catch(() => {})
+}
+
 async function trackNodeTransferTask(params: {
   hostId: number
   instanceName: string
+  importedInstanceName?: string
   kind: 'instance_export' | 'instance_import'
   targetPath: string
   storagePool?: string
   task: NodeBackupTask
 }) {
-  const { hostId, instanceName, kind, targetPath, storagePool, task } = params
+  const { hostId, instanceName, importedInstanceName, kind, targetPath, storagePool, task } = params
   const actionLabel = kind === 'instance_export' ? '导出' : '导入'
   const initialStatus = task.status === 'running' ? 'running' : task.status === 'success' ? 'success' : 'failed'
   const opTask = await prisma.operationTask.create({
@@ -143,6 +193,9 @@ async function trackNodeTransferTask(params: {
         message: initialStatus === 'success' ? `${actionLabel}完成：${task.filePath || targetPath}` : (errText || `${actionLabel}失败`)
       }
     }).catch(() => {})
+    if (initialStatus === 'success' && kind === 'instance_import') {
+      await logImportedGpuSanitization(opTask.id, hostId, task.instance?.trim() || importedInstanceName)
+    }
     return opTask.id
   }
 
@@ -193,6 +246,9 @@ async function trackNodeTransferTask(params: {
             message: finalStatus === 'success' ? `${actionLabel}完成：${found.filePath || targetPath}` : (errText || `${actionLabel}失败`)
           }
         }).catch(() => {})
+        if (finalStatus === 'success' && kind === 'instance_import') {
+          await logImportedGpuSanitization(opTask.id, hostId, found.instance?.trim() || importedInstanceName, client)
+        }
         await prisma.operationTask.updateMany({
           where: { id: opTask.id, status: 'running' },
           data: { status: finalStatus, error: finalStatus === 'success' ? null : (errText || `${actionLabel}失败`), finishedAt: new Date() }
@@ -477,6 +533,7 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         const operationTaskId = await trackNodeTransferTask({
           hostId,
           instanceName: payload.name || payload.filePath,
+          importedInstanceName: payload.name,
           kind: 'instance_import',
           targetPath: payload.filePath,
           storagePool: payload.storagePool,
@@ -664,6 +721,13 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
         const status = mapIncusStatus(incusInst.status)
         const displayName = req.body.name?.trim() || incusName
         const image = String(config['image.description'] || config['image.os'] || 'imported')
+        const cleanedGpuDevices = listIncusGpuDevices(incusInst)
+        if (clearGpuDevices(incusInst)) {
+          await client.request('PUT', `/1.0/instances/${encodeURIComponent(incusName)}`, incusInst)
+        }
+        const cleanedNote = cleanedGpuDevices.length
+          ? `（已清理未登记 GPU 设备: ${cleanedGpuDevices.map(d => (d.pci ? `${d.name}(${d.pci})` : d.name)).join(', ')}）`
+          : ''
 
         const created = await prisma.$transaction(async (tx) => {
           const dup = await tx.instance.findFirst({
@@ -694,7 +758,7 @@ export default async function adminHostInstanceTransferRoutes(app: FastifyInstan
               userId: req.user.id,
               module: LogModule.HOST,
               action: 'host.instance.assign',
-              content: `节点 #${hostId} 管理员将无归属实例 ${incusName} 分配给用户 ${targetUser.username} (#${targetUser.id})`,
+              content: `节点 #${hostId} 管理员将无归属实例 ${incusName} 分配给用户 ${targetUser.username} (#${targetUser.id})${cleanedNote}`,
               result: LogResult.SUCCESS
             }
           })

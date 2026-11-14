@@ -4,12 +4,12 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import GpuSpecification from './GpuSpecification.vue'
 import type { InstanceGpuInfo } from '@/types/api'
-const props = defineProps<{ instanceId: number }>()
+const props = defineProps<{ instanceId: number; refreshKey?: number }>()
 const { t } = useI18n()
 const gpu = ref<InstanceGpuInfo | null>(null)
 const error = ref('')
 let generation = 0
-watch(() => props.instanceId, async id => {
+watch(() => [props.instanceId, props.refreshKey] as const, async ([id]) => {
   const current = ++generation
   gpu.value = null; error.value = ''
   try { const data = await api.instances.getGpu(id); if (current === generation) gpu.value = data.gpu }

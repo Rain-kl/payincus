@@ -2633,6 +2633,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       created_at: string
       package_id: number | null
       packageName?: string | null
+      allow_instance_deletion?: boolean
       packagePlanId?: number | null
       planId?: number | null  // 方案ID（用于变更方案）
       planName?: string | null
@@ -2706,6 +2707,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
       created_at: instance.created_at,
       package_id: instance.package_id,
       packageName: pkg?.name || null,
+      allow_instance_deletion: pkg ? (pkg as any).allow_instance_deletion !== false : true,
       packagePlanId: (instance as any).package_plan_id ?? null,
       planId: (instance as any).package_plan_id ?? null,
       planName: planName,

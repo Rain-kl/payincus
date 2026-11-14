@@ -2,8 +2,13 @@
 export const GPU_REPORT_MAX_AGE_MS = 180_000
 export const GPU_SHARING_NOTICE = '共享物理 GPU；显存和算力由同池实例共同使用，不提供独立显存或算力保证。'
 export class GpuError extends Error {
-  statusCode = 400
-  code = 'GPU_CONFIGURATION_INVALID'
+  statusCode: number
+  code: string
+  constructor(message: string, statusCode = 400, code = 'GPU_CONFIGURATION_INVALID') {
+    super(message)
+    this.statusCode = statusCode
+    this.code = code
+  }
 }
 export interface GpuPolicy {
   gpuShared: boolean
@@ -57,6 +62,100 @@ export function summarizeGpuConfigurations(devices: Array<{ hostId: number; name
     else groups.set(key, { hostIds: [hostId], devices: models, count: cards.length })
   }
   return [...groups.values()]
+}
+
+const GPU_CONFIG_KEYS = ['nvidia.runtime', 'nvidia.driver.capabilities'] as const
+
+export interface IncusGpuDeviceInfo {
+  name: string
+  pci: string | null
+  gputype: string | null
+}
+
+export function listIncusGpuDevices(config: Record<string, any> | null | undefined): IncusGpuDeviceInfo[] {
+  if (!config?.devices || typeof config.devices !== 'object') return []
+  const result: IncusGpuDeviceInfo[] = []
+  for (const [name, device] of Object.entries(config.devices)) {
+    if ((device as any)?.type !== 'gpu') continue
+    const rawPci = typeof (device as any)?.pci === 'string' ? (device as any).pci.trim() : ''
+    const rawType = typeof (device as any)?.gputype === 'string' ? (device as any).gputype.trim() : ''
+    result.push({ name, pci: rawPci || null, gputype: rawType || null })
+  }
+  return result.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function extractResourceGpuPciAddresses(resources: unknown): Set<string> | null {
+  if (!resources || typeof resources !== 'object') return null
+  const cards = (resources as { gpu?: { cards?: unknown } }).gpu?.cards
+  if (!Array.isArray(cards)) return null
+  const addresses = new Set<string>()
+  for (const card of cards) {
+    if (!card || typeof card !== 'object') continue
+    const raw = (card as { pci_address?: unknown; pciAddress?: unknown }).pci_address ?? (card as { pciAddress?: unknown }).pciAddress
+    if (typeof raw === 'string' && raw.trim()) addresses.add(raw.trim().toLowerCase())
+  }
+  return addresses
+}
+
+export function clearGpuDevices(config: Record<string, any>): boolean {
+  let changed = false
+  if (config.devices && typeof config.devices === 'object') {
+    const devices = { ...config.devices }
+    for (const [name, device] of Object.entries(devices)) {
+      if ((device as any)?.type === 'gpu') {
+        delete devices[name]
+        changed = true
+      }
+    }
+    if (changed) config.devices = devices
+  }
+  if (config.config && typeof config.config === 'object') {
+    const nextConfig = { ...config.config }
+    let configChanged = false
+    for (const key of GPU_CONFIG_KEYS) {
+      if (key in nextConfig) {
+        delete nextConfig[key]
+        configChanged = true
+      }
+    }
+    if (configChanged) {
+      config.config = nextConfig
+      changed = true
+    }
+  }
+  return changed
+}
+
+export function sanitizeMissingHostGpuDevices(config: Record<string, any>, hostPciAddresses: Set<string>): string[] {
+  if (!config.devices || typeof config.devices !== 'object') return []
+  const devices = { ...config.devices }
+  const removed: string[] = []
+  let remainingGpuCount = 0
+  for (const name of Object.keys(devices).sort()) {
+    const device = devices[name]
+    if ((device as any)?.type !== 'gpu') continue
+    const rawPci = typeof (device as any)?.pci === 'string' ? (device as any).pci.trim() : ''
+    const normalizedPci = rawPci.toLowerCase()
+    if ((normalizedPci && !hostPciAddresses.has(normalizedPci)) || (!normalizedPci && hostPciAddresses.size === 0)) {
+      delete devices[name]
+      removed.push(rawPci ? `${name}(${rawPci})` : name)
+    } else {
+      remainingGpuCount++
+    }
+  }
+  let configChanged = false
+  if (remainingGpuCount === 0 && config.config && typeof config.config === 'object') {
+    const nextConfig = { ...config.config }
+    for (const key of GPU_CONFIG_KEYS) {
+      if (key in nextConfig) {
+        delete nextConfig[key]
+        configChanged = true
+      }
+    }
+    if (configChanged) config.config = nextConfig
+  }
+  if (removed.length > 0) config.devices = devices
+  return removed
 }
 
 export function applyGpuDevice(config: Record<string, any>, pci: string | string[]): void {

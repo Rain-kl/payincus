@@ -2364,6 +2364,43 @@ export interface InstanceGpuInfo {
   sharingNotice: string
 }
 
+export interface LiveInstanceGpuDevice {
+  name: string
+  pci: string | null
+  gputype: string | null
+  hostMatched: boolean
+}
+
+export interface InstanceGpuManagement {
+  canManage: boolean
+  instanceId: number
+  hostId: number
+  instanceStatus: string
+  instanceType: 'container' | 'vm'
+  privileged: boolean
+  supported: boolean
+  allocatedDeviceIds: number[]
+  reservationReleased: boolean
+  hostGpus: HostGpu[]
+  liveGpuDevices: LiveInstanceGpuDevice[] | null
+  liveSyncError: string | null
+}
+
+export interface InstanceGpuResponse {
+  gpu: InstanceGpuInfo | null
+  management?: InstanceGpuManagement
+}
+
+export interface UpdateInstanceGpuRequest {
+  gpuShared: boolean
+  gpuDeviceIds?: number[]
+}
+
+export interface UpdateInstanceGpuResponse extends InstanceGpuResponse {
+  success: boolean
+  restartRequired: boolean
+}
+
 export interface GpuModelSummary {
   name: string
   memoryTotalMiB: number

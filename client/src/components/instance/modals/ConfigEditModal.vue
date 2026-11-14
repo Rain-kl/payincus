@@ -15,7 +15,7 @@ interface ResourceStats {
 interface Props {
   show: boolean
   instance: Instance | null
-  pkg: Package | null
+  pkg?: Package | null
   userQuota: UserQuota | null
   stats?: ResourceStats
   loading?: boolean

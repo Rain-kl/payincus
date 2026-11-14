@@ -2,7 +2,7 @@ import { ensurePackageEgressBeforeStart, releasePackageEgress } from '../egress/
 import { prisma } from '../../db/prisma.js'
 import { protectProvisionedNetwork } from '../egress/provision.js'
 import { getInstanceGpuPcis } from '../../db/gpus.js'
-import { applyGpuDevice } from '../gpu.js'
+import { applyGpuDevice, clearGpuDevices } from '../gpu.js'
 import { runOperationTask, taskLog } from '../operation-task-log.js'
 /**
  * Incus 实例管理
@@ -312,12 +312,22 @@ export async function deleteInstance(client: IncusClient, name: string): Promise
 export async function startInstance(client: IncusClient, name: string): Promise<unknown> {
   await ensurePackageEgressBeforeStart(client, name)
   if (client.options?.hostId) {
-    const record = await prisma.instance.findFirst({ where: { incusId: name, hostId: client.options.hostId, status: { not: 'deleted' }, gpuDeviceId: { not: null } }, select: { id: true } })
+    const record = await prisma.instance.findFirst({
+      where: { incusId: name, hostId: client.options.hostId, status: { not: 'deleted' } },
+      select: { id: true, gpuDeviceId: true, gpuAllocations: { select: { gpuDeviceId: true }, take: 1 } }
+    })
     if (record) {
-      const pci = await getInstanceGpuPcis(record.id, client.options.hostId)
-      const live = await getInstance(client, name)
-      applyGpuDevice(live, pci!)
-      await client.request('PUT', `/1.0/instances/${name}`, live)
+      if (record.gpuDeviceId !== null || record.gpuAllocations.length > 0) {
+        const pci = await getInstanceGpuPcis(record.id, client.options.hostId)
+        const live = await getInstance(client, name)
+        applyGpuDevice(live, pci!)
+        await client.request('PUT', `/1.0/instances/${encodeURIComponent(name)}`, live)
+      } else {
+        const live = await getInstance(client, name)
+        if (clearGpuDevices(live)) {
+          await client.request('PUT', `/1.0/instances/${encodeURIComponent(name)}`, live)
+        }
+      }
     }
   }
   const result = await client.request('PUT', `/1.0/instances/${name}/state`, {

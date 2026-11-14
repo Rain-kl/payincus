@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from './prisma.js'
-import { GpuError, GPU_SHARING_NOTICE, isGpuFresh, resolveGpuPolicy, type GpuPolicy } from '../lib/gpu.js'
+import { GpuError, GPU_SHARING_NOTICE, isGpuFresh, resolveGpuPolicy, summarizeGpuModels, type GpuPolicy } from '../lib/gpu.js'
 type Client = Prisma.TransactionClient | typeof prisma
 
 export async function getGpuPolicy(client: Client, packageId?: number | null, planId?: number | null): Promise<GpuPolicy> {
@@ -50,8 +50,105 @@ export async function reserveInstanceGpu(client: Client, input: { hostId: number
   return { gpuDeviceId: devices[0].id, gpuAllocations: { create: devices.map(gpu => ({ gpuDeviceId: gpu.id })) } }
 }
 
-function allocatedGpuIds(instance: { gpuDeviceId: number | null; gpuAllocations: Array<{ gpuDeviceId: number }> }): number[] {
+export function allocatedGpuIds(instance: { gpuDeviceId: number | null; gpuAllocations: Array<{ gpuDeviceId: number }> }): number[] {
   return [...new Set([...(instance.gpuDeviceId ? [instance.gpuDeviceId] : []), ...instance.gpuAllocations.map(allocation => allocation.gpuDeviceId)])].sort((a, b) => a - b)
+}
+
+export function formatInstanceGpuSummary(
+  devices: Array<{ name: string; memoryTotalMiB: number }>,
+  reservationReleased: boolean
+) {
+  if (!devices.length) return null
+  return {
+    name: devices[0].name,
+    memoryTotalMiB: devices[0].memoryTotalMiB,
+    devices: summarizeGpuModels(devices),
+    count: devices.length,
+    shared: true,
+    reservationReleased,
+    sharingNotice: GPU_SHARING_NOTICE
+  }
+}
+
+export async function updateInstanceGpuAllocation(input: {
+  instanceId: number
+  gpuShared: boolean
+  gpuDeviceIds: number[]
+  liveInstanceType?: 'container' | 'vm' | null
+  livePrivileged?: boolean | null
+  syncIncus: (pciAddresses: string[] | null) => Promise<void>
+}): Promise<{ pciAddresses: string[] | null }> {
+  const { instanceId, gpuShared, gpuDeviceIds, liveInstanceType, livePrivileged, syncIncus } = input
+  const uniqueIds = [...new Set(gpuDeviceIds)]
+  if (gpuShared && !uniqueIds.length) {
+    throw new GpuError('请至少选择一张共享 GPU', 400)
+  }
+
+  return prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM instances WHERE id = ${instanceId} FOR UPDATE`
+    const instance = await tx.instance.findUnique({
+      where: { id: instanceId },
+      include: {
+        gpuAllocations: true,
+        package: { select: { instanceType: true, privileged: true } }
+      }
+    })
+    if (!instance || instance.status === 'deleted') {
+      throw new GpuError('实例不存在', 404, 'INSTANCE_NOT_FOUND')
+    }
+    if (['creating', 'starting', 'stopping', 'restarting'].includes(instance.status)) {
+      throw new GpuError('实例正在执行状态变更任务，请等待完成后再修改 GPU 配置', 409, 'TASK_IN_PROGRESS')
+    }
+
+    if (!gpuShared) {
+      await tx.instanceGpuAllocation.deleteMany({ where: { instanceId } })
+      await tx.instance.update({ where: { id: instanceId }, data: { gpuDeviceId: null, gpuReleasedAt: null } })
+      await syncIncus(null)
+      return { pciAddresses: null }
+    }
+
+    const effectiveType = liveInstanceType ?? (instance.package?.instanceType === 'vm' ? 'vm' : 'container')
+    const isPrivileged = Boolean(livePrivileged ?? instance.package?.privileged)
+    if (effectiveType !== 'container' || isPrivileged) {
+      throw new GpuError('共享 GPU 仅支持非特权 LXC 容器', 400)
+    }
+
+    await tx.$queryRaw`SELECT id FROM host_gpus WHERE host_id = ${instance.hostId} ORDER BY id FOR UPDATE`
+    const devices = await tx.hostGpu.findMany({
+      where: { hostId: instance.hostId, id: { in: uniqueIds } },
+      orderBy: { id: 'asc' }
+    })
+    if (devices.length !== uniqueIds.length) {
+      throw new GpuError('所选 GPU 不属于当前实例所在宿主机', 400)
+    }
+
+    const currentlyHeldIds = new Set(allocatedGpuIds(instance))
+    for (const gpu of devices) {
+      if (!gpu.sharingEnabled && !currentlyHeldIds.has(gpu.id)) {
+        throw new GpuError(`显卡 "${gpu.name}" (${gpu.pciAddress}) 尚未开放共享，请先在宿主机 GPU 页签启用共享`, 409)
+      }
+      if (!isGpuFresh(gpu)) {
+        throw new GpuError(`显卡 "${gpu.name}" (${gpu.pciAddress}) 当前不可用、运行时未就绪或监控已过期`, 409)
+      }
+      const used = await countGpuReservations(tx, gpu.id, instanceId)
+      if (used >= gpu.maxInstances) {
+        throw new GpuError(`显卡 "${gpu.name}" (${gpu.pciAddress}) 共享名额已满（${used}/${gpu.maxInstances}）`, 409)
+      }
+    }
+
+    await tx.instanceGpuAllocation.deleteMany({ where: { instanceId } })
+    await tx.instanceGpuAllocation.createMany({
+      data: devices.map(gpu => ({ instanceId, gpuDeviceId: gpu.id }))
+    })
+    await tx.instance.update({
+      where: { id: instanceId },
+      data: { gpuDeviceId: devices[0].id, gpuReleasedAt: null }
+    })
+
+    const pciAddresses = devices.map(gpu => gpu.pciAddress)
+    await syncIncus(pciAddresses)
+    return { pciAddresses }
+  }, { timeout: 15_000 })
 }
 
 // Stopped/suspended instances keep all seats. Restore/recreate always use the

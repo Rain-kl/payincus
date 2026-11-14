@@ -1,7 +1,7 @@
 import type { StorageEncryptionState } from './storage-encryption-types'
 import type { GpuConfiguration } from '@/types/api'
 import type { ProxyNode, EgressSelection, EgressProfile, FirewallPolicy, NetworkPolicy, ProxyImportResult, ProxyProbeResponse } from './egress-types'
-import type { HostGpu, InstanceGpuInfo } from '@/types/api'
+import type { HostGpu, InstanceGpuResponse, UpdateInstanceGpuRequest, UpdateInstanceGpuResponse } from '@/types/api'
 import axios, { type AxiosInstance } from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { buildApiUrl } from '@/utils/api-url'
@@ -685,7 +685,8 @@ const api = {
 
   // 实例管理
   instances: {
-    getGpu: (id: number): Promise<{ gpu: InstanceGpuInfo | null }> => http.get(`/instances/${id}/gpu`),
+    getGpu: (id: number): Promise<InstanceGpuResponse> => http.get(`/instances/${id}/gpu`),
+    updateGpu: (id: number, data: UpdateInstanceGpuRequest): Promise<UpdateInstanceGpuResponse> => http.put(`/instances/${id}/gpu`, data),
     list: (params: Record<string, unknown> = {}): Promise<PaginatedResponse<InstanceWithDetails> & { availableCountries?: string[] }> =>
       http.get('/instances', { params }),
     get: (id: number): Promise<InstanceWithDetails> => http.get(`/instances/${id}`),

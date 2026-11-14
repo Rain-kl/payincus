@@ -40,7 +40,7 @@ import AnnouncementIcon from '@/components/icons/AnnouncementIcon.vue'
 import { getStatusInfo } from '@/utils/formatters'
 import { translateError } from '@/utils/errorHandler'
 import { freeSiteCopy, getFreeSiteBillingCycleLabel, getFreeSiteBillingCycleShort } from '@/utils/freeSiteFun'
-import type { Instance, InstanceWithDetails, Snapshot, UserQuota, UpdateInstanceRequest, Package, CloudInitState, CloudInitStatusResponse } from '@/types/api'
+import type { Instance, InstanceWithDetails, Snapshot, UserQuota, UpdateInstanceRequest, CloudInitState, CloudInitStatusResponse } from '@/types/api'
 import { Button, Card, Input, Badge, PageHeader } from '@/components/ui'
 import type { BadgeVariant } from '@/components/ui'
 import {
@@ -321,7 +321,7 @@ const remainingQuota = ref<RemainingQuota>({ // 剩余额度
 // 配置编辑
 const showConfigEditModal = ref<boolean>(false)
 const configEditLoading = ref<boolean>(false)
-const instancePackage = ref<Package | null>(null)
+const gpuRefreshKey = ref<number>(0)
 
 // 兑换资源
 const showRedeemModal = ref<boolean>(false)
@@ -344,11 +344,7 @@ const canDeleteInstance = computed<boolean>(() => {
   // 没有套餐时允许删除
   if (!instance.value.package_id) return true
 
-  // 套餐信息未加载时不允许（避免误删）
-  if (!instancePackage.value) return false
-
-  // 只有明确设置为true时才允许删除
-  return (instancePackage.value as any).allow_instance_deletion === true
+  return (instance.value as any).allow_instance_deletion !== false
 })
 
 // 敏感操作验证
@@ -646,7 +642,6 @@ watch(() => route.params.id, async (newId, oldId) => {
       quotaError.value = ''
       userQuota.value = null
       remainingQuota.value = { port: 0, snapshot: 0 }
-      instancePackage.value = null
 
       // 重置 cloud-init 状态
       cloudInitReady.value = true
@@ -949,18 +944,6 @@ async function loadInstance(): Promise<void> {
     const response = await api.instances.get(instanceId)
     instance.value = (response as { instance?: Instance }).instance || null
     if (instance.value) {
-      // 如果实例绑定了套餐，加载套餐信息以检查删除权限
-      if (instance.value.package_id && instance.value.package_id > 0) {
-        try {
-          const pkgResponse = await api.packages.get(instance.value.package_id) as any
-          instancePackage.value = pkgResponse.package || pkgResponse
-        } catch (err) {
-          console.error('Failed to load package:', err)
-          instancePackage.value = null
-        }
-      } else {
-        instancePackage.value = null
-      }
       // 初始化配额表单
       instanceQuotaForm.value = {
         portLimit: (instance.value as any).portLimit ?? null,
@@ -1213,21 +1196,6 @@ async function doClone(): Promise<void> {
 // 配置编辑
 async function openConfigEditModal(): Promise<void> {
   if (!instance.value) return
-
-  // 加载套餐信息（如果实例绑定了套餐）
-  if (instance.value.package_id && instance.value.package_id > 0) {
-    try {
-      const response = await api.packages.get(instance.value.package_id) as any
-      // API 返回 { package: {...} } 格式
-      instancePackage.value = response.package || response
-    } catch (err) {
-      console.error('Failed to load package:', err)
-      instancePackage.value = null
-    }
-  } else {
-    // 如果没有绑定套餐，设置为 null
-    instancePackage.value = null
-  }
 
   // 加载用户配额
   await loadUserQuota()
@@ -3050,7 +3018,7 @@ function formatShortDate(dateStr: string | null | undefined): string {
             </Card>
 
             <!-- Original Info Tab Content -->
-            <InstanceGpuInfo :instance-id="instance.id" />
+            <InstanceGpuInfo :instance-id="instance.id" :refresh-key="gpuRefreshKey" />
             <InstanceInfoTab
               :instance="instance"
               :stats="stats"
@@ -3120,11 +3088,13 @@ function formatShortDate(dateStr: string | null | undefined): string {
             v-if="activeTab === 'config' && instance"
             :instance-id="instance.id"
             :can-edit-config="instance.isHostOwner === true"
+            :can-manage-gpu="authStore.isAdmin || instance.isHostOwner === true"
             :show-boot-settings="instance.isHostOwner === true"
             :instance-type="(instance as any).instanceType || 'container'"
             :instance-status="instance.status"
             :is-instance-owner="(instance as any).isInstanceOwner === true || authStore.isAdmin"
             @change-host-task="startTaskPolling"
+            @gpu-updated="gpuRefreshKey++"
           />
 
           <!-- Logs Tab -->
@@ -3204,7 +3174,6 @@ function formatShortDate(dateStr: string | null | undefined): string {
       v-if="instance"
       :show="showConfigEditModal"
       :instance="instance"
-      :pkg="instancePackage"
       :user-quota="userQuota"
       :stats="stats"
       :loading="configEditLoading"

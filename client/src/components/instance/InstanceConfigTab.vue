@@ -3,12 +3,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useToast } from '@/stores/toast'
-import type { InstanceConfigResponse, InstanceConfig } from '@/types/api'
+import type { InstanceConfigResponse, InstanceConfig, InstanceGpuResponse, HostGpu } from '@/types/api'
 import ChangeHostCard from '@/components/instance/ChangeHostCard.vue'
 
 const props = defineProps<{
   instanceId: number
   canEditConfig?: boolean
+  canManageGpu?: boolean
   showBootSettings?: boolean
   instanceType?: 'container' | 'vm'
   instanceStatus?: string
@@ -17,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'change-host-task': [taskId: number]
+  'gpu-updated': []
 }>()
 
 const { t } = useI18n()
@@ -32,6 +34,38 @@ const swapActionLoading = ref(false)
 // 提升进程数相关
 const showBoostModal = ref(false)
 const boostLoading = ref(false)
+
+// GPU 共享管理相关
+const gpuLoading = ref(false)
+const gpuSaving = ref(false)
+const gpuData = ref<InstanceGpuResponse | null>(null)
+const draftGpuShared = ref(false)
+const selectedGpuIds = ref<number[]>([])
+const gpuRestartRequired = ref(false)
+const gpuManagement = computed(() => gpuData.value?.management || null)
+const canModifyInstanceGpuState = computed(() => ['running', 'stopped', 'suspended', 'error'].includes(normalizedInstanceStatus.value))
+const allocatedGpuIdSet = computed(() => new Set(gpuManagement.value?.allocatedDeviceIds || []))
+const hasStaleOrUnmanagedLiveGpu = computed(() => {
+  const mgmt = gpuManagement.value
+  if (!mgmt?.liveGpuDevices?.length) return false
+  if (mgmt.allocatedDeviceIds.length === 0) return true
+  return mgmt.liveGpuDevices.some(dev => !dev.hostMatched)
+})
+const hasAnyGpuState = computed(() => {
+  const mgmt = gpuManagement.value
+  if (!mgmt) return false
+  return mgmt.allocatedDeviceIds.length > 0 || Boolean(mgmt.liveGpuDevices?.length)
+})
+const hasGpuDraftChanges = computed(() => {
+  const mgmt = gpuManagement.value
+  if (!mgmt) return false
+  const currentShared = mgmt.allocatedDeviceIds.length > 0 && !mgmt.reservationReleased
+  if (draftGpuShared.value !== currentShared) return true
+  if (!draftGpuShared.value) return hasStaleOrUnmanagedLiveGpu.value
+  const currentSorted = [...mgmt.allocatedDeviceIds].sort((a, b) => a - b)
+  const draftSorted = [...selectedGpuIds.value].sort((a, b) => a - b)
+  return currentSorted.length !== draftSorted.length || currentSorted.some((id, idx) => id !== draftSorted[idx]) || hasStaleOrUnmanagedLiveGpu.value
+})
 
 // 进程数上限：LXC=1000, KVM=2000
 const processLimit = computed(() => props.instanceType === 'vm' ? 2000 : 1000)
@@ -81,12 +115,92 @@ function getDefaultForm(): ConfigForm {
 }
 
 onMounted(async () => {
-  await loadConfig()
+  await Promise.all([loadConfig(), loadGpuManagement()])
 })
 
 watch(() => props.instanceId, async () => {
-  await loadConfig()
+  await Promise.all([loadConfig(), loadGpuManagement()])
 })
+
+watch(() => props.canManageGpu, (enabled) => {
+  if (enabled) void loadGpuManagement()
+})
+
+function syncGpuDraft(response: InstanceGpuResponse | null): void {
+  const mgmt = response?.management
+  if (!mgmt) {
+    draftGpuShared.value = false
+    selectedGpuIds.value = []
+    return
+  }
+  const hasActiveAllocation = mgmt.allocatedDeviceIds.length > 0 && !mgmt.reservationReleased
+  draftGpuShared.value = hasActiveAllocation
+  selectedGpuIds.value = [...mgmt.allocatedDeviceIds]
+}
+
+async function loadGpuManagement(): Promise<void> {
+  if (!props.canManageGpu) {
+    gpuData.value = null
+    return
+  }
+  gpuLoading.value = true
+  try {
+    const res = await api.instances.getGpu(props.instanceId)
+    gpuData.value = res
+    syncGpuDraft(res)
+  } catch (err: any) {
+    toast.error(err.message || t('common.error'))
+  } finally {
+    gpuLoading.value = false
+  }
+}
+
+function gpuCardDisabledReason(card: HostGpu): string | null {
+  const heldByCurrent = allocatedGpuIdSet.value.has(card.id)
+  const occupiedByCurrent = heldByCurrent && !gpuManagement.value?.reservationReleased ? 1 : 0
+  const usedByOthers = Math.max(0, card.usedInstances - occupiedByCurrent)
+  if (!card.sharingEnabled && !heldByCurrent) return t('instanceConfig.gpu.sharingDisabled')
+  if (!card.ready) return t('instanceConfig.gpu.notReady')
+  if (usedByOthers >= card.maxInstances) return t('instanceConfig.gpu.slotsFull')
+  return null
+}
+
+function isGpuCardSelectable(card: HostGpu): boolean {
+  if (selectedGpuIds.value.includes(card.id)) return true
+  return gpuCardDisabledReason(card) === null
+}
+
+function toggleGpuCard(cardId: number): void {
+  if (selectedGpuIds.value.includes(cardId)) {
+    selectedGpuIds.value = selectedGpuIds.value.filter(id => id !== cardId)
+  } else {
+    selectedGpuIds.value = [...selectedGpuIds.value, cardId]
+  }
+}
+
+async function saveGpuSharing(): Promise<void> {
+  if (!props.canManageGpu || gpuSaving.value) return
+  if (draftGpuShared.value && selectedGpuIds.value.length === 0) {
+    toast.error(t('instanceConfig.gpu.selectRequired'))
+    return
+  }
+  gpuSaving.value = true
+  try {
+    const res = await api.instances.updateGpu(props.instanceId, {
+      gpuShared: draftGpuShared.value,
+      gpuDeviceIds: draftGpuShared.value ? selectedGpuIds.value : []
+    })
+    gpuData.value = res
+    syncGpuDraft(res)
+    gpuRestartRequired.value = Boolean(res.restartRequired)
+    toast.success(t('instanceConfig.gpu.saveSuccess'))
+    emit('gpu-updated')
+  } catch (err: any) {
+    toast.error(err.message || t('common.error'))
+  } finally {
+    gpuSaving.value = false
+  }
+}
 
 async function loadConfig(): Promise<void> {
   loading.value = true
@@ -278,6 +392,195 @@ async function boostProcesses(): Promise<void> {
         :instance-status="props.instanceStatus"
         @task-created="emit('change-host-task', $event)"
       />
+
+      <!-- Shared GPU Management Section (Admin / Host Owner) -->
+      <div v-if="props.canManageGpu" class="card shadow-pop p-6 space-y-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-themed font-semibold text-sm">
+                {{ t('instanceConfig.sections.gpu') }}
+              </h3>
+              <span
+                v-if="gpuManagement?.reservationReleased"
+                class="badge-warning px-2.5 py-0.5 rounded-xl text-xs font-medium"
+              >
+                {{ t('instanceConfig.gpu.releasedBadge') }}
+              </span>
+              <span
+                v-else-if="(gpuManagement?.allocatedDeviceIds.length || 0) > 0"
+                class="badge-success px-2.5 py-0.5 rounded-xl text-xs font-medium"
+              >
+                {{ t('instanceConfig.gpu.enabledBadge', { count: gpuManagement?.allocatedDeviceIds.length || 0 }) }}
+              </span>
+              <span
+                v-else
+                class="badge-muted px-2.5 py-0.5 rounded-xl text-xs font-medium"
+              >
+                {{ t('instanceConfig.gpu.disabledBadge') }}
+              </span>
+            </div>
+            <p class="text-xs text-themed-muted mt-1">
+              {{ t('instanceConfig.gpu.subtitle') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn-secondary btn-sm"
+            :disabled="gpuLoading || gpuSaving"
+            @click="loadGpuManagement"
+          >
+            {{ t('gpu.refresh') }}
+          </button>
+        </div>
+
+        <div v-if="gpuLoading && !gpuManagement" class="text-xs text-themed-muted py-2">
+          {{ t('instanceConfig.gpu.loading') }}
+        </div>
+
+        <template v-else-if="gpuManagement">
+          <div
+            v-if="hasStaleOrUnmanagedLiveGpu"
+            class="rounded-xl border border-warning/30 bg-warning/5 p-3 text-xs text-themed space-y-1.5"
+          >
+            <p class="font-medium text-warning">{{ t('instanceConfig.gpu.staleLiveWarning') }}</p>
+            <div v-if="gpuManagement.liveGpuDevices?.length" class="flex flex-wrap items-center gap-2 text-themed-secondary">
+              <span>{{ t('instanceConfig.gpu.liveDevicesLabel') }}</span>
+              <span
+                v-for="dev in gpuManagement.liveGpuDevices"
+                :key="dev.name"
+                class="inline-flex items-center gap-1 rounded-lg bg-[var(--bg-surface)] px-2 py-0.5 font-mono text-xs border border-[var(--border-default)]"
+              >
+                <span>{{ dev.name }}</span>
+                <span v-if="dev.pci">· {{ dev.pci }}</span>
+                <span :class="dev.hostMatched ? 'text-success' : 'text-error'">
+                  ({{ dev.hostMatched ? t('instanceConfig.gpu.hostMatched') : t('instanceConfig.gpu.hostMissing') }})
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <p v-if="gpuManagement.liveSyncError" class="text-xs text-warning">
+            {{ t('instanceConfig.gpu.liveSyncError', { error: gpuManagement.liveSyncError }) }}
+          </p>
+
+          <p v-if="!gpuManagement.supported" class="text-xs text-warning">
+            {{ t('gpu.containerOnly') }}
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label
+              class="flex items-start gap-3 rounded-xl border p-3.5 cursor-pointer transition-colors"
+              :class="!draftGpuShared ? 'border-accent-primary bg-accent-primary/5' : 'border-[var(--border-default)] hover:bg-[var(--bg-surface-soft)]'"
+            >
+              <input
+                v-model="draftGpuShared"
+                type="radio"
+                :value="false"
+                :disabled="gpuSaving"
+                class="mt-1"
+              />
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-themed">{{ t('instanceConfig.gpu.modeDisable') }}</div>
+                <div class="text-xs text-themed-muted mt-0.5">{{ t('instanceConfig.gpu.modeDisableDesc') }}</div>
+              </div>
+            </label>
+
+            <label
+              class="flex items-start gap-3 rounded-xl border p-3.5 transition-colors"
+              :class="[
+                gpuManagement.supported ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed',
+                draftGpuShared ? 'border-accent-primary bg-accent-primary/5' : 'border-[var(--border-default)] hover:bg-[var(--bg-surface-soft)]'
+              ]"
+            >
+              <input
+                v-model="draftGpuShared"
+                type="radio"
+                :value="true"
+                :disabled="gpuSaving || !gpuManagement.supported"
+                class="mt-1"
+              />
+              <div class="min-w-0">
+                <div class="text-sm font-medium text-themed">{{ t('instanceConfig.gpu.modeEnable') }}</div>
+                <div class="text-xs text-themed-muted mt-0.5">{{ t('instanceConfig.gpu.modeEnableDesc') }}</div>
+              </div>
+            </label>
+          </div>
+
+          <div v-if="draftGpuShared" class="space-y-3">
+            <div v-if="!gpuManagement.hostGpus.length" class="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface-soft)] p-3 text-xs text-themed-muted">
+              {{ t('instanceConfig.gpu.noHostGpus') }}
+            </div>
+            <div v-else class="space-y-2">
+              <label
+                v-for="card in gpuManagement.hostGpus"
+                :key="card.id"
+                class="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 transition-colors"
+                :class="[
+                  selectedGpuIds.includes(card.id) ? 'border-accent-primary bg-accent-primary/5' : 'border-[var(--border-default)]',
+                  isGpuCardSelectable(card) ? 'cursor-pointer hover:bg-[var(--bg-surface-soft)]' : 'opacity-60 cursor-not-allowed'
+                ]"
+              >
+                <div class="flex items-start gap-3 min-w-0">
+                  <input
+                    type="checkbox"
+                    :checked="selectedGpuIds.includes(card.id)"
+                    :disabled="gpuSaving || !isGpuCardSelectable(card)"
+                    class="mt-1"
+                    @change="toggleGpuCard(card.id)"
+                  />
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-themed break-words">
+                      {{ card.name }} · {{ Math.round(card.memoryTotalMiB / 1024 * 10) / 10 }} GiB
+                    </div>
+                    <div class="font-mono text-xs text-themed-muted break-all">
+                      {{ card.pciAddress }} · {{ card.uuid }}
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                  <span class="text-themed-secondary">
+                    {{ t('gpu.seats') }}: {{ card.usedInstances }} / {{ card.maxInstances }}
+                  </span>
+                  <span
+                    :class="gpuCardDisabledReason(card) ? 'badge-warning' : 'badge-success'"
+                    class="px-2 py-0.5 rounded-lg"
+                  >
+                    {{ gpuCardDisabledReason(card) || t('gpu.ready') }}
+                  </span>
+                </div>
+              </label>
+              <p class="text-xs text-themed-muted">{{ t('gpu.notice') }} {{ t('gpu.bundleNotice') }}</p>
+            </div>
+          </div>
+
+          <p v-if="gpuRestartRequired" class="rounded-xl border border-warning/30 bg-warning/5 p-3 text-xs text-warning">
+            {{ t('instanceConfig.gpu.restartNotice') }}
+          </p>
+          <p v-else-if="normalizedInstanceStatus === 'running'" class="text-xs text-themed-muted">
+            {{ t('instanceConfig.gpu.runningNotice') }}
+          </p>
+
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <p v-if="draftGpuShared && selectedGpuIds.length === 0" class="text-xs text-warning">
+              {{ t('instanceConfig.gpu.selectRequired') }}
+            </p>
+            <span v-else></span>
+            <button
+              type="button"
+              class="btn-primary btn-sm"
+              :disabled="gpuSaving || !canModifyInstanceGpuState || !hasGpuDraftChanges || (draftGpuShared && selectedGpuIds.length === 0)"
+              @click="saveGpuSharing"
+            >
+              {{
+                gpuSaving
+                  ? t('instanceConfig.gpu.saving')
+                  : (!draftGpuShared && hasAnyGpuState ? t('instanceConfig.gpu.clearButton') : t('instanceConfig.gpu.saveButton'))
+              }}
+            </button>
+          </div>
+        </template>
+      </div>
 
       <!-- SWAP Section -->
       <div v-if="config.swap.available || config.swap.enabled" class="card shadow-pop p-6">
