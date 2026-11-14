@@ -407,7 +407,6 @@ function buildHeartbeatReport(body: AgentHeartbeatBody, previous: unknown): Reco
   const resources: Record<string, unknown> = { ...previousResources, ...incomingResources }
   if (incomingResources.storageAvailable === false && previousResources.storage) {
     resources.storage = previousResources.storage
-    resources.storageAvailable = previousResources.storageAvailable ?? false
   }
   return {
     runtime: body.runtime ?? {},
