@@ -1555,13 +1555,13 @@ async function confirmBatchDestroy(): Promise<void> {
                   </button>
                 </div>
               </th>
-              <th class="w-[22%] px-3 py-3">{{ $t('instance.name') }}</th>
-              <th class="w-[11%] px-3 py-3 whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
-              <th class="w-[15%] px-3 py-3 whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
-              <th class="w-[16%] px-3 py-3 whitespace-nowrap">{{ $t('instance.config') }}</th>
-              <th class="w-[14%] px-3 py-3 whitespace-nowrap">{{ $t('instance.trafficLabel') }}</th>
-              <th class="w-[11%] px-3 py-3 whitespace-nowrap">{{ $t('instance.expireAt') }}</th>
-              <th class="w-[7%] px-2 py-3 text-center whitespace-nowrap">
+              <th class="w-[19%] px-3 py-3">{{ $t('instance.name') }}</th>
+              <th class="w-[10%] px-3 py-3 whitespace-nowrap">{{ $t('instance.statusLabel') }}</th>
+              <th class="w-[14%] px-3 py-3 whitespace-nowrap">{{ $t('instance.publicIp') }}</th>
+              <th class="w-[15%] px-3 py-3 whitespace-nowrap">{{ $t('instance.config') }}</th>
+              <th class="w-[18%] px-3 py-3 whitespace-nowrap">{{ $t('instance.trafficLabel') }}</th>
+              <th class="w-[10%] px-3 py-3 whitespace-nowrap">{{ $t('instance.expireAt') }}</th>
+              <th class="w-[10%] px-3 py-3 text-right whitespace-nowrap">
                 <span class="sr-only">{{ $t('common.actions') }}</span>
               </th>
             </tr>
@@ -1593,7 +1593,7 @@ async function confirmBatchDestroy(): Promise<void> {
               </td>
 
               <!-- Name & OS -->
-              <td class="w-[22%] px-3 py-3">
+              <td class="w-[19%] px-3 py-3">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 overflow-hidden bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
                     <InstanceDisplayIcon
@@ -1629,7 +1629,7 @@ async function confirmBatchDestroy(): Promise<void> {
               </td>
 
               <!-- Status -->
-              <td class="w-[11%] px-3 py-3 whitespace-nowrap">
+              <td class="w-[10%] px-3 py-3 whitespace-nowrap">
                 <Badge
                   :variant="getStatusBadgeVariant(instance.status)"
                   size="sm"
@@ -1641,7 +1641,7 @@ async function confirmBatchDestroy(): Promise<void> {
               </td>
 
               <!-- IP -->
-              <td class="w-[15%] px-3 py-3 font-mono text-xs">
+              <td class="w-[14%] px-3 py-3 font-mono text-xs">
                 <div class="space-y-0.5 min-w-0">
                   <div class="flex items-center gap-1.5 min-w-0 text-[var(--text-primary)]">
                     <span class="truncate" :title="getPublicIp(instance)">{{ getPublicIp(instance) }}</span>
@@ -1662,7 +1662,7 @@ async function confirmBatchDestroy(): Promise<void> {
               </td>
 
               <!-- Config -->
-              <td class="w-[16%] px-3 py-3 text-xs">
+              <td class="w-[15%] px-3 py-3 text-xs">
                 <div class="space-y-0.5 min-w-0">
                   <div class="font-medium text-[var(--text-primary)] truncate" :title="getInstancePlanName(instance)">
                     {{ getInstancePlanName(instance) }}
@@ -1674,26 +1674,26 @@ async function confirmBatchDestroy(): Promise<void> {
               </td>
 
               <!-- Traffic -->
-              <td class="w-[14%] px-3 py-3 text-xs">
+              <td class="w-[18%] px-3 py-3 text-xs">
                 <div class="space-y-1 min-w-0">
-                  <div class="flex items-center justify-between text-[11px] font-mono">
-                    <span class="text-[var(--text-secondary)] truncate">{{ getInstanceTrafficUsage(instance) }}</span>
-                    <span v-if="getInstanceTrafficPercent(instance) !== null" class="text-[var(--text-tertiary)] ml-1">
+                  <div class="flex items-center justify-between gap-1.5 text-[11px] font-mono">
+                    <span class="text-[var(--text-secondary)] truncate" :title="getInstanceTrafficUsage(instance)">{{ getInstanceTrafficUsage(instance) }}</span>
+                    <span v-if="getInstanceTrafficPercent(instance) !== null" class="text-[var(--text-tertiary)] shrink-0">
                       {{ getInstanceTrafficPercent(instance) }}%
                     </span>
                   </div>
-                  <div class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
+                  <div v-if="getInstanceTrafficPercent(instance) !== null" class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-surface-soft)] border border-[var(--border-color)]">
                     <div
                       class="h-full rounded-full transition-all duration-300"
                       :class="getInstanceTrafficBarColor(instance)"
-                      :style="{ width: `${getInstanceTrafficPercent(instance) ?? 100}%` }"
+                      :style="{ width: `${getInstanceTrafficPercent(instance)}%` }"
                     ></div>
                   </div>
                 </div>
               </td>
 
               <!-- Expiry -->
-              <td class="w-[11%] px-3 py-3 text-xs">
+              <td class="w-[10%] px-3 py-3 text-xs">
                 <div class="space-y-0.5 min-w-0" :title="getInstanceExpiryInfo(instance).title || ''">
                   <div class="font-medium text-[11px]" :class="getInstanceExpiryInfo(instance).className">
                     {{ getInstanceExpiryInfo(instance).remainingText }}
@@ -1708,8 +1708,8 @@ async function confirmBatchDestroy(): Promise<void> {
               </td>
 
               <!-- Actions -->
-              <td class="w-[7%] px-2 py-3 text-center" @click.stop>
-                <div class="inline-flex items-center justify-center gap-1">
+              <td class="w-[10%] px-3 py-3 text-right" @click.stop>
+                <div class="inline-flex items-center justify-end gap-1">
                   <button
                     v-if="canStartInstance(instance)"
                     type="button"
