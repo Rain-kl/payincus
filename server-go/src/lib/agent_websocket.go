@@ -34,7 +34,10 @@ type AgentWebSocket struct {
 	*WebSocket
 }
 
-var _ TunnelSocket = (*AgentWebSocket)(nil)
+var (
+	_ TunnelSocket     = (*AgentWebSocket)(nil)
+	_ TunnelPingSocket = (*AgentWebSocket)(nil)
+)
 
 // IsAgentWebSocketUpgrade mirrors the check @fastify/websocket applies: an
 // `Upgrade: websocket` request with `Connection` containing the upgrade token.
@@ -66,6 +69,11 @@ func (s *AgentWebSocket) TunnelSend(data []byte) error {
 // TunnelClose mirrors `ws.close(code, reason)`.
 func (s *AgentWebSocket) TunnelClose(code int, reason string) {
 	s.Close(code, reason)
+}
+
+// TunnelPing sends a WebSocket ping control frame for reverse-tunnel probing.
+func (s *AgentWebSocket) TunnelPing() error {
+	return s.Ping()
 }
 
 // ReadBinary returns the payload of the next binary/text message, answering

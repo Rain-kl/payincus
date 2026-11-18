@@ -227,6 +227,12 @@ func GetInstance(ctx context.Context, client *IncusClient, name string) (*IncusI
 	return &instance, nil
 }
 
+// IncusInstanceFetchRaw exports incusInstanceFetchRaw for routes/services that
+// modify and PUT back the full raw Incus instance object.
+func IncusInstanceFetchRaw(ctx context.Context, client *IncusClient, name string) (map[string]any, error) {
+	return incusInstanceFetchRaw(ctx, client, name)
+}
+
 // incusInstanceFetchRaw mirrors `getInstance(client, name)` when the caller spreads
 // the whole object back into a PUT. A typed projection would silently drop every
 // field it does not know (description, expanded_config, ...), and Incus PUT is a
@@ -327,27 +333,41 @@ func IncusInstanceStart(ctx context.Context, client *IncusClient, name string) (
 
 	hostID := int32(client.options.HostID)
 	if hostID != 0 {
-		instanceID, found, err := incusInstanceFindGPUInstance(ctx, hostID, name)
+		instanceID, hasGPU, found, err := incusInstanceFindGPUInstance(ctx, hostID, name)
 		if err != nil {
 			return nil, err
 		}
 		if found {
-			pci, err := db.GpusGetInstancePCIs(ctx, instanceID, hostID)
-			if err != nil {
-				return nil, err
-			}
-			live, err := incusInstanceFetchRaw(ctx, client, name)
-			if err != nil {
-				return nil, err
-			}
-			// The TypeScript passes `pci!`; an empty list therefore also fails, just
-			// with the GPU validation message instead of a undefined.length TypeError.
-			if err := ApplyGpuDevice(live, pci); err != nil {
-				return nil, err
-			}
-			if _, err := client.Request(ctx, http.MethodPut, "/1.0/instances/"+name, live,
-				incusInstanceOperationTimeout, live); err != nil {
-				return nil, err
+			escaped := url.PathEscape(name)
+			if hasGPU {
+				pci, err := db.GpusGetInstancePCIs(ctx, instanceID, hostID)
+				if err != nil {
+					return nil, err
+				}
+				live, err := incusInstanceFetchRaw(ctx, client, name)
+				if err != nil {
+					return nil, err
+				}
+				// The TypeScript passes `pci!`; an empty list therefore also fails, just
+				// with the GPU validation message instead of a undefined.length TypeError.
+				if err := ApplyGpuDevice(live, pci); err != nil {
+					return nil, err
+				}
+				if _, err := client.Request(ctx, http.MethodPut, "/1.0/instances/"+escaped, live,
+					incusInstanceOperationTimeout, live); err != nil {
+					return nil, err
+				}
+			} else {
+				live, err := incusInstanceFetchRaw(ctx, client, name)
+				if err != nil {
+					return nil, err
+				}
+				if ClearGpuDevices(live) {
+					if _, err := client.Request(ctx, http.MethodPut, "/1.0/instances/"+escaped, live,
+						incusInstanceOperationTimeout, live); err != nil {
+						return nil, err
+					}
+				}
 			}
 		}
 	}
@@ -1854,20 +1874,25 @@ func IncusInstanceCleanup(ctx context.Context, client *IncusClient, instanceName
 }
 
 // incusInstanceFindGPUInstance mirrors
-// `prisma.instance.findFirst({ where: { incusId, hostId, status: { not: 'deleted' },
-// gpuDeviceId: { not: null } }, select: { id: true } })`.
-func incusInstanceFindGPUInstance(ctx context.Context, hostID int32, name string) (int32, bool, error) {
+// `prisma.instance.findFirst({ where: { incusId, hostId, status: { not: 'deleted' } },
+// select: { id: true, gpuDeviceId: true, gpuAllocations: { select: { gpuDeviceId: true }, take: 1 } } })`.
+func incusInstanceFindGPUInstance(ctx context.Context, hostID int32, name string) (int32, bool, bool, error) {
 	if db.DB == nil {
-		return 0, false, errors.New("数据库未初始化")
+		return 0, false, false, errors.New("数据库未初始化")
 	}
-	var id int32
-	err := db.DB.WithContext(ctx).Raw(`SELECT id FROM instances
-		WHERE incus_id = ? AND host_id = ? AND status <> 'deleted' AND gpu_device_id IS NOT NULL
-		LIMIT 1`, name, hostID).Scan(&id).Error
+	var row struct {
+		ID     int32
+		HasGPU bool `gorm:"column:has_gpu"`
+	}
+	err := db.DB.WithContext(ctx).Raw(`SELECT i.id,
+		(i.gpu_device_id IS NOT NULL OR EXISTS (SELECT 1 FROM instance_gpu_allocations a WHERE a.instance_id = i.id)) AS has_gpu
+		FROM instances i
+		WHERE i.incus_id = ? AND i.host_id = ? AND i.status <> 'deleted'
+		LIMIT 1`, name, hostID).Scan(&row).Error
 	if err != nil {
-		return 0, false, err
+		return 0, false, false, err
 	}
-	return id, id != 0, nil
+	return row.ID, row.HasGPU, row.ID != 0, nil
 }
 
 // incusInstanceReleaseFailedGpuByName mirrors releaseFailedGpuByName: a failed or

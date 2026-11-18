@@ -219,7 +219,7 @@ func agentSignedHeaders(t *testing.T, secret, agentID, method, path string, body
 		"X-Incus-Nonce":       nonce,
 		"X-Incus-Body-Sha256": bodyHash,
 		"X-Incus-Signature":   signature,
-		"Content-Type":          "application/json",
+		"Content-Type":        "application/json",
 	}
 }
 
@@ -947,6 +947,7 @@ func agentFullHeartbeatPayload() map[string]any {
 		"instances":    map[string]any{"available": true, "items": []any{}},
 		"resources": map[string]any{
 			"storageAvailable": true,
+			"nvidiaGpu":        map[string]any{"status": "unavailable"},
 			"network": map[string]any{
 				"cards": []any{
 					map[string]any{"addresses": []any{
@@ -1041,7 +1042,7 @@ func TestAgentHeartbeatPreservesStorageOnIncompleteCollection(t *testing.T) {
 	agentResetCaddyState()
 	capture := &agentHeartbeatCapture{}
 	payload := agentFullHeartbeatPayload()
-	delete(payload, "storage")
+	payload["storage"] = map[string]any{"available": false, "collectionComplete": false}
 	resources := payload["resources"].(map[string]any)
 	resources["storageAvailable"] = false
 	delete(resources, "network")
@@ -1658,5 +1659,76 @@ func TestAgentCaddyRequestSeams(t *testing.T) {
 	}
 	if !agentCaddyHas(agentCaddyState.install, 123) || !agentCaddyHas(agentCaddyState.uninstall, 123) {
 		t.Fatal("caddy seams did not record the requests")
+	}
+}
+
+func TestAgentBuildHeartbeatReportAndLightweightBehavior(t *testing.T) {
+	// 1. Merges previousResources baseline beneath incoming resources and keeps
+	// incoming storageAvailable=false (628a9b5).
+	report := agentBuildHeartbeatReport(
+		&agentHeartbeatBody{Raw: map[string]any{
+			"resources": map[string]any{"cpuUsage": 12.5, "storageAvailable": false},
+		}},
+		map[string]any{
+			"resources": map[string]any{
+				"cpu":              map[string]any{"cores": 16},
+				"storage":          map[string]any{"total": 500},
+				"storageAvailable": true,
+			},
+		},
+	)
+	res, _ := report["resources"].(map[string]any)
+	if res["cpu"] == nil || res["storage"] == nil || res["cpuUsage"] != 12.5 {
+		t.Fatalf("merged resources = %#v", res)
+	}
+	if res["storageAvailable"] != false {
+		t.Fatalf("storageAvailable = %v, want false", res["storageAvailable"])
+	}
+
+	// 2. Lightweight heartbeat without storage/nvidiaGpu skips storage & GPU calls,
+	// persists nodeSecurity.state, and triggers SyncDesiredPolicy when policy mismatches.
+	agentResetCaddyState()
+	capture := &agentHeartbeatCapture{}
+	deps := agentFakeHeartbeatDeps(capture)
+	var storageCalled, gpuCalled, policySyncCalled bool
+	deps.ProcessStorage = func(context.Context, int32, any, time.Time) (bool, error) {
+		storageCalled = true
+		return true, nil
+	}
+	deps.SyncGPU = func(context.Context, int32, any) error {
+		gpuCalled = true
+		return nil
+	}
+	deps.RecordSecurityState = func(_ context.Context, _ int32, rawState any) (bool, error) {
+		st, _ := rawState.(map[string]any)
+		if st["enabled"] != false {
+			t.Fatalf("unexpected rawState: %#v", rawState)
+		}
+		return true, nil
+	}
+	deps.SyncDesiredPolicy = func(hostID int32) {
+		if hostID == 42 {
+			policySyncCalled = true
+		}
+	}
+
+	payload := map[string]any{
+		"nodeApi":            "incus_node_v1",
+		"version":            "1.4.1",
+		"heartbeatRequestId": "req-lightweight",
+		"incus":              map[string]any{"available": true},
+		"instances":          map[string]any{"available": true, "items": []any{}},
+		"nodeSecurity":       map[string]any{"state": map[string]any{"enabled": false, "locked": false, "revision": float64(2)}},
+	}
+	c, recorder := agentHeartbeatTestContext(t, payload)
+	agentHeartbeatStateMachine(c, agentTestAgent(), agentHeartbeatBody{Raw: payload}, deps)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d (%s)", recorder.Code, recorder.Body.String())
+	}
+	if storageCalled || gpuCalled || !policySyncCalled {
+		t.Fatalf("storageCalled=%v gpuCalled=%v policySyncCalled=%v", storageCalled, gpuCalled, policySyncCalled)
+	}
+	if len(capture.completed) != 1 || capture.completed[0] != "" {
+		t.Fatalf("expected clean completion without storage payload, got %#v", capture.completed)
 	}
 }

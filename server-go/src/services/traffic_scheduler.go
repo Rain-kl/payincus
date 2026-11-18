@@ -42,7 +42,16 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/db"
 	"github.com/rain-kl/payincus/server-go/src/lib"
 	"github.com/rain-kl/payincus/server-go/src/models"
+	"github.com/rain-kl/payincus/server-go/src/workers"
 )
+
+func init() {
+	workers.SetTrafficCollector(func(ctx context.Context, instanceID int32) (bool, string) {
+		result := CollectTrafficForRunningInstance(ctx, instanceID, lib.LockOptions{})
+		return result.Success, result.Error
+	})
+	workers.SetTrafficStateReconciler(ReconcileTrafficStateForInstanceIDs)
+}
 
 // TrafficScheduler tuning, mirroring the TypeScript constants.
 const (

@@ -69,6 +69,7 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/middleware"
 	"github.com/rain-kl/payincus/server-go/src/models"
 	"github.com/rain-kl/payincus/server-go/src/services"
+	"github.com/rain-kl/payincus/server-go/src/workers"
 )
 
 const (
@@ -1537,6 +1538,7 @@ func instancesListPage(ctx context.Context, options instancesListQuery, statuses
 			"expires_at":              expiresAt,
 			"autoRenew":               row.AutoRenew,
 			"iconBadgeId":             row.IconBadgeID,
+			"packageId":               instancesNonZeroInt32Ptr(row.PackageID),
 			"packageName":             row.PackageName,
 			"packagePlanId":           row.PackagePlanID,
 			"billingPrice":            row.BillingPrice,
@@ -4612,41 +4614,42 @@ func instancesDetailHandler(c *gin.Context) {
 			"country_code":  hostCountry,
 			"storageDriver": instance.HostStorageDriver,
 		},
-		"hostCountryCode":       hostCountry,
-		"network_mode":          instance.NetworkMode,
-		"instance_type":         instanceType,
-		"instanceType":          instanceType,
-		"iconBadgeId":           instance.IconBadgeID,
-		"ssh_port":              instance.SSHPort,
-		"port_limit":            instance.PortLimit,
-		"snapshot_limit":        instance.SnapshotLimit,
-		"backup_limit":          instance.BackupLimit,
-		"monthlyTrafficLimit":   instance.MonthlyTrafficLimit,
-		"remaining_quota":       remainingQuota,
-		"quota_usage":           quotaUsage,
-		"effective_quota_limit": effectiveQuotaLimit,
-		"port_mappings":         portMappingViews,
-		"created_at":            instance.CreatedAt,
-		"package_id":            instance.PackageID,
-		"packageName":           packageName(pkg),
-		"packagePlanId":         instance.PackagePlanID,
-		"planId":                instance.PackagePlanID,
-		"planName":              planName,
-		"planPrice":             planPrice,
-		"billingPrice":          instance.BillingPrice,
-		"trafficResetPrice":     trafficResetPrice,
-		"billingCycle":          billingCycle,
-		"nextRenewPrice":        nextRenewPrice,
-		"affDiscountRate":       affDiscountRate,
-		"hasAffBinding":         hasAffBinding,
-		"promoBinding":          instancesPromoBindingView(activePromoBinding, now),
-		"limitsIngress":         instancesFirstNonNil(instance.LimitsIngress, packageLimitsIngress(pkg)),
-		"limitsEgress":          instancesFirstNonNil(instance.LimitsEgress, packageLimitsEgress(pkg)),
-		"expires_at":            instance.ExpiresAt,
-		"suspended_at":          instance.SuspendedAt,
-		"suspended_by":          instance.SuspendedBy,
-		"suspend_reason":        instance.SuspendReason,
-		"autoRenew":             instance.AutoRenew,
+		"hostCountryCode":         hostCountry,
+		"network_mode":            instance.NetworkMode,
+		"instance_type":           instanceType,
+		"instanceType":            instanceType,
+		"iconBadgeId":             instance.IconBadgeID,
+		"ssh_port":                instance.SSHPort,
+		"port_limit":              instance.PortLimit,
+		"snapshot_limit":          instance.SnapshotLimit,
+		"backup_limit":            instance.BackupLimit,
+		"monthlyTrafficLimit":     instance.MonthlyTrafficLimit,
+		"remaining_quota":         remainingQuota,
+		"quota_usage":             quotaUsage,
+		"effective_quota_limit":   effectiveQuotaLimit,
+		"port_mappings":           portMappingViews,
+		"created_at":              instance.CreatedAt,
+		"package_id":              instance.PackageID,
+		"packageName":             packageName(pkg),
+		"allow_instance_deletion": pkg == nil || pkg.AllowInstanceDeletion,
+		"packagePlanId":           instance.PackagePlanID,
+		"planId":                  instance.PackagePlanID,
+		"planName":                planName,
+		"planPrice":               planPrice,
+		"billingPrice":            instance.BillingPrice,
+		"trafficResetPrice":       trafficResetPrice,
+		"billingCycle":            billingCycle,
+		"nextRenewPrice":          nextRenewPrice,
+		"affDiscountRate":         affDiscountRate,
+		"hasAffBinding":           hasAffBinding,
+		"promoBinding":            instancesPromoBindingView(activePromoBinding, now),
+		"limitsIngress":           instancesFirstNonNil(instance.LimitsIngress, packageLimitsIngress(pkg)),
+		"limitsEgress":            instancesFirstNonNil(instance.LimitsEgress, packageLimitsEgress(pkg)),
+		"expires_at":              instance.ExpiresAt,
+		"suspended_at":            instance.SuspendedAt,
+		"suspended_by":            instance.SuspendedBy,
+		"suspend_reason":          instance.SuspendReason,
+		"autoRenew":               instance.AutoRenew,
 	}
 	if host != nil {
 		response["hostAnnouncement"] = host.Announcement
@@ -8786,6 +8789,59 @@ func RegisterInstances(r *gin.Engine) {
 	group.POST("/:id/reassign-ipv6", middleware.AuthenticateUser(), instancesReassignIPv6Handler)
 }
 
+func instancesNonZeroInt32Ptr(value *int32) *int32 {
+	if value == nil || *value == 0 {
+		return nil
+	}
+	return value
+}
+
 func init() {
 	Register(RegisterInstances)
+	workers.SetCreateTaskExecutor(func(ctx context.Context, instanceID, hostID int32, payload workers.CreateTaskPayload) error {
+		host, err := db.HostsGetByID(ctx, hostID)
+		if err != nil {
+			return err
+		}
+		if host == nil {
+			return errors.New("节点不存在，创建任务无法继续")
+		}
+		rawConfig, err := json.Marshal(payload.Config)
+		if err != nil {
+			return err
+		}
+		var config instancesCreateConfig
+		if err := json.Unmarshal(rawConfig, &config); err != nil {
+			return err
+		}
+		tunnelEnabled := host.TunnelEnabled
+		targetHost := host.TargetHost
+		targetPort := host.TargetPort
+		hostSelection := &db.HostsSelectionRecord{
+			ID:                  host.ID,
+			Name:                host.Name,
+			URL:                 host.URL,
+			Location:            host.Location,
+			CountryCode:         host.CountryCode,
+			Status:              host.Status,
+			CertPath:            host.CertPath,
+			KeyPath:             host.KeyPath,
+			NATPublicIP:         host.NATPublicIP,
+			NATPortStart:        host.NATPortStart,
+			NATPortEnd:          host.NATPortEnd,
+			IPv6Mode:            host.IPv6Mode,
+			IPv6Subnet:          host.IPv6Subnet,
+			IPv6Gateway:         host.IPv6Gateway,
+			IPv6ParentInterface: host.IPv6ParentInterface,
+			InstanceType:        host.InstanceType,
+			TunnelEnabled:       &tunnelEnabled,
+			TargetHost:          &targetHost,
+			TargetPort:          &targetPort,
+		}
+		return instancesCreateInstanceAsync(ctx, instanceID, hostSelection, config, payload.UserID, instancesResources{
+			CPU:    payload.Resources.CPU,
+			Memory: payload.Resources.Memory,
+			Disk:   payload.Resources.Disk,
+		})
+	})
 }

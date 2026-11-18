@@ -465,8 +465,12 @@ func UpdateSystemConfigs(ctx context.Context, configs []SystemConfigUpdate) erro
 	if len(updates) > 0 {
 		err := DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			for _, update := range updates {
-				if err := tx.Model(&models.SystemConfig{}).Where("key = ?", update.Key).Update("value", update.Value).Error; err != nil {
-					return err
+				result := tx.Model(&models.SystemConfig{}).Where("key = ?", update.Key).Update("value", update.Value)
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 0 {
+					return fmt.Errorf("system_config key %q not found", update.Key)
 				}
 			}
 			return nil

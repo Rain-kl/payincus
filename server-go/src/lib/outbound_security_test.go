@@ -322,7 +322,7 @@ func TestAssertSafeStorageTarget(t *testing.T) {
 
 func TestRevalidatingDialContextRejectsPrivateLiteral(t *testing.T) {
 	ctx := context.Background()
-	if _, err := safeOutboundDialContext(ctx, "tcp", "127.0.0.1:80"); err == nil {
+	if _, err := SafeOutboundDialContext(ctx, "tcp", "127.0.0.1:80"); err == nil {
 		t.Fatal("dialing a loopback IP literal must be refused")
 	}
 }

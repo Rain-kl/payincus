@@ -43,13 +43,15 @@ const (
 	operationTaskLogMaxRunes = 8000
 )
 
-// OperationTaskKind mirrors the `'create' | 'destroy' | 'node_recover'` union.
+// OperationTaskKind mirrors the `'create' | 'destroy' | 'node_recover' | 'instance_export' | 'instance_import'` union.
 type OperationTaskKind string
 
 const (
-	OperationTaskKindCreate      OperationTaskKind = "create"
-	OperationTaskKindDestroy     OperationTaskKind = "destroy"
-	OperationTaskKindNodeRecover OperationTaskKind = "node_recover"
+	OperationTaskKindCreate         OperationTaskKind = "create"
+	OperationTaskKindDestroy        OperationTaskKind = "destroy"
+	OperationTaskKindNodeRecover    OperationTaskKind = "node_recover"
+	OperationTaskKindInstanceExport OperationTaskKind = "instance_export"
+	OperationTaskKindInstanceImport OperationTaskKind = "instance_import"
 )
 
 // OperationTaskStatus mirrors the operation_tasks.status values.
@@ -449,6 +451,10 @@ func RunOperationTask(
 		task.enqueue("开始销毁实例", "info", "server")
 	case OperationTaskKindNodeRecover:
 		task.enqueue("开始恢复节点原运行状态", "info", "server")
+	case OperationTaskKindInstanceExport:
+		task.enqueue("开始导出节点实例备份", "info", "server")
+	case OperationTaskKindInstanceImport:
+		task.enqueue("开始导入节点实例", "info", "server")
 	}
 
 	collecting := false

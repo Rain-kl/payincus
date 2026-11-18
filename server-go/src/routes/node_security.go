@@ -439,7 +439,8 @@ func nodeSecurityIdentityHandler(c *gin.Context) {
 	}
 
 	fingerprint, _ := body.Values["fingerprint"].(string)
-	if err := db.UpsertNodeSecurityFingerprint(ctx, hostID, fingerprint); err != nil {
+	desiredEnabled, err := db.UpsertNodeSecurityIdentity(ctx, hostID, fingerprint)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
@@ -449,6 +450,11 @@ func nodeSecurityIdentityHandler(c *gin.Context) {
 	db.CreateLog(ctx, &userID, nodeSecurityLogModule, "node.identity",
 		fmt.Sprintf("节点 #%d 更新人工核对的服务端证书指纹", hostID),
 		db.LogResultSuccess, db.CreateLogOptions{})
+
+	lib.ClearPolicySyncCooldown(hostID)
+	if desiredEnabled != nil {
+		go lib.SyncDesiredSecurityPolicy(context.Background(), hostID, true)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"fingerprint": fingerprint})
 }
@@ -527,9 +533,10 @@ func nodeSecurityLiveState(ctx context.Context, hostID int32) (json.RawMessage, 
 	if err != nil {
 		return nil, err
 	}
-	// `recordReport(hostId, { state, events: [] })` validates the payload; an
-	// invalid one lands in the offline branch, exactly like the TypeScript.
-	if _, err := lib.RecordReport(ctx, hostID, map[string]any{"state": decoded, "events": []any{}}); err != nil {
+	// `recordReport(hostId, { state, events: [] }, { authoritative: true })`
+	// validates the payload; an invalid one lands in the offline branch,
+	// exactly like the TypeScript.
+	if _, err := lib.RecordReportWithOptions(ctx, hostID, map[string]any{"state": decoded, "events": []any{}}, db.NodeSecurityRecordReportOptions{Authoritative: true}); err != nil {
 		return nil, err
 	}
 	return raw, nil
@@ -585,7 +592,16 @@ func nodeSecurityActionHandler(c *gin.Context, action string) {
 		c.JSON(http.StatusConflict, gin.H{"error": lib.NodeErrorDetail(err, nodeSecurityActionFallback, payload)})
 		return
 	}
-	if _, err := lib.RecordReport(ctx, hostID, map[string]any{"state": decoded, "events": []any{}}); err != nil {
+	if action == "policy" {
+		lib.ClearPolicySyncCooldown(hostID)
+	}
+	reportOpts := db.NodeSecurityRecordReportOptions{Authoritative: true}
+	if action == "policy" {
+		if enabled, ok := payload["enabled"].(bool); ok {
+			reportOpts.DesiredEnabled = &enabled
+		}
+	}
+	if _, err := lib.RecordReportWithOptions(ctx, hostID, map[string]any{"state": decoded, "events": []any{}}, reportOpts); err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": lib.NodeErrorDetail(err, nodeSecurityActionFallback, payload)})
 		return
 	}
@@ -658,7 +674,7 @@ func nodeSecurityRecoverHandler(
 		if err != nil {
 			return err
 		}
-		if _, err := lib.RecordReport(taskCtx, hostID, map[string]any{"state": decodedState, "events": []any{}}); err != nil {
+		if _, err := lib.RecordReportWithOptions(taskCtx, hostID, map[string]any{"state": decodedState, "events": []any{}}, db.NodeSecurityRecordReportOptions{Authoritative: true}); err != nil {
 			return err
 		}
 
@@ -693,7 +709,7 @@ func nodeSecurityRecoverHandler(
 			nodeSecurityRefreshAfterRecovery(taskCtx, client, hostID)
 			return err
 		}
-		if _, err := lib.RecordReport(taskCtx, hostID, map[string]any{"state": resultState, "events": []any{}}); err != nil {
+		if _, err := lib.RecordReportWithOptions(taskCtx, hostID, map[string]any{"state": resultState, "events": []any{}}, db.NodeSecurityRecordReportOptions{Authoritative: true}); err != nil {
 			nodeSecurityRefreshAfterRecovery(taskCtx, client, hostID)
 			return err
 		}
@@ -751,7 +767,7 @@ func nodeSecurityRefreshAfterRecovery(ctx context.Context, client *nodeSecurityN
 		lib.TaskLog(ctx, "warn", "无法刷新节点状态，待连接恢复后重新核验")
 		return
 	}
-	if _, err := lib.RecordReport(ctx, hostID, map[string]any{"state": decoded, "events": []any{}}); err != nil {
+	if _, err := lib.RecordReportWithOptions(ctx, hostID, map[string]any{"state": decoded, "events": []any{}}, db.NodeSecurityRecordReportOptions{Authoritative: true}); err != nil {
 		lib.TaskLog(ctx, "warn", "无法刷新节点状态，待连接恢复后重新核验")
 	}
 }

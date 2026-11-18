@@ -550,9 +550,9 @@ func TestHostsRouteInventory(t *testing.T) {
 			t.Fatalf("route %s is not registered", key)
 		}
 	}
-	// 65 Fastify declarations + the `/` alias registered twice (GET and POST) = 67.
-	if hostsRoutes != 67 {
-		t.Fatalf("hosts route count = %d, want 67", hostsRoutes)
+	// 66 Fastify declarations + the `/` alias registered twice (GET and POST) = 68.
+	if hostsRoutes != 68 {
+		t.Fatalf("hosts route count = %d, want 68", hostsRoutes)
 	}
 }
 
@@ -668,3 +668,22 @@ type hostsTestError string
 func (e hostsTestError) Error() string { return string(e) }
 
 func errHostsString(message string) error { return hostsTestError(message) }
+
+func TestHostsDiagnoseRouteRegisteredAndAuthGated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	RegisterHosts(router)
+	req := httptest.NewRequest(http.MethodPost, "/api/hosts/1/diagnose", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("POST /api/hosts/1/diagnose status = %d, want 401", rec.Code)
+	}
+
+	reqTest := httptest.NewRequest(http.MethodPost, "/api/hosts/1/test", nil)
+	recTest := httptest.NewRecorder()
+	router.ServeHTTP(recTest, reqTest)
+	if recTest.Code != http.StatusUnauthorized {
+		t.Fatalf("POST /api/hosts/1/test status = %d, want 401", recTest.Code)
+	}
+}

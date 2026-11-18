@@ -986,3 +986,88 @@ func TestTunnelSafeIntegerAndSlicing(t *testing.T) {
 		t.Fatalf("slice = %q", got)
 	}
 }
+
+type tunnelPingableSocket struct {
+	*tunnelTestSocket
+	mu      sync.Mutex
+	onPong  func()
+	pingErr error
+	onPing  func(func())
+}
+
+func (s *tunnelPingableSocket) SetPongHandler(handler func()) {
+	s.mu.Lock()
+	s.onPong = handler
+	s.mu.Unlock()
+}
+
+func (s *tunnelPingableSocket) TunnelPing() error {
+	if s.pingErr != nil {
+		return s.pingErr
+	}
+	s.mu.Lock()
+	pong := s.onPong
+	fn := s.onPing
+	s.mu.Unlock()
+	if fn != nil {
+		go fn(pong)
+	}
+	return nil
+}
+
+func TestMeasureTunnelPing(t *testing.T) {
+	manager := NewTunnelManager(nil)
+
+	// Offline host.
+	res := manager.MeasureTunnelPing(context.Background(), 91, 100*time.Millisecond)
+	if res.OK || res.Error == nil || *res.Error != "反向隧道未连接" {
+		t.Fatalf("offline = %#v", res)
+	}
+
+	// Socket without TunnelPingSocket interface.
+	plain := newTunnelTestSocket()
+	manager.RegisterTunnel(92, plain)
+	res = manager.MeasureTunnelPing(context.Background(), 92, 100*time.Millisecond)
+	if !res.OK || res.LatencyMs != nil {
+		t.Fatalf("plain socket = %#v", res)
+	}
+
+	// Pingable socket returning pong immediately.
+	pingSock := &tunnelPingableSocket{
+		tunnelTestSocket: newTunnelTestSocket(),
+		onPing: func(pong func()) {
+			if pong != nil {
+				pong()
+			}
+		},
+	}
+	manager.RegisterTunnel(93, pingSock)
+	res = manager.MeasureTunnelPing(context.Background(), 93, time.Second)
+	if !res.OK || res.LatencyMs == nil || *res.LatencyMs < 0 {
+		t.Fatalf("ping ok = %#v", res)
+	}
+
+	// Disconnect during ping fails cleanly.
+	disconnectSock := &tunnelPingableSocket{
+		tunnelTestSocket: newTunnelTestSocket(),
+		onPing: func(func()) {
+			manager.HandleTunnelClosed(94, nil)
+		},
+	}
+	disconnectSock.onPing = func(func()) {
+		manager.HandleTunnelClosed(94, disconnectSock)
+	}
+	manager.RegisterTunnel(94, disconnectSock)
+	res = manager.MeasureTunnelPing(context.Background(), 94, time.Second)
+	if res.OK || res.Error == nil || *res.Error != "隧道连接在探测期间断开" {
+		t.Fatalf("disconnect = %#v", res)
+	}
+
+	// Timeout returns exact ms error string.
+	timeoutSock := &tunnelPingableSocket{tunnelTestSocket: newTunnelTestSocket()}
+	manager.RegisterTunnel(95, timeoutSock)
+	res = manager.MeasureTunnelPing(context.Background(), 95, 25*time.Millisecond)
+	if res.OK || res.Error == nil || *res.Error != "隧道 Ping 超时 (25ms)" {
+		t.Fatalf("timeout = %#v", res)
+	}
+}

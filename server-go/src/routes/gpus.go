@@ -19,8 +19,12 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -80,6 +84,284 @@ type gpusInstanceGpuView struct {
 	Shared              bool                  `json:"shared"`
 	ReservationReleased bool                  `json:"reservationReleased"`
 	SharingNotice       string                `json:"sharingNotice"`
+}
+
+// gpusLiveGpuDeviceView mirrors listIncusGpuDevices(live) enriched with hostMatched.
+type gpusLiveGpuDeviceView struct {
+	Name        string  `json:"name"`
+	Pci         *string `json:"pci"`
+	Gputype     *string `json:"gputype"`
+	HostMatched bool    `json:"hostMatched"`
+}
+
+// gpusManagementView mirrors the `management` object returned to admin / host owners.
+type gpusManagementView struct {
+	CanManage           bool                    `json:"canManage"`
+	InstanceID          int32                   `json:"instanceId"`
+	HostID              int32                   `json:"hostId"`
+	InstanceStatus      string                  `json:"instanceStatus"`
+	InstanceType        string                  `json:"instanceType"`
+	Privileged          bool                    `json:"privileged"`
+	Supported           bool                    `json:"supported"`
+	AllocatedDeviceIDs  []int32                 `json:"allocatedDeviceIds"`
+	ReservationReleased bool                    `json:"reservationReleased"`
+	HostGpus            []db.GpusHostGpu        `json:"hostGpus"`
+	LiveGpuDevices      []gpusLiveGpuDeviceView `json:"liveGpuDevices"`
+	LiveSyncError       *string                 `json:"liveSyncError"`
+}
+
+type gpusLiveOverride struct {
+	Live      map[string]any
+	SyncError *string
+}
+
+var (
+	gpusGetIncusClientForHost = func(ctx context.Context, host *db.HostsRecord) (*lib.IncusClient, error) {
+		return lib.GetIncusClientForHost(ctx, host)
+	}
+	gpusFetchLiveInstance = lib.IncusInstanceFetchRaw
+	gpusRunningHotplugRe  = regexp.MustCompile(`(?i)running|stopped|hotplug`)
+)
+
+func gpusIncusStatusCode(statusCode int) int {
+	switch statusCode {
+	case http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict, http.StatusServiceUnavailable:
+		return statusCode
+	default:
+		return http.StatusBadGateway
+	}
+}
+
+func gpusFormatInstanceSummary(devices []models.HostGpu, reservationReleased bool) *gpusInstanceGpuView {
+	if len(devices) == 0 {
+		return nil
+	}
+	summaries := make([]lib.GpuDevice, 0, len(devices))
+	for _, device := range devices {
+		summaries = append(summaries, lib.GpuDevice{Name: device.Name, MemoryTotalMiB: int64(device.MemoryTotalMiB)})
+	}
+	return &gpusInstanceGpuView{
+		Name:                devices[0].Name,
+		MemoryTotalMiB:      devices[0].MemoryTotalMiB,
+		Devices:             lib.SummarizeGpuModels(summaries),
+		Count:               len(devices),
+		Shared:              true,
+		ReservationReleased: reservationReleased,
+		SharingNotice:       lib.GpuSharingNotice,
+	}
+}
+
+func gpusBuildInstanceGpuResponse(
+	ctx context.Context,
+	instanceID int32,
+	includeManagement bool,
+	liveOverride *gpusLiveOverride,
+) (gin.H, bool, error) {
+	var instance models.Instance
+	err := db.DB.WithContext(ctx).
+		Select("id", "user_id", "host_id", "package_id", "incus_id", "status", "gpu_device_id", "gpu_released_at").
+		Where("id = ?", instanceID).First(&instance).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && string(instance.Status) == "deleted") {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	var allocations []struct {
+		GPUDeviceID int32 `gorm:"column:gpu_device_id"`
+	}
+	if err := db.DB.WithContext(ctx).Raw(
+		"SELECT gpu_device_id FROM instance_gpu_allocations WHERE instance_id = ? ORDER BY gpu_device_id ASC",
+		instanceID,
+	).Scan(&allocations).Error; err != nil {
+		return nil, false, err
+	}
+
+	allocIDs := make([]int32, 0, len(allocations))
+	for _, allocation := range allocations {
+		allocIDs = append(allocIDs, allocation.GPUDeviceID)
+	}
+	deviceIDs := make([]int32, 0, len(allocIDs)+1)
+	if len(allocIDs) > 0 {
+		deviceIDs = append(deviceIDs, allocIDs...)
+	} else if instance.GPUDeviceID != nil {
+		deviceIDs = append(deviceIDs, *instance.GPUDeviceID)
+	}
+
+	devices := make([]models.HostGpu, 0, len(deviceIDs))
+	for _, deviceID := range deviceIDs {
+		var device models.HostGpu
+		err := db.DB.WithContext(ctx).Where("id = ?", deviceID).First(&device).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		devices = append(devices, device)
+	}
+
+	gpu := gpusFormatInstanceSummary(devices, instance.GPUReleasedAt != nil)
+	if !includeManagement {
+		return gin.H{"gpu": gpu}, true, nil
+	}
+
+	hostGpus, err := db.GpusListHostGpus(ctx, instance.HostID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var live map[string]any
+	var liveSyncError *string
+	if liveOverride != nil {
+		live = liveOverride.Live
+		liveSyncError = liveOverride.SyncError
+	} else {
+		host, hostErr := db.HostsGetByID(ctx, instance.HostID)
+		if hostErr != nil {
+			msg := lib.NodeErrorDetail(hostErr, "无法读取节点实例 GPU 配置", nil)
+			liveSyncError = &msg
+		} else if host == nil {
+			msg := "无法读取节点实例 GPU 配置"
+			liveSyncError = &msg
+		} else {
+			client, clientErr := gpusGetIncusClientForHost(ctx, host)
+			if clientErr != nil {
+				msg := lib.NodeErrorDetail(clientErr, "无法读取节点实例 GPU 配置", nil)
+				liveSyncError = &msg
+			} else {
+				fetched, fetchErr := gpusFetchLiveInstance(ctx, client, instance.IncusID)
+				if fetchErr != nil {
+					msg := lib.NodeErrorDetail(fetchErr, "无法读取节点实例 GPU 配置", nil)
+					liveSyncError = &msg
+				} else {
+					live = fetched
+				}
+			}
+		}
+	}
+
+	var pkg struct {
+		InstanceType string `gorm:"column:instance_type"`
+		Privileged   bool   `gorm:"column:privileged"`
+	}
+	if instance.PackageID != nil {
+		if err := db.DB.WithContext(ctx).Raw(
+			"SELECT instance_type, privileged FROM packages WHERE id = ? LIMIT 1",
+			*instance.PackageID,
+		).Scan(&pkg).Error; err != nil {
+			return nil, false, err
+		}
+	}
+
+	effectiveInstanceType := "container"
+	if live != nil {
+		if t, _ := live["type"].(string); t == "virtual-machine" {
+			effectiveInstanceType = "vm"
+		}
+	} else if pkg.InstanceType == "vm" {
+		effectiveInstanceType = "vm"
+	}
+
+	privileged := pkg.Privileged
+	if live != nil {
+		privileged = false
+		if rawCfg, ok := live["config"].(map[string]any); ok {
+			if val, _ := rawCfg["security.privileged"].(string); val == "true" {
+				privileged = true
+			}
+		}
+	}
+
+	hostPciSet := make(map[string]struct{}, len(hostGpus))
+	for _, card := range hostGpus {
+		hostPciSet[strings.ToLower(card.PciAddress)] = struct{}{}
+	}
+
+	var liveGpuDevices []gpusLiveGpuDeviceView
+	if live != nil {
+		rawDevs := lib.ListIncusGpuDevices(live)
+		liveGpuDevices = make([]gpusLiveGpuDeviceView, 0, len(rawDevs))
+		for _, dev := range rawDevs {
+			matched := false
+			if dev.Pci != nil {
+				_, matched = hostPciSet[strings.ToLower(*dev.Pci)]
+			}
+			liveGpuDevices = append(liveGpuDevices, gpusLiveGpuDeviceView{
+				Name:        dev.Name,
+				Pci:         dev.Pci,
+				Gputype:     dev.Gputype,
+				HostMatched: matched,
+			})
+		}
+	}
+
+	return gin.H{
+		"gpu": gpu,
+		"management": gpusManagementView{
+			CanManage:           true,
+			InstanceID:          instance.ID,
+			HostID:              instance.HostID,
+			InstanceStatus:      string(instance.Status),
+			InstanceType:        effectiveInstanceType,
+			Privileged:          privileged,
+			Supported:           effectiveInstanceType == "container" && !privileged,
+			AllocatedDeviceIDs:  db.GpusAllocatedIDs(instance.GPUDeviceID, allocIDs),
+			ReservationReleased: instance.GPUReleasedAt != nil,
+			HostGpus:            hostGpus,
+			LiveGpuDevices:      liveGpuDevices,
+			LiveSyncError:       liveSyncError,
+		},
+	}, true, nil
+}
+
+// gpusParsePutInstanceGpuBody validates the PUT /instances/:id/gpu request body
+// against the TS AJV schema (additionalProperties: false, required: ['gpuShared'],
+// gpuDeviceIds: array of idSchema maxItems 64).
+func gpusParsePutInstanceGpuBody(decoded any) (map[string]any, string) {
+	decoded = unwrapAJVRootArray(decoded)
+	obj, ok := decoded.(map[string]any)
+	if !ok || obj == nil {
+		return nil, "must be object"
+	}
+	for key := range obj {
+		if key != "gpuShared" && key != "gpuDeviceIds" {
+			return nil, "must NOT have additional properties"
+		}
+	}
+	validated, msg := validateAJVObject(obj, []string{"gpuShared"}, []ajvFieldSpec{
+		{Name: "gpuShared", Kind: ajvKindBoolean, MinLength: -1, MaxLength: -1},
+	})
+	if msg != "" {
+		return nil, msg
+	}
+	out := map[string]any{
+		"gpuShared": validated.boolValue("gpuShared"),
+	}
+	if rawIDs, exists := obj["gpuDeviceIds"]; exists {
+		arr, ok := rawIDs.([]any)
+		if !ok {
+			return nil, "must be array"
+		}
+		if len(arr) > 64 {
+			return nil, "must NOT have more than 64 items"
+		}
+		coerced := make([]any, 0, len(arr))
+		for _, item := range arr {
+			itemValidated, itemMsg := validateAJVObject(
+				map[string]any{"gpuDeviceId": item},
+				[]string{"gpuDeviceId"},
+				[]ajvFieldSpec{gpusIDSpec("gpuDeviceId")},
+			)
+			if itemMsg != "" {
+				return nil, itemMsg
+			}
+			coerced = append(coerced, itemValidated.Values["gpuDeviceId"])
+		}
+		out["gpuDeviceIds"] = coerced
+	}
+	return out, ""
 }
 
 // gpusHostAccess is the projection GET /hosts/:id/gpus authorizes against.
@@ -296,65 +578,252 @@ func RegisterGpus(r *gin.Engine) {
 		}
 
 		user := middleware.CurrentUser(c)
-		if user.Role != "admin" && user.ID != instance.UserID && user.ID != host.UserID {
+		isManager := user.Role == "admin" || user.ID == host.UserID
+		if !isManager && user.ID != instance.UserID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该实例"})
 			return
 		}
 
-		// gpuAllocations ordered by gpuDeviceId, each joined to its device row.
-		var allocations []struct {
-			GPUDeviceID int32 `gorm:"column:gpu_device_id"`
+		payload, found, err := gpusBuildInstanceGpuResponse(ctx, instance.ID, isManager, nil)
+		if err != nil {
+			gpusInternalError(c)
+			return
 		}
-		err = db.DB.WithContext(ctx).Raw(
-			"SELECT gpu_device_id FROM instance_gpu_allocations WHERE instance_id = ? ORDER BY gpu_device_id ASC",
-			instanceID,
-		).Scan(&allocations).Error
+		if !found {
+			c.JSON(http.StatusNotFound, gin.H{"error": "实例不存在"})
+			return
+		}
+		c.JSON(http.StatusOK, payload)
+	})
+
+	group.PUT("/instances/:id/gpu", middleware.Authenticate(), func(c *gin.Context) {
+		ctx := c.Request.Context()
+		instanceID, ok := gpusValidateRouteID(c, "id")
+		if !ok {
+			return
+		}
+
+		decoded, status, message := decodeJSONRequestBody(c)
+		if status != 0 {
+			middleware.AbortFastifyBody(c, status, message)
+			return
+		}
+		parsedBody, validationMessage := gpusParsePutInstanceGpuBody(decoded.Value)
+		if validationMessage != "" {
+			respondAJVValidation(c, validationMessage)
+			return
+		}
+
+		var instance models.Instance
+		err := db.DB.WithContext(ctx).
+			Select("id", "user_id", "host_id", "incus_id", "status").
+			Where("id = ?", instanceID).First(&instance).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && string(instance.Status) == "deleted") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "实例不存在"})
+			return
+		}
 		if err != nil {
 			gpusInternalError(c)
 			return
 		}
 
-		deviceIDs := make([]int32, 0, len(allocations)+1)
-		for _, allocation := range allocations {
-			deviceIDs = append(deviceIDs, allocation.GPUDeviceID)
+		host, err := db.HostsGetByID(ctx, instance.HostID)
+		if err != nil {
+			gpusInternalError(c)
+			return
 		}
-		if len(deviceIDs) == 0 && instance.GPUDeviceID != nil {
-			deviceIDs = append(deviceIDs, *instance.GPUDeviceID)
-		}
-
-		devices := make([]models.HostGpu, 0, len(deviceIDs))
-		for _, deviceID := range deviceIDs {
-			var device models.HostGpu
-			err := db.DB.WithContext(ctx).Where("id = ?", deviceID).First(&device).Error
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				continue
-			}
-			if err != nil {
-				gpusInternalError(c)
-				return
-			}
-			devices = append(devices, device)
-		}
-
-		if len(devices) == 0 {
-			c.JSON(http.StatusOK, gin.H{"gpu": nil})
+		user := middleware.CurrentUser(c)
+		isManager := user.Role == "admin" || (host != nil && user.ID == host.UserID)
+		if !isManager {
+			c.JSON(http.StatusForbidden, gin.H{"error": "无权修改该实例的 GPU 共享配置"})
 			return
 		}
 
-		summaries := make([]lib.GpuDevice, 0, len(devices))
-		for _, device := range devices {
-			summaries = append(summaries, lib.GpuDevice{Name: device.Name, MemoryTotalMiB: int64(device.MemoryTotalMiB)})
+		locked, err := instancesCheckTransferLock(c, instance.ID)
+		if err != nil {
+			gpusInternalError(c)
+			return
+		}
+		if locked {
+			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"gpu": gpusInstanceGpuView{
-			Name:                devices[0].Name,
-			MemoryTotalMiB:      devices[0].MemoryTotalMiB,
-			Devices:             lib.SummarizeGpuModels(summaries),
-			Count:               len(devices),
-			Shared:              true,
-			ReservationReleased: instance.GPUReleasedAt != nil,
-			SharingNotice:       lib.GpuSharingNotice,
-		}})
+		var activeRestore struct{ ID int32 }
+		if err := db.DB.WithContext(ctx).Raw(
+			`SELECT id FROM restore_tasks WHERE instance_id = ? AND status IN ('PENDING','PROCESSING') LIMIT 1`,
+			instance.ID,
+		).Scan(&activeRestore).Error; err != nil {
+			gpusInternalError(c)
+			return
+		}
+		var activeUpload struct{ ID int32 }
+		if err := db.DB.WithContext(ctx).Raw(
+			`SELECT id FROM backup_upload_tasks WHERE instance_id = ? AND status IN ('PENDING','PROCESSING') LIMIT 1`,
+			instance.ID,
+		).Scan(&activeUpload).Error; err != nil {
+			gpusInternalError(c)
+			return
+		}
+		activeTask, err := db.GetActiveTaskForInstance(ctx, instance.ID)
+		if err != nil {
+			gpusInternalError(c)
+			return
+		}
+		if activeRestore.ID != 0 || activeUpload.ID != 0 || activeTask != nil {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "实例有正在执行的任务，请等待完成后再修改 GPU 配置",
+				"code":  "TASK_IN_PROGRESS",
+			})
+			return
+		}
+
+		sharedPtr, _, deviceIDs, _, gpuErr := lib.NormalizeGpuInput(parsedBody, false)
+		if gpuErr != nil {
+			var ge *lib.GpuError
+			if errors.As(gpuErr, &ge) {
+				c.JSON(ge.StatusCode(), gin.H{"error": ge.Error(), "code": ge.Code()})
+				return
+			}
+			gpusInternalError(c)
+			return
+		}
+		gpuShared := sharedPtr != nil && *sharedPtr
+		var selectedDeviceIDs []int32
+		if gpuShared {
+			selectedDeviceIDs = deviceIDs
+		}
+
+		if host == nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": "无法连接宿主机以更新 GPU 配置"})
+			return
+		}
+		client, err := gpusGetIncusClientForHost(ctx, host)
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": lib.NodeErrorDetail(err, "无法连接宿主机以更新 GPU 配置", nil)})
+			return
+		}
+
+		var live map[string]any
+		fetched, err := gpusFetchLiveInstance(ctx, client, instance.IncusID)
+		if err != nil {
+			var apiErr *lib.IncusApiError
+			missingOnNode := errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
+			if !(!gpuShared && missingOnNode && string(instance.Status) == "error") {
+				code := http.StatusBadGateway
+				if errors.As(err, &apiErr) {
+					code = gpusIncusStatusCode(apiErr.StatusCode)
+				}
+				c.JSON(code, gin.H{"error": lib.NodeErrorDetail(err, "读取节点实例配置失败", nil)})
+				return
+			}
+		} else {
+			live = fetched
+		}
+
+		var liveInstanceType *string
+		var livePrivileged *bool
+		if live != nil {
+			t := "container"
+			if v, _ := live["type"].(string); v == "virtual-machine" {
+				t = "vm"
+			}
+			liveInstanceType = &t
+			priv := false
+			if cfg, ok := live["config"].(map[string]any); ok {
+				if val, _ := cfg["security.privileged"].(string); val == "true" {
+					priv = true
+				}
+			}
+			livePrivileged = &priv
+		}
+
+		incusUpdated := false
+		pciAddresses, hasGPUs, allocErr := db.GpusUpdateInstanceAllocation(ctx, db.GpusUpdateAllocationInput{
+			InstanceID:       instance.ID,
+			GpuShared:        gpuShared,
+			GpuDeviceIDs:     selectedDeviceIDs,
+			LiveInstanceType: liveInstanceType,
+			LivePrivileged:   livePrivileged,
+			SyncIncus: func(syncCtx context.Context, pcis []string) error {
+				if live == nil {
+					return nil
+				}
+				if pcis == nil {
+					if !lib.ClearGpuDevices(live) {
+						return nil
+					}
+				} else {
+					if err := lib.ApplyGpuDevice(live, pcis); err != nil {
+						return err
+					}
+				}
+				escaped := url.PathEscape(instance.IncusID)
+				if _, err := client.Request(syncCtx, http.MethodPut, "/1.0/instances/"+escaped, live, 30*time.Second, live); err != nil {
+					detail := err.Error()
+					if string(instance.Status) == "running" && gpusRunningHotplugRe.MatchString(detail) {
+						msg := "实例正在运行且节点不支持热卸载 GPU，请先停止实例后再取消共享"
+						if pcis != nil {
+							msg = "实例正在运行且节点不支持热挂载 GPU，请先停止实例后再分配"
+						}
+						return &db.GpusError{
+							Message:    msg,
+							StatusCode: http.StatusConflict,
+							Code:       "INSTANCE_RUNNING",
+						}
+					}
+					statusCode := http.StatusBadGateway
+					var apiErr *lib.IncusApiError
+					if errors.As(err, &apiErr) {
+						statusCode = gpusIncusStatusCode(apiErr.StatusCode)
+					}
+					return &db.GpusError{
+						Message:    lib.NodeErrorDetail(err, "同步节点 Incus GPU 配置失败", nil),
+						StatusCode: statusCode,
+					}
+				}
+				incusUpdated = true
+				return nil
+			},
+		})
+		if allocErr != nil {
+			var ge *db.GpusError
+			if errors.As(allocErr, &ge) {
+				c.JSON(ge.HTTPStatus(), gin.H{"error": ge.Error(), "code": ge.ErrorCode()})
+				return
+			}
+			var libErr *lib.GpuError
+			if errors.As(allocErr, &libErr) {
+				c.JSON(libErr.StatusCode(), gin.H{"error": libErr.Error(), "code": libErr.Code()})
+				return
+			}
+			gpusInternalError(c)
+			return
+		}
+
+		logDetail := "Instance #" + gpusItoa(int64(instance.ID)) + " (" + instance.IncusID + ") cleared shared GPU allocation"
+		if hasGPUs {
+			logDetail = "Instance #" + gpusItoa(int64(instance.ID)) + " (" + instance.IncusID + ") assigned shared GPU PCIs: " + strings.Join(pciAddresses, ", ")
+		}
+		actorID := int64(user.ID)
+		instID := instance.ID
+		db.CreateLog(ctx, &actorID, db.LogModuleInstance, "instance.gpu.configure",
+			logDetail, db.LogResultSuccess, db.CreateLogOptions{InstanceID: &instID})
+
+		payload, found, err := gpusBuildInstanceGpuResponse(ctx, instance.ID, true, &gpusLiveOverride{
+			Live:      live,
+			SyncError: nil,
+		})
+		if err != nil {
+			gpusInternalError(c)
+			return
+		}
+		if !found {
+			c.JSON(http.StatusNotFound, gin.H{"error": "实例不存在"})
+			return
+		}
+		payload["success"] = true
+		payload["restartRequired"] = string(instance.Status) == "running" && incusUpdated
+		c.JSON(http.StatusOK, payload)
 	})
 }
 

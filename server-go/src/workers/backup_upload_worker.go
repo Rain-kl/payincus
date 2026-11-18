@@ -29,6 +29,7 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/db"
 	"github.com/rain-kl/payincus/server-go/src/lib"
 	"github.com/rain-kl/payincus/server-go/src/models"
+	"github.com/rain-kl/payincus/server-go/src/storage"
 )
 
 const (
@@ -534,4 +535,10 @@ func (r *pgUploadTaskRunner) Run(ctx context.Context, task *uploadTaskRecord) (r
 	}
 
 	return remoteFileName, stream.ContentLength, nil
+}
+
+func init() {
+	SetStorageProviderFactory(func(config *models.StorageConfig) (StorageProvider, error) {
+		return storage.Create(config)
+	})
 }

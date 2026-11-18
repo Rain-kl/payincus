@@ -66,9 +66,11 @@ var adminTasksStatuses = map[string]bool{
 
 // adminTasksKinds mirrors the `kind` enum.
 var adminTasksKinds = map[string]bool{
-	"create":       true,
-	"destroy":      true,
-	"node_recover": true,
+	"create":          true,
+	"destroy":         true,
+	"node_recover":    true,
+	"instance_export": true,
+	"instance_import": true,
 }
 
 // adminTasksConnections mirrors the per-user SSE connection counter. Process-local

@@ -196,6 +196,30 @@ type TunnelSocket interface {
 	TunnelClose(code int, reason string)
 }
 
+// TunnelPingSocket is optionally implemented by TunnelSocket transports that
+// support RFC 6455 ping/pong RTT measurement.
+type TunnelPingSocket interface {
+	TunnelPing() error
+	SetPongHandler(func())
+}
+
+// TunnelPingResult mirrors measureTunnelPing's return shape in tunnel-manager.ts.
+type TunnelPingResult struct {
+	OK        bool    `json:"ok"`
+	LatencyMs *int64  `json:"latencyMs"`
+	Error     *string `json:"error,omitempty"`
+}
+
+type tunnelPongWaiter struct {
+	socket TunnelSocket
+	ch     chan TunnelPingResult
+	once   sync.Once
+}
+
+func (w *tunnelPongWaiter) finish(res TunnelPingResult) {
+	w.once.Do(func() { w.ch <- res })
+}
+
 type tunnelControlResult struct {
 	value any
 	err   error
@@ -232,6 +256,8 @@ type TunnelManager struct {
 	streams             map[string]*TunnelStream
 	nextStreamID        uint32
 	controlCapabilities map[int32]map[string]bool
+	lastActivity        map[int32]time.Time
+	pongWaiters         map[int32]map[uint64]*tunnelPongWaiter
 	pendingHeartbeats   map[string]*tunnelPendingHeartbeat
 	pendingControls     map[string]*tunnelPendingControl
 
@@ -253,6 +279,8 @@ func NewTunnelManager(nodeRequest TunnelNodeAPIRequester) *TunnelManager {
 		activeTunnels:             map[int32]TunnelSocket{},
 		streams:                   map[string]*TunnelStream{},
 		controlCapabilities:       map[int32]map[string]bool{},
+		lastActivity:              map[int32]time.Time{},
+		pongWaiters:               map[int32]map[uint64]*tunnelPongWaiter{},
 		pendingHeartbeats:         map[string]*tunnelPendingHeartbeat{},
 		pendingControls:           map[string]*tunnelPendingControl{},
 		tunnelConnectedListeners:  map[uint64]func(int32){},
@@ -392,8 +420,15 @@ func (m *TunnelManager) RegisterTunnel(hostID int32, socket TunnelSocket) {
 	// HandleTunnelClosed, whose identity guard then sees the NEW socket and
 	// correctly does nothing (Node relies on ws emitting 'close' asynchronously).
 	m.activeTunnels[hostID] = socket
+	m.lastActivity[hostID] = time.Now()
 	delete(m.controlCapabilities, hostID)
 	m.mu.Unlock()
+
+	if pingSock, ok := socket.(TunnelPingSocket); ok {
+		pingSock.SetPongHandler(func() {
+			m.handleTunnelPong(hostID, socket)
+		})
+	}
 
 	if replaced {
 		// Close outside the lock: TunnelClose may block.
@@ -473,6 +508,89 @@ func (m *TunnelManager) IsTunnelOnline(hostID int32) bool {
 	return socket != nil && socket.TunnelReadyState() == TunnelSocketOpen
 }
 
+// MeasureTunnelPing mirrors measureTunnelPing(hostId, timeoutMs) in
+// tunnel-manager.ts, sending a WebSocket ping control frame and awaiting pong.
+func (m *TunnelManager) MeasureTunnelPing(ctx context.Context, hostID int32, timeout time.Duration) TunnelPingResult {
+	if timeout <= 0 {
+		timeout = 4 * time.Second
+	}
+
+	m.mu.Lock()
+	socket := m.activeTunnels[hostID]
+	if socket == nil || socket.TunnelReadyState() != TunnelSocketOpen {
+		m.mu.Unlock()
+		msg := "反向隧道未连接"
+		return TunnelPingResult{OK: false, LatencyMs: nil, Error: &msg}
+	}
+	pingSock, ok := socket.(TunnelPingSocket)
+	if !ok {
+		m.mu.Unlock()
+		return TunnelPingResult{OK: true, LatencyMs: nil}
+	}
+	m.listenerSeq++
+	waiterID := m.listenerSeq
+	waiter := &tunnelPongWaiter{socket: socket, ch: make(chan TunnelPingResult, 1)}
+	if m.pongWaiters[hostID] == nil {
+		m.pongWaiters[hostID] = map[uint64]*tunnelPongWaiter{}
+	}
+	m.pongWaiters[hostID][waiterID] = waiter
+	m.mu.Unlock()
+
+	defer func() {
+		m.mu.Lock()
+		if waiters := m.pongWaiters[hostID]; waiters != nil {
+			delete(waiters, waiterID)
+			if len(waiters) == 0 {
+				delete(m.pongWaiters, hostID)
+			}
+		}
+		m.mu.Unlock()
+	}()
+
+	startedAt := time.Now()
+	if err := pingSock.TunnelPing(); err != nil {
+		msg := err.Error()
+		if msg == "" {
+			msg = "发送 Ping 失败"
+		}
+		return TunnelPingResult{OK: false, LatencyMs: nil, Error: &msg}
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case res := <-waiter.ch:
+		if res.OK && res.LatencyMs == nil {
+			latency := time.Since(startedAt).Milliseconds()
+			if latency < 0 {
+				latency = 0
+			}
+			res.LatencyMs = &latency
+		}
+		return res
+	case <-timer.C:
+		msg := fmt.Sprintf("隧道 Ping 超时 (%dms)", timeout.Milliseconds())
+		return TunnelPingResult{OK: false, LatencyMs: nil, Error: &msg}
+	case <-ctx.Done():
+		msg := ctx.Err().Error()
+		return TunnelPingResult{OK: false, LatencyMs: nil, Error: &msg}
+	}
+}
+
+func (m *TunnelManager) handleTunnelPong(hostID int32, socket TunnelSocket) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	current := m.activeTunnels[hostID]
+	if !tunnelSameSocket(current, socket) {
+		return
+	}
+	m.lastActivity[hostID] = time.Now()
+	for id, waiter := range m.pongWaiters[hostID] {
+		waiter.finish(TunnelPingResult{OK: true})
+		delete(m.pongWaiters[hostID], id)
+	}
+}
+
 // GetTunnel mirrors getTunnel.
 func (m *TunnelManager) GetTunnel(hostID int32) (TunnelSocket, bool) {
 	m.mu.Lock()
@@ -485,6 +603,15 @@ func (m *TunnelManager) GetTunnel(hostID int32) (TunnelSocket, bool) {
 // finish() only writes to a buffered channel, so it never blocks.
 func (m *TunnelManager) cleanupHostControlsLocked(hostID int32) {
 	delete(m.controlCapabilities, hostID)
+	delete(m.lastActivity, hostID)
+	if waiters := m.pongWaiters[hostID]; len(waiters) > 0 {
+		msg := "隧道连接在探测期间断开"
+		for id, waiter := range waiters {
+			waiter.finish(TunnelPingResult{OK: false, LatencyMs: nil, Error: &msg})
+			delete(waiters, id)
+		}
+		delete(m.pongWaiters, hostID)
+	}
 	for _, pending := range m.pendingHeartbeats {
 		if pending.hostID == hostID {
 			pending.finish(&TunnelHeartbeatTestError{StatusCode: 502, Message: "节点连接已断开，上报测试失败"})
@@ -890,8 +1017,12 @@ func (m *TunnelManager) HandleTunnelMessage(hostID int32, socket TunnelSocket, d
 	}
 	m.mu.Lock()
 	current := m.activeTunnels[hostID]
+	same := tunnelSameSocket(current, socket)
+	if same {
+		m.lastActivity[hostID] = time.Now()
+	}
 	m.mu.Unlock()
-	if !tunnelSameSocket(current, socket) {
+	if !same {
 		return
 	}
 

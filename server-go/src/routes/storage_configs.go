@@ -46,6 +46,7 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/lib"
 	"github.com/rain-kl/payincus/server-go/src/middleware"
 	"github.com/rain-kl/payincus/server-go/src/models"
+	"github.com/rain-kl/payincus/server-go/src/storage"
 )
 
 // Storage schema bounds, mirroring the POST/PATCH JSON schemas.
@@ -1523,6 +1524,21 @@ func prismaRenderValue(value any) string {
 
 func init() {
 	Register(RegisterStorageConfigs)
+	StorageConnectionTester = func(ctx context.Context, config StorageTestConfig) error {
+		var extra map[string]any
+		if len(config.Extra) > 0 {
+			_ = json.Unmarshal(config.Extra, &extra)
+		}
+		return storage.TestConnection(ctx, storage.ConfigData{
+			Type:     config.Type,
+			Host:     config.Host,
+			Port:     config.Port,
+			Username: config.Username,
+			Password: config.Password,
+			BasePath: config.BasePath,
+			Extra:    extra,
+		})
+	}
 }
 
 // ajvPatternMessage mirrors the `pattern` branch of app.ts' setErrorHandler.

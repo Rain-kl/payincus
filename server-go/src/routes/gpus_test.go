@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/rain-kl/payincus/server-go/src/db"
 )
 
 func newParamContext(params gin.Params) (*gin.Context, *httptest.ResponseRecorder) {
@@ -63,5 +65,67 @@ func TestGpusValidateRouteIDUsesParamName(t *testing.T) {
 	}
 	if recorder.Body.Len() != 0 {
 		t.Fatalf("unexpected body for a valid id: %s", recorder.Body.String())
+	}
+}
+
+func TestGpusParsePutInstanceGpuBody(t *testing.T) {
+	body, msg := gpusParsePutInstanceGpuBody(map[string]any{
+		"gpuShared":    true,
+		"gpuDeviceIds": []any{float64(1), "2"},
+	})
+	if msg != "" || body["gpuShared"] != true {
+		t.Fatalf("valid payload rejected: body=%v msg=%q", body, msg)
+	}
+	ids, _ := body["gpuDeviceIds"].([]any)
+	if len(ids) != 2 || ids[0] != float64(1) || ids[1] != float64(2) {
+		t.Fatalf("gpuDeviceIds = %#v", ids)
+	}
+
+	if _, msg := gpusParsePutInstanceGpuBody(map[string]any{}); msg != "gpuShared is required" {
+		t.Fatalf("missing required msg = %q", msg)
+	}
+	if _, msg := gpusParsePutInstanceGpuBody(map[string]any{"gpuShared": false, "extra": 1}); msg != "must NOT have additional properties" {
+		t.Fatalf("additionalProperties msg = %q", msg)
+	}
+	if _, msg := gpusParsePutInstanceGpuBody(map[string]any{"gpuShared": true, "gpuDeviceIds": "bad"}); msg != "must be array" {
+		t.Fatalf("non-array msg = %q", msg)
+	}
+	over64 := make([]any, 65)
+	for i := range over64 {
+		over64[i] = float64(i + 1)
+	}
+	if _, msg := gpusParsePutInstanceGpuBody(map[string]any{"gpuShared": true, "gpuDeviceIds": over64}); msg != "must NOT have more than 64 items" {
+		t.Fatalf("maxItems msg = %q", msg)
+	}
+	if _, msg := gpusParsePutInstanceGpuBody(map[string]any{"gpuShared": true, "gpuDeviceIds": []any{float64(0)}}); msg != "must be >= 1" {
+		t.Fatalf("item minimum msg = %q", msg)
+	}
+}
+
+func TestGpusManagementAndStatusHelpers(t *testing.T) {
+	if code := gpusIncusStatusCode(404); code != 404 {
+		t.Fatalf("404 mapped to %d", code)
+	}
+	if code := gpusIncusStatusCode(429); code != 502 {
+		t.Fatalf("429 mapped to %d, want 502", code)
+	}
+	view := gpusManagementView{
+		CanManage:          true,
+		AllocatedDeviceIDs: []int32{2},
+		HostGpus:           []db.GpusHostGpu{},
+		LiveGpuDevices:     []gpusLiveGpuDeviceView{{Name: "gpu0", HostMatched: true}},
+	}
+	raw, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	for _, key := range []string{"canManage", "instanceId", "hostId", "instanceStatus", "instanceType", "privileged", "supported", "allocatedDeviceIds", "reservationReleased", "hostGpus", "liveGpuDevices", "liveSyncError"} {
+		if _, ok := decoded[key]; !ok {
+			t.Errorf("missing management JSON key %q", key)
+		}
 	}
 }

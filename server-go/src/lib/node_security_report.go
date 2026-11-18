@@ -22,6 +22,7 @@ package lib
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"regexp"
@@ -343,12 +344,16 @@ func nodeReportParseReason(raw any) string {
 	return jsTruncateUTF16(reason, nodeReportReasonMaxLength)
 }
 
-// RecordReport mirrors recordReport(hostId, input).
-//
-// It returns the accepted event ids. Everything else (allow-listing, the
-// recoveryBlocked override, the revision comparison, the 30-day cleanup) happens
-// inside the db transaction that holds the per-node advisory lock.
+// RecordReport mirrors recordReport(hostId, input) with default options.
 func RecordReport(ctx context.Context, hostID int32, input any) ([]string, error) {
+	return RecordReportWithOptions(ctx, hostID, input, db.NodeSecurityRecordReportOptions{})
+}
+
+// RecordReportWithOptions mirrors recordReport(hostId, input, options) in report.ts.
+// It returns the accepted event ids. Everything else (allow-listing, the
+// recoveryBlocked override, the revision comparison, _desiredEnabled retention,
+// the 30-day cleanup) happens inside the db transaction that holds the per-node advisory lock.
+func RecordReportWithOptions(ctx context.Context, hostID int32, input any, opts db.NodeSecurityRecordReportOptions) ([]string, error) {
 	report, events, err := ParseNodeReport(input)
 	if err != nil {
 		return nil, err
@@ -374,10 +379,53 @@ func RecordReport(ctx context.Context, hostID int32, input any) ([]string, error
 		ids = append(ids, event.ID)
 	}
 
-	if _, err := db.RecordNodeSecurityReport(ctx, hostID, report, inputs); err != nil {
+	if _, err := db.RecordNodeSecurityReportWithOptions(ctx, hostID, report, inputs, opts); err != nil {
 		return nil, err
 	}
 	return ids, nil
+}
+
+// RecordHeartbeatSecurityState mirrors recordHeartbeatSecurityState(hostId, rawState)
+// in report.ts: full reports go through RecordReport (reporting policyMismatch
+// when _desiredEnabled disagrees while unlocked), while degraded payloads only
+// safely merge the locked flag.
+func RecordHeartbeatSecurityState(ctx context.Context, hostID int32, rawState any) (bool, error) {
+	state, ok := rawState.(map[string]any)
+	if !ok || state == nil {
+		return false, nil
+	}
+
+	enabled, hasEnabled := state["enabled"].(bool)
+	locked, hasLocked := state["locked"].(bool)
+	revFloat, hasRev := state["revision"].(float64)
+	if hasEnabled && hasLocked && hasRev {
+		if _, revOK := nodeReportSafeInteger(revFloat); revOK {
+			if _, err := RecordReport(ctx, hostID, map[string]any{"state": state, "events": []any{}}); err != nil {
+				return false, err
+			}
+			latest, err := db.GetNodeSecurityState(ctx, hostID)
+			if err != nil {
+				return false, err
+			}
+			if latest == nil || latest.RecoveryBlocked || locked {
+				return false, nil
+			}
+			var decoded map[string]any
+			if len(latest.Report) > 0 && json.Unmarshal(latest.Report, &decoded) == nil && decoded != nil {
+				if desired, ok := decoded["_desiredEnabled"].(bool); ok && desired != enabled {
+					return true, nil
+				}
+			}
+			return false, nil
+		}
+	}
+
+	if hasLocked {
+		if err := db.RecordHeartbeatSecurityLockedOnly(ctx, hostID, locked); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
 }
 
 // ==================== JavaScript scalar semantics ====================

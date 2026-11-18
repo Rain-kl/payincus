@@ -30,6 +30,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -55,14 +56,32 @@ var (
 	gpusPCIAddressPattern = regexp.MustCompile(`^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$`)
 )
 
-// GpusError mirrors the TypeScript GpuError (message only; the route layer reports
-// the same literals as plain JSON bodies).
+// GpusError mirrors the TypeScript GpuError (defaults to statusCode 400,
+// code GPU_CONFIGURATION_INVALID, with optional overrides).
 type GpusError struct {
-	Message string
+	Message    string
+	StatusCode int
+	Code       string
 }
 
 // Error implements error.
 func (e *GpusError) Error() string { return e.Message }
+
+// HTTPStatus returns the HTTP status code for this GPU error (default 400).
+func (e *GpusError) HTTPStatus() int {
+	if e.StatusCode != 0 {
+		return e.StatusCode
+	}
+	return 400
+}
+
+// ErrorCode returns the machine-readable error code (default GPU_CONFIGURATION_INVALID).
+func (e *GpusError) ErrorCode() string {
+	if e.Code != "" {
+		return e.Code
+	}
+	return "GPU_CONFIGURATION_INVALID"
+}
 
 // GpusPolicy mirrors lib.GpuPolicy without importing lib.
 type GpusPolicy struct {
@@ -842,6 +861,193 @@ func GpusPlanAvailable(ctx context.Context, packageID, planID int32) (bool, erro
 		}
 	}
 	return false, nil
+}
+
+// GpusUpdateAllocationInput mirrors the input to updateInstanceGpuAllocation in db/gpus.ts.
+type GpusUpdateAllocationInput struct {
+	InstanceID       int32
+	GpuShared        bool
+	GpuDeviceIDs     []int32
+	LiveInstanceType *string
+	LivePrivileged   *bool
+	SyncIncus        func(ctx context.Context, pciAddresses []string) error
+}
+
+// GpusUpdateInstanceAllocation mirrors updateInstanceGpuAllocation from db/gpus.ts,
+// mutating instance_gpu_allocations + instances under row locks and invoking
+// SyncIncus inside the transaction before committing.
+func GpusUpdateInstanceAllocation(ctx context.Context, input GpusUpdateAllocationInput) ([]string, bool, error) {
+	if DB == nil {
+		return nil, false, errors.New("数据库未初始化")
+	}
+
+	seen := make(map[int32]struct{}, len(input.GpuDeviceIDs))
+	uniqueIDs := make([]int32, 0, len(input.GpuDeviceIDs))
+	for _, id := range input.GpuDeviceIDs {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniqueIDs = append(uniqueIDs, id)
+	}
+	if input.GpuShared && len(uniqueIDs) == 0 {
+		return nil, false, &GpusError{Message: "请至少选择一张共享 GPU", StatusCode: 400}
+	}
+
+	txCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	var resultPCIs []string
+	var hasGPUs bool
+	err := DB.WithContext(txCtx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`SELECT id FROM instances WHERE id = ? FOR UPDATE`, input.InstanceID).Error; err != nil {
+			return err
+		}
+
+		var row struct {
+			ID          int32   `gorm:"column:id"`
+			HostID      int32   `gorm:"column:host_id"`
+			Status      string  `gorm:"column:status"`
+			GPUDeviceID *int32  `gorm:"column:gpu_device_id"`
+			PkgType     *string `gorm:"column:pkg_type"`
+			PkgPriv     *bool   `gorm:"column:pkg_priv"`
+		}
+		if err := tx.Raw(`SELECT i.id, i.host_id, i.status, i.gpu_device_id,
+			p.instance_type AS pkg_type, p.privileged AS pkg_priv
+			FROM instances i
+			LEFT JOIN packages p ON p.id = i.package_id
+			WHERE i.id = ? LIMIT 1`, input.InstanceID).Scan(&row).Error; err != nil {
+			return err
+		}
+		if row.ID == 0 || row.Status == "deleted" {
+			return &GpusError{Message: "实例不存在", StatusCode: 404, Code: "INSTANCE_NOT_FOUND"}
+		}
+		switch row.Status {
+		case "creating", "starting", "stopping", "restarting":
+			return &GpusError{
+				Message:    "实例正在执行状态变更任务，请等待完成后再修改 GPU 配置",
+				StatusCode: 409,
+				Code:       "TASK_IN_PROGRESS",
+			}
+		}
+
+		if !input.GpuShared {
+			if err := tx.Where("instance_id = ?", input.InstanceID).Delete(&models.InstanceGpuAllocation{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.Instance{}).Where("id = ?", input.InstanceID).
+				Updates(map[string]any{"gpu_device_id": nil, "gpu_released_at": nil}).Error; err != nil {
+				return err
+			}
+			if input.SyncIncus != nil {
+				if err := input.SyncIncus(txCtx, nil); err != nil {
+					return err
+				}
+			}
+			resultPCIs = nil
+			hasGPUs = false
+			return nil
+		}
+
+		effectiveType := "container"
+		if input.LiveInstanceType != nil && *input.LiveInstanceType != "" {
+			effectiveType = *input.LiveInstanceType
+		} else if row.PkgType != nil && *row.PkgType == "vm" {
+			effectiveType = "vm"
+		}
+		isPrivileged := false
+		if input.LivePrivileged != nil {
+			isPrivileged = *input.LivePrivileged
+		} else if row.PkgPriv != nil {
+			isPrivileged = *row.PkgPriv
+		}
+		if effectiveType != "container" || isPrivileged {
+			return &GpusError{Message: "共享 GPU 仅支持非特权 LXC 容器", StatusCode: 400}
+		}
+
+		if err := tx.Exec(`SELECT id FROM host_gpus WHERE host_id = ? ORDER BY id FOR UPDATE`, row.HostID).Error; err != nil {
+			return err
+		}
+
+		var devices []models.HostGpu
+		if err := tx.Where("host_id = ? AND id IN ?", row.HostID, uniqueIDs).Order("id ASC").Find(&devices).Error; err != nil {
+			return err
+		}
+		if len(devices) != len(uniqueIDs) {
+			return &GpusError{Message: "所选 GPU 不属于当前实例所在宿主机", StatusCode: 400}
+		}
+
+		var allocations []models.InstanceGpuAllocation
+		if err := tx.Where("instance_id = ?", input.InstanceID).Find(&allocations).Error; err != nil {
+			return err
+		}
+		allocIDs := make([]int32, 0, len(allocations))
+		for _, alloc := range allocations {
+			allocIDs = append(allocIDs, alloc.GPUDeviceID)
+		}
+		heldSet := make(map[int32]struct{})
+		for _, id := range GpusAllocatedIDs(row.GPUDeviceID, allocIDs) {
+			heldSet[id] = struct{}{}
+		}
+
+		now := time.Now().UTC()
+		pciAddresses := make([]string, 0, len(devices))
+		for _, gpu := range devices {
+			if _, held := heldSet[gpu.ID]; !gpu.SharingEnabled && !held {
+				return &GpusError{
+					Message:    fmt.Sprintf("显卡 %q (%s) 尚未开放共享，请先在宿主机 GPU 页签启用共享", gpu.Name, gpu.PciAddress),
+					StatusCode: 409,
+				}
+			}
+			if !gpusIsFresh(gpu.Available, gpu.RuntimeReady, gpu.LastSeenAt, now) {
+				return &GpusError{
+					Message:    fmt.Sprintf("显卡 %q (%s) 当前不可用、运行时未就绪或监控已过期", gpu.Name, gpu.PciAddress),
+					StatusCode: 409,
+				}
+			}
+			used, err := GpusCountReservations(txCtx, tx, gpu.ID, &input.InstanceID)
+			if err != nil {
+				return err
+			}
+			if used >= int64(gpu.MaxInstances) {
+				return &GpusError{
+					Message:    fmt.Sprintf("显卡 %q (%s) 共享名额已满（%d/%d）", gpu.Name, gpu.PciAddress, used, gpu.MaxInstances),
+					StatusCode: 409,
+				}
+			}
+			pciAddresses = append(pciAddresses, gpu.PciAddress)
+		}
+
+		if err := tx.Where("instance_id = ?", input.InstanceID).Delete(&models.InstanceGpuAllocation{}).Error; err != nil {
+			return err
+		}
+		newAllocs := make([]models.InstanceGpuAllocation, 0, len(devices))
+		for _, gpu := range devices {
+			newAllocs = append(newAllocs, models.InstanceGpuAllocation{
+				InstanceID:  input.InstanceID,
+				GPUDeviceID: gpu.ID,
+			})
+		}
+		if err := tx.Create(&newAllocs).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.Instance{}).Where("id = ?", input.InstanceID).
+			Updates(map[string]any{"gpu_device_id": devices[0].ID, "gpu_released_at": nil}).Error; err != nil {
+			return err
+		}
+		if input.SyncIncus != nil {
+			if err := input.SyncIncus(txCtx, pciAddresses); err != nil {
+				return err
+			}
+		}
+		resultPCIs = pciAddresses
+		hasGPUs = true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return resultPCIs, hasGPUs, nil
 }
 
 // gpusJSTruthy mirrors JavaScript's boolean coercion for JSON values.

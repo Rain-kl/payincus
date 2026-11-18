@@ -79,7 +79,7 @@ func TestAdminTasksEnums(t *testing.T) {
 		t.Error("status pending must be rejected")
 	}
 
-	for _, kind := range []string{"create", "destroy", "node_recover"} {
+	for _, kind := range []string{"create", "destroy", "node_recover", "instance_export", "instance_import"} {
 		if !adminTasksKinds[kind] {
 			t.Errorf("kind %q must be accepted", kind)
 		}

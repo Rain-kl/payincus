@@ -130,8 +130,21 @@ func Authenticate() gin.HandlerFunc {
 		if verifyAndActivate(c) == nil {
 			return
 		}
+		if hasRequireAdminHandler(c) {
+			c.Next()
+			return
+		}
 		continueAfterAuth(c)
 	}
+}
+
+func hasRequireAdminHandler(c *gin.Context) bool {
+	for _, name := range c.HandlerNames() {
+		if strings.Contains(name, "middleware.RequireAdmin.") {
+			return true
+		}
+	}
+	return false
 }
 
 // RequireAdmin mirrors app.requireAdmin (must run after Authenticate).

@@ -255,6 +255,29 @@ func ProcessAgentStorageReport(ctx context.Context, hostID int32, payload any, r
 	}
 	rows.Close()
 
+	poolsWithInstances := make(map[string]struct{})
+	instRows, err := db.Pool().Query(ctx, `
+		SELECT DISTINCT storage_pool_name FROM instances
+		WHERE host_id = $1 AND status <> 'deleted' AND storage_pool_name IS NOT NULL`, hostID)
+	if err != nil {
+		return false, err
+	}
+	for instRows.Next() {
+		var poolName string
+		if err := instRows.Scan(&poolName); err != nil {
+			instRows.Close()
+			return false, err
+		}
+		if poolName != "" {
+			poolsWithInstances[poolName] = struct{}{}
+		}
+	}
+	if err := instRows.Err(); err != nil {
+		instRows.Close()
+		return false, err
+	}
+	instRows.Close()
+
 	accepted := true
 	for _, pool := range pools {
 		if sampledAt.Before(pool.CreatedAt) || (pool.ReportedAt != nil && !sampledAt.After(*pool.ReportedAt)) {
@@ -319,13 +342,6 @@ func ProcessAgentStorageReport(ctx context.Context, hostID int32, payload any, r
 			continue
 		}
 
-		status := "unavailable"
-		if item == nil {
-			if availableTrue {
-				status = "missing"
-			}
-		}
-
 		source := ""
 		if value, ok := config["zfs.pool_name"]; ok && agentStorageJSTruthy(value) {
 			source = agentStorageJSString(value)
@@ -342,6 +358,7 @@ func ProcessAgentStorageReport(ctx context.Context, hostID int32, payload any, r
 			}
 		}
 		matchingSource := source == "" || strings.HasPrefix(source, "/") || source == actualSource
+		_, hasAttachedInstances := poolsWithInstances[pool.Name]
 
 		var (
 			totalBytes *int64
@@ -349,12 +366,37 @@ func ProcessAgentStorageReport(ctx context.Context, hostID int32, payload any, r
 			telemetry  any
 			mergedCfg  map[string]any
 		)
-		itemDriver, _ := item["driver"].(string)
+		itemDriver := ""
+		if item != nil {
+			itemDriver, _ = item["driver"].(string)
+		}
+
+		status := "unavailable"
+		if item == nil {
+			if availableTrue {
+				status = "missing"
+			}
+		} else if (!matchingSource || itemDriver != pool.Driver) && hasAttachedInstances {
+			status = "missing"
+		}
+
 		if item != nil && itemDriver == pool.Driver && matchingSource {
 			space, spaceOK := agentStorageIsRecord(item["space"])
 			total, totalOK := agentStorageIsBytes(space["total"])
 			used, usedOK := agentStorageIsBytes(space["used"])
 			validSpace := spaceOK && totalOK && total > 0 && usedOK && used <= total
+			var spaceAvailable any
+			if validSpace {
+				if avail, ok := agentStorageIsBytes(space["available"]); ok {
+					if avail < total {
+						spaceAvailable = avail
+					} else {
+						spaceAvailable = total
+					}
+				} else {
+					spaceAvailable = total - used
+				}
+			}
 
 			status = "unavailable"
 			if importValue, importOK := config["_payincusImport"]; importOK && agentStorageJSTruthy(importValue) {
@@ -429,10 +471,11 @@ func ProcessAgentStorageReport(ctx context.Context, hostID int32, payload any, r
 				filesystemID = agentStorageSlice(value, 100)
 			}
 			telemetry = map[string]any{
-				"usedBy":       usedBy,
-				"encryption":   encryption,
-				"backing":      backing,
-				"filesystemId": filesystemID,
+				"usedBy":         usedBy,
+				"spaceAvailable": spaceAvailable,
+				"encryption":     encryption,
+				"backing":        backing,
+				"filesystemId":   filesystemID,
 			}
 
 			if itemConfig, ok := agentStorageIsRecord(item["config"]); ok {

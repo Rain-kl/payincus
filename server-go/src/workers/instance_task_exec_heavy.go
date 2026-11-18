@@ -79,14 +79,14 @@ type instanceTaskRecreateSwitch struct {
 // resolved inside the transaction (it depends on the target host's multiplier),
 // hence PackageID/BaseTrafficLimit instead of a resolved value.
 type instanceTaskHostSwitch struct {
-	TargetHostID        int32
-	IncusID             string
-	RootPassword        string
-	IPv4                *string
-	IPv6                *string
-	StoragePool         *string
-	PackageID           *int32
-	BaseTrafficLimit    *int64
+	TargetHostID     int32
+	IncusID          string
+	RootPassword     string
+	IPv4             *string
+	IPv6             *string
+	StoragePool      *string
+	PackageID        *int32
+	BaseTrafficLimit *int64
 }
 
 // instanceTaskClonePort mirrors one element of the TypeScript's newPortMappings.
@@ -143,13 +143,14 @@ type instanceTaskHeavySeams struct {
 	calculateHostRes  func(ctx context.Context, hostID int32) (db.HostsInstanceResourceSum, error)
 	updateHostRes     func(ctx context.Context, hostID int32, resources db.HostsResourceUpdate) error
 	setHostNATPorts   func(ctx context.Context, hostID, count int32) error
+	hostNATPorts      func(ctx context.Context, hostID int32) (int32, bool)
 	countSourcePorts  func(ctx context.Context, hostID int32) (int32, error)
 
 	// storage / images / traffic
-	hasStoragePool   func(ctx context.Context, hostID int32, name string) (bool, error)
-	resolveNewPool   func(ctx context.Context, hostID int32, packageID *int32) (*string, error)
+	hasStoragePool    func(ctx context.Context, hostID int32, name string) (bool, error)
+	resolveNewPool    func(ctx context.Context, hostID int32, packageID *int32) (*string, error)
 	imageAvailability func(ctx context.Context, alias string, hostID int32, options db.SystemImageAvailabilityOptions) (db.HostImageAvailability, error)
-	resolveTraffic   func(ctx context.Context, client *gorm.DB, params lib.TrafficMultiplierResolveParams) (*int64, error)
+	resolveTraffic    func(ctx context.Context, client *gorm.DB, params lib.TrafficMultiplierResolveParams) (*int64, error)
 
 	// instance rows
 	createInstanceRow     func(ctx context.Context, input db.InstanceCreateInput) (int32, error)
@@ -166,7 +167,7 @@ type instanceTaskHeavySeams struct {
 	resetCloudInit        func(ctx context.Context, instanceID int32) error
 	deleteSnapshotRows    func(ctx context.Context, instanceID int32) error
 	switchRecreated       func(ctx context.Context, instanceID int32, data instanceTaskRecreateSwitch) error
-	switchHost            func(ctx context.Context, instanceID int32, data instanceTaskHostSwitch) error
+	switchHost            func(ctx context.Context, instanceID int32, data instanceTaskHostSwitch) (int32, error)
 
 	// proxy / caddy
 	listProxySites  func(ctx context.Context, instanceID int32) ([]instanceTaskProxySite, error)
@@ -197,8 +198,8 @@ type instanceTaskHeavySeams struct {
 }
 
 var (
-	instanceTaskHeavySeamsMu  sync.RWMutex
-	instanceTaskHeavySeamSet  = newInstanceTaskHeavySeams()
+	instanceTaskHeavySeamsMu sync.RWMutex
+	instanceTaskHeavySeamSet = newInstanceTaskHeavySeams()
 )
 
 // instanceTaskHeavy returns the installed seam set.
@@ -260,6 +261,7 @@ func newInstanceTaskHeavySeams() *instanceTaskHeavySeams {
 			return db.HostsUpdateResources(ctx, hostID, resources, nil)
 		},
 		setHostNATPorts:  defaultInstanceTaskSetHostNATPorts,
+		hostNATPorts:     defaultInstanceTaskHostNATPorts,
 		countSourcePorts: defaultInstanceTaskCountSourcePorts,
 
 		hasStoragePool: db.StoragePoolsHasStoragePool,
@@ -274,10 +276,16 @@ func newInstanceTaskHeavySeams() *instanceTaskHeavySeams {
 			return lib.ResolveInstanceTrafficLimitForHost(ctx, client, params)
 		},
 
-		createInstanceRow:     db.CreateInstance,
-		setInstanceIPv4:       func(ctx context.Context, instanceID int32, address string) error { return defaultInstanceTaskSetInstanceIP(ctx, instanceID, address, true) },
-		setInstanceIPv6:       func(ctx context.Context, instanceID int32, address string) error { return defaultInstanceTaskSetInstanceIP(ctx, instanceID, address, false) },
-		setInstanceStopped:    func(ctx context.Context, instanceID int32) error { return db.UpdateInstanceStatus(ctx, instanceID, models.InstanceStatusStopped, nil) },
+		createInstanceRow: db.CreateInstance,
+		setInstanceIPv4: func(ctx context.Context, instanceID int32, address string) error {
+			return defaultInstanceTaskSetInstanceIP(ctx, instanceID, address, true)
+		},
+		setInstanceIPv6: func(ctx context.Context, instanceID int32, address string) error {
+			return defaultInstanceTaskSetInstanceIP(ctx, instanceID, address, false)
+		},
+		setInstanceStopped: func(ctx context.Context, instanceID int32) error {
+			return db.UpdateInstanceStatus(ctx, instanceID, models.InstanceStatusStopped, nil)
+		},
 		findInstanceByIncusID: defaultInstanceTaskFindInstanceByIncusID,
 		deleteInstanceRow:     defaultInstanceTaskDeleteInstanceRow,
 		cleanupRecreated:      defaultInstanceTaskCleanupRecreated,
@@ -510,7 +518,7 @@ func executeInstanceRecreateTask(ctx context.Context, rt *InstanceTaskRuntime) e
 		return err
 	}
 	log.Printf("[Recreate] 停止旧实例 %s...", oldIncusID)
-	if _, err := ops.incusStop(ctx, rt.Client, oldIncusID, false, busyStopOptions(allowCancel)); err != nil {
+	if err := ops.incusStop(ctx, rt.Client, oldIncusID, false, busyStopOptions(allowCancel)); err != nil {
 		// The instance may already be stopped or gone; continue like the TypeScript.
 		log.Printf("[Recreate] 停止旧实例异常，继续执行: %v", err)
 	} else {
@@ -550,7 +558,7 @@ func executeInstanceRecreateTask(ctx context.Context, rt *InstanceTaskRuntime) e
 			if snapshot.Name == "" {
 				continue
 			}
-			if _, err := ops.incusDeleteSnapshot(ctx, rt.Client, oldIncusID, snapshot.Name); err != nil {
+			if err := ops.incusDeleteSnapshot(ctx, rt.Client, oldIncusID, snapshot.Name); err != nil {
 				return err
 			}
 		}
@@ -766,7 +774,7 @@ func executeInstanceRecreateTask(ctx context.Context, rt *InstanceTaskRuntime) e
 			return err
 		}
 		log.Printf("[Recreate] 删除旧实例 %s（如果存在）...", oldIncusID)
-		if _, err := ops.incusDelete(ctx, rt.Client, oldIncusID); err != nil {
+		if err := ops.incusDelete(ctx, rt.Client, oldIncusID); err != nil {
 			if instanceTaskNotFound(err) {
 				log.Printf("[Recreate] 旧实例 %s 已不存在，继续执行", oldIncusID)
 				oldInstanceDeleted = true
@@ -786,7 +794,7 @@ func executeInstanceRecreateTask(ctx context.Context, rt *InstanceTaskRuntime) e
 		newInstanceCreated = true
 
 		if instanceType == "container" {
-			if _, err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{
+			if err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{
 				"config": map[string]string{
 					"limits.memory.swap": lib.InstanceSwapResolveIncusValue(instance.SwapEnabled, instance.SwapSize),
 				},
@@ -800,7 +808,7 @@ func executeInstanceRecreateTask(ctx context.Context, rt *InstanceTaskRuntime) e
 			return err
 		}
 		log.Printf("[Recreate] 启动新实例 %s...", newIncusID)
-		if _, err := ops.incusStart(ctx, rt.Client, newIncusID); err != nil {
+		if err := ops.incusStart(ctx, rt.Client, newIncusID); err != nil {
 			return err
 		}
 
@@ -896,11 +904,11 @@ func executeInstanceRecreateTask(ctx context.Context, rt *InstanceTaskRuntime) e
 
 	// Compensation: before the database switch the replacement is disposable.
 	if !databaseSwitched && newInstanceCreated {
-		if _, stopErr := ops.incusStop(ctx, rt.Client, newIncusID, true, lib.IncusInstanceBusyRetryOptions{}); stopErr != nil {
+		if stopErr := ops.incusStop(ctx, rt.Client, newIncusID, true, lib.IncusInstanceBusyRetryOptions{}); stopErr != nil {
 			// The replacement may not have reached running state; deletion can proceed.
 			log.Printf("[Recreate] 停止失败的新实例 %s 失败: %v", newIncusID, stopErr)
 		}
-		if _, deleteErr := ops.incusDelete(ctx, rt.Client, newIncusID); deleteErr != nil {
+		if deleteErr := ops.incusDelete(ctx, rt.Client, newIncusID); deleteErr != nil {
 			log.Printf("[Recreate] 清理失败的新实例 %s 失败: %v", newIncusID, deleteErr)
 		} else {
 			log.Printf("[Recreate] 已清理失败的新实例 %s", newIncusID)
@@ -1224,7 +1232,7 @@ func executeInstanceChangeHostTask(ctx context.Context, rt *InstanceTaskRuntime)
 		if err := ops.updateProgress(ctx, task.ID, "starting_target"); err != nil {
 			return err
 		}
-		if _, err := ops.incusStart(ctx, rt.Client, newIncusID); err != nil {
+		if err := ops.incusStart(ctx, rt.Client, newIncusID); err != nil {
 			return err
 		}
 
@@ -1289,7 +1297,7 @@ func executeInstanceChangeHostTask(ctx context.Context, rt *InstanceTaskRuntime)
 		if err != nil {
 			return err
 		}
-		if err := ops.switchHost(ctx, task.InstanceID, instanceTaskHostSwitch{
+		deletedPorts, err := ops.switchHost(ctx, task.InstanceID, instanceTaskHostSwitch{
 			TargetHostID:     targetHostID,
 			IncusID:          newIncusID,
 			RootPassword:     encryptedPassword,
@@ -1298,7 +1306,8 @@ func executeInstanceChangeHostTask(ctx context.Context, rt *InstanceTaskRuntime)
 			StoragePool:      storagePool,
 			PackageID:        instance.PackageID,
 			BaseTrafficLimit: baseTrafficLimit,
-		}); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 		dbSwitched = true
@@ -1323,15 +1332,18 @@ func executeInstanceChangeHostTask(ctx context.Context, rt *InstanceTaskRuntime)
 			// Mirrors the outer try/catch: the client error is handled by the
 			// "source instance not released" branch below.
 			log.Printf("[ChangeHost] 获取源节点客户端失败: %v", err)
+			if err := instanceTaskReconcileTargetOnly(ctx, ops, targetHostID); err != nil {
+				log.Printf("[ChangeHost] 更新节点资源失败: %v", err)
+			}
 		} else {
 			allowCancel := isAlpineImageAlias(&instance.Image)
-			if _, stopErr := ops.incusStop(ctx, sourceClient, oldIncusID, true, busyStopOptions(allowCancel)); stopErr != nil {
+			if stopErr := ops.incusStop(ctx, sourceClient, oldIncusID, true, busyStopOptions(allowCancel)); stopErr != nil {
 				log.Printf("[ChangeHost] 停止源实例 %s 失败，继续尝试删除: %v", oldIncusID, stopErr)
 			}
-			if _, deleteErr := ops.incusDelete(ctx, sourceClient, oldIncusID); deleteErr != nil {
+			if deleteErr := ops.incusDelete(ctx, sourceClient, oldIncusID); deleteErr != nil {
 				if instanceTaskNotFound(deleteErr) {
 					log.Printf("[ChangeHost] 源实例 %s 已不存在", oldIncusID)
-					if err := instanceTaskReleaseSourceHost(ctx, ops, instance, sourceHostID, sourceHost, task.InstanceID); err != nil {
+					if err := instanceTaskReleaseSourceHost(ctx, ops, instance, sourceHostID, deletedPorts); err != nil {
 						log.Printf("[ChangeHost] 更新节点资源失败: %v", err)
 					}
 				} else {
@@ -1342,7 +1354,7 @@ func executeInstanceChangeHostTask(ctx context.Context, rt *InstanceTaskRuntime)
 				}
 			} else {
 				log.Printf("[ChangeHost] 源实例 %s 已删除", oldIncusID)
-				if err := instanceTaskReleaseSourceHost(ctx, ops, instance, sourceHostID, sourceHost, task.InstanceID); err != nil {
+				if err := instanceTaskReleaseSourceHost(ctx, ops, instance, sourceHostID, deletedPorts); err != nil {
 					log.Printf("[ChangeHost] 更新节点资源失败: %v", err)
 				}
 			}
@@ -1379,10 +1391,10 @@ func executeInstanceChangeHostTask(ctx context.Context, rt *InstanceTaskRuntime)
 		targetInstanceReleased := newIncusID == ""
 		if newIncusID != "" {
 			targetInstanceReleased = false
-			if _, stopErr := ops.incusStop(ctx, rt.Client, newIncusID, true, lib.IncusInstanceBusyRetryOptions{}); stopErr != nil {
+			if stopErr := ops.incusStop(ctx, rt.Client, newIncusID, true, lib.IncusInstanceBusyRetryOptions{}); stopErr != nil {
 				log.Printf("[ChangeHost] 停止目标节点新实例 %s 失败: %v", newIncusID, stopErr)
 			}
-			if _, deleteErr := ops.incusDelete(ctx, rt.Client, newIncusID); deleteErr != nil {
+			if deleteErr := ops.incusDelete(ctx, rt.Client, newIncusID); deleteErr != nil {
 				if instanceTaskNotFound(deleteErr) {
 					targetInstanceReleased = true
 				} else {
@@ -1420,13 +1432,8 @@ func instanceTaskReleaseSourceHost(
 	ops *instanceTaskHeavySeams,
 	instance *db.InstanceDetailRecord,
 	sourceHostID int32,
-	sourceHost *db.HostsRecord,
-	instanceID int32,
+	deletedPorts int32,
 ) error {
-	deletedPorts, err := ops.countDeletedPortsForInstance(ctx, instanceID)
-	if err != nil {
-		return err
-	}
 	if err := ops.rollbackResources(ctx, db.RollbackResourcesOptions{
 		HostID:    sourceHostID,
 		CPU:       instance.CPU,
@@ -1463,14 +1470,14 @@ func instanceTaskReconcileBothHosts(ctx context.Context, ops *instanceTaskHeavyS
 		return err
 	}
 	sourceResources := db.HostsResourceUpdate{
-		CPUUsed:    instanceTaskMaxInt64(sourceCalculated.CPUUsed, instanceTaskHostCPU(sourceHost)),
-		MemoryUsed: instanceTaskMaxInt64(sourceCalculated.MemoryUsed, instanceTaskHostMemory(sourceHost)),
-		DiskUsed:   instanceTaskMaxInt64(sourceCalculated.DiskUsed, instanceTaskHostDisk(sourceHost)),
+		CPUUsed:    instanceTaskInt64Ptr(instanceTaskMaxInt64(sourceCalculated.CPUUsed, instanceTaskHostCPU(sourceHost))),
+		MemoryUsed: instanceTaskInt64Ptr(instanceTaskMaxInt64(sourceCalculated.MemoryUsed, instanceTaskHostMemory(sourceHost))),
+		DiskUsed:   instanceTaskInt64Ptr(instanceTaskMaxInt64(sourceCalculated.DiskUsed, instanceTaskHostDisk(sourceHost))),
 	}
 	targetResources := db.HostsResourceUpdate{
-		CPUUsed:    instanceTaskMaxInt64(targetCalculated.CPUUsed, instanceTaskHostCPU(targetHost)),
-		MemoryUsed: instanceTaskMaxInt64(targetCalculated.MemoryUsed, instanceTaskHostMemory(targetHost)),
-		DiskUsed:   instanceTaskMaxInt64(targetCalculated.DiskUsed, instanceTaskHostDisk(targetHost)),
+		CPUUsed:    instanceTaskInt64Ptr(instanceTaskMaxInt64(targetCalculated.CPUUsed, instanceTaskHostCPU(targetHost))),
+		MemoryUsed: instanceTaskInt64Ptr(instanceTaskMaxInt64(targetCalculated.MemoryUsed, instanceTaskHostMemory(targetHost))),
+		DiskUsed:   instanceTaskInt64Ptr(instanceTaskMaxInt64(targetCalculated.DiskUsed, instanceTaskHostDisk(targetHost))),
 	}
 	if err := ops.updateHostRes(ctx, sourceHostID, sourceResources); err != nil {
 		return err
@@ -1499,10 +1506,14 @@ func instanceTaskReconcileTargetOnly(ctx context.Context, ops *instanceTaskHeavy
 		return err
 	}
 	return ops.updateHostRes(ctx, targetHostID, db.HostsResourceUpdate{
-		CPUUsed:    instanceTaskMaxInt64(calculated.CPUUsed, instanceTaskHostCPU(current)),
-		MemoryUsed: instanceTaskMaxInt64(calculated.MemoryUsed, instanceTaskHostMemory(current)),
-		DiskUsed:   instanceTaskMaxInt64(calculated.DiskUsed, instanceTaskHostDisk(current)),
+		CPUUsed:    instanceTaskInt64Ptr(instanceTaskMaxInt64(calculated.CPUUsed, instanceTaskHostCPU(current))),
+		MemoryUsed: instanceTaskInt64Ptr(instanceTaskMaxInt64(calculated.MemoryUsed, instanceTaskHostMemory(current))),
+		DiskUsed:   instanceTaskInt64Ptr(instanceTaskMaxInt64(calculated.DiskUsed, instanceTaskHostDisk(current))),
 	})
+}
+
+func instanceTaskInt64Ptr(value int64) *int64 {
+	return &value
 }
 
 func instanceTaskMaxInt64(left, right int64) int64 {
@@ -1791,7 +1802,7 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 				}
 				// The guest needs the new addresses in its cloud-init network-config.
 				networkConfig := lib.GenerateCloudInitNetworkConfig(*newIPv4, []string{*newIPv6})
-				if _, err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{
+				if err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{
 					"config": map[string]string{"user.network-config": networkConfig},
 				}); err != nil {
 					return err
@@ -1808,7 +1819,7 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 
 		// 4b. Apply the device rewrite.
 		if len(updatedDevices) > 0 {
-			if _, err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{"devices": updatedDevices}); err != nil {
+			if err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{"devices": updatedDevices}); err != nil {
 				return err
 			}
 		}
@@ -1816,7 +1827,7 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 		// 4c. NAT-only clone still needs the IPv4 network-config.
 		if newIPv6 == nil {
 			networkConfig := lib.GenerateCloudInitNetworkConfig(*newIPv4, nil)
-			if _, err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{
+			if err := ops.incusUpdate(ctx, rt.Client, newIncusID, map[string]any{
 				"config": map[string]string{"user.network-config": networkConfig},
 			}); err != nil {
 				return err
@@ -1846,17 +1857,17 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 			portLimit = *sourceInstance.PortLimit
 		}
 		snapshotSpecs := map[string]any{
-			"packageId":    pkg.ID,
-			"packageName":  pkg.Name,
-			"cpuMax":       pkg.CPUMax,
-			"memoryMax":    pkg.MemoryMax,
-			"diskMax":      pkg.DiskMax,
-			"networkMode":  string(sourceInstance.NetworkMode),
-			"portLimit":    portLimit,
-			"nested":       pkg.Nested != 0,
-			"privileged":   pkg.Privileged != 0,
+			"packageId":     pkg.ID,
+			"packageName":   pkg.Name,
+			"cpuMax":        pkg.CPUMax,
+			"memoryMax":     pkg.MemoryMax,
+			"diskMax":       pkg.DiskMax,
+			"networkMode":   string(sourceInstance.NetworkMode),
+			"portLimit":     portLimit,
+			"nested":        pkg.Nested != 0,
+			"privileged":    pkg.Privileged != 0,
 			"nodeSelectors": nodeSelectors,
-			"createdAt":    instanceTaskISOString(ops.now()),
+			"createdAt":     instanceTaskISOString(ops.now()),
 		}
 		specsJSON, err := json.Marshal(snapshotSpecs)
 		if err != nil {
@@ -1934,7 +1945,7 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 		}
 
 		// 9. IP rows + denormalized instance columns.
-		if _, err := ops.createIPRecord(ctx, db.IpAddressesCreateData{
+		if err := ops.createIP(ctx, db.IpAddressesCreateData{
 			Address:    *newIPv4,
 			Type:       models.IpTypeInet4,
 			IsPrimary:  true,
@@ -1949,7 +1960,7 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 		log.Printf("[Clone] 新实例 %d IPv4 已更新: %s (device: eth0)", newInstanceID, *newIPv4)
 
 		if newIPv6 != nil {
-			if _, err := ops.createIPRecord(ctx, db.IpAddressesCreateData{
+			if err := ops.createIP(ctx, db.IpAddressesCreateData{
 				Address:    *newIPv6,
 				Type:       models.IpTypeInet6,
 				IsPrimary:  true,
@@ -2007,7 +2018,7 @@ func executeInstanceCloneTask(ctx context.Context, rt *InstanceTaskRuntime) erro
 	// Compensation: release the remote copy, then the row, then the reservation —
 	// each step only when the previous one is confirmed.
 	incusCloneReleased := false
-	if _, deleteErr := ops.incusDelete(ctx, rt.Client, newIncusID); deleteErr != nil {
+	if deleteErr := ops.incusDelete(ctx, rt.Client, newIncusID); deleteErr != nil {
 		if instanceTaskNotFound(deleteErr) {
 			incusCloneReleased = true
 		} else {
@@ -2154,6 +2165,18 @@ func defaultInstanceTaskSetHostNATPorts(ctx context.Context, hostID, count int32
 		return errors.New("host not found")
 	}
 	return nil
+}
+
+// defaultInstanceTaskHostNATPorts reads hosts.nat_ports_used_count.
+func defaultInstanceTaskHostNATPorts(ctx context.Context, hostID int32) (int32, bool) {
+	if db.Pool() == nil {
+		return 0, false
+	}
+	var count int32
+	if err := db.Pool().QueryRow(ctx, `SELECT nat_ports_used_count FROM hosts WHERE id = $1`, hostID).Scan(&count); err != nil {
+		return 0, false
+	}
+	return count, true
 }
 
 // defaultInstanceTaskCountSourcePorts mirrors
@@ -2352,11 +2375,12 @@ func defaultInstanceTaskSwitchRecreated(ctx context.Context, instanceID int32, d
 // defaultInstanceTaskSwitchHost is change_host's commit point: dependent rows are
 // dropped, the IPv6 ownership is proven under the allocation lock, the instance
 // row moves, and the new address rows are written — all in one transaction.
-func defaultInstanceTaskSwitchHost(ctx context.Context, instanceID int32, data instanceTaskHostSwitch) error {
+func defaultInstanceTaskSwitchHost(ctx context.Context, instanceID int32, data instanceTaskHostSwitch) (int32, error) {
 	if db.DB == nil {
-		return errors.New("workers: database not initialized")
+		return 0, errors.New("workers: database not initialized")
 	}
-	return db.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var deletedPortMappingsCount int32
+	err := db.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		monthlyTrafficLimit, err := defaultResolveTrafficTx(ctx, tx, lib.TrafficMultiplierResolveParams{
 			PackageID:        data.PackageID,
 			HostID:           data.TargetHostID,
@@ -2375,8 +2399,13 @@ func defaultInstanceTaskSwitchHost(ctx context.Context, instanceID int32, data i
 			return err
 		}
 
+		deletePortsRes := tx.Exec(`DELETE FROM port_mappings WHERE instance_id = ?`, instanceID)
+		if deletePortsRes.Error != nil {
+			return deletePortsRes.Error
+		}
+		deletedPortMappingsCount = int32(deletePortsRes.RowsAffected)
+
 		for _, statement := range []string{
-			`DELETE FROM port_mappings WHERE instance_id = ?`,
 			`DELETE FROM snapshots WHERE instance_id = ?`,
 			`DELETE FROM backups WHERE instance_id = ?`,
 			`DELETE FROM restore_tasks WHERE instance_id = ? AND status IN ('COMPLETED', 'FAILED')`,
@@ -2449,6 +2478,10 @@ func defaultInstanceTaskSwitchHost(ctx context.Context, instanceID int32, data i
 		}
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
+	return deletedPortMappingsCount, nil
 }
 
 // defaultResolveTrafficTx resolves the traffic multiplier on the caller's

@@ -240,6 +240,9 @@ func SchedulerNames() []string {
 		"ticket-auto-close",
 		"status",
 		"startup-cleanup",
+		"storage-encryption-loader",
+		"system-monitor",
+		"host-address-monitor",
 	}
 }
 
@@ -270,9 +273,54 @@ func StartSchedulers(ctx context.Context) (stop func()) {
 	startTicketAutoCloseScheduler(group)
 	startStatusSchedulerJob(group)
 	startStartupCleanup(group)
+	startStorageEncryptionLoaderJob(group)
+	startSystemMonitorJob(group)
+	startHostAddressMonitorJob(group)
 
 	log.Printf("[Schedulers] All background jobs started: %v", SchedulerNames())
 	return group.stop
+}
+
+var storageEncryptionLoaderRunning atomic.Bool
+
+func startStorageEncryptionLoaderJob(group *schedulerGroup) {
+	group.startIntervalLoop("StorageEncryption", storageEncryptionLoaderInterval, true, func(ctx context.Context) error {
+		runStorageEncryptionLoaderRound(ctx)
+		return nil
+	}, &storageEncryptionLoaderRunning)
+}
+
+func startSystemMonitorJob(group *schedulerGroup) {
+	group.wg.Add(1)
+	go func() {
+		defer group.wg.Done()
+		select {
+		case <-group.ctx.Done():
+			return
+		case <-group.after(5 * time.Second):
+		}
+		if group.ctx.Err() != nil {
+			return
+		}
+		ReportSystemHealth(group.ctx)
+	}()
+	group.startLoop("SystemMonitor", func(now time.Time) time.Time {
+		return schedulerEveryNMinutesNextRun(now, 10)
+	}, func(ctx context.Context) error {
+		ReportSystemHealth(ctx)
+		return nil
+	}, &systemMonitorRunning)
+}
+
+func startHostAddressMonitorJob(group *schedulerGroup) {
+	group.spawn("HostAddressBackfill", func(ctx context.Context) error {
+		RunHostAddressBackfillJob(ctx)
+		return nil
+	}, nil)
+	group.startLoop("HostAddressPoll", HostAddressMonitorNextRun, func(ctx context.Context) error {
+		RunHostAddressPollJob(ctx)
+		return nil
+	}, &hostAddressMonitorRunning)
 }
 
 // startStatusSchedulerJob wires the already-ported status reconciler into the

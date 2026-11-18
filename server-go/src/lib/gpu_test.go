@@ -34,7 +34,7 @@ func TestNormalizeGpuInputTriState(t *testing.T) {
 
 // TestNormalizeGpuInputDeviceIDs pins the id validation and de-duplication.
 func TestNormalizeGpuInputDeviceIDs(t *testing.T) {
-	_, _, ids, present, err := NormalizeGpuInput(map[string]any{"gpuDeviceIDs": []any{float64(3), float64(1), float64(3)}}, false)
+	_, _, ids, present, err := NormalizeGpuInput(map[string]any{"gpuDeviceIds": []any{float64(3), float64(1), float64(3)}}, false)
 	if err != nil || !present {
 		t.Fatalf("unexpected: ids=%v present=%v err=%v", ids, present, err)
 	}
@@ -58,7 +58,7 @@ func TestNormalizeGpuInputDeviceIDs(t *testing.T) {
 		}(),
 	}
 	for _, input := range bad {
-		if _, _, _, _, err := NormalizeGpuInput(map[string]any{"gpuDeviceIDs": input}, false); err == nil {
+		if _, _, _, _, err := NormalizeGpuInput(map[string]any{"gpuDeviceIds": input}, false); err == nil {
 			t.Errorf("expected rejection for %v", input)
 		}
 	}
@@ -247,5 +247,117 @@ func TestGpuErrorShape(t *testing.T) {
 	}
 	if err.Error() != "x" {
 		t.Fatalf("Error() = %q", err.Error())
+	}
+
+	custom := &GpuError{Message: "busy", StatusCodeValue: 409, CodeValue: "INSTANCE_RUNNING"}
+	if custom.StatusCode() != 409 || custom.Code() != "INSTANCE_RUNNING" {
+		t.Fatalf("custom = %d %q", custom.StatusCode(), custom.Code())
+	}
+}
+
+func TestListIncusGpuDevicesAndExtractPciAddresses(t *testing.T) {
+	if got := ListIncusGpuDevices(nil); len(got) != 0 {
+		t.Fatalf("nil config -> %v", got)
+	}
+	cfg := map[string]any{
+		"devices": map[string]any{
+			"gpu1": map[string]any{"type": "gpu", "pci": " 0000:00:1f.0 ", "gputype": "physical"},
+			"gpu0": map[string]any{"type": "gpu", "pci": "", "gputype": "  "},
+			"eth0": map[string]any{"type": "nic"},
+		},
+	}
+	got := ListIncusGpuDevices(cfg)
+	if len(got) != 2 || got[0].Name != "gpu0" || got[0].Pci != nil || got[0].Gputype != nil {
+		t.Fatalf("got[0] = %#v", got)
+	}
+	if got[1].Name != "gpu1" || got[1].Pci == nil || *got[1].Pci != "0000:00:1f.0" || got[1].Gputype == nil || *got[1].Gputype != "physical" {
+		t.Fatalf("got[1] = %#v", got[1])
+	}
+
+	if addrs := ExtractResourceGpuPciAddresses(nil); addrs != nil {
+		t.Fatalf("expected nil for nil resources, got %v", addrs)
+	}
+	if addrs := ExtractResourceGpuPciAddresses(map[string]any{"gpu": map[string]any{}}); addrs != nil {
+		t.Fatalf("expected nil without cards array, got %v", addrs)
+	}
+	addrs := ExtractResourceGpuPciAddresses(map[string]any{
+		"gpu": map[string]any{
+			"cards": []any{
+				map[string]any{"pci_address": " 0000:00:1E.0 "},
+				map[string]any{"pciAddress": "0000:00:1F.1"},
+				map[string]any{"pci_address": "   "},
+			},
+		},
+	})
+	if len(addrs) != 2 {
+		t.Fatalf("expected 2 addresses, got %#v", addrs)
+	}
+	if _, ok := addrs["0000:00:1e.0"]; !ok {
+		t.Fatalf("missing lowercased pci_address in %#v", addrs)
+	}
+	if _, ok := addrs["0000:00:1f.1"]; !ok {
+		t.Fatalf("missing pciAddress in %#v", addrs)
+	}
+}
+
+func TestClearAndSanitizeGpuDevices(t *testing.T) {
+	cfg := map[string]any{
+		"config": map[string]any{
+			"nvidia.runtime":             "true",
+			"nvidia.driver.capabilities": "compute,utility",
+			"security.nesting":           "true",
+		},
+		"devices": map[string]any{
+			"gpu0": map[string]any{"type": "gpu", "pci": "0000:00:1e.0"},
+			"gpu1": map[string]any{"type": "gpu", "pci": "0000:00:1f.0"},
+			"root": map[string]any{"type": "disk", "path": "/"},
+		},
+	}
+
+	// Sanitize keeps gpu0 and drops gpu1, keeping NVIDIA config keys.
+	removed := SanitizeMissingHostGpuDevices(cfg, map[string]struct{}{"0000:00:1e.0": {}})
+	if len(removed) != 1 || removed[0] != "gpu1(0000:00:1f.0)" {
+		t.Fatalf("removed = %v", removed)
+	}
+	settings := cfg["config"].(map[string]any)
+	if settings["nvidia.runtime"] != "true" {
+		t.Fatalf("expected nvidia.runtime preserved while gpu0 remains")
+	}
+
+	// Sanitize with no matching GPUs strips remaining gpu0 + NVIDIA config keys.
+	removed2 := SanitizeMissingHostGpuDevices(cfg, map[string]struct{}{})
+	if len(removed2) != 1 || removed2[0] != "gpu0(0000:00:1e.0)" {
+		t.Fatalf("removed2 = %v", removed2)
+	}
+	settings = cfg["config"].(map[string]any)
+	if _, ok := settings["nvidia.runtime"]; ok {
+		t.Fatal("nvidia.runtime should be removed when no GPUs remain")
+	}
+	if settings["security.nesting"] != "true" {
+		t.Fatal("unrelated config keys must remain")
+	}
+
+	// ClearGpuDevices removes all gpu devices and nvidia keys and reports changed=false on second call.
+	cfg2 := map[string]any{
+		"config": map[string]any{"nvidia.runtime": "true", "other": "1"},
+		"devices": map[string]any{
+			"gpu0": map[string]any{"type": "gpu", "pci": "0000:00:1e.0"},
+			"root": map[string]any{"type": "disk"},
+		},
+	}
+	if !ClearGpuDevices(cfg2) {
+		t.Fatal("expected ClearGpuDevices to report changed=true")
+	}
+	if _, ok := cfg2["devices"].(map[string]any)["gpu0"]; ok {
+		t.Fatal("gpu0 should be deleted")
+	}
+	if _, ok := cfg2["devices"].(map[string]any)["root"]; !ok {
+		t.Fatal("non-gpu device should remain")
+	}
+	if _, ok := cfg2["config"].(map[string]any)["nvidia.runtime"]; ok {
+		t.Fatal("nvidia.runtime should be cleared")
+	}
+	if ClearGpuDevices(cfg2) {
+		t.Fatal("second ClearGpuDevices should report changed=false")
 	}
 }

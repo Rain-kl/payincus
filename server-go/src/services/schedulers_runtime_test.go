@@ -94,6 +94,7 @@ func TestSchedulersNamesCoverEveryJob(t *testing.T) {
 	want := []string{
 		"traffic", "auto-policy", "billing", "mail-expiry", "mail-autorenew",
 		"mail-usage", "ticket-auto-close", "status", "startup-cleanup",
+		"storage-encryption-loader", "system-monitor", "host-address-monitor",
 	}
 	got := SchedulerNames()
 	if len(got) != len(want) {

@@ -95,6 +95,13 @@ type NodeSecurityReport struct {
 	Results           []NodeSecurityResult         `json:"results"`
 	ResumeInstances   []NodeSecurityResumeInstance `json:"resumeInstances"`
 	Reason            string                       `json:"reason"`
+	DesiredEnabled    *bool                        `json:"_desiredEnabled,omitempty"`
+}
+
+// NodeSecurityRecordReportOptions mirrors RecordReportOptions in report.ts.
+type NodeSecurityRecordReportOptions struct {
+	Authoritative  bool
+	DesiredEnabled *bool
 }
 
 // NodeCLIEventInput is one validated CLI event, already allow-listed by
@@ -155,18 +162,85 @@ func GetNodeSecurityState(ctx context.Context, hostID int32) (*models.NodeSecuri
 	return &state, nil
 }
 
-// UpsertNodeSecurityFingerprint mirrors the identity route's
-// `nodeSecurityState.upsert({create:{hostId, report:{}, serverFingerprint}, update:{serverFingerprint}})`.
-//
-// The report column is required by the schema, so the insert seeds it with `{}`
-// exactly like the TypeScript.
+// UpsertNodeSecurityFingerprint mirrors the legacy simple fingerprint upsert.
 func UpsertNodeSecurityFingerprint(ctx context.Context, hostID int32, fingerprint string) error {
-	return DB.WithContext(ctx).Exec(
-		`INSERT INTO node_security_states (host_id, report, server_fingerprint)
-		 VALUES ($1, '{}'::jsonb, $2)
-		 ON CONFLICT (host_id) DO UPDATE SET server_fingerprint = EXCLUDED.server_fingerprint`,
-		hostID, fingerprint,
-	).Error
+	_, err := UpsertNodeSecurityIdentity(ctx, hostID, fingerprint)
+	return err
+}
+
+// UpsertNodeSecurityIdentity mirrors the identity enrollment upsert in
+// routes/node-security.ts: when the pinned fingerprint changes, it resets
+// recoveryBlocked/report/reportedAt (preserving _desiredEnabled) and increments
+// recoveryGeneration, returning any preserved desiredEnabled policy flag.
+func UpsertNodeSecurityIdentity(ctx context.Context, hostID int32, fingerprint string) (*bool, error) {
+	tx, err := Pool().Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+
+	var (
+		existingFingerprint *string
+		rawReport           []byte
+	)
+	err = tx.QueryRow(ctx,
+		`SELECT server_fingerprint, report FROM node_security_states WHERE host_id = $1 FOR UPDATE`,
+		hostID,
+	).Scan(&existingFingerprint, &rawReport)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	exists := err == nil
+
+	var desiredEnabled *bool
+	if prevObj := nodeReportObject(rawReport); prevObj != nil {
+		if flag, ok := prevObj["_desiredEnabled"].(bool); ok {
+			desiredEnabled = &flag
+		}
+	}
+
+	if !exists {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO node_security_states (host_id, report, server_fingerprint)
+			 VALUES ($1, '{}'::jsonb, $2)`,
+			hostID, fingerprint,
+		); err != nil {
+			return nil, err
+		}
+	} else if existingFingerprint != nil && *existingFingerprint != "" && *existingFingerprint != fingerprint {
+		resetObj := map[string]any{}
+		if desiredEnabled != nil {
+			resetObj["_desiredEnabled"] = *desiredEnabled
+		}
+		resetJSON, err := json.Marshal(resetObj)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE node_security_states
+			 SET server_fingerprint = $1,
+			     recovery_blocked = false,
+			     recovery_generation = recovery_generation + 1,
+			     report = $2::jsonb,
+			     reported_at = $3
+			 WHERE host_id = $4`,
+			fingerprint, string(resetJSON), time.Unix(0, 0).UTC(), hostID,
+		); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := tx.Exec(ctx,
+			`UPDATE node_security_states SET server_fingerprint = $1 WHERE host_id = $2`,
+			fingerprint, hostID,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return desiredEnabled, nil
 }
 
 // GetNodeSecurityRecoveryGeneration mirrors
@@ -283,13 +357,20 @@ func ListNodeCliEvents(ctx context.Context, hostID int32, commands []string, tak
 
 // ==================== report transaction ====================
 
-// RecordNodeSecurityReport mirrors recordReport's transaction body.
-//
-// The returned count is Prisma's `inserted.count`: how many CLI events were
-// actually written (duplicates are skipped). The report is mutated in place when
-// the node is recovery-blocked, mirroring `state = { ...state, locked: true,
-// reason: 'startup_verification' }`.
+// RecordNodeSecurityReport mirrors recordReport's transaction body with default options.
 func RecordNodeSecurityReport(ctx context.Context, hostID int32, report NodeSecurityReport, events []NodeCLIEventInput) (int64, error) {
+	return RecordNodeSecurityReportWithOptions(ctx, hostID, report, events, NodeSecurityRecordReportOptions{})
+}
+
+// RecordNodeSecurityReportWithOptions mirrors recordReport(hostId, input, options)
+// in report.ts: supports authoritative overrides and _desiredEnabled persistence.
+func RecordNodeSecurityReportWithOptions(
+	ctx context.Context,
+	hostID int32,
+	report NodeSecurityReport,
+	events []NodeCLIEventInput,
+	opts NodeSecurityRecordReportOptions,
+) (int64, error) {
 	tx, err := Pool().Begin(ctx)
 	if err != nil {
 		return 0, err
@@ -313,18 +394,31 @@ func RecordNodeSecurityReport(ctx context.Context, hostID int32, report NodeSecu
 		return 0, err
 	}
 
+	prevObj := nodeReportObject(previousReport)
+	desiredEnabled := opts.DesiredEnabled
+	if desiredEnabled == nil && prevObj != nil {
+		if flag, ok := prevObj["_desiredEnabled"].(bool); ok {
+			desiredEnabled = &flag
+		}
+	}
+
 	// A node awaiting recovery must never be reported as unlocked, no matter what
 	// the (possibly delayed) agent payload says.
 	report = NodeSecurityApplyRecoveryBlocked(report, hasPrevious && recoveryBlocked)
+	report.DesiredEnabled = desiredEnabled
 
+	hasPreviousRevision := false
 	previousRevision := 0.0
-	if hasPrevious {
-		previousRevision = NodeReportRevisionOf(previousReport)
+	if prevObj != nil {
+		if rev, ok := prevObj["revision"].(float64); ok && !math.IsNaN(rev) && !math.IsInf(rev, 0) {
+			hasPreviousRevision = true
+			previousRevision = rev
+		}
 	}
 
 	// Preserve a newer durable lock revision against delayed delivery. The two
 	// "unavailable" reasons always persist so the panel can see the node is down.
-	if NodeSecurityShouldPersistReport(report.Revision, report.Reason, previousRevision) {
+	if opts.Authoritative || !hasPreviousRevision || NodeSecurityShouldPersistReport(report.Revision, report.Reason, previousRevision) {
 		encoded, err := json.Marshal(report)
 		if err != nil {
 			return 0, err
@@ -396,6 +490,69 @@ func RecordNodeSecurityReport(ctx context.Context, hostID int32, report NodeSecu
 		return 0, err
 	}
 	return inserted, nil
+}
+
+// RecordHeartbeatSecurityLockedOnly merges a partial heartbeat lock flag
+// under the node-security advisory lock while honoring recoveryBlocked.
+func RecordHeartbeatSecurityLockedOnly(ctx context.Context, hostID int32, locked bool) error {
+	tx, err := Pool().Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+
+	if err := AdvisoryTransactionLock(ctx, tx, NodeSecurityReportLockNamespace, hostID); err != nil {
+		return err
+	}
+
+	var (
+		recoveryBlocked bool
+		rawReport       []byte
+	)
+	err = tx.QueryRow(ctx,
+		"SELECT recovery_blocked, report FROM node_security_states WHERE host_id = $1",
+		hostID,
+	).Scan(&recoveryBlocked, &rawReport)
+	hasPrevious := err == nil
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+
+	next := nodeReportObject(rawReport)
+	if next == nil {
+		next = map[string]any{}
+	}
+	next["locked"] = (hasPrevious && recoveryBlocked) || locked
+	if hasPrevious && recoveryBlocked {
+		next["reason"] = "startup_verification"
+	}
+	encoded, err := json.Marshal(next)
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO node_security_states (host_id, report, reported_at)
+		 VALUES ($1, $2::jsonb, NOW())
+		 ON CONFLICT (host_id) DO UPDATE
+		   SET report = EXCLUDED.report, reported_at = NOW()`,
+		hostID, string(encoded),
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func nodeReportObject(raw []byte) map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return nil
+	}
+	obj, _ := decoded.(map[string]any)
+	return obj
 }
 
 // NodeSecurityApplyRecoveryBlocked mirrors

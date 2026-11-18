@@ -351,11 +351,11 @@ func revalidatingLookupAddresses(ctx context.Context, host string) ([]net.IPAddr
 	return addrs, nil
 }
 
-// safeOutboundDialContext is the Go equivalent of undici's connect.lookup hook: it
+// SafeOutboundDialContext is the Go equivalent of undici's connect.lookup hook: it
 // resolves the hostname itself, validates every address and only then dials a
 // validated IP. TLS still uses the original hostname for SNI (http.Transport sets
 // ServerName from the request URL), so certificate verification is unaffected.
-func safeOutboundDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+func SafeOutboundDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -393,7 +393,7 @@ func safeOutboundDialContext(ctx context.Context, network, addr string) (net.Con
 // safeOutboundDispatcher; callers must not mutate it.
 var safeOutboundHTTPClient = &http.Client{
 	Transport: &http.Transport{
-		DialContext:           safeOutboundDialContext,
+		DialContext:           SafeOutboundDialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,

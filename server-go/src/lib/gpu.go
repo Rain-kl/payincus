@@ -31,20 +31,32 @@ const GpuSharingNotice = "共享物理 GPU；显存和算力由同池实例共�
 // gpuPCIAddressPattern mirrors /^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$/.
 var gpuPCIAddressPattern = regexp.MustCompile(`^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]$`)
 
-// GpuError mirrors the TypeScript GpuError (statusCode 400, code
-// GPU_CONFIGURATION_INVALID).
+// GpuError mirrors the TypeScript GpuError (defaults to statusCode 400, code
+// GPU_CONFIGURATION_INVALID, with optional per-error overrides).
 type GpuError struct {
-	Message string
+	Message         string
+	StatusCodeValue int
+	CodeValue       string
 }
 
 // Error implements error.
 func (e *GpuError) Error() string { return e.Message }
 
-// StatusCode mirrors the class field.
-func (e *GpuError) StatusCode() int { return 400 }
+// StatusCode mirrors the class field, defaulting to 400 when unset.
+func (e *GpuError) StatusCode() int {
+	if e.StatusCodeValue != 0 {
+		return e.StatusCodeValue
+	}
+	return 400
+}
 
-// Code mirrors the class field.
-func (e *GpuError) Code() string { return "GPU_CONFIGURATION_INVALID" }
+// Code mirrors the class field, defaulting to GPU_CONFIGURATION_INVALID when unset.
+func (e *GpuError) Code() string {
+	if e.CodeValue != "" {
+		return e.CodeValue
+	}
+	return "GPU_CONFIGURATION_INVALID"
+}
 
 // GpuPolicy mirrors the GpuPolicy interface.
 type GpuPolicy struct {
@@ -106,7 +118,7 @@ func NormalizeGpuInput(input map[string]any, nullable bool) (shared *bool, share
 		}
 	}
 
-	raw, present := input["gpuDeviceIDs"]
+	raw, present := input["gpuDeviceIds"]
 	if !present {
 		return shared, sharedPresent, nil, false, nil
 	}
@@ -248,6 +260,198 @@ func gpuBundleKey(models []GpuModelSummary) string {
 	}
 	builder.WriteByte(']')
 	return builder.String()
+}
+
+var gpuConfigKeys = [...]string{"nvidia.runtime", "nvidia.driver.capabilities"}
+
+// IncusGpuDeviceInfo mirrors the TS IncusGpuDeviceInfo entry parsed from an
+// Incus instance config object.
+type IncusGpuDeviceInfo struct {
+	Name    string  `json:"name"`
+	Pci     *string `json:"pci"`
+	Gputype *string `json:"gputype"`
+}
+
+func deleteGpuConfigKeys(config map[string]any) bool {
+	settings, ok := config["config"].(map[string]any)
+	if !ok || settings == nil {
+		return false
+	}
+	changed := false
+	nextConfig := make(map[string]any, len(settings))
+	for k, v := range settings {
+		nextConfig[k] = v
+	}
+	for _, key := range gpuConfigKeys {
+		if _, exists := nextConfig[key]; exists {
+			delete(nextConfig, key)
+			changed = true
+		}
+	}
+	if changed {
+		config["config"] = nextConfig
+	}
+	return changed
+}
+
+// ListIncusGpuDevices mirrors listIncusGpuDevices from lib/gpu.ts.
+func ListIncusGpuDevices(config map[string]any) []IncusGpuDeviceInfo {
+	if config == nil {
+		return []IncusGpuDeviceInfo{}
+	}
+	devices, ok := config["devices"].(map[string]any)
+	if !ok || devices == nil {
+		return []IncusGpuDeviceInfo{}
+	}
+	result := make([]IncusGpuDeviceInfo, 0)
+	for name, rawDevice := range devices {
+		entry, ok := rawDevice.(map[string]any)
+		if !ok || entry == nil {
+			continue
+		}
+		if deviceType, _ := entry["type"].(string); deviceType != "gpu" {
+			continue
+		}
+		var pciPtr *string
+		if rawPci, ok := entry["pci"].(string); ok {
+			if trimmed := strings.TrimSpace(rawPci); trimmed != "" {
+				pciPtr = &trimmed
+			}
+		}
+		var gpuTypePtr *string
+		if rawType, ok := entry["gputype"].(string); ok {
+			if trimmed := strings.TrimSpace(rawType); trimmed != "" {
+				gpuTypePtr = &trimmed
+			}
+		}
+		result = append(result, IncusGpuDeviceInfo{
+			Name:    name,
+			Pci:     pciPtr,
+			Gputype: gpuTypePtr,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return localeCompare(result[i].Name, result[j].Name) < 0
+	})
+	return result
+}
+
+// ExtractResourceGpuPciAddresses mirrors extractResourceGpuPciAddresses from
+// lib/gpu.ts. Returns nil when host resources lack a valid gpu.cards array.
+func ExtractResourceGpuPciAddresses(resources any) map[string]struct{} {
+	root, ok := resources.(map[string]any)
+	if !ok || root == nil {
+		return nil
+	}
+	gpuObj, ok := root["gpu"].(map[string]any)
+	if !ok || gpuObj == nil {
+		return nil
+	}
+	cards, ok := gpuObj["cards"].([]any)
+	if !ok {
+		return nil
+	}
+	addresses := make(map[string]struct{}, len(cards))
+	for _, rawCard := range cards {
+		card, ok := rawCard.(map[string]any)
+		if !ok || card == nil {
+			continue
+		}
+		rawAddr, has := card["pci_address"].(string)
+		if !has || strings.TrimSpace(rawAddr) == "" {
+			rawAddr, _ = card["pciAddress"].(string)
+		}
+		if trimmed := strings.TrimSpace(rawAddr); trimmed != "" {
+			addresses[strings.ToLower(trimmed)] = struct{}{}
+		}
+	}
+	return addresses
+}
+
+// ClearGpuDevices mirrors clearGpuDevices from lib/gpu.ts, removing all GPU
+// devices and NVIDIA runtime/driver config keys from config in-place and
+// returning true when anything changed.
+func ClearGpuDevices(config map[string]any) bool {
+	if config == nil {
+		return false
+	}
+	changed := false
+	if rawDevices, ok := config["devices"].(map[string]any); ok && rawDevices != nil {
+		devices := make(map[string]any, len(rawDevices))
+		for k, v := range rawDevices {
+			devices[k] = v
+		}
+		for name, rawDevice := range devices {
+			if entry, ok := rawDevice.(map[string]any); ok && entry != nil {
+				if deviceType, _ := entry["type"].(string); deviceType == "gpu" {
+					delete(devices, name)
+					changed = true
+				}
+			}
+		}
+		if changed {
+			config["devices"] = devices
+		}
+	}
+	if deleteGpuConfigKeys(config) {
+		changed = true
+	}
+	return changed
+}
+
+// SanitizeMissingHostGpuDevices mirrors sanitizeMissingHostGpuDevices from
+// lib/gpu.ts, pruning GPU devices whose PCI address does not appear in
+// hostPciAddresses (and clearing NVIDIA config keys if no GPUs remain).
+func SanitizeMissingHostGpuDevices(config map[string]any, hostPciAddresses map[string]struct{}) []string {
+	if config == nil {
+		return []string{}
+	}
+	rawDevices, ok := config["devices"].(map[string]any)
+	if !ok || rawDevices == nil {
+		return []string{}
+	}
+	devices := make(map[string]any, len(rawDevices))
+	names := make([]string, 0, len(rawDevices))
+	for k, v := range rawDevices {
+		devices[k] = v
+		names = append(names, k)
+	}
+	sort.Strings(names)
+
+	removed := make([]string, 0)
+	remainingGpuCount := 0
+	for _, name := range names {
+		entry, ok := devices[name].(map[string]any)
+		if !ok || entry == nil {
+			continue
+		}
+		if deviceType, _ := entry["type"].(string); deviceType != "gpu" {
+			continue
+		}
+		rawPci := ""
+		if s, ok := entry["pci"].(string); ok {
+			rawPci = strings.TrimSpace(s)
+		}
+		normalizedPci := strings.ToLower(rawPci)
+		_, present := hostPciAddresses[normalizedPci]
+		if (normalizedPci != "" && !present) || (normalizedPci == "" && len(hostPciAddresses) == 0) {
+			delete(devices, name)
+			if rawPci != "" {
+				removed = append(removed, name+"("+rawPci+")")
+			} else {
+				removed = append(removed, name)
+			}
+		} else {
+			remainingGpuCount++
+		}
+	}
+	if remainingGpuCount == 0 {
+		deleteGpuConfigKeys(config)
+	}
+	if len(removed) > 0 {
+		config["devices"] = devices
+	}
+	return removed
 }
 
 // ApplyGpuDevice mirrors applyGpuDevice: reject privileged/VM targets, validate

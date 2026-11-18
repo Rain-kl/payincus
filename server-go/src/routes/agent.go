@@ -555,19 +555,27 @@ func agentNormalizeAgentMetrics(metrics map[string]any) map[string]any {
 	return result
 }
 
-// agentBuildHeartbeatReport mirrors buildHeartbeatReport. When the node says it
-// could not enumerate storage, the previous storage snapshot is preserved so a
-// transient failure does not look like a deletion.
+// agentBuildHeartbeatReport mirrors buildHeartbeatReport. Lightweight heartbeats
+// omit static hardware/storage baseline fields, so previous baseline keys are
+// merged underneath incoming ones; when storage enumeration failed, any prior
+// storage snapshot is retained while preserving incoming storageAvailable=false.
 func agentBuildHeartbeatReport(body *agentHeartbeatBody, previous map[string]any) map[string]any {
-	resources := map[string]any{}
+	incomingResources := map[string]any{}
 	if typed, ok := agentIsRecord(body.Raw["resources"]); ok {
-		resources = typed
+		incomingResources = typed
 	}
 	previousResources := map[string]any{}
 	if typed, ok := agentIsRecord(previous["resources"]); ok {
 		previousResources = typed
 	}
-	if resources["storageAvailable"] == false {
+	resources := make(map[string]any, len(previousResources)+len(incomingResources))
+	for key, value := range previousResources {
+		resources[key] = value
+	}
+	for key, value := range incomingResources {
+		resources[key] = value
+	}
+	if incomingResources["storageAvailable"] == false {
 		if storage, present := previousResources["storage"]; present {
 			resources["storage"] = storage
 		}
@@ -601,67 +609,7 @@ func mapOrEmpty(value any) map[string]any {
 
 // agentExtractHostPublicIPv6 mirrors extractHostPublicIpv6FromResources from
 // lib/host-resources.ts.
-func agentExtractHostPublicIPv6(resources any) *string {
-	object, ok := agentIsRecord(resources)
-	if !ok {
-		return nil
-	}
-	network, ok := agentIsRecord(object["network"])
-	if !ok {
-		return nil
-	}
-	cards, ok := network["cards"].([]any)
-	if !ok {
-		return nil
-	}
-	check := func(addresses any) *string {
-		list, ok := addresses.([]any)
-		if !ok {
-			return nil
-		}
-		for _, entry := range list {
-			address, ok := agentIsRecord(entry)
-			if !ok {
-				continue
-			}
-			if address["family"] != "inet6" || address["scope"] != "global" {
-				continue
-			}
-			ip, ok := address["address"].(string)
-			if !ok || ip == "" {
-				continue
-			}
-			if strings.HasPrefix(ip, "fe80:") || strings.HasPrefix(ip, "fd") || strings.HasPrefix(ip, "fc") {
-				continue
-			}
-			return &ip
-		}
-		return nil
-	}
-	for _, cardValue := range cards {
-		card, ok := agentIsRecord(cardValue)
-		if !ok {
-			continue
-		}
-		if ip := check(card["addresses"]); ip != nil {
-			return ip
-		}
-		ports, ok := card["ports"].([]any)
-		if !ok {
-			continue
-		}
-		for _, portValue := range ports {
-			port, ok := agentIsRecord(portValue)
-			if !ok {
-				continue
-			}
-			if ip := check(port["addresses"]); ip != nil {
-				return ip
-			}
-		}
-	}
-	return nil
-}
+var agentExtractHostPublicIPv6 = lib.ExtractHostPublicIPv6FromResources
 
 // ==================== request body / errors ====================
 
@@ -1421,11 +1369,11 @@ func agentStartupKeysHandler(c *gin.Context) {
 		go func() {
 			lockCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			_, lockErr := storageEncryptionWithStorageSession(lockCtx, hostID, false,
-				func(node StorageEncryptionNode, _ storageEncryptionKeyVault) (storageEncryptionPoolState, error) {
+			_, lockErr := services.WithStorageSession[services.StorageEncryptionPoolState](lockCtx, hostID, false,
+				func(node services.StorageEncryptionNode, _ services.StorageEncryptionKeyVault) (services.StorageEncryptionPoolState, error) {
 					_, requestErr := node.Request(lockCtx, http.MethodPost, "/1.0/agent/security/lock",
 						map[string]any{"generation": generation})
-					return storageEncryptionPoolState{}, requestErr
+					return services.StorageEncryptionPoolState{}, requestErr
 				})
 			if lockErr != nil {
 				log.Printf("[agent] Node action pending for host %d: %v", hostID, lockErr)
@@ -1538,6 +1486,8 @@ type agentHeartbeatDeps struct {
 	NudgeWorker         func()
 	RecordNetworkStatus func(ctx context.Context, hostID int32, report any) error
 	CompleteHeartbeat   func(hostID int32, requestID any, message string)
+	RecordSecurityState func(ctx context.Context, hostID int32, rawState any) (bool, error)
+	SyncDesiredPolicy   func(hostID int32)
 	Now                 func() time.Time
 }
 
@@ -1599,11 +1549,24 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 	lastSeenAt := now
 	heartbeatIP := agentSanitizeShortString(agentHeartbeatIP(c), 128)
 	locked := false
+	policyMismatch := false
 	if nodeSecurity, ok := agentIsRecord(body.Raw["nodeSecurity"]); ok {
+		if rawState, hasState := nodeSecurity["state"]; hasState && rawState != nil {
+			if deps.RecordSecurityState != nil {
+				mismatch, secErr := deps.RecordSecurityState(ctx, agent.HostID, rawState)
+				if secErr != nil {
+					log.Printf("[agent] failed to persist heartbeat node security state (agentId=%s hostId=%d): %v",
+						agent.AgentID, agent.HostID, secErr)
+				} else {
+					policyMismatch = mismatch
+				}
+			}
+		}
 		if state, ok := agentIsRecord(nodeSecurity["state"]); ok {
 			locked = state["locked"] == true
 		}
 	}
+	_, hasStoragePayload := agentIsRecord(body.Raw["storage"])
 
 	// A locked node stays online, but its deliberately absent inventory must not
 	// be turned into deletions.
@@ -1618,14 +1581,18 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 			log.Printf("[agent] heartbeat agent update failed: %v", err)
 		}
 		storage := body.Raw["storage"]
-		storageAccepted, err := deps.ProcessStorage(ctx, agent.HostID, storage, now)
-		if err != nil {
-			log.Printf("[agent] locked-node storage report failed: %v", err)
-			storageAccepted = false
+		storageAccepted := true
+		if hasStoragePayload {
+			var err error
+			storageAccepted, err = deps.ProcessStorage(ctx, agent.HostID, storage, now)
+			if err != nil {
+				log.Printf("[agent] locked-node storage report failed: %v", err)
+				storageAccepted = false
+			}
 		}
 		storageObject, _ := agentIsRecord(storage)
-		if storageAccepted && storageObject != nil &&
-			storageObject["available"] == true && storageObject["collectionComplete"] == true {
+		if !hasStoragePayload || (storageAccepted && storageObject != nil &&
+			storageObject["available"] == true && storageObject["collectionComplete"] == true) {
 			reportError = ""
 		} else {
 			reportError = "节点已连接，但锁定存储状态采集或保存未完成，测试失败"
@@ -1686,16 +1653,22 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 
 	gpuPersisted := true
 	resources, _ := agentIsRecord(body.Raw["resources"])
-	if err := deps.SyncGPU(ctx, agent.HostID, resources["nvidiaGpu"]); err != nil {
-		gpuPersisted = false
-		log.Printf("[agent] failed to update NVIDIA GPU inventory (hostId=%d): %v", agent.HostID, err)
+	if nvidiaGPU, hasNvidiaGPU := resources["nvidiaGpu"]; hasNvidiaGPU {
+		if err := deps.SyncGPU(ctx, agent.HostID, nvidiaGPU); err != nil {
+			gpuPersisted = false
+			log.Printf("[agent] failed to update NVIDIA GPU inventory (hostId=%d): %v", agent.HostID, err)
+		}
 	}
 
 	storage := body.Raw["storage"]
-	storageAccepted, err := deps.ProcessStorage(ctx, agent.HostID, storage, now)
-	if err != nil {
-		log.Printf("[agent] storage report failed (hostId=%d): %v", agent.HostID, err)
-		storageAccepted = false
+	storageAccepted := true
+	if hasStoragePayload {
+		var err error
+		storageAccepted, err = deps.ProcessStorage(ctx, agent.HostID, storage, now)
+		if err != nil {
+			log.Printf("[agent] storage report failed (hostId=%d): %v", agent.HostID, err)
+			storageAccepted = false
+		}
 	}
 	storageObject, _ := agentIsRecord(storage)
 	incus, _ := agentIsRecord(body.Raw["incus"])
@@ -1703,11 +1676,11 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 	switch {
 	case incus["available"] != true:
 		reportError = "节点已连接，但 Incus 状态采集失败，测试失败"
-	case !storageAccepted || storageObject == nil || storageObject["available"] != true || storageObject["collectionComplete"] != true:
+	case hasStoragePayload && (!storageAccepted || storageObject == nil || storageObject["available"] != true || storageObject["collectionComplete"] != true):
 		reportError = "节点存储状态采集或保存失败，测试失败"
 	case !instancePersisted || instances["available"] != true || instanceReport == nil || instanceReport.Errors > 0:
 		reportError = "节点实例状态采集或保存失败，测试失败"
-	case !gpuPersisted || resources["storageAvailable"] != true:
+	case !gpuPersisted || (hasStoragePayload && resources["storageAvailable"] != true):
 		reportError = "节点硬件状态采集或保存失败，测试失败"
 	default:
 		reportError = ""
@@ -1738,6 +1711,9 @@ func agentHeartbeatStateMachine(c *gin.Context, agent *models.HostAgent, body ag
 			}
 		}
 		deps.RecordHostSuccess(agent.HostID)
+		if policyMismatch && deps.SyncDesiredPolicy != nil {
+			deps.SyncDesiredPolicy(agent.HostID)
+		}
 	}
 
 	connection, err := deps.HostConnection(ctx, agent.HostID)
@@ -1984,6 +1960,10 @@ var agentDefaultHeartbeatDeps = agentHeartbeatDeps{
 	},
 	CompleteHeartbeat: func(hostID int32, requestID any, message string) {
 		lib.TunnelManagerInstance().CompleteHeartbeat(hostID, requestID, message)
+	},
+	RecordSecurityState: lib.RecordHeartbeatSecurityState,
+	SyncDesiredPolicy: func(hostID int32) {
+		go lib.SyncDesiredSecurityPolicy(context.Background(), hostID, false)
 	},
 	Now: func() time.Time { return time.Now().UTC() },
 }

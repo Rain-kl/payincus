@@ -32,12 +32,12 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,6 +51,7 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/lib"
 	"github.com/rain-kl/payincus/server-go/src/middleware"
 	"github.com/rain-kl/payincus/server-go/src/models"
+	"github.com/rain-kl/payincus/server-go/src/services"
 )
 
 // ==================== constants (mirroring the TS module header) ====================
@@ -90,46 +91,9 @@ func errHostsSeam(component string) error {
 }
 
 // HostsStoragePoolsSnapshot mirrors `storedStoragePools(hostId)` from
-// lib/storage/read-model.ts (wave C storage pools are not ported).
+// lib/storage/read-model.ts.
 var HostsStoragePoolsSnapshot = func(ctx context.Context, hostID int32) (any, error) {
-	return nil, errHostsSeam("lib/storage/read-model.ts#storedStoragePools")
-}
-
-// HostsStoragePoolCreateData carries the resolved create/import arguments.
-type HostsStoragePoolCreateData struct {
-	HostID       int32
-	Name         string
-	Driver       string
-	Source       string
-	Size         string
-	LoopDir      string
-	Preallocate  bool
-	UseLoop      bool
-	ZFSPoolName  string
-	LVMVGName    string
-	LVMThinpool  string
-	LVMUseThin   *bool
-	Description  *string
-	Purpose      string
-	UseExisting  bool
-	ExistingSrc  string
-	ProvisionOps bool
-}
-
-// HostsStoragePoolCreate mirrors the create/import branches of POST
-// /:hostId/storage-pools (lib/storage/{provision,import}.ts).
-var HostsStoragePoolCreate = func(ctx context.Context, data HostsStoragePoolCreateData) (any, int, error) {
-	return nil, http.StatusInternalServerError, errHostsSeam("lib/storage/provision.ts+import.ts")
-}
-
-// HostsStoragePoolDelete mirrors DELETE /:hostId/storage-pools/:poolName.
-var HostsStoragePoolDelete = func(ctx context.Context, hostID int32, poolName string) error {
-	return errHostsSeam("lib/storage/delete.ts+resize.ts")
-}
-
-// HostsStoragePoolUpdate mirrors PATCH /:hostId/storage-pools/:poolName.
-var HostsStoragePoolUpdate = func(ctx context.Context, hostID int32, poolName string, size, description *string, purpose *string) error {
-	return errHostsSeam("lib/storage/resize.ts")
+	return services.StoredStoragePools(ctx, hostID)
 }
 
 // HostsAgentInstall is the tuple issueHostAgentInstallToken returns.
@@ -157,7 +121,7 @@ var HostsAgentLogTicket = struct {
 
 // HostsAgentLogStreamSubscribe mirrors agentLogStreamManager.subscribe(hostId, client).
 var HostsAgentLogStreamSubscribe = func(ctx context.Context, hostID int32, write func(string) bool) error {
-	return errHostsSeam("lib/agent-log-stream.ts#agentLogStreamManager")
+	return lib.DefaultAgentLogStreamManager().Subscribe(ctx, hostID, write)
 }
 
 // HostsCaddyInstallRequested / HostsCaddyUninstallRequested mirror the two sets
@@ -169,14 +133,10 @@ var (
 
 // HostsManagedInstanceProvision mirrors provisionManagedInstanceAsync(instanceId,
 // host, options) from lib/managed-instance-provision.ts.
-var HostsManagedInstanceProvision = func(ctx context.Context, instanceID int32, host *db.HostsSelectionRecord, options map[string]any) error {
-	return errHostsSeam("lib/managed-instance-provision.ts#provisionManagedInstanceAsync")
-}
+var HostsManagedInstanceProvision = hostsManagedProvision
 
-// HostsInstanceRefund mirrors db.calculateInstanceRefund (instance-billing wave).
-var HostsInstanceRefund = func(ctx context.Context, input HostsRefundInput) (HostsRefundInfo, error) {
-	return HostsRefundInfo{}, errHostsSeam("db/instance-billing.ts#calculateInstanceRefund")
-}
+// HostsInstanceRefund mirrors db.calculateInstanceRefund.
+var HostsInstanceRefund = hostsRefundFromInstance
 
 // HostsRefundInput is the argument object of calculateInstanceRefund.
 type HostsRefundInput struct {
@@ -194,10 +154,9 @@ type HostsRefundInfo struct {
 	RefundAmount  float64
 }
 
-// HostsBatchDeleteExecutor mirrors the Incus/refund/notification half of
-// DELETE /:hostId/instances/batch (lib/incus + instance-billing + notifier).
+// HostsBatchDeleteExecutor executes host-owner batch instance deletion.
 var HostsBatchDeleteExecutor = func(ctx context.Context, plans []HostsBatchDeletePlan) ([]HostsBatchDeleteResult, float64, error) {
-	return nil, 0, errHostsSeam("lib/incus + instance-billing + notifier（批量删除执行段）")
+	return hostsExecuteBatchDelete(ctx, 0, plans)
 }
 
 // HostsBatchDeletePlan is one instance to delete.
@@ -219,10 +178,34 @@ type HostsBatchDeleteResult struct {
 
 // HostsSnapshotSyncApplier mirrors persistResolvedInstanceNetworkAddresses(
 // ... resolveInstanceNetworkAddresses(...)) from lib/instance-network-sync.ts.
-// The default reports "nothing changed", which is what the TypeScript reports for a
-// stopped instance with no network data.
 var HostsSnapshotSyncApplier = func(ctx context.Context, instance models.Instance, incusInstance, state json.RawMessage) (HostsNetworkDelta, error) {
-	return HostsNetworkDelta{}, nil
+	resolved := lib.ResolveInstanceNetworkAddresses(lib.InstanceNetworkSyncTarget{
+		ID:          instance.ID,
+		Name:        instance.Name,
+		HostID:      &instance.HostID,
+		NetworkMode: string(instance.NetworkMode),
+		IPv4:        instance.IPv4,
+		IPv6:        instance.IPv6,
+	}, incusInstance, state)
+	persisted, err := lib.PersistResolvedInstanceNetworkAddresses(ctx, lib.InstanceNetworkSyncTarget{
+		ID:          instance.ID,
+		Name:        instance.Name,
+		HostID:      &instance.HostID,
+		NetworkMode: string(instance.NetworkMode),
+		IPv4:        instance.IPv4,
+		IPv6:        instance.IPv6,
+	}, resolved, lib.PersistNetworkAddressesOptions{UpdateLastSyncedAt: true})
+	if err != nil {
+		return HostsNetworkDelta{}, err
+	}
+	return HostsNetworkDelta{
+		IPv4Changed: persisted.IPv4Changed,
+		OldIPv4:     persisted.OldIPv4,
+		NewIPv4:     persisted.NewIPv4,
+		IPv6Changed: persisted.IPv6Changed,
+		OldIPv6:     persisted.OldIPv6,
+		NewIPv6:     persisted.NewIPv6,
+	}, nil
 }
 
 // HostsNetworkDelta mirrors the persistResolvedInstanceNetworkAddresses result.
@@ -235,10 +218,21 @@ type HostsNetworkDelta struct {
 	NewIPv6     *string `json:"newIpv6"`
 }
 
-// HostsAuditExecutor mirrors the incus-exec + analyse half of POST
-// /:hostId/ops/instances/:instanceId/audit/scan and the kill-process path.
+// HostsAuditExecutor mirrors the incus-exec step of audit/scan and kill-process.
 var HostsAuditExecutor = func(ctx context.Context, req HostsAuditExecRequest) (HostsAuditExecResult, error) {
-	return HostsAuditExecResult{}, errHostsSeam("lib/instance-audit.ts（审查命令执行/解析/研判）")
+	host, err := db.HostsGetByID(ctx, req.HostID)
+	if err != nil || host == nil {
+		return HostsAuditExecResult{}, errors.New("宿主机不存在")
+	}
+	client, err := lib.GetIncusClientForHost(ctx, host)
+	if err != nil {
+		return HostsAuditExecResult{}, err
+	}
+	res, err := lib.IncusInstanceExecWithOutput(ctx, client, req.IncusID, req.Command, nil, req.Timeout)
+	if err != nil {
+		return HostsAuditExecResult{}, err
+	}
+	return HostsAuditExecResult{Stdout: res.Stdout, Stderr: res.Stderr}, nil
 }
 
 // HostsAuditExecRequest is what the audit routes need from the audit engine.
@@ -257,16 +251,36 @@ type HostsAuditExecResult struct {
 }
 
 // HostsMigrateExecutor mirrors the per-instance migration body of
-// POST /:hostId/instances/migrate (incus-config-generator + incus + billing).
+// POST /:hostId/instances/migrate.
 var HostsMigrateExecutor = func(ctx context.Context, plan HostsMigratePlan) (int32, error) {
-	return 0, errHostsSeam("lib/incus-config-generator.ts + lib/incus（跨节点迁移执行段）")
+	sourceClient, err := lib.GetIncusClient(ctx, hostsIncusClientOptions(plan.SourceHost))
+	if err != nil {
+		return 0, fmt.Errorf("无法连接源节点: %w", err)
+	}
+	targetClient, err := lib.GetIncusClient(ctx, hostsIncusClientOptions(plan.TargetHost))
+	if err != nil {
+		return 0, fmt.Errorf("无法连接目标节点: %w", err)
+	}
+	var targetPlan *models.PackagePlan
+	var targetPkg *models.Package
+	if plan.TargetPlanID != nil {
+		targetPlan, _ = db.GetPackagePlanById(ctx, *plan.TargetPlanID)
+		if targetPlan != nil && db.DB != nil {
+			var p models.Package
+			if res := db.DB.WithContext(ctx).Where("id = ?", targetPlan.PackageID).Limit(1).Find(&p); res.Error == nil && res.RowsAffected > 0 {
+				targetPkg = &p
+			}
+		}
+	}
+	return hostsMigrateOne(ctx, sourceClient, targetClient, plan, targetPlan, targetPkg)
 }
 
 // HostsIncusStopInstance mirrors `stopInstance(client, name, force)` from
 // lib/incus/incus-instances.ts. The batch-suspend path logs and continues when it
 // fails, exactly like the TypeScript.
 var HostsIncusStopInstance = func(ctx context.Context, client *lib.IncusClient, name string, force bool) error {
-	return errHostsSeam("lib/incus#stopInstance")
+	_, err := lib.IncusInstanceStop(ctx, client, name, force, lib.IncusInstanceBusyRetryOptions{})
+	return err
 }
 
 // HostsMigratePlan is one instance migration.
@@ -932,123 +946,15 @@ func hostsFormatStoragePoolCreateError(err error) string {
 
 // ==================== host service status (port of lib/host-service-status.ts) ====================
 
-// hostsHostServiceStatus mirrors HostServiceStatus.
-type hostsHostServiceStatus struct {
-	Status           string   `json:"status"`
-	PendingInstances []string `json:"pendingInstances"`
-	Available        bool     `json:"available"`
-}
+// hostsHostServiceStatus mirrors services.HostServiceStatus (shared across
+// storage baseline reads, host listing and instance status derivation).
+type hostsHostServiceStatus = services.HostServiceStatus
 
-type hostsServiceStatusRow struct {
-	ID            int32
-	Status        string
-	TunnelEnabled bool
-	Report        []byte
-	AgentStatus   *string
-	AgentLastSeen *time.Time
-	AgentReport   []byte
-}
-
-func hostsLoadHostServiceStatuses(ctx context.Context, ids []int32) (map[int32]hostsHostServiceStatus, error) {
-	out := map[int32]hostsHostServiceStatus{}
-	if ids != nil && len(ids) == 0 {
-		return out, nil
-	}
-	if db.DB == nil {
-		return out, errors.New("hosts: database not initialized")
-	}
-	query := db.DB.WithContext(ctx).
-		Table("hosts AS h").
-		Select(`h.id, h.status, h.tunnel_enabled,
-			ns.report AS report,
-			a.status AS agent_status, a.last_seen_at AS agent_last_seen, a.last_report AS agent_report`).
-		Joins("LEFT JOIN node_security_states ns ON ns.host_id = h.id").
-		Joins("LEFT JOIN host_agents a ON a.host_id = h.id AND a.enabled = true")
-	if ids != nil {
-		query = query.Where("h.id IN ?", ids)
-	}
-	var rows []hostsServiceStatusRow
-	if err := query.Scan(&rows).Error; err != nil {
-		return nil, err
-	}
-	now := time.Now().UTC()
-	for _, row := range rows {
-		out[row.ID] = hostsEvaluateHostService(row, now)
-	}
-	return out, nil
-}
-
-// hostsEvaluateHostService mirrors evaluateHostService.
-func hostsEvaluateHostService(row hostsServiceStatusRow, now time.Time) hostsHostServiceStatus {
-	state := map[string]any{}
-	if len(row.Report) > 0 {
-		_ = json.Unmarshal(row.Report, &state)
-	}
-	report := map[string]any{}
-	if len(row.AgentReport) > 0 {
-		_ = json.Unmarshal(row.AgentReport, &report)
-	}
-
-	status := hostsDeriveEffectiveStatusSummary(models.Host{
-		ID:            row.ID,
-		Status:        models.HostStatus(row.Status),
-		TunnelEnabled: row.TunnelEnabled,
-	})
-	if locked, ok := state["locked"].(bool); ok && locked {
-		status = "locked"
-	}
-
-	interval := float64(5)
-	if metrics, ok := report["metrics"].(map[string]any); ok {
-		if reported, ok := hostsJSONNumber(metrics["heartbeatIntervalSeconds"]); ok && reported >= 5 && reported <= 3600 {
-			interval = reported
-		}
-	}
-	stale := false
-	if row.AgentStatus != nil {
-		threshold := math.Max(120, interval*3)
-		stale = *row.AgentStatus != "online" || row.AgentLastSeen == nil ||
-			now.Sub(row.AgentLastSeen.UTC()).Seconds() > threshold
-	}
-
-	pending := []string{}
-	if items, ok := state["resumeInstances"].([]any); ok {
-		for _, item := range items {
-			entry, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if project, _ := entry["project"].(string); project == "default" {
-				if name, ok := entry["name"].(string); ok {
-					pending = append(pending, name)
-				}
-			}
-		}
-	}
-
-	recoveryPending, _ := state["recoveryPending"].(bool)
-	agentPresent := row.AgentStatus != nil
-	incusAvailable := false
-	if incus, ok := report["incus"].(map[string]any); ok {
-		incusAvailable, _ = incus["available"].(bool)
-	}
-	instancesUnavailable := false
-	if instances, ok := report["instances"].(map[string]any); ok {
-		if available, ok := instances["available"].(bool); ok && !available {
-			instancesUnavailable = true
-		}
-	}
-
-	available := !recoveryPending &&
-		(status == "online" || status == "maintenance") &&
-		(!row.TunnelEnabled || lib.TunnelManagerInstance().IsTunnelOnline(row.ID)) &&
-		!stale &&
-		(!agentPresent || incusAvailable) &&
-		!instancesUnavailable &&
-		lib.IsHostHealthy(row.ID)
-
-	return hostsHostServiceStatus{Status: status, PendingInstances: pending, Available: available}
-}
+var (
+	hostsLoadHostServiceStatuses = services.LoadHostServiceStatuses
+	hostsRunDiagnostics          = services.RunHostDiagnostics
+	hostsSyncStorageBaseline     = services.SyncHostStorageBaseline
+)
 
 // ==================== instance helpers (route-local) ====================
 
@@ -1655,8 +1561,11 @@ func hostsCreateHandler(c *gin.Context) {
 	}
 
 	// 隧道模式端点是逐宿主独立的回环地址，不做全局唯一性注册。
+	var addrSnapshot *services.HostAddressSnapshot
 	if !tunnelEnabled {
-		if err := hostsPrepareAddressSnapshot(ctx, sanitizedURL, nil); err != nil {
+		var err error
+		addrSnapshot, err = hostsPrepareAddressSnapshot(ctx, sanitizedURL, nil)
+		if err != nil {
 			var registryErr *hostsAddressRegistryError
 			if errors.As(err, &registryErr) {
 				hostsRespondAPIError(c, http.StatusBadRequest, registryErr.Code, registryErr.Details)
@@ -1741,6 +1650,14 @@ func hostsCreateHandler(c *gin.Context) {
 		hostsRespondInternal(c)
 		return
 	}
+	if addrSnapshot != nil && db.DB != nil {
+		_, _ = services.WithHostAddressRegistryLock(ctx, func() (struct{}, error) {
+			return struct{}{}, db.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				_, err := services.PersistHostAddressSnapshot(ctx, hostID, addrSnapshot, models.HostAddressCheckTriggerCreate, tx)
+				return err
+			})
+		})
+	}
 
 	// 如果不需要初始化（已安装 Incus），尝试自动连接并同步资源
 	autoConnected := false
@@ -1773,6 +1690,7 @@ func hostsCreateHandler(c *gin.Context) {
 			_ = client.Close()
 			autoConnected = true
 			lib.TunnelManagerInstance().RequestHeartbeat(hostID)
+			_, _ = hostsSyncStorageBaseline(ctx, hostID, nil)
 		}
 	} else if cpuAllowanceMax != nil || memoryMax != nil || instanceType != "" {
 		_ = db.HostsUpdateResources(ctx, hostID, db.HostsResourceUpdate{
@@ -1990,26 +1908,17 @@ type hostsAddressRegistryError struct {
 
 func (e *hostsAddressRegistryError) Error() string { return string(e.Code) }
 
-// hostsPrepareAddressSnapshot mirrors prepareHostAddressSnapshotForWrite: it
-// resolves the host name and refuses an address that cannot be resolved. The alias
-// bookkeeping of services/host-address-monitor.ts (host_address_aliases /
-// host_address_conflicts) is NOT ported yet, so the uniqueness registry is inert;
-// resolution failures still produce the exact 400 the TypeScript returns.
-func hostsPrepareAddressSnapshot(ctx context.Context, rawURL string, excludeHostID *int32) error {
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || parsed.Hostname() == "" {
-		return &hostsAddressRegistryError{Code: lib.ErrInvalidParams, Details: "host address cannot be resolved"}
+// hostsPrepareAddressSnapshot mirrors prepareHostAddressSnapshotForWrite.
+func hostsPrepareAddressSnapshot(ctx context.Context, rawURL string, excludeHostID *int32) (*services.HostAddressSnapshot, error) {
+	snapshot, err := services.PrepareHostAddressSnapshotForWrite(ctx, rawURL, excludeHostID)
+	if err != nil {
+		var regErr *services.HostAddressRegistryError
+		if errors.As(err, &regErr) {
+			return nil, &hostsAddressRegistryError{Code: regErr.ErrorCode, Details: regErr.Details}
+		}
+		return nil, err
 	}
-	hostname := parsed.Hostname()
-	if net.ParseIP(hostname) != nil {
-		return nil
-	}
-	resolveCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if _, err := net.DefaultResolver.LookupHost(resolveCtx, hostname); err != nil {
-		return &hostsAddressRegistryError{Code: lib.ErrHostAddressUnresolvable, Details: hostname}
-	}
-	return nil
+	return snapshot, nil
 }
 
 // hostsInstallScriptHandler mirrors GET /install.sh (public).
@@ -2208,6 +2117,63 @@ func hostsRegenerateInstallHandler(c *gin.Context) {
 	})
 }
 
+func hostsSyncReachabilityFromDiagnostic(
+	ctx context.Context,
+	hostID int32,
+	currentStatus string,
+	diagnostic services.HostDiagnosticResult,
+) {
+	// Control plane only maintains online/offline on reachability transitions;
+	// locked/maintenance states remain governed by node security & admins.
+	if diagnostic.Checks.IncusMtls.OK {
+		if currentStatus == "offline" {
+			_ = db.HostsUpdateStatus(ctx, hostID, "online")
+		}
+	} else if !diagnostic.Checks.AgentHeartbeat.OK {
+		if currentStatus == "online" {
+			_ = db.HostsUpdateStatus(ctx, hostID, "offline")
+		}
+	}
+}
+
+// hostsDiagnoseHandler mirrors POST /:id/diagnose.
+func hostsDiagnoseHandler(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	hostID, ok := hostsRouteID(c)
+	if !ok {
+		return
+	}
+	host, ok := hostsLoadHost(c, hostID)
+	if !ok {
+		return
+	}
+	if !hostsOwnerOrAdmin(host, user) {
+		hostsRespondAPIError(c, http.StatusForbidden, lib.ErrForbidden, "")
+		return
+	}
+
+	ctx := c.Request.Context()
+	diagnostic, err := hostsRunDiagnostics(ctx, hostID)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	hostsSyncReachabilityFromDiagnostic(ctx, hostID, string(host.Status), diagnostic)
+	c.JSON(http.StatusOK, gin.H{
+		"success":           diagnostic.OK,
+		"status":            diagnostic.OverallStatus,
+		"message":           diagnostic.Summary,
+		"hostId":            diagnostic.HostID,
+		"hostName":          diagnostic.HostName,
+		"checkedAt":         diagnostic.CheckedAt,
+		"ok":                diagnostic.OK,
+		"overallStatus":     diagnostic.OverallStatus,
+		"summary":           diagnostic.Summary,
+		"needsBaselineSync": diagnostic.NeedsBaselineSync,
+		"checks":            diagnostic.Checks,
+	})
+}
+
 // hostsTestHandler mirrors POST /:id/test.
 func hostsTestHandler(c *gin.Context) {
 	user := middleware.CurrentUser(c)
@@ -2224,18 +2190,24 @@ func hostsTestHandler(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), lib.TunnelDefaultHeartbeatTimeout)
-	defer cancel()
-	if err := lib.TunnelManagerInstance().RequestHeartbeatAndWait(ctx, hostID, lib.TunnelDefaultHeartbeatTimeout); err != nil {
+	ctx := c.Request.Context()
+	diagnostic, err := hostsRunDiagnostics(ctx, hostID)
+	if err != nil {
 		var heartbeatErr *lib.TunnelHeartbeatTestError
 		if errors.As(err, &heartbeatErr) {
 			c.JSON(heartbeatErr.StatusCode, gin.H{"success": false, "error": heartbeatErr.Message})
 			return
 		}
-		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": "节点上报测试失败"})
+		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "测试通过"})
+	hostsSyncReachabilityFromDiagnostic(ctx, hostID, string(host.Status), diagnostic)
+	c.JSON(http.StatusOK, gin.H{
+		"success":    diagnostic.OK,
+		"status":     diagnostic.OverallStatus,
+		"message":    diagnostic.Summary,
+		"diagnostic": diagnostic,
+	})
 }
 
 // hostsDetailHandler mirrors GET /:id.
@@ -2749,8 +2721,11 @@ func hostsUpdateHandler(c *gin.Context) {
 		update.TargetPort = db.HostsValue(int32(*value))
 	}
 
+	var addrSnapshot *services.HostAddressSnapshot
 	if hasURL && !tunnelModeEffective {
-		if err := hostsPrepareAddressSnapshot(ctx, rawURL, &hostID); err != nil {
+		var err error
+		addrSnapshot, err = hostsPrepareAddressSnapshot(ctx, rawURL, &hostID)
+		if err != nil {
 			var registryErr *hostsAddressRegistryError
 			if errors.As(err, &registryErr) {
 				hostsRespondAPIError(c, http.StatusBadRequest, registryErr.Code, registryErr.Details)
@@ -2800,6 +2775,15 @@ func hostsUpdateHandler(c *gin.Context) {
 		}
 		if len(columns) > 0 {
 			if err := tx.WithContext(ctx).Table("hosts").Where("id = ?", hostID).Updates(columns).Error; err != nil {
+				return err
+			}
+		}
+		if addrSnapshot != nil {
+			if _, err := services.PersistHostAddressSnapshot(ctx, hostID, addrSnapshot, models.HostAddressCheckTriggerUpdate, tx); err != nil {
+				return err
+			}
+		} else if tunnelModeEffective {
+			if err := services.RemoveHostAddressAliasesAndSyncConflicts(ctx, hostID, tx); err != nil {
 				return err
 			}
 		}
@@ -3234,8 +3218,6 @@ func hostsBatchDeleteHandler(c *gin.Context) {
 		return
 	}
 
-	// 执行段（Incus 停止/删除、快照/备份/反代清理、退款、通知、资源回滚）依赖
-	// lib/incus + instance-billing + notifier，均未移植 —— 显式失败，不再伪装成功。
 	plan := make([]HostsBatchDeletePlan, 0, len(instances))
 	for _, instance := range instances {
 		plan = append(plan, HostsBatchDeletePlan{
@@ -3245,14 +3227,40 @@ func hostsBatchDeleteHandler(c *gin.Context) {
 			DBOnly:   databaseOnly,
 		})
 	}
-	results, totalRefund, err := HostsBatchDeleteExecutor(ctx, plan)
-	_ = results
-	_ = totalRefund
+	results, totalRefund, err := hostsExecuteBatchDelete(ctx, user.ID, plan)
 	if err != nil {
-		hostsRespondSeam(c, err)
+		var incusErr *hostsIncusClientError
+		if errors.As(err, &incusErr) {
+			c.JSON(http.StatusBadGateway, gin.H{
+				"error": "获取 Incus 客户端失败: " + incusErr.Error(),
+				"code":  "INCUS_CLIENT_UNAVAILABLE",
+			})
+			return
+		}
+		hostsRespondInternal(c)
 		return
 	}
-	hostsRespondSeam(c, errHostsSeam("DELETE /:hostId/instances/batch"))
+	successCount := 0
+	for _, r := range results {
+		if r.Success {
+			successCount++
+		}
+	}
+	failedCount := len(results) - successCount
+	msg := fmt.Sprintf("成功删除 %d 个实例", successCount)
+	if failedCount > 0 {
+		msg += fmt.Sprintf("，%d 个失败", failedCount)
+	}
+	if totalRefund > 0 {
+		msg += fmt.Sprintf("，共退款 ¥%.2f", totalRefund)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message":           msg,
+		"results":           results,
+		"successCount":      successCount,
+		"failedCount":       failedCount,
+		"totalRefundAmount": totalRefund,
+	})
 }
 
 // hostsUsernameByID mirrors the `user: { select: { username } }` join.
@@ -3288,7 +3296,7 @@ func hostsStoragePoolsListHandler(c *gin.Context) {
 	}
 	pools, err := HostsStoragePoolsSnapshot(ctx, hostID)
 	if err != nil {
-		hostsRespondSeam(c, err)
+		hostsRespondInternal(c)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"pools": pools})
@@ -3368,31 +3376,41 @@ func hostsStoragePoolCreateHandler(c *gin.Context) {
 		_ = loopMode
 	}
 
-	data := HostsStoragePoolCreateData{
-		HostID:      hostID,
-		Name:        name,
-		Driver:      driver,
-		Source:      source,
-		Size:        size,
-		LoopDir:     loopDirectory,
-		Preallocate: preallocate,
-		UseLoop:     useLoop,
-		ZFSPoolName: zfsPoolName,
-		LVMVGName:   lvmVgName,
-		LVMThinpool: lvmThinpoolName,
-		UseExisting: useExisting,
-		ExistingSrc: existingSource,
-		Purpose:     purpose,
-	}
+	var lvmUseThinPtr *bool
 	if hasLVMUseThinpool {
-		data.LVMUseThin = &lvmUseThinpool
+		lvmUseThinPtr = &lvmUseThinpool
 	}
+	var descPtr *string
 	if hasDescription {
-		data.Description = &description
+		descPtr = &description
 	}
 
-	payload, status, err := HostsStoragePoolCreate(ctx, data)
+	payload, status, err := services.CreateHostStoragePool(ctx, host, services.HostStoragePoolCreateInput{
+		HostID:          hostID,
+		UserID:          user.ID,
+		HostName:        host.Name,
+		Name:            name,
+		Driver:          driver,
+		Source:          source,
+		Size:            size,
+		LoopDirectory:   loopDirectory,
+		Preallocate:     preallocate,
+		UseLoop:         useLoop,
+		ZFSPoolName:     zfsPoolName,
+		LVMVGName:       lvmVgName,
+		LVMThinpoolName: lvmThinpoolName,
+		LVMUseThinpool:  lvmUseThinPtr,
+		Description:     descPtr,
+		Purpose:         purpose,
+		UseExisting:     useExisting,
+		ExistingSource:  existingSource,
+	})
 	if err != nil {
+		var storageErr *services.StorageEncryptionError
+		if errors.As(err, &storageErr) {
+			c.JSON(storageErr.StatusCode, gin.H{"error": storageErr.Message})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建存储池失败: " + hostsFormatStoragePoolCreateError(err)})
 		return
 	}
@@ -3416,13 +3434,23 @@ func hostsStoragePoolDeleteHandler(c *gin.Context) {
 		hostsRespondAPIError(c, http.StatusForbidden, lib.ErrForbidden, "")
 		return
 	}
-	if err := HostsStoragePoolDelete(ctx, hostID, poolName); err != nil {
-		hostsRespondSeam(c, err)
+	deleted, err := services.DeleteHostStoragePool(ctx, host, poolName)
+	if err != nil {
+		var storageErr *services.StorageEncryptionError
+		if errors.As(err, &storageErr) {
+			c.JSON(storageErr.StatusCode, gin.H{"error": storageErr.Message})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除存储池失败: " + err.Error()})
 		return
 	}
+	suffix := ""
+	if deleted["missingOnNode"] == true {
+		suffix = " (missing on node)"
+	}
 	hostsCreateLog(ctx, i64Ptr(user.ID), "storage.delete",
-		fmt.Sprintf(`Deleted storage pool "%s" from host "%s"`, poolName, host.Name), "success", nil)
-	c.JSON(http.StatusOK, gin.H{"message": "存储池删除成功"})
+		fmt.Sprintf(`Deleted storage pool "%s" from host "%s"%s`, poolName, host.Name, suffix), "success", nil)
+	c.JSON(http.StatusOK, deleted)
 }
 
 // hostsStoragePoolUpdateHandler mirrors PATCH /:id/storage-pools/:poolName.
@@ -3469,14 +3497,18 @@ func hostsStoragePoolUpdateHandler(c *gin.Context) {
 	if hasPurpose {
 		purposePtr = &purpose
 	}
-	if err := HostsStoragePoolUpdate(ctx, hostID, poolName, sizePtr, descriptionPtr, purposePtr); err != nil {
-		hostsRespondSeam(c, err)
+	if err := services.UpdateHostStoragePool(ctx, host, poolName, sizePtr, descriptionPtr, purposePtr); err != nil {
+		var storageErr *services.StorageEncryptionError
+		if errors.As(err, &storageErr) {
+			c.JSON(storageErr.StatusCode, gin.H{"error": storageErr.Message})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "修改存储池失败: " + err.Error()})
 		return
 	}
 	hostsCreateLog(ctx, i64Ptr(user.ID), "storage.update",
 		fmt.Sprintf(`Updated storage pool "%s" on host "%s"`, poolName, host.Name), "success", nil)
-	lib.TunnelManagerInstance().RequestHeartbeat(hostID)
-	c.JSON(http.StatusOK, gin.H{"message": "存储池修改成功，容量将由节点心跳更新"})
+	c.JSON(http.StatusOK, gin.H{"message": "存储池修改成功"})
 }
 
 // ==================== D. 公网 IPv4 地址池 ====================
@@ -4697,6 +4729,8 @@ func hostsMigrateHandler(c *gin.Context) {
 			paidCount++
 		}
 	}
+	var targetPlanObj *models.PackagePlan
+	var targetPkgObj *models.Package
 	if paidCount > 0 {
 		if targetPlanID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "有付费实例需要迁移，请选择目标方案"})
@@ -4734,10 +4768,27 @@ func hostsMigrateHandler(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "目标方案的套餐未绑定目标节点"})
 			return
 		}
+		targetPlanObj = plan
+		if db.DB != nil {
+			var p models.Package
+			if res := db.DB.WithContext(ctx).Where("id = ?", plan.PackageID).Limit(1).Find(&p); res.Error == nil && res.RowsAffected > 0 {
+				targetPkgObj = &p
+			}
+		}
 	}
 
-	// 执行段依赖 lib/incus + incus-config-generator（未移植）——显式失败。
-	plan := HostsMigratePlan{
+	sourceClient, err := lib.GetIncusClient(ctx, hostsIncusClientOptions(sourceHost))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法连接源节点: " + err.Error()})
+		return
+	}
+	targetClient, err := lib.GetIncusClient(ctx, hostsIncusClientOptions(targetHost))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法连接目标节点: " + err.Error()})
+		return
+	}
+
+	migratePlan := HostsMigratePlan{
 		SourceHost:   sourceHost,
 		TargetHost:   targetHost,
 		TargetImage:  targetImage,
@@ -4746,20 +4797,38 @@ func hostsMigrateHandler(c *gin.Context) {
 		OperatorRole: user.Role,
 	}
 	results := make([]gin.H, 0, len(instances))
-	failed := 0
+	successCount := 0
+	failedCount := 0
 	for _, instance := range instances {
-		plan.Instance = instance
-		if _, err := HostsMigrateExecutor(ctx, plan); err != nil {
-			hostsRespondSeam(c, err)
-			return
+		migratePlan.Instance = instance
+		newID, err := hostsMigrateOne(ctx, sourceClient, targetClient, migratePlan, targetPlanObj, targetPkgObj)
+		if err != nil {
+			failedCount++
+			results = append(results, gin.H{
+				"id":      instance.ID,
+				"name":    instance.Name,
+				"success": false,
+				"error":   err.Error(),
+			})
+			continue
 		}
+		successCount++
+		results = append(results, gin.H{
+			"id":            instance.ID,
+			"name":          instance.Name,
+			"success":       true,
+			"newInstanceId": newID,
+		})
 	}
-	_ = failed
+	msg := fmt.Sprintf("成功迁移 %d 个实例", successCount)
+	if failedCount > 0 {
+		msg += fmt.Sprintf("，%d 个失败", failedCount)
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"message":      fmt.Sprintf("成功迁移 %d 个实例", len(results)),
+		"message":      msg,
 		"results":      results,
-		"successCount": len(results),
-		"failedCount":  failed,
+		"successCount": successCount,
+		"failedCount":  failedCount,
 	})
 }
 
@@ -5014,13 +5083,10 @@ func hostsCreateForUserHandler(c *gin.Context) {
 		return
 	}
 
-	// 执行段依赖 db.selectAvailableHost / selectAndReserveHostWithLock 的事务包装、
-	// lib/incus + lib/managed-instance-provision.ts + GPU 预留 —— 未移植，显式失败。
-	_ = giftDays
-	_ = requestedCPU
-	_ = requestedDisk
-	_ = target
-	hostsRespondSeam(c, errHostsSeam("lib/managed-instance-provision.ts#provisionManagedInstanceAsync"))
+	hostsExecuteCreateForUser(
+		c, user, host, target, targetKeys[0].PublicKey, pkg, plan,
+		name, image, networkMode, requestedCPU, requestedMemory, requestedDisk, giftDays,
+	)
 }
 
 // hostsPackageRow is the subset of the package row the host routes read.
@@ -5453,8 +5519,17 @@ func hostsOpsOptimizePortMappingsHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	_ = client
-	hostsRespondSeam(c, errHostsSeam("ops/optimize-port-mappings 的 Incus 设备改写段"))
+	converted, skipped, failed, details, err := hostsExecuteOptimizePortMappings(ctx, user.ID, host, client, bindable)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"converted": converted,
+		"skipped":   skipped,
+		"failed":    failed,
+		"details":   details,
+	})
 }
 
 // hostsOpsBaselineSyncHandler mirrors POST /:id/ops/baseline-sync.
@@ -5478,7 +5553,11 @@ func hostsOpsBaselineSyncHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	lib.TunnelManagerInstance().RequestHeartbeat(hostID)
+	storageSync, err := hostsSyncStorageBaseline(ctx, hostID, client)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	used, err := db.HostsCalculateResourcesFromInstances(ctx, hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -5534,6 +5613,15 @@ func hostsOpsBaselineSyncHandler(c *gin.Context) {
 			"cpuUsed":    used.CPUUsed,
 			"memoryUsed": used.MemoryUsed,
 			"diskUsed":   used.DiskUsed,
+		},
+		"storageSync": gin.H{
+			"usedBaselineEndpoint": storageSync.UsedBaselineEndpoint,
+			"storageAccepted":      storageSync.StorageAccepted,
+			"locked":               storageSync.Locked,
+			"poolCount":            len(storageSync.Pools),
+			"missingPools":         storageSync.MissingPools,
+			"untrackedPools":       storageSync.UntrackedPools,
+			"nodeSecuritySynced":   storageSync.NodeSecuritySynced,
 		},
 		"instanceSync": gin.H{
 			"total":     len(instances),
@@ -5831,81 +5919,11 @@ func hostsOpsInstanceInitCommandsHandler(c *gin.Context) {
 
 // ==================== F. 审计规则 ====================
 
-// hostsAuditRule mirrors AuditRuleDefinition.
-type hostsAuditRule struct {
-	ID             string
-	Severity       string
-	Category       string
-	Name           string
-	Description    *string
-	TargetTypes    []string
-	MatchType      string
-	PatternText    string
-	CaseSensitive  bool
-	Source         string
-	Enabled        bool
-	Recommendation *string
-}
+// hostsAuditRule / hostsBuiltinAuditRules alias lib.AuditRuleDefinition and
+// lib.BuiltinAuditRules so builtin definitions stay in a single source of truth.
+type hostsAuditRule = lib.AuditRuleDefinition
 
-// hostsBuiltinAuditRules mirrors BUILTIN_AUDIT_RULES (lib/instance-audit.ts).
-var hostsBuiltinAuditRules = []hostsAuditRule{
-	{
-		ID: "packet-tool-hping", Severity: "high", Category: "network-abuse",
-		Name: "疑似发包工具进程", Description: strPtrHosts("匹配常见的发包、构造数据包或压测类工具。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(hping[3]?|nping|mz|mausezahn|mzbench|pktgen|packit|nemesis|tcpreplay|scapy|flood|synflood|udpflood|icmpflood|httpflood|slowloris|goldeneye|hulk|xerxes)\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("请先确认进程归属、流量用途和客户业务背景，再决定是否手动处置。"),
-	},
-	{
-		ID: "mass-scan-tool", Severity: "high", Category: "network-abuse",
-		Name: "疑似大规模扫描工具", Description: strPtrHosts("匹配常见的公网大范围扫描或高频扫描工具。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(masscan|zmap|zdns|zgrab2?|naabu|rustscan|httpx|nuclei|fscan|kscan|gogo|goscan|scanrs|nmap)\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("请核实扫描是否经过授权，并结合网络连接、工单或客户说明判断。"),
-	},
-	{
-		ID: "flood-tool-name", Severity: "high", Category: "network-abuse",
-		Name: "疑似 Flood/DDoS 程序", Description: strPtrHosts("匹配常见 Flood、DDoS 工具名称或命令名称。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(syn[-_]?flood|udp[-_]?flood|http[-_]?flood|slowloris|goldeneye|hulk|xerxes|torshammer|ufonet|mhddos|ddosim|layer[47]|flooder|cc[-_]?attack|stress|hammer|python.*(ddos|flood|attack|hammer)|node.*(ddos|flood|attack))\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("建议按高风险处理。手动停止前请先保留进程参数和连接证据。"),
-	},
-	{
-		ID: "proxy-panel", Severity: "medium", Category: "proxy-panel",
-		Name: "疑似代理面板程序", Description: strPtrHosts("匹配常见代理面板或相关管理面板名称。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(3x-ui|x-ui|v2-ui|s-ui|h-ui|marzban|v2board|sspanel|xboard|trojan-panel|hiddify|nebula|alpine|sub-web|subconverter|bt-panel|aapanel|aa-panel)\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("请确认当前节点规则是否允许此类应用，并结合客户业务说明判断。"),
-	},
-	{
-		ID: "proxy-core", Severity: "medium", Category: "proxy-panel",
-		Name: "疑似代理核心进程", Description: strPtrHosts("匹配常见代理核心、转发核心或隧道类进程名称。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(xray|v2ray|sing-?box|trojan(-go|rs)?|hysteria2?|naive|brook|gost|ss-server|ss-rust|shadowsocks(-rust)?|tuic|juicity|clash(-meta)?|mihomo|reality|xtls|vless|vmess|frp[cs]?|nps|npc|chisel|ligolo(-ng)?|rathole|bore)\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("处置前请核对客户用途、节点政策和实际流量，避免误伤正常服务。"),
-	},
-	{
-		ID: "miner", Severity: "high", Category: "resource-abuse",
-		Name: "疑似挖矿进程", Description: strPtrHosts("匹配常见加密货币挖矿进程名称。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(xmrig|xmrig-proxy|xmr-stak|xmrigcc|cpuminer|minerd|ethminer|lolminer|nbminer|teamredminer|t-rex|gminer|bzminer|srbminer|wildrig|rigel|miniZ|SRBMiner|moneroocean)\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("请结合 CPU 占用、运行时间和服务条款人工确认，违规后再执行处置。"),
-	},
-	{
-		ID: "bruteforce", Severity: "medium", Category: "credential-attack",
-		Name: "疑似爆破/撞库工具", Description: strPtrHosts("匹配常见密码爆破、登录尝试或凭据攻击工具。"),
-		TargetTypes: []string{"process", "startup"}, MatchType: "regex",
-		PatternText: `\b(hydra|thc-hydra|medusa|ncrack|patator|crowbar|brutespray|ffuf|gobuster|dirsearch|dirb|sshpass|brute)\b`,
-		Source:      "builtin", Enabled: true,
-		Recommendation: strPtrHosts("请检查外连目标、登录尝试记录和客户说明，再决定是否手动处理。"),
-	},
-}
+var hostsBuiltinAuditRules = lib.BuiltinAuditRules
 
 var hostsAuditSeverities = map[string]bool{"info": true, "low": true, "medium": true, "high": true}
 var hostsAuditTargets = map[string]bool{"process": true, "network": true, "startup": true}
@@ -7005,8 +7023,235 @@ func hostsAuditScanHandler(c *gin.Context) {
 		return
 	}
 
-	// 执行/解析/研判依赖 lib/instance-audit.ts（未移植）——显式失败。
-	hostsRespondSeam(c, errHostsSeam("lib/instance-audit.ts（审查扫描执行段）"))
+	var (
+		procRes, connRes, startupRes lib.IncusExecOutput
+		procErr, connErr, startupErr error
+		execWG                       sync.WaitGroup
+	)
+	execWG.Add(3)
+	go func() {
+		defer execWG.Done()
+		procRes, procErr = lib.IncusInstanceExecWithOutput(ctx, client, instance.IncusID, lib.BuildProcessAuditCommand(), nil, 45*time.Second)
+	}()
+	go func() {
+		defer execWG.Done()
+		connRes, connErr = lib.IncusInstanceExecWithOutput(ctx, client, instance.IncusID, lib.BuildConnectionAuditCommand(), nil, 45*time.Second)
+	}()
+	go func() {
+		defer execWG.Done()
+		startupRes, startupErr = lib.IncusInstanceExecWithOutput(ctx, client, instance.IncusID, lib.BuildStartupAuditCommand(), nil, 45*time.Second)
+	}()
+	execWG.Wait()
+
+	execErr := procErr
+	if execErr == nil {
+		execErr = connErr
+	}
+	if execErr == nil {
+		execErr = startupErr
+	}
+	if execErr != nil {
+		errMsg := execErr.Error()
+		trimmedErr := hostsTruncateRunes(errMsg, 2000)
+		unavailableCap := "unavailable"
+		_ = db.DB.WithContext(ctx).Create(&models.InstanceAuditScan{
+			HostID:     hostID,
+			InstanceID: instance.ID,
+			UserID:     user.ID,
+			Status:     "failed",
+			Capability: &unavailableCap,
+			RiskLevel:  "info",
+			Error:      &trimmedErr,
+		}).Error
+		hostsCreateLog(ctx, i64Ptr(user.ID), "host.ops.audit.scan",
+			fmt.Sprintf(`Audit scan unavailable for instance "%s" on host "%s": %s`, instance.Name, host.Name, errMsg),
+			"failed", &instance.ID)
+		instType := detail.Type
+		if instType == "" {
+			instType = "unknown"
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"success":    false,
+			"capability": "unavailable",
+			"error":      "无法在实例内执行审查命令: " + errMsg,
+			"instance": gin.H{
+				"id":      instance.ID,
+				"name":    instance.Name,
+				"incusId": instance.IncusID,
+				"type":    instType,
+				"status":  incusStatus,
+			},
+		})
+		return
+	}
+
+	stderrList := make([]string, 0, 3)
+	for _, s := range []string{procRes.Stderr, connRes.Stderr, startupRes.Stderr} {
+		if trimmed := strings.TrimSpace(s); trimmed != "" {
+			stderrList = append(stderrList, hostsTruncateRunes(trimmed, 1000))
+		}
+	}
+
+	processes := lib.ParseAuditProcesses(procRes.Stdout, 300)
+	connections := lib.ParseAuditConnections(connRes.Stdout, 300)
+	startupItems := lib.ParseAuditStartupItems(startupRes.Stdout, 200)
+
+	overrides, err := hostsLoadBuiltinAuditOverrides(ctx, hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "审查扫描失败: " + err.Error()})
+		return
+	}
+	customRules, err := hostsLoadCustomAuditRules(ctx, hostID, false, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "审查扫描失败: " + err.Error()})
+		return
+	}
+	ignoresRaw, err := hostsLoadAuditIgnores(ctx, hostID, instance.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "审查扫描失败: " + err.Error()})
+		return
+	}
+
+	rules := make([]lib.AuditRuleDefinition, 0, len(hostsBuiltinAuditRules)+len(customRules))
+	for _, b := range hostsBuiltinAuditRules {
+		rules = append(rules, hostsApplyBuiltinAuditOverride(b, overrides[b.ID]))
+	}
+	for _, cr := range customRules {
+		rules = append(rules, lib.AuditRuleDefinition{
+			ID:             fmt.Sprintf("custom:%d", cr.ID),
+			Severity:       hostsNormalizeAuditSeverity(cr.Severity),
+			Category:       cr.Category,
+			Name:           cr.Name,
+			Description:    cr.Description,
+			TargetTypes:    hostsNormalizeAuditTargetTypes(hostsJSONArray(cr.TargetTypes)),
+			MatchType:      hostsNormalizeAuditMatchType(cr.MatchType),
+			PatternText:    cr.Pattern,
+			CaseSensitive:  cr.CaseSensitive,
+			Source:         "custom",
+			Enabled:        cr.Enabled,
+			Recommendation: cr.Recommendation,
+		})
+	}
+
+	ignores := make([]lib.AuditIgnoreDefinition, 0, len(ignoresRaw))
+	for _, ig := range ignoresRaw {
+		ignores = append(ignores, lib.AuditIgnoreDefinition{
+			ID:         ig.ID,
+			RuleID:     ig.RuleID,
+			TargetType: hostsNormalizeAuditFindingTarget(ig.TargetType),
+			MatchText:  ig.MatchText,
+			Reason:     ig.Reason,
+			ExpiresAt:  ig.ExpiresAt,
+		})
+	}
+
+	analysis := lib.AnalyzeAuditData(lib.AuditAnalysisInput{
+		Processes:    processes,
+		Connections:  connections,
+		StartupItems: startupItems,
+		Rules:        rules,
+		Ignores:      ignores,
+	})
+	ignoredCount := 0
+	for _, f := range analysis.Findings {
+		if f.Ignored {
+			ignoredCount++
+		}
+	}
+	findingsForDB := analysis.Findings
+	if len(findingsForDB) > 80 {
+		findingsForDB = findingsForDB[:80]
+	}
+	findingsJSON, _ := json.Marshal(findingsForDB)
+	capability := "container-exec"
+	if detail.Type == "virtual-machine" {
+		capability = "guest-agent"
+	}
+	scanRecord := models.InstanceAuditScan{
+		HostID:           hostID,
+		InstanceID:       instance.ID,
+		UserID:           user.ID,
+		Status:           "success",
+		Capability:       &capability,
+		RiskLevel:        analysis.Summary.RiskLevel,
+		FindingCount:     int32(analysis.Summary.FindingCount),
+		IgnoredCount:     int32(ignoredCount),
+		ProcessCount:     int32(analysis.Summary.ProcessCount),
+		ConnectionCount:  int32(analysis.Summary.ConnectionCount),
+		ListeningCount:   int32(analysis.Summary.ListeningCount),
+		StartupItemCount: int32(analysis.Summary.StartupItemCount),
+		Findings:         datatypes.JSON(findingsJSON),
+	}
+	if err := db.DB.WithContext(ctx).Create(&scanRecord).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "审查扫描失败: " + err.Error()})
+		return
+	}
+
+	hostsCreateLog(ctx, i64Ptr(user.ID), "host.ops.audit.scan",
+		fmt.Sprintf(`Ran manual audit scan for instance "%s" on host "%s" (%d finding(s))`, instance.Name, host.Name, analysis.Summary.FindingCount),
+		"success", &instance.ID)
+
+	ruleViews := make([]gin.H, 0, len(rules))
+	for _, r := range rules {
+		ruleViews = append(ruleViews, gin.H{
+			"id":             r.ID,
+			"source":         r.Source,
+			"name":           r.Name,
+			"category":       r.Category,
+			"severity":       r.Severity,
+			"targetTypes":    r.TargetTypes,
+			"matchType":      r.MatchType,
+			"pattern":        r.PatternText,
+			"caseSensitive":  r.CaseSensitive,
+			"enabled":        r.Enabled,
+			"recommendation": r.Recommendation,
+		})
+	}
+	sort.SliceStable(processes, func(i, j int) bool {
+		if len(processes[i].Findings) != len(processes[j].Findings) {
+			return len(processes[i].Findings) > len(processes[j].Findings)
+		}
+		var ci, cj float64
+		if processes[i].CPUPercent != nil {
+			ci = *processes[i].CPUPercent
+		}
+		if processes[j].CPUPercent != nil {
+			cj = *processes[j].CPUPercent
+		}
+		return ci > cj
+	})
+	if len(processes) > 200 {
+		processes = processes[:200]
+	}
+	if len(connections) > 200 {
+		connections = connections[:200]
+	}
+	sort.SliceStable(startupItems, func(i, j int) bool {
+		return len(startupItems[i].Findings) > len(startupItems[j].Findings)
+	})
+	if len(startupItems) > 120 {
+		startupItems = startupItems[:120]
+	}
+
+	instType := detail.Type
+	if instType == "" {
+		instType = "unknown"
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success":      true,
+		"scanId":       scanRecord.ID,
+		"scannedAt":    time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		"capability":   capability,
+		"instance":     gin.H{"id": instance.ID, "name": instance.Name, "incusId": instance.IncusID, "type": instType, "status": incusStatus},
+		"summary":      analysis.Summary,
+		"ignoredCount": ignoredCount,
+		"rules":        ruleViews,
+		"findings":     analysis.Findings,
+		"processes":    processes,
+		"connections":  connections,
+		"startupItems": startupItems,
+		"stderr":       stderrList,
+	})
 }
 
 // hostsAuditKillProcessHandler mirrors POST
@@ -7091,14 +7336,114 @@ func hostsAuditKillProcessHandler(c *gin.Context) {
 		return
 	}
 
-	_ = pid
-	_ = signalName
-	_ = parsedScanID
-	_ = expectedCommand
-	hostsRespondSeam(c, errHostsSeam("lib/instance-audit.ts（execWithOutput + 审查动作落库）"))
+	procCheck, err := lib.IncusInstanceExecWithOutput(ctx, client, instance.IncusID,
+		fmt.Sprintf("ps -p %d -o pid=,comm=,args= 2>/dev/null || true", pid), nil, 30*time.Second)
+	scanIDPtr := hostsInt64ToInt32Ptr(parsedScanID)
+	pid32 := int32(pid)
+	if err != nil {
+		errMsg := err.Error()
+		stderrTrim := hostsTruncateRunes(errMsg, 2000)
+		_ = db.DB.WithContext(ctx).Create(&models.InstanceAuditAction{
+			ScanID:     scanIDPtr,
+			HostID:     hostID,
+			InstanceID: instance.ID,
+			UserID:     user.ID,
+			ActionType: "kill_process",
+			Pid:        &pid32,
+			Signal:     &signalName,
+			Reason:     reason,
+			Result:     "failed",
+			Stderr:     &stderrTrim,
+		}).Error
+		hostsCreateLog(ctx, i64Ptr(user.ID), "host.ops.audit.kill_process",
+			fmt.Sprintf(`Failed SIG%s for PID %d in instance "%s" on host "%s": %s`, signalName, pid, instance.Name, host.Name, errMsg),
+			"failed", &instance.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "停止进程失败: " + errMsg})
+		return
+	}
+	currentProcessText := hostsNormalizeProcessText(procCheck.Stdout)
+	if currentProcessText == "" {
+		c.JSON(http.StatusConflict, gin.H{"error": "该 PID 当前不存在，请重新扫描后再操作"})
+		return
+	}
+	if expectedCommand != "" && !strings.Contains(strings.ToLower(currentProcessText), strings.ToLower(expectedCommand)) {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":          "PID 当前进程与扫描时不一致，请重新扫描确认后再操作",
+			"currentProcess": currentProcessText,
+		})
+		return
+	}
+
+	killRes, err := lib.IncusInstanceExecWithOutput(ctx, client, instance.IncusID,
+		fmt.Sprintf("kill -%s -- %d", signalName, pid), nil, 30*time.Second)
+	if err != nil {
+		errMsg := err.Error()
+		stderrTrim := hostsTruncateRunes(errMsg, 2000)
+		_ = db.DB.WithContext(ctx).Create(&models.InstanceAuditAction{
+			ScanID:     scanIDPtr,
+			HostID:     hostID,
+			InstanceID: instance.ID,
+			UserID:     user.ID,
+			ActionType: "kill_process",
+			Pid:        &pid32,
+			Signal:     &signalName,
+			Reason:     reason,
+			Result:     "failed",
+			Stderr:     &stderrTrim,
+		}).Error
+		hostsCreateLog(ctx, i64Ptr(user.ID), "host.ops.audit.kill_process",
+			fmt.Sprintf(`Failed SIG%s for PID %d in instance "%s" on host "%s": %s`, signalName, pid, instance.Name, host.Name, errMsg),
+			"failed", &instance.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "停止进程失败: " + errMsg})
+		return
+	}
+
+	procTrim := hostsTruncateRunes(currentProcessText, 2000)
+	outTrim := hostsTruncateRunes(killRes.Stdout, 2000)
+	errTrim := hostsTruncateRunes(killRes.Stderr, 2000)
+	_ = db.DB.WithContext(ctx).Create(&models.InstanceAuditAction{
+		ScanID:         scanIDPtr,
+		HostID:         hostID,
+		InstanceID:     instance.ID,
+		UserID:         user.ID,
+		ActionType:     "kill_process",
+		Pid:            &pid32,
+		Signal:         &signalName,
+		ProcessCommand: &procTrim,
+		Reason:         reason,
+		Result:         "success",
+		Stdout:         &outTrim,
+		Stderr:         &errTrim,
+	}).Error
+	hostsCreateLog(ctx, i64Ptr(user.ID), "host.ops.audit.kill_process",
+		fmt.Sprintf(`Sent SIG%s to PID %d in instance "%s" on host "%s". Reason: %s`, signalName, pid, instance.Name, host.Name, reason),
+		"warning", &instance.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": fmt.Sprintf("已向 PID %d 发送 SIG%s", pid, signalName),
+		"pid":     pid,
+		"signal":  signalName,
+		"stdout":  killRes.Stdout,
+		"stderr":  killRes.Stderr,
+	})
 }
 
-// hostsNormalizeProcessText mirrors normalizeProcessText.
+func hostsTruncateRunes(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit])
+}
+
+func hostsInt64ToInt32Ptr(v *int64) *int32 {
+	if v == nil {
+		return nil
+	}
+	c := int32(*v)
+	return &c
+}
 func hostsNormalizeProcessText(value string) string {
 	return strings.TrimSpace(regexp.MustCompile(`\s+`).ReplaceAllString(value, " "))
 }
@@ -7238,8 +7583,18 @@ func hostsOpsInstanceRestartHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "重启失败: " + err.Error()})
 		return
 	}
-	_ = client
-	hostsRespondSeam(c, errHostsSeam("lib/incus#restartInstance"))
+	if _, err := lib.IncusInstanceRestart(ctx, client, instance.IncusID, force); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "重启失败: " + err.Error()})
+		return
+	}
+	msg := "实例已安全重启"
+	if force {
+		msg = "实例已强制重启"
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": msg,
+	})
 }
 
 // hostsDangerousActionHandler mirrors POST
@@ -7561,6 +7916,7 @@ func RegisterHosts(r *gin.Engine) {
 
 	group.POST("/:hostId/verify", hostsVerifyHandler)
 	group.POST("/:hostId/regenerate-install", hostsRegenerateInstallHandler)
+	group.POST("/:hostId/diagnose", hostsDiagnoseHandler)
 	group.POST("/:hostId/test", hostsTestHandler)
 	group.GET("/:hostId", hostsDetailHandler)
 	group.GET("/:hostId/images", hostsImagesGetHandler)
