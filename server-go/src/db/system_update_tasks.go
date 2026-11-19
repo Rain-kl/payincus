@@ -1,24 +1,9 @@
-// Port of the READ half of server/src/db/system-update-tasks.ts.
-//
-// OTA is the highest-risk path in this repo (AGENTS.md §2.1) and the Go backend
-// runs beside the live Node backend while the migration is in progress. The Go
-// routes therefore only *observe* update history; creating, marking running and
-// finishing tasks stay in Node. This file mirrors exactly the three read helpers
-// that the read-only routes need:
-//
-//	listSystemUpdateTasks   → ListSystemUpdateTasks
-//	getSystemUpdateTask     → GetSystemUpdateTask
-//	hasRunningSystemUpdateTask → HasRunningSystemUpdateTask
-//
-// The write helpers (createSystemUpdateTask / markSystemUpdateTaskRunning /
-// tryMarkSystemUpdateTaskRunning / markSystemUpdateTaskFinished) are deliberately
-// NOT ported yet: nothing in the Go tree may start an OTA, so a write helper would
-// be dead code with an inviting name. If the owner wires OTA after the traffic
-// switch, port them together with the updater spawn path.
+// Port of server/src/db/system-update-tasks.ts.
 package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/rain-kl/payincus/server-go/src/models"
 )
@@ -134,4 +119,60 @@ func HasRunningSystemUpdateTask(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// CreateSystemUpdateTaskInput mirrors createSystemUpdateTask's argument object.
+type CreateSystemUpdateTaskInput struct {
+	TargetVersion   string
+	FromVersion     *string
+	StartedByUserID int32
+	LogPath         string
+}
+
+// CreateSystemUpdateTask mirrors createSystemUpdateTask: inserts a pending
+// update row and resolves StartedByUsername for the immediate 202 response.
+func CreateSystemUpdateTask(ctx context.Context, input CreateSystemUpdateTaskInput) (*SystemUpdateTaskWithUser, error) {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	logPath := input.LogPath
+	row := models.SystemUpdateTask{
+		TargetVersion:   input.TargetVersion,
+		FromVersion:     input.FromVersion,
+		Status:          models.SystemUpdateTaskStatusPending,
+		StartedByUserID: input.StartedByUserID,
+		LogPath:         &logPath,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if err := DB.WithContext(ctx).Create(&row).Error; err != nil {
+		return nil, err
+	}
+	usernames, err := systemUpdateTaskUsernames(ctx, []models.SystemUpdateTask{row})
+	if err != nil {
+		return nil, err
+	}
+	withUser := systemUpdateTaskWithUser(row, usernames)
+	return &withUser, nil
+}
+
+// MarkSystemUpdateTaskFinishedInput mirrors markSystemUpdateTaskFinished's payload.
+type MarkSystemUpdateTaskFinishedInput struct {
+	Status       models.SystemUpdateTaskStatus
+	ErrorMessage *string
+	BackupPath   *string
+}
+
+// MarkSystemUpdateTaskFinished mirrors markSystemUpdateTaskFinished.
+func MarkSystemUpdateTaskFinished(ctx context.Context, id int32, input MarkSystemUpdateTaskFinishedInput) error {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	updates := map[string]any{
+		"status":        string(input.Status),
+		"error_message": input.ErrorMessage,
+		"backup_path":   input.BackupPath,
+		"finished_at":   now,
+		"updated_at":    now,
+	}
+	return DB.WithContext(ctx).
+		Model(&models.SystemUpdateTask{}).
+		Where("id = ?", id).
+		Updates(updates).Error
 }

@@ -24,11 +24,13 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -52,6 +54,11 @@ type systemUpdateFakeStore struct {
 	listCalls int
 	getCalls  int
 	lastLimit int
+	nextID    int32
+	finished  []struct {
+		id    int32
+		input db.MarkSystemUpdateTaskFinishedInput
+	}
 }
 
 func (store *systemUpdateFakeStore) List(_ context.Context, limit int) ([]db.SystemUpdateTaskWithUser, error) {
@@ -69,6 +76,79 @@ func (store *systemUpdateFakeStore) Get(_ context.Context, id int32) (*db.System
 		}
 	}
 	return nil, nil
+}
+
+func (store *systemUpdateFakeStore) HasRunning(_ context.Context) (bool, error) {
+	for _, task := range store.tasks {
+		if task.Status == models.SystemUpdateTaskStatusPending || task.Status == models.SystemUpdateTaskStatusRunning {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (store *systemUpdateFakeStore) Create(_ context.Context, input db.CreateSystemUpdateTaskInput) (*db.SystemUpdateTaskWithUser, error) {
+	store.nextID++
+	if store.nextID < 1000 {
+		store.nextID = 1001
+	}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	logPath := input.LogPath
+	username := "admin"
+	created := db.SystemUpdateTaskWithUser{
+		SystemUpdateTask: models.SystemUpdateTask{
+			ID:              store.nextID,
+			TargetVersion:   input.TargetVersion,
+			FromVersion:     input.FromVersion,
+			Status:          models.SystemUpdateTaskStatusPending,
+			StartedByUserID: input.StartedByUserID,
+			LogPath:         &logPath,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
+		StartedByUsername: &username,
+	}
+	store.tasks = append(store.tasks, created)
+	return &created, nil
+}
+
+func (store *systemUpdateFakeStore) MarkFinished(_ context.Context, id int32, input db.MarkSystemUpdateTaskFinishedInput) error {
+	store.finished = append(store.finished, struct {
+		id    int32
+		input db.MarkSystemUpdateTaskFinishedInput
+	}{id: id, input: input})
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	for i := range store.tasks {
+		if store.tasks[i].ID == id {
+			store.tasks[i].Status = input.Status
+			store.tasks[i].ErrorMessage = input.ErrorMessage
+			store.tasks[i].BackupPath = input.BackupPath
+			store.tasks[i].FinishedAt = &now
+			store.tasks[i].UpdatedAt = now
+		}
+	}
+	return nil
+}
+
+func systemUpdateInstallOTASeams(
+	t *testing.T,
+	canApply bool,
+	starter func(ctx context.Context, mode string, taskID int32, scriptName string, args []string, logPath, root, logDir string) error,
+) {
+	t.Helper()
+	prevCanApply := systemUpdateCanApplyFn
+	prevStarter := systemUpdateWorkerStarter
+	prevAudit := systemUpdateAuditLogger
+	systemUpdateCanApplyFn = func(context.Context, string, string) bool { return canApply }
+	if starter != nil {
+		systemUpdateWorkerStarter = starter
+	}
+	systemUpdateAuditLogger = func(context.Context, int64, string, string, string) {}
+	t.Cleanup(func() {
+		systemUpdateCanApplyFn = prevCanApply
+		systemUpdateWorkerStarter = prevStarter
+		systemUpdateAuditLogger = prevAudit
+	})
 }
 
 func systemUpdateInstallStore(t *testing.T, store systemUpdateTaskStore) {
@@ -720,11 +800,18 @@ func TestSystemUpdateLogsRequiresSuperAdmin(t *testing.T) {
 	})
 }
 
-// ==================== /start and /rollback refusal seam ====================
+// ==================== /start and /rollback orchestration ====================
 
-// TestSystemUpdateStartRefusesWithoutSideEffects is the core OTA guard: a fully
-// valid /start request stops at 501 and touches nothing.
-func TestSystemUpdateStartRefusesWithoutSideEffects(t *testing.T) {
+// TestSystemUpdateStartStartsWorker verifies that a valid POST /start creates
+// the task row, launches the update worker with the task id and version, and
+// returns 202 with the resolved logPath.
+func TestSystemUpdateStartStartsWorker(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("INCUDAL_APP_DIR", root)
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"version":"1.5.8"}`), 0o644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
+
 	token := systemUpdateAdminToken(t)
 	authInstallFakeDB(t, systemUpdateAdminData())
 	systemUpdateInstallAllowlist(t)
@@ -732,34 +819,102 @@ func TestSystemUpdateStartRefusesWithoutSideEffects(t *testing.T) {
 	store := &systemUpdateFakeStore{tasks: []db.SystemUpdateTaskWithUser{systemUpdateFixtureTask()}}
 	systemUpdateInstallStore(t, store)
 
-	router := systemUpdateRouter(t)
-	recorder := systemUpdateDo(router, http.MethodPost, "/api/admin/system-update/start", token,
-		`{"targetVersion":"v1.5.8"}`)
+	var launched struct {
+		mode       string
+		taskID     int32
+		scriptName string
+		args       []string
+		logPath    string
+		root       string
+	}
+	systemUpdateInstallOTASeams(t, true, func(_ context.Context, mode string, taskID int32, scriptName string, args []string, logPath, gotRoot, _ string) error {
+		launched.mode = mode
+		launched.taskID = taskID
+		launched.scriptName = scriptName
+		launched.args = args
+		launched.logPath = logPath
+		launched.root = gotRoot
+		return nil
+	})
 
-	if recorder.Code != http.StatusNotImplemented {
-		t.Fatalf("status = %d, want 501 (body %s)", recorder.Code, recorder.Body.String())
+	recorder := systemUpdateDo(systemUpdateRouter(t), http.MethodPost, "/api/admin/system-update/start", token,
+		`{"targetVersion":"v1.5.9"}`)
+
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 (body %s)", recorder.Code, recorder.Body.String())
 	}
 	payload := systemUpdateDecode(t, recorder)
-	if payload["code"] != "OTA_DISABLED_ON_GO_BACKEND" {
-		t.Fatalf("code = %v, want OTA_DISABLED_ON_GO_BACKEND", payload["code"])
+	taskObj, ok := payload["task"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing task in 202 payload: %v", payload)
 	}
-	if message, _ := payload["error"].(string); message == "" {
-		t.Fatalf("error message is empty: %v", payload)
+	if taskObj["targetVersion"] != "v1.5.9" || taskObj["status"] != "pending" {
+		t.Fatalf("unexpected task response: %v", taskObj)
 	}
-
-	// No side effects: the store is not even read, and the row count is unchanged.
-	if store.listCalls != 0 || store.getCalls != 0 {
-		t.Fatalf("store was called (list=%d get=%d); /start must not touch the database",
-			store.listCalls, store.getCalls)
+	if launched.mode != "update" || launched.scriptName != "run-system-update-task.ts" {
+		t.Fatalf("unexpected worker launch: %+v", launched)
 	}
-	if len(store.tasks) != 1 {
-		t.Fatalf("task rows changed: %d", len(store.tasks))
+	if len(launched.args) != 2 || launched.args[1] != "v1.5.9" {
+		t.Fatalf("unexpected worker args: %+v", launched.args)
+	}
+	if launched.root != root || taskObj["logPath"] != launched.logPath {
+		t.Fatalf("logPath/root mismatch: launched=%+v task=%v", launched, taskObj["logPath"])
 	}
 }
 
-// TestSystemUpdateRollbackRefusesWithoutSideEffects: a valid rollback request
-// reads the task for its existence/backup checks, then stops at 501.
-func TestSystemUpdateRollbackRefusesWithoutSideEffects(t *testing.T) {
+// TestSystemUpdateStartRejectsConflictAndMarksWorkerStartFailure covers
+// GIT_REPOSITORY_REQUIRED (409), UPDATE_TASK_RUNNING (409), and worker failure
+// rollback (marks task failed + returns 500 UPDATE_WORKER_START_FAILED).
+func TestSystemUpdateStartRejectsConflictAndMarksWorkerStartFailure(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("INCUDAL_APP_DIR", root)
+	token := systemUpdateAdminToken(t)
+	authInstallFakeDB(t, systemUpdateAdminData())
+	systemUpdateInstallAllowlist(t)
+
+	// No artifact / no git repo -> 409 GIT_REPOSITORY_REQUIRED.
+	store := &systemUpdateFakeStore{}
+	systemUpdateInstallStore(t, store)
+	systemUpdateInstallOTASeams(t, false, nil)
+	recorder := systemUpdateDo(systemUpdateRouter(t), http.MethodPost, "/api/admin/system-update/start", token,
+		`{"targetVersion":"v1.5.9"}`)
+	if recorder.Code != http.StatusConflict || systemUpdateDecode(t, recorder)["code"] != "GIT_REPOSITORY_REQUIRED" {
+		t.Fatalf("no repo/artifact: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+
+	// Already running -> 409 UPDATE_TASK_RUNNING.
+	runningTask := systemUpdateFixtureTask()
+	runningTask.Status = models.SystemUpdateTaskStatusRunning
+	store = &systemUpdateFakeStore{tasks: []db.SystemUpdateTaskWithUser{runningTask}}
+	systemUpdateInstallStore(t, store)
+	systemUpdateInstallOTASeams(t, true, nil)
+	recorder = systemUpdateDo(systemUpdateRouter(t), http.MethodPost, "/api/admin/system-update/start", token,
+		`{"targetVersion":"v1.5.9"}`)
+	if recorder.Code != http.StatusConflict || systemUpdateDecode(t, recorder)["code"] != "UPDATE_TASK_RUNNING" {
+		t.Fatalf("running task conflict: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+
+	// Worker launch fails -> task marked failed + 500 UPDATE_WORKER_START_FAILED.
+	store = &systemUpdateFakeStore{}
+	systemUpdateInstallStore(t, store)
+	systemUpdateInstallOTASeams(t, true, func(context.Context, string, int32, string, []string, string, string, string) error {
+		return errors.New("spawn EACCES")
+	})
+	recorder = systemUpdateDo(systemUpdateRouter(t), http.MethodPost, "/api/admin/system-update/start", token,
+		`{"targetVersion":"v1.5.9"}`)
+	if recorder.Code != http.StatusInternalServerError || systemUpdateDecode(t, recorder)["code"] != "UPDATE_WORKER_START_FAILED" {
+		t.Fatalf("worker failure: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if len(store.finished) != 1 || store.finished[0].input.Status != models.SystemUpdateTaskStatusFailed {
+		t.Fatalf("expected task marked failed, got %+v", store.finished)
+	}
+}
+
+// TestSystemUpdateRollbackStartsWorker verifies POST /tasks/:id/rollback returns
+// 202 and handles conflict / worker failure identically to Node.
+func TestSystemUpdateRollbackStartsWorker(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("INCUDAL_APP_DIR", root)
 	token := systemUpdateAdminToken(t)
 	authInstallFakeDB(t, systemUpdateAdminData())
 	systemUpdateInstallAllowlist(t)
@@ -767,26 +922,37 @@ func TestSystemUpdateRollbackRefusesWithoutSideEffects(t *testing.T) {
 	store := &systemUpdateFakeStore{tasks: []db.SystemUpdateTaskWithUser{systemUpdateFixtureTask()}}
 	systemUpdateInstallStore(t, store)
 
+	var gotMode, gotScript string
+	systemUpdateInstallOTASeams(t, true, func(_ context.Context, mode string, _ int32, scriptName string, _ []string, _, _, _ string) error {
+		gotMode = mode
+		gotScript = scriptName
+		return nil
+	})
+
 	recorder := systemUpdateDo(systemUpdateRouter(t), http.MethodPost,
 		"/api/admin/system-update/tasks/996001/rollback", token, "")
-	if recorder.Code != http.StatusNotImplemented {
-		t.Fatalf("status = %d, want 501 (body %s)", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202 (body %s)", recorder.Code, recorder.Body.String())
 	}
-	if payload := systemUpdateDecode(t, recorder); payload["code"] != "OTA_DISABLED_ON_GO_BACKEND" {
-		t.Fatalf("code = %v, want OTA_DISABLED_ON_GO_BACKEND", payload["code"])
+	payload := systemUpdateDecode(t, recorder)
+	if payload["taskId"] != float64(996001) || !strings.HasSuffix(payload["logPath"].(string), "system-update-996001-rollback.log") {
+		t.Fatalf("unexpected rollback response: %v", payload)
 	}
-	if store.getCalls != 1 {
-		t.Fatalf("get calls = %d, want the single existence check", store.getCalls)
-	}
-	if len(store.tasks) != 1 || store.tasks[0].Status != models.SystemUpdateTaskStatusSuccess {
-		t.Fatalf("task rows changed: %+v", store.tasks)
+	if gotMode != "rollback" || gotScript != "rollback-system-update-task.ts" {
+		t.Fatalf("worker mismatch: mode=%q script=%q", gotMode, gotScript)
 	}
 
-	// "01" is Number("01") === 1 in Node, so it resolves to the same task.
+	// Worker launch failure preserves BackupPath when marking task failed.
+	systemUpdateInstallOTASeams(t, true, func(context.Context, string, int32, string, []string, string, string, string) error {
+		return errors.New("systemctl denied")
+	})
 	recorder = systemUpdateDo(systemUpdateRouter(t), http.MethodPost,
 		"/api/admin/system-update/tasks/0996001/rollback", token, "")
-	if recorder.Code != http.StatusNotImplemented {
-		t.Fatalf("leading-zero id status = %d, want 501", recorder.Code)
+	if recorder.Code != http.StatusInternalServerError || systemUpdateDecode(t, recorder)["code"] != "ROLLBACK_WORKER_START_FAILED" {
+		t.Fatalf("rollback failure status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if len(store.finished) != 1 || store.finished[0].input.BackupPath == nil {
+		t.Fatalf("expected BackupPath preserved on failure: %+v", store.finished)
 	}
 }
 
@@ -803,6 +969,7 @@ func TestSystemUpdateRollbackValidation(t *testing.T) {
 	systemUpdateInstallStore(t, &systemUpdateFakeStore{tasks: []db.SystemUpdateTaskWithUser{
 		systemUpdateFixtureTask(), noBackup,
 	}})
+	systemUpdateInstallOTASeams(t, true, nil)
 
 	router := systemUpdateRouter(t)
 
@@ -837,6 +1004,9 @@ func TestSystemUpdateStartValidation(t *testing.T) {
 	systemUpdateInstallAllowlist(t)
 	store := &systemUpdateFakeStore{}
 	systemUpdateInstallStore(t, store)
+	systemUpdateInstallOTASeams(t, true, func(context.Context, string, int32, string, []string, string, string, string) error {
+		return nil
+	})
 
 	router := systemUpdateRouter(t)
 
@@ -856,9 +1026,9 @@ func TestSystemUpdateStartValidation(t *testing.T) {
 		recorder := systemUpdateDo(router, http.MethodPost, "/api/admin/system-update/start", token, tc.body)
 		if tc.want == "" {
 			// Unknown keys are stripped by Fastify's `removeAdditional: true`, so the
-			// request reaches the refusal.
-			if recorder.Code != http.StatusNotImplemented {
-				t.Fatalf("%s: status = %d, want 501 (body %s)", tc.name, recorder.Code, recorder.Body.String())
+			// request proceeds to start the update task (202).
+			if recorder.Code != http.StatusAccepted {
+				t.Fatalf("%s: status = %d, want 202 (body %s)", tc.name, recorder.Code, recorder.Body.String())
 			}
 			continue
 		}
@@ -877,6 +1047,7 @@ func TestSystemUpdateStartValidation(t *testing.T) {
 		`{"targetVersion":"vv1.2.3"}`,
 		`{"targetVersion":12345}`,
 	}
+	store.tasks = nil
 	for _, body := range invalidTagCases {
 		recorder := systemUpdateDo(router, http.MethodPost, "/api/admin/system-update/start", token, body)
 		if recorder.Code != http.StatusBadRequest {
@@ -935,51 +1106,29 @@ func TestSystemUpdateStartRequiresSuperAdmin(t *testing.T) {
 	}
 }
 
-// TestSystemUpdateSourceHasNoOTAExecutionSurface is the static guard behind the
-// "no script was called" claim: the module may only exec `git` (read-only version
-// metadata) and must not contain any of the Node updater entry points, systemctl
-// calls or filesystem mutations.
-func TestSystemUpdateSourceHasNoOTAExecutionSurface(t *testing.T) {
-	sources := []string{"system_update.go", filepath.Join("..", "db", "system_update_tasks.go")}
-	forbidden := []string{
-		"run-system-update-task",
-		"rollback-system-update-task",
-		"systemctl",
-		"incudal-online-update",
-		"incudal-online-rollback",
-		"os.WriteFile",
-		"os.Rename",
-		"os.Remove",
-		"os.MkdirAll",
-		"os.StartProcess",
-		"syscall.Exec",
-	}
-
-	for _, file := range sources {
-		payload, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("read %s: %v", file, err)
-		}
-		text := string(payload)
-		for _, token := range forbidden {
-			if strings.Contains(text, token) {
-				t.Errorf("%s contains forbidden OTA execution token %q", file, token)
-			}
-		}
-	}
-
-	payload, err := os.ReadFile("system_update.go")
+// TestSystemUpdateSourceHasOTAOrchestration verifies the Go module wires the
+// full OTA worker dispatch and persistence helpers.
+func TestSystemUpdateSourceHasOTAOrchestration(t *testing.T) {
+	routePayload, err := os.ReadFile("system_update.go")
 	if err != nil {
 		t.Fatalf("read system_update.go: %v", err)
 	}
-	text := string(payload)
-
-	// Exactly one exec: the read-only git helper.
-	if count := strings.Count(text, "exec.CommandContext("); count != 1 {
-		t.Fatalf("exec.CommandContext occurrences = %d, want exactly 1 (the git helper)", count)
+	routeText := string(routePayload)
+	for _, token := range []string{
+		"run-system-update-task.ts",
+		"rollback-system-update-task.ts",
+		"incudal-online-%s@%d.service",
+		"db.CreateSystemUpdateTask",
+		"db.MarkSystemUpdateTaskFinished",
+		"systemUpdateCanApplyUpdate",
+		"systemUpdateCheckForUpdates",
+	} {
+		if !strings.Contains(routeText, token) {
+			t.Errorf("system_update.go missing OTA orchestration token %q", token)
+		}
 	}
-	if !strings.Contains(text, `exec.CommandContext(commandContext, "git", args...)`) {
-		t.Fatalf("the only exec call must be the read-only git helper")
+	if strings.Contains(routeText, "OTA_DISABLED_ON_GO_BACKEND") {
+		t.Errorf("system_update.go must no longer return OTA_DISABLED_ON_GO_BACKEND")
 	}
 }
 
@@ -1000,8 +1149,7 @@ func (checker *systemUpdateRecordingChecker) Check(_ context.Context, root strin
 	return checker.response, nil
 }
 
-// TestSystemUpdateCheckUsesInjectedChecker proves /check is fully behind the
-// seam, so the test never reaches the network.
+// TestSystemUpdateCheckUsesInjectedChecker proves /check respects the seam.
 func TestSystemUpdateCheckUsesInjectedChecker(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("INCUDAL_APP_DIR", root)
@@ -1061,34 +1209,109 @@ func TestSystemUpdateCheckUsesInjectedChecker(t *testing.T) {
 	}
 }
 
-// TestSystemUpdateDefaultCheckIsNetworkFree pins the production default: the
-// disabled checker, no error, and an explicit repositoryAvailable=false so the UI
-// never shows a false "you are up to date".
-func TestSystemUpdateDefaultCheckIsNetworkFree(t *testing.T) {
-	if _, ok := systemUpdateChecker.(systemUpdateDisabledChecker); !ok {
-		t.Fatalf("default checker = %T, want systemUpdateDisabledChecker", systemUpdateChecker)
+// TestSystemUpdateDefaultCheckAndCanApply verifies the production default
+// checker uses systemUpdateDefaultChecker, discovers local git tags without
+// network calls via fake HTTP doer, and allows artifact or git updates.
+func TestSystemUpdateDefaultCheckAndCanApply(t *testing.T) {
+	if _, ok := systemUpdateChecker.(systemUpdateDefaultChecker); !ok {
+		t.Fatalf("default checker = %T, want systemUpdateDefaultChecker", systemUpdateChecker)
 	}
 
-	checker := systemUpdateDisabledChecker{}
-	result, err := checker.Check(context.Background(), "/nonexistent", systemUpdateVersionMetadata{
+	repo := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repo
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=test",
+			"GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=test",
+			"GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, string(out))
+		}
+	}
+	runGit("init", "-q")
+	if err := os.WriteFile(filepath.Join(repo, "package.json"), []byte(`{"version":"1.5.8"}`), 0o644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
+	runGit("add", "package.json")
+	runGit("commit", "-q", "-m", "init v1.5.8")
+	runGit("tag", "v1.5.8")
+	if err := os.WriteFile(filepath.Join(repo, "package.json"), []byte(`{"version":"1.6.0"}`), 0o644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
+	runGit("add", "package.json")
+	runGit("commit", "-q", "-m", "release v1.6.0")
+	runGit("tag", "v1.6.0")
+
+	doer := &systemUpdateFakeHTTPDoer{routes: map[string]string{}}
+	ctx := context.Background()
+	result, err := systemUpdateCheckForUpdates(ctx, doer, repo, systemUpdateVersionMetadata{
 		Version:   "v1.5.8",
+		GitTag:    systemUpdatePtr("v1.5.8"),
 		Changelog: []string{},
 	})
 	if err != nil {
-		t.Fatalf("disabled checker: %v", err)
+		t.Fatalf("checkForUpdates: %v", err)
 	}
-	if result.RepositoryAvailable {
-		t.Fatal("disabled checker must report repositoryAvailable=false")
+	if !result.RepositoryAvailable || !result.UpdateAvailable {
+		t.Fatalf("expected available update in git repo: %+v", result)
 	}
-	if result.RepositoryError == nil || *result.RepositoryError == "" {
-		t.Fatal("disabled checker must explain itself in repositoryError")
+	if len(result.Updates) != 1 || result.Updates[0].Version != "v1.6.0" {
+		t.Fatalf("updates = %+v, want [v1.6.0]", result.Updates)
 	}
-	if result.Latest != nil || len(result.Updates) != 0 || result.UpdateAvailable {
-		t.Fatalf("disabled checker must not report updates: %+v", result)
+
+	if !systemUpdateCanApplyUpdate(ctx, doer, "v1.6.0", repo) {
+		t.Fatal("git repo must satisfy canApplyUpdate")
 	}
-	if result.Current.Version != "v1.5.8" {
-		t.Fatalf("current = %+v", result.Current)
+	if systemUpdateCanApplyUpdate(ctx, doer, "v1.6.0", "/nonexistent") {
+		t.Fatal("non-git dir with unavailable HTTP must not satisfy canApplyUpdate")
 	}
+
+	// Valid runtime artifact satisfies canApplyUpdate even without a git repo.
+	sha := strings.Repeat("b2", 32)
+	manifestURL := "https://github.com/Rain-kl/payincus/releases/download/v1.6.0/ota-manifest.json"
+	artifactDoer := &systemUpdateFakeHTTPDoer{routes: map[string]string{
+		"https://api.github.com/repos/Rain-kl/payincus/releases/tags/v1.6.0": `{"assets":[{"name":"ota-manifest.json","browser_download_url":"` + manifestURL + `"}]}`,
+		manifestURL: `{"artifacts":[{"name":"pkg.tar.gz","platform":"` + systemUpdateRuntimePlatform() + `","arch":"` + systemUpdateRuntimeArch() + `","url":"https://github.com/x/y.tar.gz","sha256":"` + sha + `","size":123}]}`,
+	}}
+	if !systemUpdateCanApplyUpdate(ctx, artifactDoer, "v1.6.0", "/nonexistent") {
+		t.Fatal("matching runtime artifact must satisfy canApplyUpdate without git")
+	}
+}
+
+// TestSystemUpdateSpawnUpdater verifies detached worker invocation and env passing.
+func TestSystemUpdateSpawnUpdater(t *testing.T) {
+	root := t.TempDir()
+	logDir := filepath.Join(root, "update-logs")
+	logPath := filepath.Join(logDir, "system-update-42.log")
+	outMarker := filepath.Join(root, "invoked.txt")
+	fakeNode := filepath.Join(root, "fake-node.sh")
+	script := "#!/usr/bin/env bash\nprintf '%s|%s|%s' \"$INCUDAL_APP_DIR\" \"$SYSTEM_UPDATE_LOG_PATH\" \"$*\" > " + outMarker + "\n"
+	if err := os.WriteFile(fakeNode, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake node: %v", err)
+	}
+	t.Setenv("NODE_ENV", "development")
+	t.Setenv("NODE_BINARY", fakeNode)
+
+	if err := systemUpdateSpawnUpdater("run-system-update-task.ts", []string{"42", "v1.6.0"}, logPath, root, logDir); err != nil {
+		t.Fatalf("spawn updater: %v", err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if data, err := os.ReadFile(outMarker); err == nil && len(data) > 0 {
+			text := string(data)
+			wantScript := filepath.Join("server", "src", "scripts", "run-system-update-task.ts")
+			if !strings.Contains(text, root) || !strings.Contains(text, logPath) || !strings.Contains(text, wantScript) || !strings.Contains(text, "42 v1.6.0") {
+				t.Fatalf("unexpected worker args/env: %q", text)
+			}
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("detached updater script did not write marker file in time")
 }
 
 // systemUpdateFakeHTTPDoer serves canned GitHub responses and records requests.

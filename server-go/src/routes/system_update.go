@@ -1,40 +1,11 @@
 // Port of server/src/routes/system-update.ts (prefix /api/admin/system-update).
 //
-// OTA IS THE HIGHEST-RISK PATH IN THIS REPOSITORY (AGENTS.md §2.1). The Node
-// backend is still production and owns the OTA machinery: it spawns the updater
-// and rollback worker scripts (or starts a systemd template unit), which download
-// release artifacts, rewrite the `current` symlink and restart services. While the
-// Go backend runs beside it, starting an update from Go would race Node for the
-// same install directory.
-//
-// The module therefore splits into two deliberately different halves:
-//
-//	READ-ONLY, FULLY IMPLEMENTED
-//	  GET  /version              version metadata (version.json + local git)
-//	  GET  /check                update check through an injectable checker seam
-//	  GET  /tasks                newest 30 tasks, with starter username
-//	  GET  /tasks/:id            one task or 400/404
-//	  GET  /tasks/:id/logs       bounded log tail (last 200k UTF-16 units)
-//
-//	VALIDATED, THEN EXPLICITLY REFUSED
-//	  POST /start                501 OTA_DISABLED_ON_GO_BACKEND
-//	  POST /tasks/:id/rollback   501 OTA_DISABLED_ON_GO_BACKEND
-//
-// The two write routes run the same authentication, super-admin allowlist,
-// schema/route-id validation and existence checks as Node, and then stop: they
-// never touch the database, never write a log row, never exec a script and never
-// signal a process. The 501 is intentional and temporary — after the traffic
-// switch the owner decides whether OTA is wired into Go (see docs/WAVE_D_SPEC.md).
-// TestSystemUpdateStartRefusesWithoutSideEffects and
-// TestSystemUpdateRollbackRefusesWithoutSideEffects pin that contract, and
-// TestSystemUpdateSourceHasNoOTAExecutionSurface fails if a worker-script or
-// service-manager invocation ever appears in this module.
-//
-// `GET /check` in Node performs `git fetch --tags` (mutating the working tree's
-// refs) and calls api.github.com. Both are outbound side effects that the Go
-// backend must not perform by default, so the default checker is a network-free
-// "disabled" implementation. The real GitHub checker is ported behind the
-// systemUpdateHTTPDoer seam and is exercised only with a fake client in tests.
+// Implements all read routes (/version, /check, /tasks, /tasks/:id,
+// /tasks/:id/logs) and mutating OTA orchestration routes (POST /start,
+// POST /tasks/:id/rollback). Production Linux deploys launch the root-owned
+// systemd template units (`incudal-online-update@<id>.service` /
+// `incudal-online-rollback@<id>.service`) via sudo; non-systemd / dev runs
+// spawn the detached updater scripts directly.
 package routes
 
 import (
@@ -48,8 +19,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -59,6 +32,7 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/db"
 	"github.com/rain-kl/payincus/server-go/src/lib"
 	"github.com/rain-kl/payincus/server-go/src/middleware"
+	"github.com/rain-kl/payincus/server-go/src/models"
 )
 
 const (
@@ -70,20 +44,13 @@ const (
 	systemUpdateLogTailLimit = 200000
 	// systemUpdateGitTimeout mirrors the 30_000 ms execFile timeout.
 	systemUpdateGitTimeout = 30 * time.Second
-	// systemUpdateDisabledCode is the machine-readable refusal. It is NOT a Node
-	// code: the Node backend has no equivalent response.
-	systemUpdateDisabledCode = "OTA_DISABLED_ON_GO_BACKEND"
+	// systemUpdateSystemdTimeout mirrors the 30_000 ms systemctl start timeout.
+	systemUpdateSystemdTimeout = 30 * time.Second
 	// systemUpdateMaxInt32 is the Prisma Int ceiling. Node's parsePositiveId accepts
 	// any safe integer, then Prisma fails on the 32-bit column and the request
 	// answers 500; the handler mirrors that status instead of truncating the id.
 	systemUpdateMaxInt32 = math.MaxInt32
 )
-
-// systemUpdateDisabledMessage is the human-readable refusal.
-const systemUpdateDisabledMessage = "OTA updates are disabled on the Go backend while the Node backend still serves them; no update or rollback was started"
-
-// systemUpdateDisabledCheckReason explains the network-free default of /check.
-const systemUpdateDisabledCheckReason = "Go 后端默认不执行在线版本检查（不访问 api.github.com，也不执行 git fetch）；OTA 仍由 Node 后端负责，切流后由 owner 决定是否接线"
 
 // systemUpdateGitHubUnavailableMessage is the literal from
 // checkForUpdatesWithoutGit() when the Releases API cannot be reached.
@@ -101,12 +68,13 @@ var systemUpdateStartBodyFields = []ajvFieldSpec{
 
 // ==================== seams ====================
 
-// systemUpdateTaskStore is the read-only DB surface this module needs. It has no
-// create/update method on purpose: the Go backend must not be able to record an
-// OTA task, so the refusal seam cannot accidentally write one.
+// systemUpdateTaskStore is the DB surface for system update tasks.
 type systemUpdateTaskStore interface {
 	List(ctx context.Context, limit int) ([]db.SystemUpdateTaskWithUser, error)
 	Get(ctx context.Context, id int32) (*db.SystemUpdateTaskWithUser, error)
+	HasRunning(ctx context.Context) (bool, error)
+	Create(ctx context.Context, input db.CreateSystemUpdateTaskInput) (*db.SystemUpdateTaskWithUser, error)
+	MarkFinished(ctx context.Context, id int32, input db.MarkSystemUpdateTaskFinishedInput) error
 }
 
 // systemUpdateDBStore is the production store.
@@ -118,6 +86,18 @@ func (systemUpdateDBStore) List(ctx context.Context, limit int) ([]db.SystemUpda
 
 func (systemUpdateDBStore) Get(ctx context.Context, id int32) (*db.SystemUpdateTaskWithUser, error) {
 	return db.GetSystemUpdateTask(ctx, id)
+}
+
+func (systemUpdateDBStore) HasRunning(ctx context.Context) (bool, error) {
+	return db.HasRunningSystemUpdateTask(ctx)
+}
+
+func (systemUpdateDBStore) Create(ctx context.Context, input db.CreateSystemUpdateTaskInput) (*db.SystemUpdateTaskWithUser, error) {
+	return db.CreateSystemUpdateTask(ctx, input)
+}
+
+func (systemUpdateDBStore) MarkFinished(ctx context.Context, id int32, input db.MarkSystemUpdateTaskFinishedInput) error {
+	return db.MarkSystemUpdateTaskFinished(ctx, id, input)
 }
 
 // systemUpdateTasks is replaced by tests with an in-memory store.
@@ -134,36 +114,49 @@ var systemUpdateAdminAllowlist = func(ctx context.Context) (lib.CombinedAdminIDA
 	)
 }
 
-// systemUpdateHTTPDoer is the HTTP seam for the (disabled by default) GitHub
-// checker. *http.Client satisfies it.
+// systemUpdateHTTPDoer is the HTTP seam for GitHub Releases / OTA manifest I/O.
 type systemUpdateHTTPDoer interface {
 	Do(request *http.Request) (*http.Response, error)
 }
+
+// systemUpdateHTTPClient is the production HTTP client for GitHub OTA API calls.
+var systemUpdateHTTPClient systemUpdateHTTPDoer = &http.Client{Timeout: 30 * time.Second}
 
 // systemUpdateCheckRunner mirrors checkForUpdates(root).
 type systemUpdateCheckRunner interface {
 	Check(ctx context.Context, root string, current systemUpdateVersionMetadata) (systemUpdateCheckResult, error)
 }
 
-// systemUpdateDisabledChecker is the production default: no network, no git
-// mutation, and an explicit "repository unavailable" result instead of a
-// misleading "no updates available".
-type systemUpdateDisabledChecker struct{}
+// systemUpdateDefaultChecker executes checkForUpdates(root): local git tags when
+// inside a git working tree, or GitHub Releases API otherwise.
+type systemUpdateDefaultChecker struct{}
 
-func (systemUpdateDisabledChecker) Check(_ context.Context, _ string, current systemUpdateVersionMetadata) (systemUpdateCheckResult, error) {
-	reason := systemUpdateDisabledCheckReason
-	return systemUpdateCheckResult{
-		Current:             current,
-		Latest:              nil,
-		Updates:             []systemUpdateAvailableUpdate{},
-		UpdateAvailable:     false,
-		RepositoryAvailable: false,
-		RepositoryError:     &reason,
-	}, nil
+func (systemUpdateDefaultChecker) Check(ctx context.Context, root string, current systemUpdateVersionMetadata) (systemUpdateCheckResult, error) {
+	return systemUpdateCheckForUpdates(ctx, systemUpdateHTTPClient, root, current)
 }
 
-// systemUpdateChecker is the /check seam.
-var systemUpdateChecker systemUpdateCheckRunner = systemUpdateDisabledChecker{}
+// systemUpdateChecker is the /check seam (real checker in production, mockable in tests).
+var systemUpdateChecker systemUpdateCheckRunner = systemUpdateDefaultChecker{}
+
+// systemUpdateCanApplyFn checks whether targetVersion can be applied via an OTA
+// artifact or a local Git working tree.
+var systemUpdateCanApplyFn = func(ctx context.Context, targetVersion, root string) bool {
+	return systemUpdateCanApplyUpdate(ctx, systemUpdateHTTPClient, targetVersion, root)
+}
+
+// systemUpdateWorkerStarter launches the update or rollback worker (systemd
+// unit in Linux production, detached script runner otherwise).
+var systemUpdateWorkerStarter = systemUpdateStartWorker
+
+// systemUpdateEnsureLogDir ensures the update log directory exists.
+var systemUpdateEnsureLogDir = func(dir string) error {
+	return os.MkdirAll(dir, 0o755)
+}
+
+// systemUpdateAuditLogger persists system-update audit entries.
+var systemUpdateAuditLogger = func(ctx context.Context, userID int64, action, detail, result string) {
+	db.CreateLog(ctx, &userID, db.LogModuleSystem, action, detail, result, db.CreateLogOptions{})
+}
 
 // ==================== wire shapes ====================
 
@@ -682,14 +675,7 @@ func systemUpdateRequireManager(c *gin.Context) bool {
 	return false
 }
 
-// systemUpdateRefuseOTA is the owner-approved refusal seam for the two mutating
-// routes. It performs no I/O and no state change: 501 + a stable machine code.
-func systemUpdateRefuseOTA(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": systemUpdateDisabledMessage,
-		"code":  systemUpdateDisabledCode,
-	})
-}
+// systemUpdateRefuseOTA removed: OTA execution is wired into /start and /rollback.
 
 // ==================== routes ====================
 
@@ -810,12 +796,6 @@ func RegisterSystemUpdate(r *gin.Engine) {
 	})
 
 	// POST /api/admin/system-update/start
-	//
-	// Validation and authorization run exactly like Node; the action does not.
-	// Fastify's order matters: onRequest auth → body parser → body schema (AJV) →
-	// handler (where requireUpdateManager runs). An administrator outside the OTA
-	// allowlist therefore gets 400 for a malformed body before the 403, exactly as
-	// the Node route does.
 	group.POST("/start", func(c *gin.Context) {
 		body, status, message := decodeJSONRequestBody(c)
 		if status != 0 {
@@ -830,7 +810,8 @@ func RegisterSystemUpdate(r *gin.Engine) {
 		if !systemUpdateRequireManager(c) {
 			return
 		}
-		targetVersion, _ := validated.stringValue("targetVersion")
+		targetVersionRaw, _ := validated.stringValue("targetVersion")
+		targetVersion := strings.TrimSpace(targetVersionRaw)
 		if !systemUpdateIsValidReleaseTag(targetVersion) {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Target version must be a release tag like v1.2.3",
@@ -839,17 +820,87 @@ func RegisterSystemUpdate(r *gin.Engine) {
 			return
 		}
 
-		// AGENTS.md §2.1: no OTA from the Go backend while Node owns production.
-		// Node would call canApplyUpdate() (network), create the task row, write an
-		// audit log and spawn the updater here. None of that happens: the request
-		// stops at a deterministic 501.
-		systemUpdateRefuseOTA(c)
+		ctx := c.Request.Context()
+		root := systemUpdateProjectRoot()
+		if !systemUpdateCanApplyFn(ctx, targetVersion, root) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "No usable OTA artifact for this platform and the deployment directory is not a Git working tree",
+				"code":  "GIT_REPOSITORY_REQUIRED",
+			})
+			return
+		}
+
+		running, err := systemUpdateTasks.HasRunning(ctx)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+		if running {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "Another update task is already running",
+				"code":  "UPDATE_TASK_RUNNING",
+			})
+			return
+		}
+
+		logDir := systemUpdateLogDir(root)
+		if err := systemUpdateEnsureLogDir(logDir); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		user := middleware.CurrentUser(c)
+		current := systemUpdateCurrentVersionMetadata(ctx, root)
+		fromVersion := current.Version
+		pendingLogPath := filepath.Join(logDir, fmt.Sprintf("system-update-pending-%d.log", time.Now().UnixMilli()))
+		task, err := systemUpdateTasks.Create(ctx, db.CreateSystemUpdateTaskInput{
+			TargetVersion:   targetVersion,
+			FromVersion:     &fromVersion,
+			StartedByUserID: user.ID,
+			LogPath:         pendingLogPath,
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		logPath := filepath.Join(logDir, fmt.Sprintf("system-update-%d.log", task.ID))
+		systemUpdateAuditLogger(
+			ctx,
+			int64(user.ID),
+			"system.update.start",
+			fmt.Sprintf("Started system update from %s to %s", current.Version, targetVersion),
+			db.LogResultSuccess,
+		)
+
+		if err := systemUpdateWorkerStarter(
+			ctx,
+			"update",
+			task.ID,
+			"run-system-update-task.ts",
+			[]string{strconv.Itoa(int(task.ID)), targetVersion},
+			logPath,
+			root,
+			logDir,
+		); err != nil {
+			errMsg := "Failed to start system update worker: " + err.Error()
+			_ = systemUpdateTasks.MarkFinished(context.WithoutCancel(ctx), task.ID, db.MarkSystemUpdateTaskFinishedInput{
+				Status:       models.SystemUpdateTaskStatusFailed,
+				ErrorMessage: &errMsg,
+				BackupPath:   nil,
+			})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to start system update worker",
+				"code":  "UPDATE_WORKER_START_FAILED",
+			})
+			return
+		}
+
+		task.LogPath = &logPath
+		c.JSON(http.StatusAccepted, gin.H{"task": systemUpdateTaskViewFromRow(*task)})
 	})
 
 	// POST /api/admin/system-update/tasks/:id/rollback
-	//
-	// Same split: the route id and task existence are real checks, the rollback is
-	// refused.
 	group.POST("/tasks/:id/rollback", func(c *gin.Context) {
 		if !systemUpdateRequireManager(c) {
 			return
@@ -867,7 +918,61 @@ func RegisterSystemUpdate(r *gin.Engine) {
 			return
 		}
 
-		systemUpdateRefuseOTA(c)
+		ctx := c.Request.Context()
+		running, err := systemUpdateTasks.HasRunning(ctx)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+		if running {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "Another update task is already running",
+				"code":  "UPDATE_TASK_RUNNING",
+			})
+			return
+		}
+
+		root := systemUpdateProjectRoot()
+		logDir := systemUpdateLogDir(root)
+		if err := systemUpdateEnsureLogDir(logDir); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
+
+		user := middleware.CurrentUser(c)
+		logPath := filepath.Join(logDir, fmt.Sprintf("system-update-%d-rollback.log", task.ID))
+		systemUpdateAuditLogger(
+			ctx,
+			int64(user.ID),
+			"system.update.rollback",
+			fmt.Sprintf("Started rollback for system update task #%d", task.ID),
+			db.LogResultWarning,
+		)
+
+		if err := systemUpdateWorkerStarter(
+			ctx,
+			"rollback",
+			task.ID,
+			"rollback-system-update-task.ts",
+			[]string{strconv.Itoa(int(task.ID))},
+			logPath,
+			root,
+			logDir,
+		); err != nil {
+			errMsg := "Failed to start rollback worker: " + err.Error()
+			_ = systemUpdateTasks.MarkFinished(context.WithoutCancel(ctx), task.ID, db.MarkSystemUpdateTaskFinishedInput{
+				Status:       models.SystemUpdateTaskStatusFailed,
+				ErrorMessage: &errMsg,
+				BackupPath:   task.BackupPath,
+			})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to start rollback worker",
+				"code":  "ROLLBACK_WORKER_START_FAILED",
+			})
+			return
+		}
+
+		c.JSON(http.StatusAccepted, gin.H{"taskId": task.ID, "logPath": logPath})
 	})
 }
 
@@ -904,15 +1009,227 @@ func systemUpdateLoadTask(c *gin.Context) (*db.SystemUpdateTaskWithUser, bool) {
 	return task, true
 }
 
-// ==================== GitHub update checker (disabled by default) ====================
+// ==================== OTA eligibility, update check, and worker execution ====================
+
+// systemUpdateRuntimePlatform mirrors getRuntimePlatform() in lib/system-version.ts.
+func systemUpdateRuntimePlatform() string {
+	return runtime.GOOS
+}
+
+// systemUpdateRuntimeArch mirrors getRuntimeArch() in lib/system-version.ts.
+func systemUpdateRuntimeArch() string {
+	switch runtime.GOARCH {
+	case "amd64", "arm64":
+		return runtime.GOARCH
+	default:
+		return runtime.GOARCH
+	}
+}
+
+// systemUpdateSelectRuntimeArtifact mirrors selectRuntimeArtifact(artifacts).
+func systemUpdateSelectRuntimeArtifact(artifacts []systemUpdateOtaArtifact) *systemUpdateOtaArtifact {
+	platform := systemUpdateRuntimePlatform()
+	arch := systemUpdateRuntimeArch()
+	for i := range artifacts {
+		if artifacts[i].Platform == platform && artifacts[i].Arch == arch {
+			return &artifacts[i]
+		}
+	}
+	return nil
+}
+
+// systemUpdateIsGitRepository mirrors isGitRepository(root).
+func systemUpdateIsGitRepository(ctx context.Context, root string) bool {
+	out, ok := systemUpdateRunGit(ctx, root, "rev-parse", "--is-inside-work-tree")
+	return ok && out == "true"
+}
+
+// systemUpdateHasUsableOtaArtifact mirrors hasUsableOtaArtifact(tag).
+func systemUpdateHasUsableOtaArtifact(ctx context.Context, client systemUpdateHTTPDoer, tag string) bool {
+	if !systemUpdateIsValidReleaseTag(tag) {
+		return false
+	}
+	ota := systemUpdateGetOtaReleaseInfo(ctx, client, tag)
+	return systemUpdateSelectRuntimeArtifact(ota.Artifacts) != nil
+}
+
+// systemUpdateCanApplyUpdate mirrors canApplyUpdate(tag, root).
+func systemUpdateCanApplyUpdate(ctx context.Context, client systemUpdateHTTPDoer, tag, root string) bool {
+	if systemUpdateHasUsableOtaArtifact(ctx, client, tag) {
+		return true
+	}
+	return systemUpdateIsGitRepository(ctx, root)
+}
+
+// systemUpdateTagDate mirrors getTagDate(tag, root).
+func systemUpdateTagDate(ctx context.Context, root, tag string) *string {
+	out, ok := systemUpdateRunGit(ctx, root, "log", "-1", "--format=%cI", tag)
+	if !ok || out == "" {
+		return nil
+	}
+	return &out
+}
+
+// systemUpdateTagCommit mirrors getTagCommit(tag, root).
+func systemUpdateTagCommit(ctx context.Context, root, tag string) *string {
+	out, ok := systemUpdateRunGit(ctx, root, "rev-list", "-n", "1", "--abbrev-commit", "--abbrev=12", tag)
+	if !ok || out == "" {
+		return nil
+	}
+	return &out
+}
+
+// systemUpdateCheckForUpdates mirrors checkForUpdates(root) in lib/system-version.ts.
+func systemUpdateCheckForUpdates(
+	ctx context.Context, client systemUpdateHTTPDoer, root string, current systemUpdateVersionMetadata,
+) (systemUpdateCheckResult, error) {
+	if !systemUpdateIsGitRepository(ctx, root) {
+		return systemUpdateNewGitHubChecker(client).Check(ctx, root, current)
+	}
+
+	_, _ = systemUpdateRunGit(ctx, root, "fetch", "--tags", "--quiet")
+	tagOutput, _ := systemUpdateRunGit(ctx, root, "tag", "--list", "v*", "--sort=-v:refname")
+	tags := make([]string, 0, 30)
+	for _, line := range strings.Split(tagOutput, "\n") {
+		tag := strings.TrimSpace(line)
+		if systemUpdateIsValidReleaseTag(tag) {
+			tags = append(tags, tag)
+			if len(tags) >= 30 {
+				break
+			}
+		}
+	}
+
+	currentTag := current.Version
+	if current.GitTag != nil && *current.GitTag != "" {
+		currentTag = *current.GitTag
+	}
+
+	build := func(tag string) systemUpdateAvailableUpdate {
+		return systemUpdateAvailableUpdate{
+			Version:   tag,
+			Commit:    systemUpdateTagCommit(ctx, root, tag),
+			Date:      systemUpdateTagDate(ctx, root, tag),
+			Changelog: systemUpdateTagChangelog(ctx, root, tag),
+			OTA:       systemUpdateGetOtaReleaseInfo(ctx, client, tag),
+		}
+	}
+
+	var latest *systemUpdateAvailableUpdate
+	if len(tags) > 0 {
+		built := build(tags[0])
+		latest = &built
+	}
+
+	updates := make([]systemUpdateAvailableUpdate, 0, len(tags))
+	for _, tag := range tags {
+		if tag == currentTag || tag == current.Version {
+			break
+		}
+		if latest != nil && latest.Version == tag {
+			updates = append(updates, *latest)
+			continue
+		}
+		updates = append(updates, build(tag))
+	}
+
+	return systemUpdateCheckResult{
+		Current:             current,
+		Latest:              latest,
+		Updates:             updates,
+		UpdateAvailable:     len(updates) > 0,
+		RepositoryAvailable: true,
+		RepositoryError:     nil,
+	}, nil
+}
+
+// systemUpdateShouldUseSystemd mirrors the systemd dispatch condition in
+// server/src/routes/system-update.ts#startSystemUpdateWorker.
+func systemUpdateShouldUseSystemd() bool {
+	return systemUpdateRuntimePlatform() == "linux" &&
+		lib.IsProductionEnv() &&
+		os.Getenv("SYSTEM_UPDATE_USE_SYSTEMD") != "false"
+}
+
+// systemUpdateStartWorker mirrors startSystemUpdateWorker + spawnUpdater.
+func systemUpdateStartWorker(
+	ctx context.Context,
+	mode string,
+	taskID int32,
+	scriptName string,
+	args []string,
+	logPath string,
+	root string,
+	logDir string,
+) error {
+	if systemUpdateShouldUseSystemd() {
+		unitName := fmt.Sprintf("incudal-online-%s@%d.service", mode, taskID)
+		cmdCtx, cancel := context.WithTimeout(ctx, systemUpdateSystemdTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(cmdCtx, "sudo", "-n", "systemctl", "start", "--no-block", unitName)
+		cmd.Dir = root
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			trimmed := strings.TrimSpace(string(output))
+			if trimmed != "" {
+				return fmt.Errorf("%w: %s", err, trimmed)
+			}
+			return err
+		}
+		return nil
+	}
+
+	return systemUpdateSpawnUpdater(scriptName, args, logPath, root, logDir)
+}
+
+// systemUpdateSpawnUpdater launches the Node updater/rollback script detached.
+func systemUpdateSpawnUpdater(scriptName string, args []string, logPath, root, logDir string) error {
+	var scriptPath string
+	var nodeArgs []string
+	if lib.IsProductionEnv() {
+		scriptPath = filepath.Join("server", "dist", "scripts", strings.TrimSuffix(scriptName, ".ts")+".js")
+		nodeArgs = append([]string{scriptPath}, args...)
+	} else {
+		scriptPath = filepath.Join("server", "src", "scripts", scriptName)
+		nodeArgs = append([]string{"--import", "tsx", scriptPath}, args...)
+	}
+
+	nodeBinary := os.Getenv("NODE_BINARY")
+	if nodeBinary == "" {
+		nodeBinary = "node"
+	}
+
+	devNull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
+	if err == nil {
+		defer devNull.Close()
+	}
+
+	cmd := exec.Command(nodeBinary, nodeArgs...)
+	cmd.Dir = root
+	if err == nil {
+		cmd.Stdin = devNull
+		cmd.Stdout = devNull
+		cmd.Stderr = devNull
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Env = append(os.Environ(),
+		"INCUDAL_APP_DIR="+root,
+		"SYSTEM_UPDATE_LOG_PATH="+logPath,
+		"SYSTEM_UPDATE_LOG_DIR="+logDir,
+	)
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() {
+		_ = cmd.Wait()
+	}()
+	return nil
+}
 
 // systemUpdateGitHubChecker mirrors checkForUpdatesWithoutGit(): version
 // discovery through the GitHub Releases API and OTA manifest lookup, with all
 // network I/O going through the injected doer.
-//
-// It intentionally does NOT run `git fetch --tags`, which the git-based Node path
-// performs: that mutates local refs, an outbound side effect the Go backend must
-// not have while the Node process owns the deployment.
 type systemUpdateGitHubChecker struct {
 	client systemUpdateHTTPDoer
 }
