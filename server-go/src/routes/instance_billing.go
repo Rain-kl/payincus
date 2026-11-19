@@ -859,6 +859,7 @@ func instanceBillingPerformRenewal(ctx context.Context, userID int32, instance *
 
 	var balanceLogID int32
 	alreadyApplied := false
+	promoBindingUnbound := false
 	version := instance.Version
 	status := instance.Status
 	suspendReason := instance.SuspendReason
@@ -960,10 +961,7 @@ func instanceBillingPerformRenewal(ctx context.Context, userID int32, instance *
 				return err
 			}
 			if renewResult.Unbound {
-				// services/promo/notifications.ts is not ported yet; the inbox
-				// message is a non-critical side effect, never a reason to roll
-				// back a paid renewal.
-				log.Printf("[instance-billing] promo binding exhausted for instance %d", instance.ID)
+				promoBindingUnbound = true
 			}
 		}
 
@@ -971,6 +969,36 @@ func instanceBillingPerformRenewal(ctx context.Context, userID int32, instance *
 	})
 	if txErr != nil {
 		return instanceBillingRenewResult{}, txErr
+	}
+
+	if promoBindingUnbound && promoBinding != nil {
+		// Mirror services/promo/notifications.ts#sendPromoBindingExhaustedNotification
+		// asynchronously after commit so a notification error never aborts renewal.
+		totalCycles := int32(0)
+		if promoBinding.TotalCycles != nil {
+			totalCycles = *promoBinding.TotalCycles
+		}
+		instanceID := instance.ID
+		instanceName := instance.Name
+		promoCode := promoBinding.PromoCode.Code
+		go func() {
+			_, err := db.CreateInboxMessage(context.Background(), db.CreateInboxMessageData{
+				UserID:    userID,
+				EventType: "promo_binding_exhausted",
+				Title:     "【优惠期满】您的实例优惠折扣已结束",
+				Content: fmt.Sprintf("尊敬的用户：\n您的实例 **%s**（ID: #%d）所绑定的优惠码 **%s** 设定的优惠期数（共 %d 期）已全部使用完毕。\n从下一个计费周期开始，该实例将恢复为标准资费续费。您也可以在实例管理页面随时绑定新的有效优惠码。",
+					instanceName, instanceID, promoCode, totalCycles),
+				Data: map[string]any{
+					"instanceId":   instanceID,
+					"instanceName": instanceName,
+					"promoCode":    promoCode,
+					"totalCycles":  totalCycles,
+				},
+			})
+			if err != nil {
+				log.Printf("[Promo Notification] Failed to send promo_binding_exhausted notification: %v", err)
+			}
+		}()
 	}
 
 	// AFF commission runs after the commit on purpose. The Go AFF layer

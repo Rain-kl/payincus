@@ -498,15 +498,42 @@ func TestEgressJSStringAndNumber(t *testing.T) {
 }
 
 func TestEgressRequireNetworkControlDefaults(t *testing.T) {
-	// The tunnel is not ported: the default must fail explicitly, never succeed.
+	// With no host tunnel connected for host 1, the wired tunnel manager must
+	// fail closed (503 OFFLINE / 409 UPGRADE_REQUIRED), never succeed.
 	err := egressRequireNetworkControl(1, "network.apply")
 	if err == nil {
-		t.Fatalf("unported tunnel reported as available")
+		t.Fatalf("offline tunnel reported as available")
 	}
 	if status, _ := egressControlFailure(err); status != 503 && status != 409 {
 		t.Fatalf("unexpected status %d", status)
 	}
 	if _, err := EgressTunnelRequestControl(nil, 1, "proxy.probe", nil, 0); err == nil {
-		t.Fatalf("default requestControl succeeded")
+		t.Fatalf("default requestControl succeeded while host offline")
+	}
+	if lib.EgressAttachmentPushNetworkPolicy == nil {
+		t.Fatalf("lib.EgressAttachmentPushNetworkPolicy must be wired by routes/egress init()")
+	}
+}
+
+func TestEgressStatusToAttachmentApplied(t *testing.T) {
+	sanitized, err := egressSanitizeNetworkStatus(map[string]any{
+		"appliedRevision": float64(7),
+		"state":           "ready",
+		"groups": []any{
+			map[string]any{"key": "p1", "state": "ready", "error": "none"},
+		},
+		"bindings": []any{
+			map[string]any{"instanceName": "vm-101", "generation": float64(4)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("egressSanitizeNetworkStatus: %v", err)
+	}
+	applied := egressStatusToAttachmentApplied(sanitized)
+	if len(applied.Bindings) != 1 || applied.Bindings[0].InstanceName != "vm-101" || applied.Bindings[0].Generation != 4 {
+		t.Fatalf("unexpected bindings: %+v", applied.Bindings)
+	}
+	if len(applied.Groups) != 1 || applied.Groups[0].Key != "p1" || applied.Groups[0].State != "ready" {
+		t.Fatalf("unexpected groups: %+v", applied.Groups)
 	}
 }

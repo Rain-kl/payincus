@@ -4,6 +4,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -255,19 +256,19 @@ func TestTrafficUserSummaryWireShape(t *testing.T) {
 	}
 }
 
-func TestTrafficSchedulerSeamsFailExplicitly(t *testing.T) {
+func TestTrafficSchedulerSeamsWiredToServices(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	if err := TrafficReconcileInstanceIDs(nil, []int32{1}); err == nil {
-		t.Fatalf("instance reconciliation seam must fail until Phase 7")
-	} else if !strings.Contains(err.Error(), "Phase 7") {
-		t.Fatalf("instance reconciliation seam error = %v", err)
+	if TrafficReconcileInstanceIDs == nil || TrafficReconcileUser == nil || TrafficRunJob == nil {
+		t.Fatal("traffic scheduler seams must be wired")
 	}
-	if err := TrafficReconcileUser(nil, 1); err == nil {
-		t.Fatalf("user reconciliation seam must fail until Phase 7")
+	// With no DB pool initialised in unit tests, the wired service functions
+	// fail on DB/pool state rather than an unported Phase 7 stub message.
+	if err := TrafficReconcileInstanceIDs(context.Background(), []int32{1}); err != nil && strings.Contains(err.Error(), "未接线") {
+		t.Fatalf("instance reconciliation seam still stubbed: %v", err)
 	}
-	if err := TrafficRunJob(nil); err == nil {
-		t.Fatalf("traffic job seam must fail until Phase 7")
+	if err := TrafficReconcileUser(context.Background(), 1); err != nil && strings.Contains(err.Error(), "未接线") {
+		t.Fatalf("user reconciliation seam still stubbed: %v", err)
 	}
 }
 

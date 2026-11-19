@@ -59,19 +59,45 @@ import (
 // ==================== seams ====================
 
 // EgressTunnelIsOnline reports whether the host's control tunnel is connected.
-// SEAM: wire to hostTunnelManager.isTunnelOnline in Phase 7.
-var EgressTunnelIsOnline = func(hostID int32) bool { return false }
+var EgressTunnelIsOnline = func(hostID int32) bool {
+	return lib.TunnelManagerInstance().IsTunnelOnline(hostID)
+}
 
 // EgressTunnelSupportsControl reports whether the connected Agent advertises the
-// control method. SEAM: wire to hostTunnelManager.supportsControl in Phase 7.
-var EgressTunnelSupportsControl = func(hostID int32, method string) bool { return false }
+// control method.
+var EgressTunnelSupportsControl = func(hostID int32, method string) bool {
+	return lib.TunnelManagerInstance().SupportsControl(hostID, lib.TunnelControlMethod(method))
+}
 
 // EgressTunnelRequestControl performs one control request over the tunnel.
-// SEAM: wire to hostTunnelManager.requestControl in Phase 7.
 var EgressTunnelRequestControl = func(
 	ctx context.Context, hostID int32, method string, payload any, timeout time.Duration,
 ) (json.RawMessage, error) {
-	return nil, &egressTunnelControlError{Code: egressTunnelCodeUpgradeRequired}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	raw, err := lib.TunnelManagerInstance().RequestControl(ctx, hostID, lib.TunnelControlMethod(method), payload, timeout)
+	if err != nil {
+		var libErr *lib.TunnelControlError
+		if errors.As(err, &libErr) {
+			return nil, &egressTunnelControlError{Code: string(libErr.Code)}
+		}
+		return nil, err
+	}
+	switch v := raw.(type) {
+	case nil:
+		return nil, nil
+	case json.RawMessage:
+		return v, nil
+	case []byte:
+		return json.RawMessage(v), nil
+	default:
+		encoded, marshalErr := json.Marshal(v)
+		if marshalErr != nil {
+			return nil, &egressTunnelControlError{Code: egressTunnelCodeInvalidResponse}
+		}
+		return json.RawMessage(encoded), nil
+	}
 }
 
 // egressTunnelControlError mirrors TunnelControlError.
@@ -101,8 +127,11 @@ const (
 func egressControlFailure(err error) (int, string) {
 	code := egressTunnelCodeRemoteError
 	var tunnelError *egressTunnelControlError
+	var libTunnelError *lib.TunnelControlError
 	if errors.As(err, &tunnelError) {
 		code = tunnelError.Code
+	} else if errors.As(err, &libTunnelError) {
+		code = string(libTunnelError.Code)
 	}
 	switch code {
 	case egressTunnelCodeOffline:
@@ -2829,6 +2858,95 @@ func RegisterEgress(r *gin.Engine) {
 	admin.POST("/admin/proxy-probes", egressProxyProbes)
 }
 
+func egressStatusToAttachmentApplied(status gin.H) *lib.EgressAttachmentApplied {
+	out := &lib.EgressAttachmentApplied{}
+	toInt32 := func(raw any) int32 {
+		switch v := raw.(type) {
+		case float64:
+			return int32(v)
+		case int:
+			return int32(v)
+		case int32:
+			return v
+		case int64:
+			return int32(v)
+		default:
+			return 0
+		}
+	}
+	appendBinding := func(entry map[string]any) {
+		if entry == nil {
+			return
+		}
+		name, _ := entry["instanceName"].(string)
+		out.Bindings = append(out.Bindings, lib.EgressAttachmentBinding{
+			InstanceName: name,
+			Generation:   toInt32(entry["generation"]),
+		})
+	}
+	switch bindings := status["bindings"].(type) {
+	case []gin.H:
+		for _, entry := range bindings {
+			appendBinding(entry)
+		}
+	case []map[string]any:
+		for _, entry := range bindings {
+			appendBinding(entry)
+		}
+	case []any:
+		for _, raw := range bindings {
+			entry, _ := raw.(map[string]any)
+			appendBinding(entry)
+		}
+	}
+	appendGroup := func(entry map[string]any) {
+		if entry == nil {
+			return
+		}
+		key, _ := entry["key"].(string)
+		state, _ := entry["state"].(string)
+		errText, _ := entry["error"].(string)
+		out.Groups = append(out.Groups, lib.EgressAttachmentGroup{
+			Key:   key,
+			State: state,
+			Error: errText,
+		})
+	}
+	switch groups := status["groups"].(type) {
+	case []gin.H:
+		for _, entry := range groups {
+			appendGroup(entry)
+		}
+	case []map[string]any:
+		for _, entry := range groups {
+			appendGroup(entry)
+		}
+	case []any:
+		for _, raw := range groups {
+			entry, _ := raw.(map[string]any)
+			appendGroup(entry)
+		}
+	}
+	return out
+}
+
 func init() {
 	Register(RegisterEgress)
+
+	// Install the egress control plane into lib's attachment seam so instance
+	// provisioning (egressAttachmentPush → EgressAttachmentEnsureBeforeStart)
+	// verifies the live binding before the guest gets outbound access, exactly
+	// like the TypeScript's pushNetworkPolicy consumer in lib/egress/attachments.
+	// The adapter maps the sanitized status (bindings/groups) onto
+	// lib.EgressAttachmentApplied.
+	lib.EgressAttachmentPushNetworkPolicy = func(ctx context.Context, hostID int32) (*lib.EgressAttachmentApplied, error) {
+		applied, err := egressPushNetworkPolicy(ctx, hostID)
+		if err != nil {
+			return nil, err
+		}
+		if applied == nil {
+			return nil, nil
+		}
+		return egressStatusToAttachmentApplied(applied.Status), nil
+	}
 }

@@ -30,7 +30,51 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rain-kl/payincus/server-go/src/db"
 )
+
+func init() {
+	// Wire db.TrafficFetchInstanceCounters to the real Incus counter collector so
+	// db.ResetInstanceTrafficForOwnerInTransaction captures a fresh live baseline
+	// for running instances before resetting counters (matching db/traffic.ts).
+	db.TrafficFetchInstanceCounters = func(
+		ctx context.Context, hostID int32, hostURL string, certPath, keyPath *string, incusID string,
+	) (db.TrafficInstanceCounters, error) {
+		var (
+			client *IncusClient
+			err    error
+		)
+		if db.Pool() != nil {
+			if host, hostErr := db.HostsGetByID(ctx, hostID); hostErr == nil && host != nil {
+				client, err = GetIncusClientForHost(ctx, host)
+			}
+		}
+		if client == nil && err == nil {
+			client, err = GetIncusClientFromPool(ctx, IncusClientOptions{
+				HostID:   int64(hostID),
+				URL:      hostURL,
+				CertPath: certPath,
+				KeyPath:  keyPath,
+			})
+		}
+		if err != nil {
+			return db.TrafficInstanceCounters{}, err
+		}
+		counters, err := GetTrafficCounters(ctx, client, incusID)
+		if err != nil {
+			return db.TrafficInstanceCounters{}, err
+		}
+		return db.TrafficInstanceCounters{
+			RxBytes:     counters.RxBytes,
+			TxBytes:     counters.TxBytes,
+			RxPackets:   counters.RxPackets,
+			TxPackets:   counters.TxPackets,
+			CPUUsageRaw: counters.CPUUsageRaw,
+			SampledAt:   counters.SampledAt,
+		}, nil
+	}
+}
 
 var (
 	// trafficEthPattern mirrors /^eth[0-9]+$/

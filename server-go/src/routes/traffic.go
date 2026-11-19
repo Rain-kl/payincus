@@ -35,7 +35,6 @@ package routes
 
 import (
 	"context"
-	"errors"
 	"log"
 	"math"
 	"math/big"
@@ -55,29 +54,22 @@ import (
 
 // ==================== seams ====================
 
-// errTrafficSchedulerUnavailable is the explicit "not wired yet" error every
-// scheduler seam returns until Phase 7 ports services/traffic-scheduler.ts.
-var errTrafficSchedulerUnavailable = errors.New(
-	"traffic scheduler 未接线（server/src/services/traffic-scheduler.ts 属 Phase 7 worker）")
-
 // TrafficReconcileInstanceIDs mirrors
 // services/traffic-scheduler.reconcileTrafficStateForInstanceIds.
-// SEAM: Phase 7 worker.
 var TrafficReconcileInstanceIDs = func(ctx context.Context, instanceIDs []int32) error {
-	return errTrafficSchedulerUnavailable
+	return services.ReconcileTrafficStateForInstanceIDs(ctx, instanceIDs)
 }
 
 // TrafficReconcileUser mirrors services/traffic-scheduler.reconcileTrafficStateForUser.
-// SEAM: Phase 7 worker.
 var TrafficReconcileUser = func(ctx context.Context, userID int32) error {
-	return errTrafficSchedulerUnavailable
+	return services.ReconcileTrafficStateForUser(ctx, userID)
 }
 
 // TrafficRunJob mirrors services/traffic-scheduler.runTrafficJob. The TypeScript
-// takes no arguments; ctx is added so the Phase 7 job can honour cancellation.
-// SEAM: Phase 7 worker.
+// takes no arguments; ctx is added so the Go job can honour cancellation.
 var TrafficRunJob = func(ctx context.Context) error {
-	return errTrafficSchedulerUnavailable
+	services.RunTrafficJob(ctx)
+	return nil
 }
 
 // ==================== helpers ====================

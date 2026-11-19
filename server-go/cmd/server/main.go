@@ -69,6 +69,9 @@ func main() {
 	defer stopRun()
 	stopSchedulers := services.StartSchedulers(runCtx)
 	stopWorkers := workers.StartWorkers(runCtx)
+	if services.SchedulersEnabled() {
+		lib.TunnelReconcileHostsStatus(runCtx)
+	}
 
 	shutdown := func(reason string) {
 		log.Printf("shutting down: %s", reason)
