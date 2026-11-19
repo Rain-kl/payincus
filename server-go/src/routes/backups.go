@@ -56,6 +56,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -134,16 +135,23 @@ func errBackupsSeam(component string) error {
 	return fmt.Errorf("备份模块依赖尚未移植（seam: %s）", component)
 }
 
-// BackupsOpenExportStream mirrors getBackupExportStream. The Go IncusClient only
-// exposes a buffered Request (whole body in memory), while a backup can be many
-// gigabytes, so this stays a seam until a streaming API is added to
-// lib/incus_client.go by its owner.
+// BackupsOpenExportStream mirrors getBackupExportStream. Backed by
+// lib.GetBackupExportStream, which returns a true streaming body (the raw
+// node response, closed by the caller) instead of buffering gigabytes.
 var BackupsOpenExportStream = func(
 	ctx context.Context,
 	client *lib.IncusClient,
 	instanceName, backupName string,
 ) (io.ReadCloser, int64, error) {
-	return nil, 0, errBackupsSeam("lib/incus/incus-backups.ts#getBackupExportStream（流式 HTTP）")
+	stream, err := lib.GetBackupExportStream(ctx, client, instanceName, backupName)
+	if err != nil {
+		return nil, 0, err
+	}
+	contentLength := int64(-1)
+	if stream.ContentLength != nil {
+		contentLength = *stream.ContentLength
+	}
+	return stream.Body, contentLength, nil
 }
 
 // BackupsInstanceExists mirrors incus-restore.ts#instanceExists. Unlike the
@@ -156,28 +164,38 @@ var BackupsInstanceExists = func(
 	client *lib.IncusClient,
 	instanceName string,
 ) (bool, error) {
-	return false, errBackupsSeam("lib/incus/incus-restore.ts#instanceExists")
+	// lib.InstanceExists mirrors the TypeScript exactly: any request error
+	// (unreachable node, mTLS failure) means "not reachable", which the TS
+	// treats as "does not exist".
+	return lib.InstanceExists(ctx, client, instanceName), nil
 }
 
 // BackupsStartInstance mirrors lib/incus/incus-instances.ts#startInstance, which
-// first applies egress-package bindings and GPU devices (instances wave).
+// first applies egress-package bindings and GPU devices.
 var BackupsStartInstance = func(
 	ctx context.Context,
 	client *lib.IncusClient,
 	instanceName string,
 ) error {
-	return errBackupsSeam("lib/incus/incus-instances.ts#startInstance（含 egress/GPU 副作用）")
+	if client == nil {
+		return errors.New("Incus 客户端未连接")
+	}
+	_, err := lib.IncusInstanceStart(ctx, client, instanceName)
+	return err
 }
 
 // BackupsDeleteInstance mirrors lib/incus/incus-instances.ts#deleteInstance, which
-// releases egress-package bindings and GPU devices before/after the destroy
-// (instances wave).
+// releases egress-package bindings and GPU devices before/after the destroy.
 var BackupsDeleteInstance = func(
 	ctx context.Context,
 	client *lib.IncusClient,
 	instanceName string,
 ) error {
-	return errBackupsSeam("lib/incus/incus-instances.ts#deleteInstance（含 egress/GPU 释放）")
+	if client == nil {
+		return errors.New("Incus 客户端未连接")
+	}
+	_, err := lib.IncusInstanceDelete(ctx, client, instanceName)
+	return err
 }
 
 // ==================== helpers ====================

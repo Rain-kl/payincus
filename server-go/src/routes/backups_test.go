@@ -571,24 +571,33 @@ func TestBackupsDownloadTokenExpiry(t *testing.T) {
 
 // ==================== seams ====================
 
-// TestBackupsSeamsFailClosed proves every unported Incus component returns an
-// explicit error naming the missing module (never a silent success).
-func TestBackupsSeamsFailClosed(t *testing.T) {
+// TestBackupsSeamsWiredToLib proves every formerly-seamed Incus component now
+// delegates to the real lib implementation. The seams were wired in the
+// 2026-11-19 completion pass: a nil client must still fail (the lib functions
+// validate connectivity first), but with the lib's own error — never the old
+// "尚未移植" seam message.
+func TestBackupsSeamsWiredToLib(t *testing.T) {
 	ctx := context.Background()
 
 	if _, _, err := BackupsOpenExportStream(ctx, nil, "instance", "backup"); err == nil {
-		t.Fatal("BackupsOpenExportStream must fail closed")
-	} else if !strings.Contains(err.Error(), "seam") {
-		t.Fatalf("stream seam error = %v", err)
+		t.Fatal("BackupsOpenExportStream(nil client) must fail")
+	} else if strings.Contains(err.Error(), "尚未移植") || strings.Contains(err.Error(), "seam") {
+		t.Fatalf("export stream still seam-stubbed: %v", err)
 	}
-	if exists, err := BackupsInstanceExists(ctx, nil, "instance"); err == nil || exists {
-		t.Fatalf("BackupsInstanceExists = (%v,%v), want an explicit error", exists, err)
+	if exists, err := BackupsInstanceExists(ctx, nil, "instance"); err != nil || exists {
+		// lib.InstanceExists mirrors the TypeScript: an unreachable node reads
+		// as "does not exist" without an error.
+		t.Fatalf("BackupsInstanceExists(nil client) = (%v,%v), want (false,nil)", exists, err)
 	}
 	if err := BackupsStartInstance(ctx, nil, "instance"); err == nil {
-		t.Fatal("BackupsStartInstance must fail closed")
+		t.Fatal("BackupsStartInstance(nil client) must fail")
+	} else if strings.Contains(err.Error(), "尚未移植") || strings.Contains(err.Error(), "seam") {
+		t.Fatalf("start instance still seam-stubbed: %v", err)
 	}
 	if err := BackupsDeleteInstance(ctx, nil, "instance"); err == nil {
-		t.Fatal("BackupsDeleteInstance must fail closed")
+		t.Fatal("BackupsDeleteInstance(nil client) must fail")
+	} else if strings.Contains(err.Error(), "尚未移植") || strings.Contains(err.Error(), "seam") {
+		t.Fatalf("delete instance still seam-stubbed: %v", err)
 	}
 }
 

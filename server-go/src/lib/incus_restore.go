@@ -261,6 +261,11 @@ func RenameIncusInstance(ctx context.Context, client *IncusClient, oldName, newN
 // InstanceExists mirrors instanceExists: any error means "not reachable", which
 // the TypeScript treats as "does not exist".
 func InstanceExists(ctx context.Context, client *IncusClient, instanceName string) bool {
+	// A nil client mirrors the TypeScript's unreachable-node case: instanceExists
+	// catches every request error and answers "does not exist".
+	if client == nil {
+		return false
+	}
 	_, err := client.Request(ctx, http.MethodGet, "/1.0/instances/"+instanceName, nil, 0, nil)
 	return err == nil
 }
