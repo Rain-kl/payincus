@@ -3,9 +3,9 @@
 # PayIncus 面板一键部署脚本（产物包模式）
 #
 # 功能：
-#   - 安装 Node.js 22、PostgreSQL 16 和系统仓库提供的 Redis
+#   - 安装 PostgreSQL 16 和系统仓库提供的 Redis（Go 后端单二进制运行，无需 Node.js / pnpm）
 #   - 从 GitHub Releases 下载预构建产物包
-#   - 自动配置数据库、环境变量、systemd 服务
+#   - 自动配置数据库、环境变量、systemd 服务（服务启动时自动运行 Goose 数据库迁移）
 #   - 支持 Nginx+Certbot / Cloudflare Tunnel / 纯端口 三种外部访问方案
 #   - 支持升级已有安装
 #
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # ========================== 全局常量 ==========================
-readonly SCRIPT_VERSION="3.0.0"
+readonly SCRIPT_VERSION="3.1.0"
 readonly GITHUB_REPO="VipMaxxxx/payincus"
 readonly INSTALL_DIR="/opt/incudal"
 readonly SERVICE_NAME="incudal-backend"
@@ -27,8 +27,6 @@ readonly SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 readonly ENV_FILE="${INSTALL_DIR}/.env"
 readonly RUN_USER="incudal"
 readonly DEFAULT_PORT=3001
-readonly NODE_MAJOR=22
-readonly PNPM_VERSION="9.14.2"
 readonly PG_VERSION=16
 RELEASE_VERIFIED_THIS_RUN=false
 
@@ -327,6 +325,8 @@ show_banner() {
 # ========================== 检查已有安装 ==========================
 check_existing() {
     if [[ -d "$INSTALL_DIR" && (
+        -f "${INSTALL_DIR}/server/incudal-server" ||
+        -f "${INSTALL_DIR}/current/server/incudal-server" ||
         -f "${INSTALL_DIR}/server/dist/app.js" ||
         -f "${INSTALL_DIR}/current/server/dist/app.js"
     ) ]]; then
@@ -336,53 +336,10 @@ check_existing() {
 }
 
 is_atomic_layout() {
-    [[ -L "${INSTALL_DIR}/current" && -f "${INSTALL_DIR}/current/server/dist/app.js" ]]
-}
-
-# ========================== 安装 Node.js ==========================
-install_nodejs() {
-    step "安装 Node.js ${NODE_MAJOR}..."
-
-    if command -v node &>/dev/null; then
-        local current_ver
-        current_ver=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
-        if [[ "$current_ver" -ge "$NODE_MAJOR" ]] 2>/dev/null; then
-            log "Node.js $(node -v) 已安装，跳过"
-            return 0
-        fi
-        warn "当前 Node.js 版本较低 ($(node -v))，将升级到 v${NODE_MAJOR}"
-    fi
-
-    # 通过 NodeSource 安装
-    info "添加 NodeSource APT 源..."
-    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - >/dev/null 2>&1
-    apt-get install -y -qq nodejs >/dev/null 2>&1
-
-    log "Node.js $(node -v) 安装完成"
-}
-
-# ========================== 安装 pnpm ==========================
-install_pnpm() {
-    step "安装 pnpm ${PNPM_VERSION}..."
-
-    if command -v pnpm &>/dev/null; then
-        log "pnpm $(pnpm --version) 已安装，跳过"
-        return 0
-    fi
-
-    if command -v corepack &>/dev/null; then
-        corepack enable >/dev/null 2>&1
-        corepack prepare "pnpm@${PNPM_VERSION}" --activate >/dev/null 2>&1
-    else
-        npm install -g "pnpm@${PNPM_VERSION}" >/dev/null 2>&1
-    fi
-
-    if ! command -v pnpm &>/dev/null; then
-        error "pnpm 安装失败，请检查 Node.js/Corepack 环境"
-        exit 1
-    fi
-
-    log "pnpm $(pnpm --version) 安装完成"
+    [[ -L "${INSTALL_DIR}/current" ]] && (
+        [[ -f "${INSTALL_DIR}/current/server/incudal-server" ]] ||
+        [[ -f "${INSTALL_DIR}/current/server/dist/app.js" ]]
+    )
 }
 
 # ========================== 安装系统工具 ==========================
@@ -788,11 +745,14 @@ install_release() {
         tar -xzf "$tar_file" -C "$INSTALL_DIR" --strip-components=0
     fi
 
-    # 清理下载的临时文件
+    # 清理 download 临时文件
     rm -f "$tar_file" "${tar_file}.sha256"
 
-    # 创建证书目录
+    # 创建证书目录并确保 Go 二进制具备执行权限
     mkdir -p "${INSTALL_DIR}/server/certs"
+    if [[ -f "${INSTALL_DIR}/server/incudal-server" ]]; then
+        chmod 0755 "${INSTALL_DIR}/server/incudal-server"
+    fi
 
     # The fixed helper came directly from the checksum-verified archive.  Use
     # its non-executing harden action before any service account can modify the
@@ -1038,25 +998,6 @@ setup_redis() {
     fi
 }
 
-# ========================== 运行数据库迁移 ==========================
-run_migrations() {
-    step "执行数据库迁移..."
-
-    cd "${INSTALL_DIR}/server"
-
-    # 以 incudal 用户身份加载 .env 并运行迁移
-    # HOME 需要指向有写权限的目录，否则 npm 缓存报 EACCES
-    sudo -u "$RUN_USER" HOME="${INSTALL_DIR}" bash -c "
-        set -a
-        source '${ENV_FILE}'
-        set +a
-        cd '${INSTALL_DIR}/server'
-        pnpm exec prisma migrate deploy
-    "
-
-    log "数据库迁移完成"
-}
-
 # ========================== 创建 systemd 服务 ==========================
 create_service() {
     step "创建 systemd 服务..."
@@ -1079,17 +1020,11 @@ Group=${RUN_USER}
 WorkingDirectory=${app_dir}
 EnvironmentFile=${ENV_FILE}
 
-# 确保 npm 缓存目录可写
 Environment=HOME=${INSTALL_DIR}
-Environment=NPM_CONFIG_CACHE=${INSTALL_DIR}/.npm
-Environment=XDG_CACHE_HOME=${INSTALL_DIR}/.cache
 Environment=PATH=/usr/local/libexec/incudal:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# 启动前自动执行数据库迁移
-ExecStartPre=/usr/bin/bash -c 'cd ${app_dir}/server && pnpm exec prisma migrate deploy'
-
-# 启动主程序
-ExecStart=/usr/bin/node ${app_dir}/server/dist/app.js
+# 服务启动时自动通过内置 Goose 迁移对比数据库版本并按需执行，无需独立 ExecStartPre 迁移命令
+ExecStart=${app_dir}/server/incudal-server
 
 # 优雅关闭
 KillMode=mixed
@@ -1509,18 +1444,31 @@ setup_cf_tunnel() {
 
 # ========================== 启动服务 ==========================
 start_service() {
-    step "启动 PayIncus 服务..."
+    step "启动 PayIncus 服务（Go 启动时将自动通过 Goose 检查并迁移数据库）..."
 
     systemctl start "$SERVICE_NAME"
 
-    # 等待几秒检查状态
-    sleep 3
+    local waited=0
+    local max_wait=60
+    while [[ "$waited" -lt "$max_wait" ]]; do
+        if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+            error "服务启动失败，查看日志："
+            journalctl -u "$SERVICE_NAME" --no-pager -n 30
+            exit 1
+        fi
+        if curl -fsS --max-time 2 "http://127.0.0.1:${DEFAULT_PORT}/api/health" >/dev/null 2>&1; then
+            log "PayIncus 服务启动成功并通过健康检查！"
+            return 0
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
 
     if systemctl is-active --quiet "$SERVICE_NAME"; then
-        log "PayIncus 服务启动成功！"
+        log "PayIncus 服务已激活（若首次迁移较大，健康检查可能仍在预热中）"
     else
-        error "服务启动失败，查看日志："
-        journalctl -u "$SERVICE_NAME" --no-pager -n 20
+        error "服务启动超时，查看日志："
+        journalctl -u "$SERVICE_NAME" --no-pager -n 30
         exit 1
     fi
 }
@@ -1597,8 +1545,11 @@ do_upgrade() {
     install_release "$tar_file" true
 
     local version="unknown"
-    if [[ -f "${INSTALL_DIR}/version.json" ]]; then
-        version=$(node -e "try { console.log(require('${INSTALL_DIR}/version.json').version || 'unknown') } catch { console.log('unknown') }")
+    if [[ -x "${INSTALL_DIR}/server/incudal-server" ]]; then
+        version="$(INCUDAL_APP_DIR="${INSTALL_DIR}" "${INSTALL_DIR}/server/incudal-server" version 2>/dev/null || echo unknown)"
+    elif [[ -f "${INSTALL_DIR}/version.json" ]]; then
+        version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${INSTALL_DIR}/version.json" 2>/dev/null | head -n 1 || true)"
+        version="${version:-unknown}"
     fi
 
     # 修复权限
@@ -1613,10 +1564,7 @@ do_upgrade() {
     create_service
     create_online_update_service
 
-    # 运行迁移
-    run_migrations
-
-    # 重启服务
+    # 重启服务（Go 后端启动时自动通过 Goose 对比并迁移数据库）
     start_service
 
     echo ""
@@ -1722,8 +1670,6 @@ do_install() {
     apt-get update -qq >/dev/null 2>&1
 
     install_system_tools
-    install_nodejs
-    install_pnpm
     install_postgresql
     install_redis
 
@@ -1763,12 +1709,9 @@ do_install() {
     # 生成 .env
     generate_env "$db_password" "$redis_password" "$(gen_password 16)" "$admin_email"
 
-    # 创建 systemd 服务
+    # 创建 systemd 服务（Go 服务启动时自动通过 Goose 对比并迁移数据库）
     create_service
     create_online_update_service
-
-    # 运行数据库迁移
-    run_migrations
 
     # 选择网络方案
     echo ""

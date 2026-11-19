@@ -190,3 +190,93 @@ func MarkSystemUpdateTaskFinished(ctx context.Context, id int32, input MarkSyste
 		Where("id = ?", id).
 		Updates(updates).Error
 }
+
+// UpdateSystemUpdateTaskFromVersion records the pre-upgrade version detected at worker start.
+func UpdateSystemUpdateTaskFromVersion(ctx context.Context, id int32, fromVersion string) error {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	return DB.WithContext(ctx).
+		Model(&models.SystemUpdateTask{}).
+		Where("id = ?", id).
+		Updates(map[string]any{
+			"from_version": fromVersion,
+			"updated_at":   now,
+		}).Error
+}
+
+// TryMarkSystemUpdateTaskRunning atomically transitions a task from one of allowedStatuses to running.
+func TryMarkSystemUpdateTaskRunning(ctx context.Context, id int32, allowedStatuses []models.SystemUpdateTaskStatus, logPath string) (bool, error) {
+	if len(allowedStatuses) == 0 {
+		return false, nil
+	}
+	allowed := make([]string, 0, len(allowedStatuses))
+	for _, s := range allowedStatuses {
+		allowed = append(allowed, string(s))
+	}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	res := DB.WithContext(ctx).
+		Model(&models.SystemUpdateTask{}).
+		Where("id = ? AND status IN ?", id, allowed).
+		Updates(map[string]any{
+			"status":        string(models.SystemUpdateTaskStatusRunning),
+			"log_path":      logPath,
+			"error_message": nil,
+			"finished_at":   nil,
+			"updated_at":    now,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
+// ListRecentProtectedBackupPaths returns recent backup_path values still protected against pruning.
+func ListRecentProtectedBackupPaths(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	var tasks []models.SystemUpdateTask
+	if err := DB.WithContext(ctx).
+		Select("backup_path").
+		Where("backup_path IS NOT NULL AND status IN ?", []string{
+			string(models.SystemUpdateTaskStatusSuccess),
+			string(models.SystemUpdateTaskStatusRolledBack),
+		}).
+		Order("finished_at DESC, id DESC").
+		Limit(limit).
+		Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		if task.BackupPath != nil && *task.BackupPath != "" {
+			paths = append(paths, *task.BackupPath)
+		}
+	}
+	return paths, nil
+}
+
+// FindFirstActiveAdminUserID resolves an active administrator ID for CLI-triggered OTA updates.
+func FindFirstActiveAdminUserID(ctx context.Context, preferredID int32) (int32, error) {
+	var user models.User
+	if preferredID > 0 {
+		if err := DB.WithContext(ctx).
+			Select("id").
+			Where("id = ? AND role = ? AND status = ?", preferredID, string(models.UserRoleAdmin), string(models.UserStatusActive)).
+			Limit(1).
+			Find(&user).Error; err != nil {
+			return 0, err
+		}
+		if user.ID > 0 {
+			return user.ID, nil
+		}
+	}
+	if err := DB.WithContext(ctx).
+		Select("id").
+		Where("role = ? AND status = ?", string(models.UserRoleAdmin), string(models.UserStatusActive)).
+		Order("id ASC").
+		Limit(1).
+		Find(&user).Error; err != nil {
+		return 0, err
+	}
+	return user.ID, nil
+}

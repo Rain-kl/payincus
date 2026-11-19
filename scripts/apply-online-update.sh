@@ -29,9 +29,15 @@ if [[ ! -d .git ]] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; the
   echo "提示：当前目录不是 Git 工作区，将走 OTA release 包（artifact）模式更新；若目标版本没有本机可用的 artifact，更新会被拒绝。" >&2
 fi
 
-corepack enable
-corepack prepare pnpm@9.14.2 --activate
-
-INCUDAL_APP_DIR="$APP_DIR" \
-NODE_ENV="${NODE_ENV:-production}" \
-node "$APP_DIR/server/dist/scripts/start-system-update-task.js" "$TARGET_VERSION"
+if [[ -x "$APP_DIR/server/incudal-server" ]]; then
+  INCUDAL_APP_DIR="$APP_DIR" \
+  INSTALL_DIR="$INSTALL_DIR" \
+  "$APP_DIR/server/incudal-server" ota-start "$TARGET_VERSION"
+elif [[ -f "$APP_DIR/server/dist/scripts/start-system-update-task.js" ]] && command -v node >/dev/null 2>&1; then
+  INCUDAL_APP_DIR="$APP_DIR" \
+  NODE_ENV="${NODE_ENV:-production}" \
+  node "$APP_DIR/server/dist/scripts/start-system-update-task.js" "$TARGET_VERSION"
+else
+  echo "未找到可执行的更新入口 ($APP_DIR/server/incudal-server)" >&2
+  exit 1
+fi

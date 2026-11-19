@@ -48,21 +48,21 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - name: 安装 Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'server-go/go.mod'
+          cache-dependency-path: 'server-go/go.sum'
+
       - name: 校验一键安装脚本
         run: bash scripts/test-install-panel-guards.sh
 
-      # ===== 安装依赖 =====
+      # ===== 安装前端构建与守卫依赖 =====
       - name: 安装全部依赖
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: 重新构建 esbuild（Vite 构建需要）
         run: pnpm rebuild esbuild
-
-      # ===== 生成 Prisma Client =====
-      - name: 生成 Prisma Client
-        run: pnpm --filter server exec prisma generate
-        env:
-          DATABASE_URL: postgresql://user:pass@localhost:5432/db
 
       # ===== 构建前端 =====
       - name: 构建前端 (Vite)
@@ -73,9 +73,19 @@ jobs:
           pnpm --filter server test:frontend-dist-boundary-guards
           pnpm --filter server test:frontend-route-guards
 
-      # ===== 构建后端 =====
-      - name: 编译后端 (TypeScript)
-        run: pnpm --filter server build
+      # ===== 校验并编译 Go 后端 =====
+      - name: 校验 Go 后端与嵌入迁移
+        working-directory: server-go
+        run: |
+          go vet ./...
+          go test -count=1 ./src/migrations ./src/ota
+
+      - name: 编译 Go 后端 (${{ matrix.arch }})
+        working-directory: server-go
+        run: |
+          mkdir -p ../release/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build -trimpath -ldflags="-s -w" -o ../release/server/incudal-server ./cmd/server
+          chmod 0755 ../release/server/incudal-server
 
       # ===== 准备发行目录 =====
       - name: 准备发行目录结构
@@ -88,17 +98,11 @@ jobs:
           # 复制前端构建产物
           cp -r client/dist/* release/client/dist/
 
-          # 复制后端构建产物
-          cp -r server/dist release/server/
-          cp -r server/prisma release/server/
-          cp server/prisma.config.ts release/server/
-          cp server/package.json release/server/
+          # 复制 Go 后端运行所需的节点安装脚本模板
           cp -r server/templates release/server/
 
-          # 复制根配置文件
+          # 复制根配置文件与运维脚本
           cp package.json release/
-          cp pnpm-lock.yaml release/
-          cp pnpm-workspace.yaml release/
           cp .env.example release/
           cp -r deploy/* release/deploy/
           cp scripts/init-env.sh release/scripts/
@@ -108,16 +112,6 @@ jobs:
           cp scripts/verify-split-host.sh release/scripts/
           cp scripts/apply-online-update.sh release/scripts/
           cp scripts/migrate-ota-atomic-layout.sh release/scripts/
-
-      # ===== 安装生产依赖 =====
-      - name: 安装后端生产依赖
-        working-directory: release
-        run: |
-          # 在发行目录中按锁文件只安装后端生产依赖
-          pnpm install --prod --frozen-lockfile --ignore-scripts --filter server
-
-          # 在当前架构的 runner 上原生生成 Prisma Client
-          DATABASE_URL="postgresql://user:pass@localhost:5432/db" pnpm --filter server exec prisma generate
 
       # ===== 创建启动辅助脚本 =====
       - name: 创建管理脚本
@@ -130,23 +124,15 @@ jobs:
 
           case "${1:-}" in
             start)
-              echo "🚀 启动 PayIncus..."
-              cd "$APP_DIR/server"
-              pnpm exec prisma migrate deploy
+              echo "🚀 启动 PayIncus（服务启动时将通过 Goose 自动对比并迁移数据库）..."
               cd "$APP_DIR"
-              exec node server/dist/app.js
-              ;;
-            migrate)
-              echo "🔄 执行数据库迁移..."
-              cd "$APP_DIR/server"
-              pnpm exec prisma migrate deploy
-              echo "✅ 迁移完成"
+              exec "$APP_DIR/server/incudal-server"
               ;;
             version)
-              echo "PayIncus $(node -e "console.log(require('./package.json').version)")"
+              echo "PayIncus $("$APP_DIR/server/incudal-server" version)"
               ;;
             *)
-              echo "用法: $0 {start|migrate|version}"
+              echo "用法: $0 {start|version}"
               exit 1
               ;;
           esac

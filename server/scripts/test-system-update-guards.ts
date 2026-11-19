@@ -319,6 +319,39 @@ assert.ok(
   'release package and package scripts must expose the controlled online updater and version metadata'
 )
 
+const goUpdater = read('server-go/src/ota/updater.go')
+const goOtaCli = read('server-go/src/ota/cli.go')
+const goMigrate = read('server-go/src/db/migrate.go')
+const goServerMain = read('server-go/cmd/server/main.go')
+
+assert.ok(
+  goServerMain.includes('db.RunMigrations(migCtx)') &&
+    goMigrate.includes('reconcilePrismaMigrations') &&
+    goMigrate.includes('goose.NewProvider') &&
+    goMigrate.includes('incudalMigrationLockID') &&
+    goOtaCli.includes('RunOTAUpdateCommand') &&
+    goOtaCli.includes('RunOTARollbackCommand') &&
+    goOtaCli.includes('RunOTAStartCommand') &&
+    goOtaCli.includes('RunVerifyProductionDBCommand') &&
+    goUpdater.includes('"server/incudal-server"'),
+  'Go backend must run locked Goose startup auto-migrations with Prisma baseline reconciliation and provide native OTA subcommands'
+)
+
+assert.ok(
+  goUpdater.includes('buildPostgresEnvFromDatabaseURL') &&
+    goUpdater.includes('pg_dump') &&
+    goUpdater.includes('--format=plain') &&
+    goOtaCli.includes('p.backupDatabase(ctx, dbBackupTarget, targetVersion, timestamp)') &&
+    goOtaCli.indexOf('p.backupDatabase') < goOtaCli.indexOf('p.verifyUpdatedRuntime') &&
+    goOtaCli.includes('Goose 自动迁移，代码已回滚但 DB 不会自动回滚') &&
+    backendService.includes('ExecStart=/opt/incudal/current/server/incudal-server') &&
+    !backendService.includes('prisma migrate deploy') &&
+    !atomicMigrationScript.includes('prisma migrate deploy') &&
+    atomicMigrationScript.includes('ExecStart=${app_dir}/server/incudal-server') &&
+    onlineScript.includes('"$APP_DIR/server/incudal-server" ota-start "$TARGET_VERSION"'),
+  'Go OTA flow must run pre-restart pg_dump backup, rely on startup Goose migration without separate migrate commands, and warn on DB rollback'
+)
+
 assert.ok(
   atomicMigrationScript.includes('current_link="$INSTALL_DIR/current"') &&
     atomicMigrationScript.includes('releases_dir="$INSTALL_DIR/releases"') &&

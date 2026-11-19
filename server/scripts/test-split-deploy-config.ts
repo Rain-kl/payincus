@@ -197,17 +197,13 @@ assert.ok(
   'backend runtime must honor SERVE_STATIC_CLIENT=false before registering static frontend routes'
 )
 assert.match(installPanel, /^readonly DEFAULT_PORT=3001$/m, 'install script must default backend port to 3001')
-assert.match(installPanel, /^readonly PNPM_VERSION="9\.14\.2"$/m, 'install script must pin the pnpm version used for production migrations')
-assert.ok(installPanel.includes('install_pnpm()'), 'install script must install pnpm for clean servers before running migrations')
 assert.ok(
-  installPanel.includes('corepack prepare "pnpm@${PNPM_VERSION}" --activate') &&
-    installPanel.includes('npm install -g "pnpm@${PNPM_VERSION}"'),
-  'install script must enable pnpm through Corepack and keep an npm fallback'
-)
-assert.ok(
-  installPanel.indexOf('install_nodejs') < installPanel.indexOf('install_pnpm') &&
-    installPanel.indexOf('install_pnpm') < installPanel.indexOf('install_postgresql'),
-  'install script must install pnpm after Node.js and before migrations'
+  installPanel.includes('${INSTALL_DIR}/server/incudal-server') &&
+    installPanel.includes('${app_dir}/server/incudal-server') &&
+    !installPanel.includes('prisma migrate deploy') &&
+    !installPanel.includes('install_pnpm') &&
+    !installPanel.includes('install_nodejs'),
+  'install script must deploy the Go backend binary with automatic Goose startup migrations and without requiring Node.js/pnpm/Prisma CLI'
 )
 assert.ok(
   installPanel.includes('prompt_initial_admin_email()') &&
@@ -241,8 +237,9 @@ assert.ok(
   onlineTaskHelper.includes('/usr/bin/chown -R root:root "${INSTALL_DIR}/releases"') &&
     onlineTaskHelper.includes('verify_manifest') &&
     onlineTaskHelper.includes('verify_git_control') &&
-    onlineTaskHelper.indexOf('verify_manifest') < onlineTaskHelper.indexOf('/usr/bin/node "${app_dir}/${script}"'),
-  'fixed root helper must enforce root ownership and verify release integrity before Node execution'
+    onlineTaskHelper.includes('"$server_bin" "$subcmd" "$task_id"') &&
+    onlineTaskHelper.indexOf('verify_manifest') < onlineTaskHelper.indexOf('"$server_bin" "$subcmd" "$task_id"'),
+  'fixed root helper must enforce root ownership and verify release integrity before Go OTA worker execution'
 )
 assert.ok(
   installPanel.includes('install_verified_root_helpers_from_archive "$tar_file"') &&
@@ -343,13 +340,13 @@ assert.ok(
   'split verify script must scan admin frontend assets and verify admin /api/ws proxy'
 )
 assert.ok(
-    backendServiceExample.includes('Environment=NPM_CONFIG_CACHE=/opt/incudal/.npm') &&
-    backendServiceExample.includes('Environment=XDG_CACHE_HOME=/opt/incudal/.cache') &&
     backendServiceExample.includes('WorkingDirectory=/opt/incudal/current') &&
+    backendServiceExample.includes('ExecStart=/opt/incudal/current/server/incudal-server') &&
     backendServiceExample.includes('NoNewPrivileges=false') &&
-    backendServiceExample.includes('pnpm exec prisma migrate deploy') &&
+    !backendServiceExample.includes('ExecStartPre=') &&
+    !backendServiceExample.includes('prisma migrate deploy') &&
     !backendServiceExample.includes('npx prisma'),
-  'systemd backend example must keep runtime cache paths writable, allow restricted online-update sudo, and run locked local Prisma migrations under ProtectSystem=strict'
+  'systemd backend example must launch the Go backend directly with automatic Goose startup migration and restricted online-update sudo'
 )
 assertIncludesAll(
   backendServiceExample,
@@ -367,13 +364,13 @@ assertIncludesAll(
   'systemd backend example must keep all runtime, cache, git and update paths writable'
 )
 assert.ok(
-    installPanel.includes('Environment=NPM_CONFIG_CACHE=${INSTALL_DIR}/.npm') &&
-    installPanel.includes('Environment=XDG_CACHE_HOME=${INSTALL_DIR}/.cache') &&
     installPanel.includes('app_dir="${INSTALL_DIR}/current"') &&
+    installPanel.includes('ExecStart=${app_dir}/server/incudal-server') &&
     installPanel.includes('NoNewPrivileges=false') &&
-    installPanel.includes('pnpm exec prisma migrate deploy') &&
+    !installPanel.includes('ExecStartPre=') &&
+    !installPanel.includes('prisma migrate deploy') &&
     !installPanel.includes('npx prisma'),
-  'install script systemd service must keep runtime cache paths writable, allow restricted online-update sudo, and run locked local Prisma migrations under ProtectSystem=strict'
+  'install script systemd service must launch the Go backend directly with automatic Goose startup migration and restricted online-update sudo'
 )
 assertIncludesAll(
   installPanel,
@@ -450,21 +447,17 @@ assert.ok(
   'server package must run production DB readiness from compiled dist output so release installs do not need tsx/dev sources'
 )
 assert.ok(
-  serverPackage.includes('"prisma": "^7.1.0"') &&
-    serverPackage.indexOf('"prisma": "^7.1.0"') < serverPackage.indexOf('"devDependencies"'),
-  'server package must keep the Prisma CLI in production dependencies because release startup/migration uses prisma migrate deploy'
-)
-assert.ok(
-  releaseWorkflow.includes('cp pnpm-lock.yaml release/') &&
-    releaseWorkflow.includes('pnpm install --prod --frozen-lockfile --ignore-scripts --filter server') &&
-    releaseWorkflow.includes('pnpm --filter server exec prisma generate') &&
+  releaseWorkflow.includes('CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build -trimpath -ldflags="-s -w" -o ../release/server/incudal-server ./cmd/server') &&
+    releaseWorkflow.includes('cp -r server/templates release/server/') &&
+    releaseWorkflow.includes('exec "$APP_DIR/server/incudal-server"') &&
+    !releaseWorkflow.includes('pnpm exec prisma migrate deploy') &&
     !releaseWorkflow.includes('npm install --omit=dev') &&
     !releaseWorkflow.includes('npx prisma') &&
     releaseWorkflow.includes('cp scripts/verify-production-readiness.sh release/scripts/') &&
     releaseWorkflow.includes('cp scripts/verify-log-header-exposure.sh release/scripts/') &&
     releaseWorkflow.includes('cp scripts/verify-live-acceptance.sh release/scripts/') &&
     releaseWorkflow.includes('cp scripts/verify-split-host.sh release/scripts/'),
-  'release workflow must package production verification scripts and install server production dependencies through the pnpm lockfile'
+  'release workflow must compile the Go backend binary with embedded Goose migrations and package frontend assets and verification scripts without runtime Prisma CLI'
 )
 assert.ok(
   readme.includes('pnpm verify:production') &&
@@ -542,8 +535,9 @@ assert.ok(
 )
 assert.ok(
   verifyProductionReadiness.includes('RUN_DB_CHECKS="${RUN_DB_CHECKS:-$RUN_LIVE_CHECKS}"') &&
+    verifyProductionReadiness.includes('verify-production-db') &&
     verifyProductionReadiness.includes('ENV_FILE="$ENV_FILE" pnpm --filter server verify:production-db'),
-  'production readiness verifier must run DB readiness checks by default in full mode while allowing config-only skips'
+  'production readiness verifier must support Go binary verify-production-db checks while preserving source-mode fallback and config-only skips'
 )
 assert.ok(
   verifyLogHeaderExposure.includes('assert_header "$tmp_dir/frontend.headers" "content-security-policy"') &&

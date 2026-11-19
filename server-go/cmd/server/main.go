@@ -4,10 +4,12 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,11 +17,35 @@ import (
 	"github.com/rain-kl/payincus/server-go/src/config"
 	"github.com/rain-kl/payincus/server-go/src/db"
 	"github.com/rain-kl/payincus/server-go/src/lib"
+	"github.com/rain-kl/payincus/server-go/src/ota"
 	"github.com/rain-kl/payincus/server-go/src/services"
 	"github.com/rain-kl/payincus/server-go/src/workers"
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "serve":
+			// Start the HTTP server and schedulers.
+		case "version", "--version", "-v":
+			os.Exit(ota.RunVersionCommand(os.Args[2:]))
+		case "verify-production-db":
+			os.Exit(ota.RunVerifyProductionDBCommand(os.Args[2:]))
+		case "ota-start":
+			os.Exit(ota.RunOTAStartCommand(os.Args[2:]))
+		case "ota-update":
+			os.Exit(ota.RunOTAUpdateCommand(os.Args[2:]))
+		case "ota-rollback":
+			os.Exit(ota.RunOTARollbackCommand(os.Args[2:]))
+		case "help", "--help", "-h":
+			fmt.Println("Usage: incudal-server [serve|version|verify-production-db|ota-start|ota-update|ota-rollback]")
+			return
+		default:
+			fmt.Fprintf(os.Stderr, "unknown subcommand %q (expected serve, version, verify-production-db, ota-start, ota-update, ota-rollback)\n", os.Args[1])
+			os.Exit(2)
+		}
+	}
+
 	config.LoadEnv()
 	if err := config.ApplyRateLimitOverrides(); err != nil {
 		log.Fatalf("rate limit config: %v", err)
@@ -33,6 +59,19 @@ func main() {
 		log.Fatalf("database init failed: %v", err)
 	}
 	defer db.Close()
+
+	migTimeout := 5 * time.Minute
+	if raw := os.Getenv("MIGRATION_TIMEOUT_SECONDS"); raw != "" {
+		if secs, err := strconv.Atoi(raw); err == nil && secs > 0 {
+			migTimeout = time.Duration(secs) * time.Second
+		}
+	}
+	migCtx, cancelMig := context.WithTimeout(context.Background(), migTimeout)
+	if _, err := db.RunMigrations(migCtx); err != nil {
+		cancelMig()
+		log.Fatalf("database migration failed: %v", err)
+	}
+	cancelMig()
 
 	if err := db.NormalizeLegacyNetworkModes(initCtx); err != nil {
 		log.Printf("network mode normalization skipped: %v", err)

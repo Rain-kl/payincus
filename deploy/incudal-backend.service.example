@@ -11,12 +11,10 @@ Group=incudal
 WorkingDirectory=/opt/incudal/current
 EnvironmentFile=/opt/incudal/.env
 Environment=HOME=/opt/incudal
-Environment=NPM_CONFIG_CACHE=/opt/incudal/.npm
-Environment=XDG_CACHE_HOME=/opt/incudal/.cache
 Environment=PATH=/usr/local/libexec/incudal:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-ExecStartPre=/usr/bin/bash -lc 'cd /opt/incudal/current/server && pnpm exec prisma migrate deploy'
-ExecStart=/usr/bin/node /opt/incudal/current/server/dist/app.js
+# 服务启动时自动通过内置 Goose 迁移对比数据库版本并按需执行，无需单独 ExecStartPre 迁移命令
+ExecStart=/opt/incudal/current/server/incudal-server
 
 Restart=on-failure
 RestartSec=10

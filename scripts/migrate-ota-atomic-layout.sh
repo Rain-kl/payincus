@@ -73,11 +73,9 @@ WorkingDirectory=${app_dir}
 EnvironmentFile=${env_file}
 Environment=HOME=${INSTALL_DIR}
 Environment=PATH=/usr/local/libexec/incudal:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-Environment=NPM_CONFIG_CACHE=${INSTALL_DIR}/.npm
-Environment=XDG_CACHE_HOME=${INSTALL_DIR}/.cache
 
-ExecStartPre=/usr/bin/bash -lc 'cd ${app_dir}/server && pnpm exec prisma migrate deploy'
-ExecStart=/usr/bin/node ${app_dir}/server/dist/app.js
+# Go 后端启动时自动对比 Goose 迁移版本并执行待迁移 SQL
+ExecStart=${app_dir}/server/incudal-server
 
 Restart=on-failure
 RestartSec=10
@@ -165,7 +163,8 @@ main() {
   /usr/local/libexec/incudal/incudal-online-task harden
 
   local version timestamp releases_dir release_dir current_link
-  version="$(node -e "try { console.log(require('${INSTALL_DIR}/version.json').version || 'local') } catch { console.log('local') }" 2>/dev/null || echo local)"
+  version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${INSTALL_DIR}/version.json" 2>/dev/null | head -n 1 || true)"
+  version="${version:-local}"
   timestamp="$(date +%Y%m%d%H%M%S)"
   releases_dir="$INSTALL_DIR/releases"
   release_dir="$releases_dir/${version}-${timestamp}"
@@ -180,6 +179,9 @@ main() {
   chown -R root:root "$release_dir"
   find "$release_dir" -xdev -type d -exec chmod 0755 {} +
   find "$release_dir" -xdev -type f -exec chmod go-w {} +
+  if [[ -f "$release_dir/server/incudal-server" ]]; then
+    chmod 0755 "$release_dir/server/incudal-server"
+  fi
   local next_link
   next_link="$releases_dir/.next-current-$timestamp"
   rm -f "$next_link"

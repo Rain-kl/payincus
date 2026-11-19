@@ -83,9 +83,38 @@ require_sha256() {
   [[ "$value" =~ ^[A-Fa-f0-9]{64}$ ]] || fail "${key} must be a 64-character hex sha256"
 }
 
+require_command curl
+
+env_script_runtime() {
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3'
+  elif command -v node >/dev/null 2>&1; then
+    printf 'node'
+  else
+    fail "Missing python3 or node for production config checks"
+  fi
+}
+
 validate_http_url() {
   local key="$1"
   local value="$2"
+  local rt
+  rt="$(env_script_runtime)"
+  if [[ "$rt" == "python3" ]]; then
+    python3 - "$key" "$value" <<'PY'
+import sys
+from urllib.parse import urlparse
+key, value = sys.argv[1], sys.argv[2]
+parsed = urlparse(value)
+if not parsed.scheme or not parsed.netloc:
+    print(f"{key} must be a valid URL", file=sys.stderr)
+    sys.exit(1)
+if parsed.scheme not in ("http", "https"):
+    print(f"{key} must use HTTP(S)", file=sys.stderr)
+    sys.exit(1)
+PY
+    return 0
+  fi
   node - "$key" "$value" <<'NODE'
 const [key, value] = process.argv.slice(2)
 let url
@@ -105,6 +134,35 @@ NODE
 validate_https_public_url() {
   local key="$1"
   local value="$2"
+  local rt
+  rt="$(env_script_runtime)"
+  if [[ "$rt" == "python3" ]]; then
+    python3 - "$key" "$value" <<'PY'
+import ipaddress, sys
+from urllib.parse import urlparse
+key, value = sys.argv[1], sys.argv[2]
+parsed = urlparse(value)
+if not parsed.scheme or not parsed.netloc:
+    print(f"{key} must be a valid URL", file=sys.stderr)
+    sys.exit(1)
+if parsed.scheme != "https":
+    print(f"{key} must use HTTPS in production", file=sys.stderr)
+    sys.exit(1)
+host = (parsed.hostname or "").lower()
+if not host or host == "localhost" or host.endswith(".localhost") or "." not in host:
+    print(f"{key} must use a browser-accessible public hostname", file=sys.stderr)
+    sys.exit(1)
+try:
+    ip = ipaddress.ip_address(host.strip("[]"))
+    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+        kind = "IPv6" if ip.version == 6 else "IP"
+        print(f"{key} must not use a private or loopback {kind} address in production" if ip.version == 6 else f"{key} must not use a private or loopback IP in production", file=sys.stderr)
+        sys.exit(1)
+except ValueError:
+    pass
+PY
+    return 0
+  fi
   node - "$key" "$value" <<'NODE'
 const net = require('node:net')
 const [key, value] = process.argv.slice(2)
@@ -149,6 +207,22 @@ NODE
 
 validate_ip_whitelist() {
   local value="$1"
+  local rt
+  rt="$(env_script_runtime)"
+  if [[ "$rt" == "python3" ]]; then
+    python3 - "$value" <<'PY'
+import ipaddress, sys
+value = sys.argv[1] if len(sys.argv) > 1 else ""
+for raw in [ip.strip() for ip in value.split(",") if ip.strip()]:
+    normalized = raw[7:] if raw.startswith("::ffff:") else raw
+    try:
+        ipaddress.ip_address(normalized)
+    except ValueError:
+        print(f"PAYMENT_CALLBACK_IP_WHITELIST contains an invalid IP: {raw}", file=sys.stderr)
+        sys.exit(1)
+PY
+    return 0
+  fi
   node - "$value" <<'NODE'
 const net = require('node:net')
 const value = process.argv[2] || ''
@@ -162,9 +236,6 @@ for (const ip of ips) {
 }
 NODE
 }
-
-require_command node
-require_command curl
 
 NODE_ENV_VALUE="$(config_value NODE_ENV)"
 PORT_VALUE="$(config_value PORT)"
@@ -221,7 +292,12 @@ log "Static production environment checks passed"
 
 if [[ "$RUN_DB_CHECKS" == "1" ]]; then
   log "Running production database readiness checks"
-  ENV_FILE="$ENV_FILE" pnpm --filter server verify:production-db
+  app_root="${INCUDAL_APP_DIR:-$(pwd)}"
+  if [[ -x "${app_root}/server/incudal-server" ]]; then
+    ENV_FILE="$ENV_FILE" INCUDAL_APP_DIR="$app_root" "${app_root}/server/incudal-server" verify-production-db
+  else
+    ENV_FILE="$ENV_FILE" pnpm --filter server verify:production-db
+  fi
 else
   log "Database checks skipped because RUN_DB_CHECKS=${RUN_DB_CHECKS}"
 fi
@@ -237,7 +313,11 @@ fi
 
 FRONTEND_URL="$FRONTEND_URL_VALUE" ADMIN_FRONTEND_URL="$ADMIN_FRONTEND_URL_VALUE" BACKEND_URL="$BACKEND_URL_VALUE" bash scripts/verify-split-host.sh
 
-curl -fsS --max-time 15 "${FRONTEND_URL_VALUE}/api/agent/distribution" | node -e '
-let body="";process.stdin.on("data",c=>body+=c);process.stdin.on("end",()=>{const d=JSON.parse(body);if(d.repository!=="Rain-kl/incus"||d.managedBy!=="apt")process.exit(1)})'
+dist_payload="$(curl -fsS --max-time 15 "${FRONTEND_URL_VALUE}/api/agent/distribution")"
+if [[ "$(env_script_runtime)" == "python3" ]]; then
+  printf '%s' "$dist_payload" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("repository")=="Rain-kl/incus" and d.get("managedBy")=="apt" else 1)'
+else
+  printf '%s' "$dist_payload" | node -e 'let body="";process.stdin.on("data",c=>body+=c);process.stdin.on("end",()=>{const d=JSON.parse(body);if(d.repository!=="Rain-kl/incus"||d.managedBy!=="apt")process.exit(1)})'
+fi
 
 log "Production readiness verification passed"

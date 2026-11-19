@@ -1298,13 +1298,12 @@ func TestSystemUpdateSpawnUpdater(t *testing.T) {
 	logDir := filepath.Join(root, "update-logs")
 	logPath := filepath.Join(logDir, "system-update-42.log")
 	outMarker := filepath.Join(root, "invoked.txt")
-	fakeNode := filepath.Join(root, "fake-node.sh")
+	fakeBin := filepath.Join(root, "fake-incudal-server.sh")
 	script := "#!/usr/bin/env bash\nprintf '%s|%s|%s' \"$INCUDAL_APP_DIR\" \"$SYSTEM_UPDATE_LOG_PATH\" \"$*\" > " + outMarker + "\n"
-	if err := os.WriteFile(fakeNode, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake node: %v", err)
+	if err := os.WriteFile(fakeBin, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake server bin: %v", err)
 	}
-	t.Setenv("NODE_ENV", "development")
-	t.Setenv("NODE_BINARY", fakeNode)
+	t.Setenv("INCUDAL_SERVER_BIN", fakeBin)
 
 	if err := systemUpdateSpawnUpdater("run-system-update-task.ts", []string{"42", "v1.6.0"}, logPath, root, logDir); err != nil {
 		t.Fatalf("spawn updater: %v", err)
@@ -1313,15 +1312,14 @@ func TestSystemUpdateSpawnUpdater(t *testing.T) {
 	for time.Now().Before(deadline) {
 		if data, err := os.ReadFile(outMarker); err == nil && len(data) > 0 {
 			text := string(data)
-			wantScript := filepath.Join("server", "src", "scripts", "run-system-update-task.ts")
-			if !strings.Contains(text, root) || !strings.Contains(text, logPath) || !strings.Contains(text, wantScript) || !strings.Contains(text, "42 v1.6.0") {
+			if !strings.Contains(text, root) || !strings.Contains(text, logPath) || !strings.Contains(text, "ota-update 42 v1.6.0") {
 				t.Fatalf("unexpected worker args/env: %q", text)
 			}
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatal("detached updater script did not write marker file in time")
+	t.Fatal("detached updater command did not write marker file in time")
 }
 
 // systemUpdateFakeHTTPDoer serves canned GitHub responses and records requests.

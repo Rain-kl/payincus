@@ -25,18 +25,36 @@ if verify_release_checksum "$SAFE_ARCHIVE"; then
 fi
 
 UNSAFE_ARCHIVE="$WORK_DIR/unsafe.tar.gz"
-tar -czf "$UNSAFE_ARCHIVE" --transform='s#^#../#' -C "$WORK_DIR/payload" .
+if tar --help 2>&1 | grep -q -- '--transform'; then
+    tar -czf "$UNSAFE_ARCHIVE" --transform='s#^#../#' -C "$WORK_DIR/payload" .
+else
+    python3 - "$UNSAFE_ARCHIVE" "$WORK_DIR/payload/version.txt" <<'PY'
+import sys, tarfile
+archive_path, src_path = sys.argv[1], sys.argv[2]
+with tarfile.open(archive_path, "w:gz") as tf:
+    tf.add(src_path, arcname="../version.txt")
+PY
+fi
 if validate_release_archive "$UNSAFE_ARCHIVE"; then
     echo "archive guard accepted a parent traversal path" >&2
     exit 1
 fi
 
-grep -Fq -- '-f "${INSTALL_DIR}/current/server/dist/app.js"' "$REPO_ROOT/scripts/install-panel.sh"
+grep -Fq -- '-f "${INSTALL_DIR}/current/server/incudal-server"' "$REPO_ROOT/scripts/install-panel.sh"
 grep -Fq '检测到原子 OTA 布局' "$REPO_ROOT/scripts/install-panel.sh"
+grep -Fq 'ExecStart=${app_dir}/server/incudal-server' "$REPO_ROOT/scripts/install-panel.sh"
 grep -Fq 'ExecStart=/usr/local/libexec/incudal/incudal-online-task update %i' "$REPO_ROOT/scripts/install-panel.sh"
 grep -Fq 'ExecStart=/usr/local/libexec/incudal/incudal-online-task rollback %i' "$REPO_ROOT/scripts/install-panel.sh"
 grep -Fq 'chown "root:${RUN_USER}" "$ENV_FILE"' "$REPO_ROOT/scripts/install-panel.sh"
 grep -Fq 'Defaults:${RUN_USER} secure_path=/usr/local/libexec/incudal:' "$REPO_ROOT/scripts/install-panel.sh"
+
+if grep -Fq 'prisma migrate deploy' \
+    "$REPO_ROOT/scripts/install-panel.sh" \
+    "$REPO_ROOT/deploy/incudal-backend.service.example" \
+    "$REPO_ROOT/scripts/migrate-ota-atomic-layout.sh"; then
+    echo "systemd unit or installer still executes prisma migrate deploy separately" >&2
+    exit 1
+fi
 
 for helper in \
     incudal-online-task.sh.example \
@@ -51,5 +69,7 @@ if grep -Fq 'ExecStart=/usr/bin/node /opt/incudal/current/server/dist/scripts/' 
     echo "root unit still executes a worker from current directly" >&2
     exit 1
 fi
+
+grep -Fq 'ExecStart=/opt/incudal/current/server/incudal-server' "$REPO_ROOT/deploy/incudal-backend.service.example"
 
 echo "install-panel guards passed"

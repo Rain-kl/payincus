@@ -1188,29 +1188,29 @@ func systemUpdateStartWorker(
 	return systemUpdateSpawnUpdater(scriptName, args, logPath, root, logDir)
 }
 
-// systemUpdateSpawnUpdater launches the Node updater/rollback script detached.
+// systemUpdateSpawnUpdater launches the native Go updater/rollback subcommand detached.
 func systemUpdateSpawnUpdater(scriptName string, args []string, logPath, root, logDir string) error {
-	var scriptPath string
-	var nodeArgs []string
-	if lib.IsProductionEnv() {
-		scriptPath = filepath.Join("server", "dist", "scripts", strings.TrimSuffix(scriptName, ".ts")+".js")
-		nodeArgs = append([]string{scriptPath}, args...)
-	} else {
-		scriptPath = filepath.Join("server", "src", "scripts", scriptName)
-		nodeArgs = append([]string{"--import", "tsx", scriptPath}, args...)
+	subcommand := "ota-update"
+	if scriptName == "rollback-system-update-task.ts" {
+		subcommand = "ota-rollback"
 	}
 
-	nodeBinary := os.Getenv("NODE_BINARY")
-	if nodeBinary == "" {
-		nodeBinary = "node"
+	serverBinary := os.Getenv("INCUDAL_SERVER_BIN")
+	if serverBinary == "" {
+		exe, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("resolve server executable: %w", err)
+		}
+		serverBinary = exe
 	}
+	cmdArgs := append([]string{subcommand}, args...)
 
 	devNull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
 	if err == nil {
 		defer devNull.Close()
 	}
 
-	cmd := exec.Command(nodeBinary, nodeArgs...)
+	cmd := exec.Command(serverBinary, cmdArgs...)
 	cmd.Dir = root
 	if err == nil {
 		cmd.Stdin = devNull

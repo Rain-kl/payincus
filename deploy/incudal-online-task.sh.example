@@ -73,10 +73,14 @@ apply_secure_ownership() {
     /usr/bin/chown -R root:root "${INSTALL_DIR}/releases"
     find "${INSTALL_DIR}/releases" -xdev -type d -exec /usr/bin/chmod u=rwx,go=rx {} +
     find "${INSTALL_DIR}/releases" -xdev -type f -exec /usr/bin/chmod u+rw,go+r,go-w {} +
+    find "${INSTALL_DIR}/releases" -xdev -type f -path '*/server/incudal-server' -exec /usr/bin/chmod 0755 {} +
   else
     /usr/bin/chown -R root:root "$app_dir"
     find "$app_dir" -xdev -type d -exec /usr/bin/chmod u=rwx,go=rx {} +
     find "$app_dir" -xdev -type f -exec /usr/bin/chmod u+rw,go+r,go-w {} +
+    if [[ -f "${app_dir}/server/incudal-server" ]]; then
+      /usr/bin/chmod 0755 "${app_dir}/server/incudal-server"
+    fi
   fi
   local controlled
   for controlled in .git .gitconfig; do
@@ -202,30 +206,52 @@ run_task() {
   verify_manifest
   verify_git_control
 
-  local app_dir script
+  local app_dir subcmd legacy_script
   app_dir="$(resolve_app_dir)"
   case "$mode" in
-    update) script="server/dist/scripts/run-system-update-task.js" ;;
-    rollback) script="server/dist/scripts/rollback-system-update-task.js" ;;
+    update)
+      subcmd="ota-update"
+      legacy_script="server/dist/scripts/run-system-update-task.js"
+      ;;
+    rollback)
+      subcmd="ota-rollback"
+      legacy_script="server/dist/scripts/rollback-system-update-task.js"
+      ;;
     *) fail "unsupported mode" ;;
   esac
-  [[ -f "${app_dir}/${script}" && ! -L "${app_dir}/${script}" ]] || fail "worker entry is missing or is a symlink"
 
+  local server_bin="${app_dir}/server/incudal-server"
   set +e
-  /usr/bin/env \
-    -u NODE_OPTIONS \
-    -u NODE_PATH \
-    -u LD_PRELOAD \
-    -u BASH_ENV \
-    -u ENV \
-    PATH="$OTA_PATH" \
-    HOME="$ROOT_CACHE_DIR" \
-    NPM_CONFIG_CACHE="${ROOT_CACHE_DIR}/npm" \
-    XDG_CACHE_HOME="${ROOT_CACHE_DIR}/xdg" \
-    INCUDAL_APP_DIR="$app_dir" \
-    INSTALL_DIR="$INSTALL_DIR" \
-    SERVICE_NAME="incudal-backend" \
-    /usr/bin/node "${app_dir}/${script}" "$task_id"
+  if [[ -f "$server_bin" && ! -L "$server_bin" ]]; then
+    [[ -x "$server_bin" ]] || /usr/bin/chmod 0755 "$server_bin"
+    /usr/bin/env \
+      -u LD_PRELOAD \
+      -u BASH_ENV \
+      -u ENV \
+      PATH="$OTA_PATH" \
+      HOME="$ROOT_CACHE_DIR" \
+      XDG_CACHE_HOME="${ROOT_CACHE_DIR}/xdg" \
+      INCUDAL_APP_DIR="$app_dir" \
+      INSTALL_DIR="$INSTALL_DIR" \
+      SERVICE_NAME="incudal-backend" \
+      "$server_bin" "$subcmd" "$task_id"
+  else
+    [[ -f "${app_dir}/${legacy_script}" && ! -L "${app_dir}/${legacy_script}" ]] || fail "worker entry is missing or is a symlink"
+    /usr/bin/env \
+      -u NODE_OPTIONS \
+      -u NODE_PATH \
+      -u LD_PRELOAD \
+      -u BASH_ENV \
+      -u ENV \
+      PATH="$OTA_PATH" \
+      HOME="$ROOT_CACHE_DIR" \
+      NPM_CONFIG_CACHE="${ROOT_CACHE_DIR}/npm" \
+      XDG_CACHE_HOME="${ROOT_CACHE_DIR}/xdg" \
+      INCUDAL_APP_DIR="$app_dir" \
+      INSTALL_DIR="$INSTALL_DIR" \
+      SERVICE_NAME="incudal-backend" \
+      /usr/bin/node "${app_dir}/${legacy_script}" "$task_id"
+  fi
   local status=$?
   set -e
 
