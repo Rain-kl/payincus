@@ -65,8 +65,9 @@ const (
 
 // OperationTaskControlResult mirrors the shape returned by operationTaskControl().
 type OperationTaskControlResult struct {
-	CanStop  bool `json:"canStop"`
-	Stopping bool `json:"stopping"`
+	CanStop  bool    `json:"canStop"`
+	Stopping bool    `json:"stopping"`
+	Progress *string `json:"progress,omitempty"`
 }
 
 // OperationTask is the live, process-local context of a running task.
@@ -103,7 +104,33 @@ type pendingOperationTaskLog struct {
 var (
 	operationTasksMu sync.Mutex
 	operationTasks   = map[int32]*OperationTask{}
+
+	// operationTaskProgress mirrors the process-local `progressMap`: the last
+	// progress line a node task reported, capped at 500 chars after redaction.
+	// Only reachable while the task is alive, exactly like the TypeScript.
+	operationTaskProgressMu sync.Mutex
+	operationTaskProgress   = map[int32]string{}
 )
+
+// SetOperationTaskProgress mirrors setOperationTaskProgress: redact, trim, cap at
+// 500 chars; a nil/empty value removes the entry so the control endpoint stops
+// reporting a finished task's stale progress.
+func SetOperationTaskProgress(id int32, progress *string) {
+	trimmed := ""
+	if progress != nil {
+		trimmed = strings.TrimSpace(RedactTaskLog(*progress))
+		if len([]rune(trimmed)) > 500 {
+			trimmed = string([]rune(trimmed)[:500])
+		}
+	}
+	operationTaskProgressMu.Lock()
+	defer operationTaskProgressMu.Unlock()
+	if trimmed != "" {
+		operationTaskProgress[id] = trimmed
+	} else {
+		delete(operationTaskProgress, id)
+	}
+}
 
 // TunnelLogControl is the seam for
 // `hostTunnelManager.sendTaskLogControl(hostId, taskId, name, action)`. The
@@ -148,19 +175,22 @@ func OperationTaskControl(id int32) OperationTaskControlResult {
 	task := operationTasks[id]
 	operationTasksMu.Unlock()
 
-	if task == nil {
-		return OperationTaskControlResult{}
-	}
+	operationTaskProgressMu.Lock()
+	progress := operationTaskProgress[id]
+	operationTaskProgressMu.Unlock()
 
-	task.mu.Lock()
-	defer task.mu.Unlock()
-	return OperationTaskControlResult{
+	result := OperationTaskControlResult{
 		// Only expose cancellation while an actual node operation is attached.
 		// Cleanup is deliberately not cancellable: it must finish releasing the
 		// failed instance.
-		CanStop:  task.cancel != nil && !task.stopping && !task.cancelled,
-		Stopping: task.stopping || task.cancelled,
+		CanStop:  task != nil && task.cancel != nil && !task.stopping && !task.cancelled,
+		Stopping: task != nil && (task.stopping || task.cancelled),
 	}
+	if progress != "" {
+		p := progress
+		result.Progress = &p
+	}
+	return result
 }
 
 // BindOperationCancellation mirrors bindOperationCancellation. The returned func

@@ -123,6 +123,7 @@ type adminTasksTaskView struct {
 	FinishedAt   *string `json:"finishedAt"`
 	CanStop      bool    `json:"canStop"`
 	Stopping     bool    `json:"stopping"`
+	Progress     *string `json:"progress,omitempty"`
 	HostName     *string `json:"hostName"`
 }
 
@@ -189,6 +190,7 @@ func adminTasksTaskViewFromRow(row models.OperationTask, hostName *string) admin
 		FinishedAt:   adminTasksISOTime(row.FinishedAt),
 		CanStop:      control.CanStop,
 		Stopping:     control.Stopping,
+		Progress:     control.Progress,
 		HostName:     hostName,
 	}
 }

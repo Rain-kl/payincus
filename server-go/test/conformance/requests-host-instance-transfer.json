@@ -1,0 +1,291 @@
+[
+  {
+    "name": "transfer-list-host-missing",
+    "method": "GET",
+    "path": "/api/admin/hosts/999999/instance-transfer",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-list-invalid-host-id",
+    "method": "GET",
+    "path": "/api/admin/hosts/abc/instance-transfer",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-list-zero-host-id",
+    "method": "GET",
+    "path": "/api/admin/hosts/0/instance-transfer",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-list-nonadmin",
+    "method": "GET",
+    "path": "/api/admin/hosts/900001/instance-transfer",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-instance-missing",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/999999/export",
+    "body": {
+      "targetPath": "/parity/exports"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-missing-target-path",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/900001/export",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-short-target-path",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/900001/export",
+    "body": {
+      "targetPath": "/"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-relative-target-path",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/900001/export",
+    "body": {
+      "targetPath": "relative/path"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-bad-mode",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/900001/export",
+    "body": {
+      "targetPath": "/parity/exports",
+      "mode": "tape"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-bad-task-id",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/900001/export",
+    "body": {
+      "targetPath": "/parity/exports",
+      "id": "not-hex"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-export-invalid-instance-id",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/abc/export",
+    "body": {
+      "targetPath": "/parity/exports"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-packages-host-missing",
+    "method": "GET",
+    "path": "/api/admin/hosts/999999/import-packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-packages-owner",
+    "method": "GET",
+    "path": "/api/admin/hosts/900001/import-packages",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-packages-nonadmin",
+    "method": "GET",
+    "path": "/api/admin/hosts/900001/import-packages",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-missing-file-path",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-relative-file-path",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "relative.tar.gz"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-bad-name",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "name": "bad_name"
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-zero-valid-days",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "validDays": 0
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-huge-valid-days",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "validDays": 36501
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-empty-display-name",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "displayName": ""
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-bad-user",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "userId": 999999
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-plan-without-package",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "planId": 900001
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-packages-unknown-package",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/instances/import",
+    "body": {
+      "filePath": "/parity/imports/backup.tar.gz",
+      "packageId": 999999
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-storage-pools-host-missing",
+    "method": "GET",
+    "path": "/api/admin/hosts/999999/import-storage-pools",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-import-storage-pools-owner",
+    "method": "GET",
+    "path": "/api/admin/hosts/900001/import-storage-pools",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-unassigned-host-missing",
+    "method": "GET",
+    "path": "/api/admin/hosts/999999/unassigned-instances",
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-unassigned-bad-incus-name",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/unassigned-instances/bad_name/assign",
+    "body": {
+      "userId": 1
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-unassigned-assign-missing-user-id",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/unassigned-instances/parity-inst/assign",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-unassigned-assign-unknown-user",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/unassigned-instances/parity-inst/assign",
+    "body": {
+      "userId": 999999
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-unassigned-assign-plan-without-package",
+    "method": "POST",
+    "path": "/api/admin/hosts/900001/unassigned-instances/parity-inst/assign",
+    "body": {
+      "userId": 1,
+      "planId": 900001
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-package-rebind-missing-instance",
+    "method": "PUT",
+    "path": "/api/admin/hosts/900001/instances/999999/package",
+    "body": {
+      "packageId": 900001
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-package-rebind-wrong-host",
+    "method": "PUT",
+    "path": "/api/admin/hosts/999999/instances/900001/package",
+    "body": {
+      "packageId": 900001
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-package-rebind-bad-valid-days",
+    "method": "PUT",
+    "path": "/api/admin/hosts/900001/instances/900001/package",
+    "body": {
+      "validDays": 0
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-package-rebind-plan-without-package",
+    "method": "PUT",
+    "path": "/api/admin/hosts/900001/instances/900001/package",
+    "body": {
+      "planId": 900001
+    },
+    "token": "REPLACE_WITH_A_REAL_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "transfer-package-rebind-nonadmin",
+    "method": "PUT",
+    "path": "/api/admin/hosts/900001/instances/900001/package",
+    "body": {
+      "packageId": 900001
+    },
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  }
+]

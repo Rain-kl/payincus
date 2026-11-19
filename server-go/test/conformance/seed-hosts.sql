@@ -166,4 +166,20 @@ VALUES (900001, 900001, 'parity-plan-monthly', NULL, 50, 1024, 5120, 20,
         12.34, 1, true, false, 0, now() - interval '30 days', now() - interval '1 day')
 ON CONFLICT (id) DO NOTHING;
 
+-- Storage pools on the online host (GET /api/hosts/:id/storage-pools reads them).
+-- Two drivers so the list view exercises both the plain and the encrypted branch.
+INSERT INTO storage_pools (
+  id, host_id, name, driver, description, purpose, config, status,
+  total_bytes, used_bytes, telemetry, reported_at, created_at, updated_at
+)
+VALUES
+  (900001, 900001, 'default', 'zfs', 'Parity default pool', 'instance_data',
+   '{"source": "tank/default"}'::jsonb, 'ready', 107374182400, 10737418240,
+   '{"encryption": {"encrypted": true, "state": "unlocked", "encryptionRoot": "tank/default", "keyStatus": "available"}}'::jsonb,
+   now() - interval '1 hour', now() - interval '30 days', now() - interval '1 hour'),
+  (900002, 900001, 'parity-dir', 'dir', NULL, 'instance_storage',
+   '{"source": "/var/lib/incus/storage-pools/parity-dir"}'::jsonb, 'ready', 0, 0,
+   NULL, NULL, now() - interval '30 days', now() - interval '1 hour')
+ON CONFLICT (id) DO NOTHING;
+
 COMMIT;

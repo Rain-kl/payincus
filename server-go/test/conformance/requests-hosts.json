@@ -1059,5 +1059,100 @@
     },
     "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN",
     "ignoreRateLimit": true
+  },
+  {
+    "name": "hosts-storage-pools-list-owner",
+    "method": "GET",
+    "path": "/api/hosts/900001/storage-pools",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-list-nonadmin",
+    "method": "GET",
+    "path": "/api/hosts/900001/storage-pools",
+    "token": "REPLACE_WITH_A_REAL_NON_ADMIN_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-list-host-missing",
+    "method": "GET",
+    "path": "/api/hosts/999999/storage-pools",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-create-missing-name",
+    "method": "POST",
+    "path": "/api/hosts/900001/storage-pools",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-create-bad-name",
+    "method": "POST",
+    "path": "/api/hosts/900001/storage-pools",
+    "body": {
+      "name": "bad/pool",
+      "driver": "zfs"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-create-bad-driver",
+    "method": "POST",
+    "path": "/api/hosts/900001/storage-pools",
+    "body": {
+      "name": "newpool",
+      "driver": "xfs"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-create-both-source-size",
+    "method": "POST",
+    "path": "/api/hosts/900001/storage-pools",
+    "body": {
+      "name": "newpool",
+      "driver": "zfs",
+      "source": "/dev/sdb",
+      "size": "10GiB"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-create-lvm-needs-source",
+    "method": "POST",
+    "path": "/api/hosts/900001/storage-pools",
+    "body": {
+      "name": "newlvm",
+      "driver": "lvm"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-delete-missing-pool",
+    "method": "DELETE",
+    "path": "/api/hosts/900001/storage-pools/parity-none",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-delete-missing-host",
+    "method": "DELETE",
+    "path": "/api/hosts/999999/storage-pools/default",
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-update-missing-pool",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/storage-pools/parity-none",
+    "body": {
+      "description": "updated"
+    },
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
+  },
+  {
+    "name": "hosts-storage-pools-update-empty-body",
+    "method": "PATCH",
+    "path": "/api/hosts/900001/storage-pools/default",
+    "body": {},
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   }
 ]
