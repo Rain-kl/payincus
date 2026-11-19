@@ -154,6 +154,20 @@ func CreateSystemUpdateTask(ctx context.Context, input CreateSystemUpdateTaskInp
 	return &withUser, nil
 }
 
+// UpdateSystemUpdateTaskLogPath updates a newly created task's log_path from the
+// pending placeholder to `system-update-<id>.log` so /tasks/:id/logs can tail it
+// immediately without waiting for the worker process to claim the row.
+func UpdateSystemUpdateTaskLogPath(ctx context.Context, id int32, logPath string) error {
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	return DB.WithContext(ctx).
+		Model(&models.SystemUpdateTask{}).
+		Where("id = ?", id).
+		Updates(map[string]any{
+			"log_path":   logPath,
+			"updated_at": now,
+		}).Error
+}
+
 // MarkSystemUpdateTaskFinishedInput mirrors markSystemUpdateTaskFinished's payload.
 type MarkSystemUpdateTaskFinishedInput struct {
 	Status       models.SystemUpdateTaskStatus

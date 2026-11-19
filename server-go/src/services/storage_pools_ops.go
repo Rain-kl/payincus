@@ -1161,7 +1161,7 @@ func insertStoragePoolRow(ctx context.Context, hostID int32, name, driver, purpo
 		return errors.New("database not initialized")
 	}
 	_, err := db.Pool().Exec(ctx, `INSERT INTO storage_pools (host_id, name, driver, purpose, description, config, created_at, updated_at)
-		VALUES ($1, $2, $3, $4::storage_pool_purpose, $5, $6::jsonb, NOW(), NOW())`,
+		VALUES ($1, $2, $3, $4::"StoragePurpose", $5, $6::jsonb, NOW(), NOW())`,
 		hostID, name, driver, purpose, description, string(config))
 	return err
 }
@@ -1171,7 +1171,7 @@ func upsertStoragePoolIfMissing(ctx context.Context, hostID int32, name, driver,
 		return errors.New("database not initialized")
 	}
 	_, err := db.Pool().Exec(ctx, `INSERT INTO storage_pools (host_id, name, driver, purpose, description, config, created_at, updated_at)
-		VALUES ($1, $2, $3, $4::storage_pool_purpose, $5, $6::jsonb, NOW(), NOW())
+		VALUES ($1, $2, $3, $4::"StoragePurpose", $5, $6::jsonb, NOW(), NOW())
 		ON CONFLICT (host_id, name) DO NOTHING`,
 		hostID, name, driver, purpose, description, string(config))
 	return err
@@ -1182,7 +1182,7 @@ func upsertStoragePoolDeletionCheckpoint(ctx context.Context, hostID int32, name
 		return errors.New("database not initialized")
 	}
 	_, err := db.Pool().Exec(ctx, `INSERT INTO storage_pools (host_id, name, driver, purpose, config, created_at, updated_at)
-		VALUES ($1, $2, $3, $4::storage_pool_purpose, $5::jsonb, NOW(), NOW())
+		VALUES ($1, $2, $3, $4::"StoragePurpose", $5::jsonb, NOW(), NOW())
 		ON CONFLICT (host_id, name) DO UPDATE SET config = EXCLUDED.config, updated_at = NOW()`,
 		hostID, name, driver, purpose, string(config))
 	return err
@@ -1193,7 +1193,7 @@ func updateStoragePoolMeta(ctx context.Context, hostID int32, name string, descr
 		return errors.New("database not initialized")
 	}
 	if description != nil && purpose != nil {
-		_, err := db.Pool().Exec(ctx, `UPDATE storage_pools SET description = $3, purpose = $4::storage_pool_purpose, updated_at = NOW()
+		_, err := db.Pool().Exec(ctx, `UPDATE storage_pools SET description = $3, purpose = $4::"StoragePurpose", updated_at = NOW()
 			WHERE host_id = $1 AND name = $2`, hostID, name, *description, *purpose)
 		return err
 	}
@@ -1203,7 +1203,7 @@ func updateStoragePoolMeta(ctx context.Context, hostID int32, name string, descr
 		return err
 	}
 	if purpose != nil {
-		_, err := db.Pool().Exec(ctx, `UPDATE storage_pools SET purpose = $3::storage_pool_purpose, updated_at = NOW()
+		_, err := db.Pool().Exec(ctx, `UPDATE storage_pools SET purpose = $3::"StoragePurpose", updated_at = NOW()
 			WHERE host_id = $1 AND name = $2`, hostID, name, *purpose)
 		return err
 	}

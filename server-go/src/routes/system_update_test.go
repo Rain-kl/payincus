@@ -112,6 +112,16 @@ func (store *systemUpdateFakeStore) Create(_ context.Context, input db.CreateSys
 	return &created, nil
 }
 
+func (store *systemUpdateFakeStore) SetLogPath(_ context.Context, id int32, logPath string) error {
+	for i := range store.tasks {
+		if store.tasks[i].ID == id {
+			lp := logPath
+			store.tasks[i].LogPath = &lp
+		}
+	}
+	return nil
+}
+
 func (store *systemUpdateFakeStore) MarkFinished(_ context.Context, id int32, input db.MarkSystemUpdateTaskFinishedInput) error {
 	store.finished = append(store.finished, struct {
 		id    int32

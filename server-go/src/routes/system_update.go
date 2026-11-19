@@ -74,6 +74,7 @@ type systemUpdateTaskStore interface {
 	Get(ctx context.Context, id int32) (*db.SystemUpdateTaskWithUser, error)
 	HasRunning(ctx context.Context) (bool, error)
 	Create(ctx context.Context, input db.CreateSystemUpdateTaskInput) (*db.SystemUpdateTaskWithUser, error)
+	SetLogPath(ctx context.Context, id int32, logPath string) error
 	MarkFinished(ctx context.Context, id int32, input db.MarkSystemUpdateTaskFinishedInput) error
 }
 
@@ -94,6 +95,10 @@ func (systemUpdateDBStore) HasRunning(ctx context.Context) (bool, error) {
 
 func (systemUpdateDBStore) Create(ctx context.Context, input db.CreateSystemUpdateTaskInput) (*db.SystemUpdateTaskWithUser, error) {
 	return db.CreateSystemUpdateTask(ctx, input)
+}
+
+func (systemUpdateDBStore) SetLogPath(ctx context.Context, id int32, logPath string) error {
+	return db.UpdateSystemUpdateTaskLogPath(ctx, id, logPath)
 }
 
 func (systemUpdateDBStore) MarkFinished(ctx context.Context, id int32, input db.MarkSystemUpdateTaskFinishedInput) error {
@@ -865,6 +870,7 @@ func RegisterSystemUpdate(r *gin.Engine) {
 		}
 
 		logPath := filepath.Join(logDir, fmt.Sprintf("system-update-%d.log", task.ID))
+		_ = systemUpdateTasks.SetLogPath(ctx, task.ID, logPath)
 		systemUpdateAuditLogger(
 			ctx,
 			int64(user.ID),

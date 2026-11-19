@@ -1209,7 +1209,7 @@ func RegisterImportedHostInstance(
 				boot_autostart_delay, boot_host_shutdown_timeout, swap_enabled, swap_size,
 				egress_mode, egress_profile_id, billing_price, billing_cycle, expires_at,
 				auto_renew, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::network_mode, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::"NetworkMode", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?)
 			RETURNING id`,
 			incusName, name, targetUser.ID, hostID, r.PackageID, r.PackagePlanID, metrics.StoragePoolName,
 			metrics.Image, metrics.Status, metrics.CPU, metrics.Memory, metrics.Disk, metrics.IPv4, metrics.IPv6, string(metrics.NetworkMode),

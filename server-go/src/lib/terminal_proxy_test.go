@@ -199,8 +199,13 @@ func TestWebSocketTerminalSessionProxiesData(t *testing.T) {
 			}
 			dataSockets <- socket
 			for {
-				payload, _, readErr := socket.ReadMessage()
+				payload, isBinary, readErr := socket.ReadMessage()
 				if readErr != nil {
+					return
+				}
+				if !isBinary {
+					// Incus treats non-binary data frames as EOF barriers.
+					_ = socket.SendBinary([]byte("ERR_TEXT_FRAME"))
 					return
 				}
 				_ = socket.SendBinary([]byte(strings.ToUpper(string(payload))))
@@ -246,7 +251,7 @@ func TestWebSocketTerminalSessionProxiesData(t *testing.T) {
 		t.Fatalf("connected message = (%q,%t,%v)", payload, isBinary, err)
 	}
 
-	// Browser → Incus → browser.
+	// Browser → Incus → browser (both binary and browser text frames must reach Incus as binary).
 	dataSide := <-dataSockets
 	if err := browserClient.SendBinary([]byte("hi")); err != nil {
 		t.Fatalf("browser send: %v", err)
@@ -254,6 +259,13 @@ func TestWebSocketTerminalSessionProxiesData(t *testing.T) {
 	payload, isBinary, err = readWSMessage(t, browserClient)
 	if err != nil || !isBinary || string(payload) != "HI" {
 		t.Fatalf("echo = (%q,%t,%v)", payload, isBinary, err)
+	}
+	if err := browserClient.SendText("ping"); err != nil {
+		t.Fatalf("browser send text: %v", err)
+	}
+	payload, isBinary, err = readWSMessage(t, browserClient)
+	if err != nil || !isBinary || string(payload) != "PING" {
+		t.Fatalf("text-frame echo = (%q,%t,%v)", payload, isBinary, err)
 	}
 
 	// Resize goes to the control channel, not the data channel.

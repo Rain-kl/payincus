@@ -606,7 +606,11 @@ func handleClientMessage(session *TerminalSession, message terminalClientMessage
 	dataWS := session.incus
 	session.mu.Unlock()
 	if dataWS != nil && dataWS.IsOpen() {
-		_ = dataWS.SendMessage(message.payload, message.isBinary)
+		// Incus treats TextMessage on the exec/console data websocket as an EOF
+		// barrier (shared/ws/rwc.go), while browser xterm.js sends text frames via
+		// ws.send(str). Always forward terminal input to Incus as a binary frame,
+		// matching Node's ws Buffer semantics.
+		_ = dataWS.SendBinary(message.payload)
 	}
 }
 
