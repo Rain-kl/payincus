@@ -1871,13 +1871,26 @@ type PublicAPIRenewalResult struct {
 	DiscountAmount *float64
 }
 
-// PublicAPIPerformRenewal is the seam for db.performRenewal
-// (server/src/db/billing-operations.ts:560). That function is owned by the billing
-// wave and is not ported yet; until it lands this seam fails explicitly so the
-// route answers 400 SERVICE_RENEW_FAILED instead of pretending to renew. The route
-// keeps every pre-call guard (months, ownership, free-service) intact.
+// PublicAPIPerformRenewal is db.performRenewal (server/src/db/billing-operations.ts:560),
+// ported as instanceBillingPerformRenewal in routes/instance_billing.go (same package).
+// The route keeps every pre-call guard (months, ownership, free-service) intact.
 var PublicAPIPerformRenewal = func(ctx context.Context, userID int32, instanceID int32, months int) (PublicAPIRenewalResult, error) {
-	return PublicAPIRenewalResult{}, fmt.Errorf("续费模块尚未移植（seam: db/billing-operations.ts#performRenewal）")
+	instance, err := db.GetInstanceForBilling(ctx, instanceID)
+	if err != nil {
+		return PublicAPIRenewalResult{}, err
+	}
+	if instance == nil {
+		return PublicAPIRenewalResult{}, errors.New("服务不存在")
+	}
+	result, err := instanceBillingPerformRenewal(ctx, userID, instance, months)
+	if err != nil {
+		return PublicAPIRenewalResult{}, err
+	}
+	return PublicAPIRenewalResult{
+		NewExpiresAt:   result.NewExpiresAt,
+		Amount:         result.Amount,
+		DiscountAmount: result.DiscountAmount,
+	}, nil
 }
 
 // ==================== response views ====================
