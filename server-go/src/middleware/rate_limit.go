@@ -65,6 +65,11 @@ func RateLimit() gin.HandlerFunc {
 	limiter := newFixedWindowLimiter()
 
 	return func(c *gin.Context) {
+		// RATE_LIMIT_DISABLED=1 turns every limiter off (parity harness).
+		if config.RateLimitDisabled() {
+			c.Next()
+			return
+		}
 		path := c.Request.URL.Path
 		if !strings.HasPrefix(path, "/api/") || config.IsWhitelisted(path) {
 			c.Next()

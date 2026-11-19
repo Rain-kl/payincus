@@ -31,8 +31,7 @@ function sendVipBenefitError(reply: FastifyReply, error: unknown) {
 
 export default async function vipBenefitRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/vip-benefits/me', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate]
   }, async (request) => {
     return getVipBenefitOverview(request.user.id)
   })
@@ -40,8 +39,7 @@ export default async function vipBenefitRoutes(app: FastifyInstance): Promise<vo
   app.post<{
     Params: { rewardId: string }
   }>('/api/vip-benefits/:rewardId/claim', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 100, timeWindow: '3 minutes' } }
+    onRequest: [app.authenticate]
   }, async (request, reply) => {
     const rewardId = parsePositiveRouteId(request.params.rewardId)
     if (!rewardId) {
@@ -56,8 +54,7 @@ export default async function vipBenefitRoutes(app: FastifyInstance): Promise<vo
   })
 
   app.post('/api/vip-benefits/claim-all', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 30, timeWindow: '3 minutes' } }
+    onRequest: [app.authenticate]
   }, async (request, reply) => {
     try {
       return await claimAllAvailableVipBenefitRewards(request.user.id)
@@ -67,8 +64,7 @@ export default async function vipBenefitRoutes(app: FastifyInstance): Promise<vo
   })
 
   app.get('/api/admin/vip-benefits/rewards', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async () => {
     return { rewards: await listAdminVipBenefitRewards() }
   })
@@ -76,8 +72,7 @@ export default async function vipBenefitRoutes(app: FastifyInstance): Promise<vo
   app.post<{
     Body: VipBenefitRewardInput
   }>('/api/admin/vip-benefits/rewards', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       return { reward: await createVipBenefitReward(request.body || {}) }
@@ -90,8 +85,7 @@ export default async function vipBenefitRoutes(app: FastifyInstance): Promise<vo
     Params: { id: string }
     Body: VipBenefitRewardInput
   }>('/api/admin/vip-benefits/rewards/:id', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const id = parsePositiveRouteId(request.params.id)
     if (!id) {
@@ -108,8 +102,7 @@ export default async function vipBenefitRoutes(app: FastifyInstance): Promise<vo
   app.delete<{
     Params: { id: string }
   }>('/api/admin/vip-benefits/rewards/:id', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const id = parsePositiveRouteId(request.params.id)
     if (!id) {

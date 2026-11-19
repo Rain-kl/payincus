@@ -38,7 +38,7 @@ export default async function spiceRoutes(fastify: FastifyInstance, options: {
   }
 
   fastify.post<{ Params: { id: string }; Body: { reconnect?: boolean } }>('/:id/spice-session', {
-    onRequest: [fastify.authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    onRequest: [fastify.authenticate],
     schema: { body: { type: 'object', properties: { reconnect: { type: 'boolean' } }, additionalProperties: false } }
   }, async (request, reply) => {
     const instanceId = parseId(request.params.id)

@@ -37,12 +37,10 @@ type requestCase struct {
 	// SkipBody compares only the status code (useful for volatile payloads).
 	SkipBody bool `json:"skipBody,omitempty"`
 	// IgnoreRateLimit treats a 429 from either side as inconclusive instead of a
-	// failure. It exists for ONE narrow case: a limit that lives only in
-	// config/rate-limit.ts. Node's app-level onRoute hook that injects those rules
-	// runs after @fastify/rate-limit's own hook, so the injection is dead and Node
-	// answers with the global 300/min instead. Limits declared inline on the route
-	// (`config: { rateLimit: ... }`) ARE enforced by Node, so a 429 divergence on
-	// those routes is a real bug and must not be skipped.
+	// failure. parity.sh now starts both backends with RATE_LIMIT_DISABLED=1, so
+	// 429s should never occur during a comparison; the flag remains for ad-hoc
+	// runs without the harness (e.g. comparing against a production-like
+	// deployment where the limiter cannot be switched off).
 	IgnoreRateLimit bool `json:"ignoreRateLimit,omitempty"`
 	// CompareCookieAttrs diffs the Set-Cookie *attributes* (name, path, domain,
 	// httpOnly, secure, sameSite, maxAge) while ignoring the value, which is a

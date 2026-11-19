@@ -796,7 +796,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
    * 只返回已启用的公开套餐（官方直营）
    */
   fastify.get<{ Querystring: { source?: string } }>('/public', {
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } }  // 公开接口需要限流
+      // 公开接口需要限流
   }, async (request: FastifyRequest<{ Querystring: { source?: string } }>) => {
     const source = request.query.source || 'all'
     
@@ -942,7 +942,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
    * 公开获取地区列表（用于门户市场页面）
    */
   fastify.get<{ Querystring: { source?: string } }>('/public/regions', {
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
+    
   }, async (request: FastifyRequest<{ Querystring: { source?: string } }>) => {
     const source = request.query.source || 'all'
     
@@ -1457,7 +1457,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
   // 创建套餐（管理员或满足准入条件的用户）
   fastify.post<{ Body: CreatePackageRequest }>('/', {
     onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -1660,7 +1659,6 @@ export default async function packageRoutes(fastify: FastifyInstance) {
     Body: UpdatePackageRequest
   }>('/:id', {
     onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -1940,8 +1938,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
 
   // 删除套餐（管理员或套餐所有者）
   fastify.delete<{ Params: { id: string } }>('/:id', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }  // 高危操作，更严格限制
+    onRequest: [fastify.authenticate]  // 高危操作，更严格限制
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params
     const packageId = parsePositiveRouteId(id)
@@ -2186,8 +2183,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       notify?: boolean
     }
   }>('/:id/release-quota', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },  // 修改资源配额，严格限制
+    onRequest: [fastify.authenticate],  // 修改资源配额，严格限制
     schema: {
       body: {
         type: 'object',
@@ -2405,8 +2401,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       slaGuarantee?: number | null
     }
   }>('/:id/plans', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request, reply) => {
     const { id } = request.params
     const { user } = request
@@ -2528,8 +2523,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
       slaGuarantee?: number | null
     }
   }>('/:id/plans/:planId', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request, reply) => {
     const { id, planId } = request.params
     const { user } = request
@@ -2662,8 +2656,7 @@ export default async function packageRoutes(fastify: FastifyInstance) {
 
   // 删除套餐方案
   fastify.delete<{ Params: { id: string; planId: string } }>('/:id/plans/:planId', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }  // 删除操作，更严格限制
+    onRequest: [fastify.authenticate]  // 删除操作，更严格限制
   }, async (request, reply) => {
     const { id, planId } = request.params
     const { user } = request

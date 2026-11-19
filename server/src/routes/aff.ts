@@ -147,8 +147,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Body: { packagePlanId?: number }
   }>('/me/codes', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Body: { packagePlanId?: number } }>, reply: FastifyReply) => {
     const { user } = request
     const { packagePlanId } = request.body
@@ -196,8 +195,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
   fastify.delete<{
     Params: { codeId: string }
   }>('/me/codes/:codeId', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Params: { codeId: string } }>, reply: FastifyReply) => {
     const { user } = request
     const codeId = parsePositiveRouteId(request.params.codeId)
@@ -271,8 +269,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
 
   // 获取 AFF 收益榜单 TOP 10
   fastify.get('/leaderboard', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest) => {
     const { user } = request
     const leaderboard = await db.getAffLeaderboard(user.id)
@@ -286,8 +283,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
       packagePlanId: number
     }
   }>('/validate', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Body: { code: string; packagePlanId: number } }>, reply: FastifyReply) => {
     const { user } = request
     const { code, packagePlanId } = request.body
@@ -355,8 +351,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Body: { amount: number }
   }>('/me/convert', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Body: { amount: number } }>, reply: FastifyReply) => {
     const { user } = request
     const { amount } = request.body
@@ -484,8 +479,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Params: { withdrawalId: string }
   }>('/admin/withdrawals/:withdrawalId/approve', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{ Params: { withdrawalId: string } }>, reply: FastifyReply) => {
     const { user } = request
     const withdrawalId = parsePositiveRouteId(request.params.withdrawalId)
@@ -531,8 +525,7 @@ export default async function affRoutes(fastify: FastifyInstance) {
     Params: { withdrawalId: string }
     Body: { reason: string }
   }>('/admin/withdrawals/:withdrawalId/reject', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{ Params: { withdrawalId: string }; Body: { reason: string } }>, reply: FastifyReply) => {
     const { user } = request
     const withdrawalId = parsePositiveRouteId(request.params.withdrawalId)

@@ -855,7 +855,6 @@ export default async function instanceDestroyRoutes(fastify: FastifyInstance) {
     Body: { instanceIds: number[] }
   }>('/batch/destroy-info', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -885,7 +884,6 @@ export default async function instanceDestroyRoutes(fastify: FastifyInstance) {
     Body: { instanceIds: number[] }
   }>('/batch/destroy', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -942,8 +940,7 @@ export default async function instanceDestroyRoutes(fastify: FastifyInstance) {
   // ==================== 获取销毁预览信息 ====================
   // GET /api/instances/:id/destroy-info
   fastify.get<{ Params: { id: string }; Querystring: { feeWaiver?: string } }>('/:id/destroy-info', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Params: { id: string }; Querystring: { feeWaiver?: string } }>, reply: FastifyReply) => {
     const { user } = request
     const instanceId = Number(request.params.id)
@@ -1080,8 +1077,7 @@ export default async function instanceDestroyRoutes(fastify: FastifyInstance) {
   // ==================== 执行销毁 ====================
   // POST /api/instances/:id/destroy
   fastify.post<{ Params: { id: string }; Querystring: { feeWaiver?: string } }>('/:id/destroy', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Params: { id: string }; Querystring: { feeWaiver?: string } }>, reply: FastifyReply) => {
     const { user } = request
     const instanceId = Number(request.params.id)

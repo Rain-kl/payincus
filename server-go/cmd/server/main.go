@@ -21,6 +21,9 @@ import (
 
 func main() {
 	config.LoadEnv()
+	if err := config.ApplyRateLimitOverrides(); err != nil {
+		log.Fatalf("rate limit config: %v", err)
+	}
 	lib.LogCookieConfig()
 
 	initCtx, cancelInit := context.WithTimeout(context.Background(), 30*time.Second)

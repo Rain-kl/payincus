@@ -5622,8 +5622,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
   // 启用实例 SWAP
   fastify.post<{ Params: { id: string } }>('/:id/swap/enable', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params
     const instanceId = parsePositiveRouteId(id)
@@ -5730,8 +5729,7 @@ export default async function instanceRoutes(fastify: FastifyInstance) {
 
   // 关闭实例 SWAP
   fastify.post<{ Params: { id: string } }>('/:id/swap/disable', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params
     const instanceId = parsePositiveRouteId(id)

@@ -37,6 +37,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/rain-kl/payincus/server-go/src/config"
 	"github.com/rain-kl/payincus/server-go/src/db"
 	"github.com/rain-kl/payincus/server-go/src/lib"
 )
@@ -519,87 +520,44 @@ func TestPublicAPIBodyParserRunsBeforeAuth(t *testing.T) {
 	}
 }
 
-// ==================== inline rate limits ====================
+// ==================== rate limits ====================
 
-// TestPublicAPIInlineRateLimits verifies all nine PUBLIC_API_RATE_LIMITS quotas.
-// The limiter runs before authentication, so unauthenticated probes count exactly
-// like Node's onRequest hook.
-func TestPublicAPIInlineRateLimits(t *testing.T) {
-	type rateCase struct {
-		method string
-		path   string
-		route  string
-		max    int
+// TestPublicAPIRateRulesInSharedTable verifies the nine Public-API quotas are
+// present in the generated shared rule table (config/rate_limit_gen.go), which
+// the global middleware enforces. The per-route inline limiter that used to
+// live here was removed in the 2026-11-19 rate-limit remediation: rules now
+// have a single source of truth on both backends.
+func TestPublicAPIRateRulesInSharedTable(t *testing.T) {
+	want := []struct {
+		path       string
+		method     string
+		max        int
+		timeWindow string
+	}{
+		{"/api/v1/balance/adjustment-requests", "POST", 5, "10 minutes"},
+		{"/api/v1/services/*/actions", "POST", 10, "1 minute"},
+		{"/api/v1/services/*/renew", "POST", 5, "10 minutes"},
+		{"/api/v1/services/*/tasks/*", "GET", 120, "1 minute"},
+		{"/api/v1/services/*/tasks/*", "DELETE", 10, "1 minute"},
+		{"/api/v1/tickets", "POST", 10, "5 minutes"},
+		{"/api/v1/tickets/*/replies", "POST", 20, "1 minute"},
+		{"/api/v1/tickets/*/status", "PATCH", 20, "1 minute"},
+		{"/api/v1/notifications", "POST", 20, "1 minute"},
 	}
-	cases := []rateCase{
-		{"POST", "/api/v1/balance/adjustment-requests", "POST /balance/adjustment-requests", 5},
-		{"POST", "/api/v1/services/1/actions", "POST /services/:id/actions", 10},
-		{"POST", "/api/v1/services/1/renew", "POST /services/:id/renew", 5},
-		{"GET", "/api/v1/services/1/tasks/1", "GET /services/:id/tasks/:taskId", 120},
-		{"DELETE", "/api/v1/services/1/tasks/1", "DELETE /services/:id/tasks/:taskId", 10},
-		{"POST", "/api/v1/tickets", "POST /tickets", 10},
-		{"POST", "/api/v1/tickets/1/replies", "POST /tickets/:id/replies", 20},
-		{"PATCH", "/api/v1/tickets/1/status", "PATCH /tickets/:id/status", 20},
-		{"POST", "/api/v1/notifications", "POST /notifications", 20},
+
+	rules := map[string]config.RateLimitRule{}
+	for _, rule := range config.RateLimitRules {
+		rules[rule.Method+" "+rule.Path] = rule
 	}
-
-	for _, tc := range cases {
-		t.Run(tc.route, func(t *testing.T) {
-			rule, ok := publicAPIRateLimits[tc.route]
-			if !ok {
-				t.Fatalf("no rule registered for %s", tc.route)
-			}
-			if rule.Max != tc.max {
-				t.Fatalf("rule %s max = %d, want %d", tc.route, rule.Max, tc.max)
-			}
-
-			publicAPIInlineLimiter = &publicAPIRateLimiter{buckets: map[string]*publicAPIRateBucket{}}
-			router := publicAPINewRouter()
-
-			for i := 0; i < tc.max; i++ {
-				request := httptest.NewRequest(tc.method, tc.path, nil)
-				request.RemoteAddr = "198.51.100.10:1234"
-				recorder := publicAPIServe(router, request)
-				if recorder.Code == http.StatusTooManyRequests {
-					t.Fatalf("request %d/%d was already limited", i+1, tc.max)
-				}
-			}
-
-			request := httptest.NewRequest(tc.method, tc.path, nil)
-			request.RemoteAddr = "198.51.100.10:1234"
-			recorder := publicAPIServe(router, request)
-			if recorder.Code != http.StatusTooManyRequests {
-				t.Fatalf("request %d: status = %d, want 429", tc.max+1, recorder.Code)
-			}
-			if !strings.Contains(recorder.Body.String(), "Too many requests, please try again later") {
-				t.Fatalf("body = %s", recorder.Body.String())
-			}
-		})
-	}
-}
-
-// TestPublicAPIRateLimitIsPerRouteAndIP proves the bucket key includes both the
-// route and the caller IP (Node's child store per route, key = request.ip).
-func TestPublicAPIRateLimitIsPerRouteAndIP(t *testing.T) {
-	publicAPIInlineLimiter = &publicAPIRateLimiter{buckets: map[string]*publicAPIRateBucket{}}
-	router := publicAPINewRouter()
-
-	for i := 0; i < 5; i++ {
-		request := httptest.NewRequest(http.MethodPost, "/api/v1/balance/adjustment-requests", nil)
-		request.RemoteAddr = "198.51.100.20:1"
-		publicAPIServe(router, request)
-	}
-	// Another IP on the same route is unaffected.
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/balance/adjustment-requests", nil)
-	request.RemoteAddr = "198.51.100.21:1"
-	if recorder := publicAPIServe(router, request); recorder.Code == http.StatusTooManyRequests {
-		t.Fatal("a different IP must not inherit the exhausted bucket")
-	}
-	// Another rate-limited route is unaffected.
-	request = httptest.NewRequest(http.MethodPost, "/api/v1/notifications", nil)
-	request.RemoteAddr = "198.51.100.20:1"
-	if recorder := publicAPIServe(router, request); recorder.Code == http.StatusTooManyRequests {
-		t.Fatal("a different route must not inherit the exhausted bucket")
+	for _, w := range want {
+		rule, ok := rules[w.method+" "+w.path]
+		if !ok {
+			t.Fatalf("no shared rule for %s %s", w.method, w.path)
+		}
+		if rule.Max != w.max || rule.TimeWindow != w.timeWindow {
+			t.Fatalf("%s %s = (max %d, %s), want (max %d, %s)",
+				w.method, w.path, rule.Max, rule.TimeWindow, w.max, w.timeWindow)
+		}
 	}
 }
 

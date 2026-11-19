@@ -123,7 +123,7 @@ function normalizeAdminIdCsv(value: string): string | null {
 export default async function systemConfigRoutes(fastify: FastifyInstance) {
     // 获取公开的系统配置 (无需登录)
     fastify.get('/public', {
-        config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
+        
     }, async (_request: FastifyRequest, _reply: FastifyReply) => {
         const [registrationEnabled, requireInviteCode, ticketCreationEnabled, freeSiteMode, mailAvailable, turnstileEnabled, turnstileSiteKey, avatarApiBase, smtpEnabled, emailDomainWhitelistEnabled, emailAllowedDomains, transferFee, footerContactEmail, footerTelegramLink, brandName, brandSubtitle, brandLogoUrl, brandCopyright, popupAnnouncementConfig, popupPromoImageUrlConfig, popupPromoPackageIdConfig] = await Promise.all([
             db.isRegistrationEnabled(),

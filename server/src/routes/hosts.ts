@@ -5461,7 +5461,6 @@ export default async function hostRoutes(fastify: FastifyInstance) {
     }
   }>('/:id/instances/create-for-user', {
     onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',

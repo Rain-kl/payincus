@@ -33,17 +33,7 @@ const MIN_PUBLIC_BALANCE_ADJUSTMENT_REASON_LENGTH = 10
 const MAX_PUBLIC_BALANCE_ADJUSTMENT_REASON_LENGTH = 500
 const MAX_PUBLIC_BALANCE_ADJUSTMENT_AMOUNT = 10000
 const POSITIVE_ID_PATTERN = /^[1-9]\d*$/
-const PUBLIC_API_RATE_LIMITS = {
-  balanceAdjustmentWrite: { max: 5, timeWindow: '10 minutes' },
-  serviceOperate: { max: 10, timeWindow: '1 minute' },
-  serviceRenew: { max: 5, timeWindow: '10 minutes' },
-  serviceTaskRead: { max: 120, timeWindow: '1 minute' },
-  serviceTaskCancel: { max: 10, timeWindow: '1 minute' },
-  ticketCreate: { max: 10, timeWindow: '5 minutes' },
-  ticketReply: { max: 20, timeWindow: '1 minute' },
-  ticketStatus: { max: 20, timeWindow: '1 minute' },
-  notificationSend: { max: 20, timeWindow: '1 minute' },
-} as const
+
 const PUBLIC_TICKET_CATEGORIES = new Set(['general', 'billing', 'technical', 'abuse'])
 const PUBLIC_TICKET_PRIORITIES = new Set(['low', 'normal', 'high', 'urgent'])
 const PUBLIC_TICKET_STATUSES = new Set(['open', 'in_progress', 'resolved', 'closed'])
@@ -954,7 +944,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
       LogResult.SUCCESS
     )
 
-
     return {
       data: {
         id: user.id,
@@ -1119,7 +1108,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Body: PublicApiCreateBalanceAdjustmentBody }>('/balance/adjustment-requests', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.balanceAdjustmentWrite }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'balance:write')
     if (!apiToken) return
@@ -1616,7 +1605,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Params: PublicApiIdParams; Body: PublicApiServiceActionBody }>('/services/:id/actions', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.serviceOperate }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'services:operate')
     if (!apiToken) return
@@ -1661,7 +1650,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
         taskType: action
       })
 
-
       await createLog(
         apiToken.userId,
         LogModule.PLUGIN,
@@ -1699,7 +1687,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Params: PublicApiIdParams; Body: PublicApiServiceRenewBody }>('/services/:id/renew', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.serviceRenew }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'services:billing')
     if (!apiToken) return
@@ -1786,7 +1774,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.get<{ Params: PublicApiServiceTaskParams }>('/services/:id/tasks/:taskId', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.serviceTaskRead }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'services:operate')
     if (!apiToken) return
@@ -1814,7 +1802,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.delete<{ Params: PublicApiServiceTaskParams }>('/services/:id/tasks/:taskId', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.serviceTaskCancel }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'services:operate')
     if (!apiToken) return
@@ -1846,7 +1834,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
     if (!publicTask) {
       return reply.code(404).send({ error: 'Service task not found', code: 'SERVICE_TASK_NOT_FOUND' })
     }
-
 
     await createLog(
       apiToken.userId,
@@ -1924,8 +1911,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Body: PublicApiCreateTicketBody }>('/tickets', {
-    bodyLimit: TICKET_UPLOAD_BODY_LIMIT,
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.ticketCreate }
+    bodyLimit: TICKET_UPLOAD_BODY_LIMIT
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'tickets:write')
     if (!apiToken) return
@@ -2030,7 +2016,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
         console.error('[PublicAPI] Failed to send ticket creation notification:', error)
       }
 
-
       await createLog(apiToken.userId, LogModule.PLUGIN, 'public_api.ticket_create', `Public API ${apiToken.source} created ticket #${result.ticketId}`, LogResult.SUCCESS)
 
       return reply.code(201).send({
@@ -2116,7 +2101,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.patch<{ Params: PublicApiIdParams; Body: PublicApiTicketStatusBody }>('/tickets/:id/status', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.ticketStatus }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'tickets:write')
     if (!apiToken) return
@@ -2161,7 +2146,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
       return reply.code(409).send({ error: 'Ticket status changed concurrently', code: 'TICKET_STATUS_CONFLICT' })
     }
 
-
     await createLog(apiToken.userId, LogModule.PLUGIN, 'public_api.ticket_status_update', `Public API ${apiToken.source} changed own ticket #${ticket.id} status to ${nextStatus}`, LogResult.SUCCESS)
 
     return {
@@ -2177,8 +2161,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Params: PublicApiIdParams; Body: PublicApiTicketReplyBody }>('/tickets/:id/replies', {
-    bodyLimit: TICKET_UPLOAD_BODY_LIMIT,
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.ticketReply }
+    bodyLimit: TICKET_UPLOAD_BODY_LIMIT
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'tickets:write')
     if (!apiToken) return
@@ -2247,7 +2230,6 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
       } catch (error) {
         console.error('[PublicAPI] Failed to send ticket reply notification:', error)
       }
-
 
       await createLog(apiToken.userId, LogModule.PLUGIN, 'public_api.ticket_reply_create', `Public API ${apiToken.source} replied to own ticket #${ticket.id}`, LogResult.SUCCESS)
 
@@ -2335,7 +2317,7 @@ export default async function publicApiRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Body: PublicApiNotificationBody }>('/notifications', {
-    config: { rateLimit: PUBLIC_API_RATE_LIMITS.notificationSend }
+    
   }, async (request, reply) => {
     const apiToken = await authenticatePublicApiRequest(request, reply, 'notifications:send')
     if (!apiToken) return

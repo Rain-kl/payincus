@@ -164,7 +164,6 @@ export default async function userInviteRoutes(fastify: FastifyInstance) {
 
   fastify.post<{ Body: GenerateInviteBody }>('/', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',

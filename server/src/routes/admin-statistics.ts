@@ -143,8 +143,7 @@ function addRisk(risks: OperationRisk[], condition: boolean, key: string, severi
 export default async function adminStatisticsRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/admin/statistics/overview - 管理员统计概览
   app.get('/api/admin/statistics/overview', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const dailyWindow = getDailyWindow(DAILY_DAYS)

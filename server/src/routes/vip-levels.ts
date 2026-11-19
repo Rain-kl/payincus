@@ -22,8 +22,7 @@ function parseUserVipMetric(value: unknown): UserVipMetric | null {
 
 export default async function vipLevelRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/vip-levels/me', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate]
   }, async (request) => {
     return getVipOverview(request.user.id)
   })
@@ -31,8 +30,7 @@ export default async function vipLevelRoutes(app: FastifyInstance): Promise<void
   app.get<{
     Params: { type: string }
   }>('/api/admin/vip-levels/:type', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const type = parseRuleType(request.params.type)
     if (!type) return sendInvalidType(reply)
@@ -49,8 +47,7 @@ export default async function vipLevelRoutes(app: FastifyInstance): Promise<void
     Params: { type: string }
     Body: { rules?: VipRuleInput[], userMetric?: UserVipMetric }
   }>('/api/admin/vip-levels/:type', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const type = parseRuleType(request.params.type)
     if (!type) return sendInvalidType(reply)

@@ -342,7 +342,7 @@ func SyncHostAddressConflicts(ctx context.Context, addresses []string, client *g
 				if res.RowsAffected == 0 {
 					var newID int32
 					if err := dbConn.WithContext(ctx).Raw(`
-						INSERT INTO host_address_conflicts (host_a_id, host_b_id, address, status, created_at, updated_at)
+						INSERT INTO host_address_conflicts (host_a_id, host_b_id, address, status, first_detected_at, last_detected_at)
 						VALUES (?, ?, ?, 'active'::"HostAddressConflictStatus", ?, ?)
 						RETURNING id`, hostAID, hostBID, addr, now, now,
 					).Scan(&newID).Error; err != nil {
@@ -359,7 +359,7 @@ func SyncHostAddressConflicts(ctx context.Context, addresses []string, client *g
 				if existing.Status == "resolved" {
 					if err := dbConn.WithContext(ctx).Exec(`
 						UPDATE host_address_conflicts
-						SET status = 'active'::"HostAddressConflictStatus", resolved_at = NULL, updated_at = ?
+						SET status = 'active'::"HostAddressConflictStatus", resolved_at = NULL, last_detected_at = ?
 						WHERE id = ?`, now, existing.ID,
 					).Error; err != nil {
 						return nil, err
@@ -373,7 +373,7 @@ func SyncHostAddressConflicts(ctx context.Context, addresses []string, client *g
 					continue
 				}
 				if err := dbConn.WithContext(ctx).Exec(`
-					UPDATE host_address_conflicts SET resolved_at = NULL, updated_at = ? WHERE id = ?`,
+					UPDATE host_address_conflicts SET resolved_at = NULL, last_detected_at = ? WHERE id = ?`,
 					now, existing.ID,
 				).Error; err != nil {
 					return nil, err
@@ -402,7 +402,7 @@ func SyncHostAddressConflicts(ctx context.Context, addresses []string, client *g
 		}
 		if err := dbConn.WithContext(ctx).Exec(`
 			UPDATE host_address_conflicts
-			SET status = 'resolved'::"HostAddressConflictStatus", resolved_at = ?, updated_at = ?
+			SET status = 'resolved'::"HostAddressConflictStatus", resolved_at = ?, last_detected_at = ?
 			WHERE id = ?`, now, now, c.ID,
 		).Error; err != nil {
 			return nil, err

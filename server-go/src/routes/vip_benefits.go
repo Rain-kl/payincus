@@ -14,11 +14,10 @@
 // (P2020) and the Node route does not catch it, so it answers 500 like the other
 // ports of this codebase.
 //
-// The inline `config.rateLimit` entries in the TypeScript (60/100/30/20/10 per
-// minute or 3 minutes) are dead code in Node — @fastify/rate-limit's onRoute hook is
-// registered on the plugin context before app.ts adds the app-level hook — and the
-// generated Go rule table has no rule for these paths either, so both backends are
-// limited by the global 300/min only.
+// The rate limits formerly declared inline in the TypeScript (60/100/30/20/10
+// per minute or 3 minutes) were migrated into server/src/config/rate-limit.ts
+// (2026-11-19 rate-limit remediation) and are mirrored in the generated Go rule
+// table, so both backends enforce them identically via the shared middleware.
 package routes
 
 import (

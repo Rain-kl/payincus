@@ -179,7 +179,7 @@ VALUES
    now() - interval '1 hour', now() - interval '30 days', now() - interval '1 hour'),
   (900002, 900001, 'parity-dir', 'dir', NULL, 'instance_storage',
    '{"source": "/var/lib/incus/storage-pools/parity-dir"}'::jsonb, 'ready', 0, 0,
-   NULL, NULL, now() - interval '30 days', now() - interval '1 hour')
+   '{}'::jsonb, NULL, now() - interval '30 days', now() - interval '1 hour')
 ON CONFLICT (id) DO NOTHING;
 
 COMMIT;

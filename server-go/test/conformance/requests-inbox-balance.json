@@ -56,8 +56,7 @@
     "body": {
       "title": "t",
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-admin-send-anon",
@@ -176,8 +175,7 @@
     "body": {
       "title": "t",
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-missing-title",
@@ -186,8 +184,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-missing-content",
@@ -196,8 +193,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "title": "t"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-empty-title",
@@ -207,8 +203,7 @@
     "body": {
       "title": "",
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-long-title",
@@ -218,8 +213,7 @@
     "body": {
       "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-empty-instance-ids",
@@ -230,8 +224,7 @@
       "title": "t",
       "content": "c",
       "instanceIds": []
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-zero-instance-id",
@@ -244,8 +237,7 @@
       "instanceIds": [
         0
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-float-instance-id",
@@ -258,8 +250,7 @@
       "instanceIds": [
         1.5
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-bad-send-email",
@@ -270,16 +261,14 @@
       "title": "t",
       "content": "c",
       "sendEmail": 2
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-non-object-body",
     "method": "POST",
     "path": "/api/inbox/hosts/1/notify",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "body": [],
-    "ignoreRateLimit": true
+    "body": []
   },
   {
     "name": "inbox-host-notify-unsupported-media-type",
@@ -289,8 +278,7 @@
     "headers": {
       "Content-Type": "application/x-www-form-urlencoded"
     },
-    "body": "title=t",
-    "ignoreRateLimit": true
+    "body": "title=t"
   },
   {
     "name": "inbox-host-notify-not-found",
@@ -300,8 +288,7 @@
     "body": {
       "title": "t",
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-blank-title",
@@ -311,8 +298,7 @@
     "body": {
       "title": "   ",
       "content": "c"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-host-notify-blank-content",
@@ -322,8 +308,7 @@
     "body": {
       "title": "t",
       "content": " \n\t "
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "inbox-broadcast-blank-title",

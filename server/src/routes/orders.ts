@@ -678,8 +678,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post<{ Params: { type: string; id: string }; Body: OrderOperationInput }>('/api/admin/orders/:type/:id/operation', {
-    preHandler: [fastify.authenticateAdmin],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    preHandler: [fastify.authenticateAdmin]
   }, async (request, reply) => {
     const type = normalizeOrderType(request.params.type)
     const id = parsePositiveId(request.params.id)

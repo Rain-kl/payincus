@@ -54,7 +54,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -1879,85 +1878,6 @@ type PublicAPIRenewalResult struct {
 // keeps every pre-call guard (months, ownership, free-service) intact.
 var PublicAPIPerformRenewal = func(ctx context.Context, userID int32, instanceID int32, months int) (PublicAPIRenewalResult, error) {
 	return PublicAPIRenewalResult{}, fmt.Errorf("续费模块尚未移植（seam: db/billing-operations.ts#performRenewal）")
-}
-
-// ==================== inline rate limits ====================
-
-// publicAPIRateRule mirrors one PUBLIC_API_RATE_LIMITS entry.
-type publicAPIRateRule struct {
-	Max    int
-	Window time.Duration
-}
-
-// publicAPIRateLimits is copied verbatim from PUBLIC_API_RATE_LIMITS.
-var publicAPIRateLimits = map[string]publicAPIRateRule{
-	"POST /balance/adjustment-requests":  {Max: 5, Window: 10 * time.Minute},
-	"POST /services/:id/actions":         {Max: 10, Window: time.Minute},
-	"POST /services/:id/renew":           {Max: 5, Window: 10 * time.Minute},
-	"GET /services/:id/tasks/:taskId":    {Max: 120, Window: time.Minute},
-	"DELETE /services/:id/tasks/:taskId": {Max: 10, Window: time.Minute},
-	"POST /tickets":                      {Max: 10, Window: 5 * time.Minute},
-	"POST /tickets/:id/replies":          {Max: 20, Window: time.Minute},
-	"PATCH /tickets/:id/status":          {Max: 20, Window: time.Minute},
-	"POST /notifications":                {Max: 20, Window: time.Minute},
-}
-
-type publicAPIRateBucket struct {
-	count   int
-	resetAt time.Time
-}
-
-type publicAPIRateLimiter struct {
-	mu      sync.Mutex
-	buckets map[string]*publicAPIRateBucket
-}
-
-var publicAPIInlineLimiter = &publicAPIRateLimiter{buckets: map[string]*publicAPIRateBucket{}}
-
-// reap drops expired buckets. @fastify/rate-limit's LocalStore does the same via
-// its toad-cache TTL; without it the map would grow with every caller IP forever.
-func (l *publicAPIRateLimiter) reap() {
-	ticker := time.NewTicker(time.Minute)
-	for range ticker.C {
-		now := time.Now()
-		l.mu.Lock()
-		for key, bucket := range l.buckets {
-			if now.After(bucket.resetAt) {
-				delete(l.buckets, key)
-			}
-		}
-		l.mu.Unlock()
-	}
-}
-
-// allow records a hit for (route, ip) and reports whether it is within the quota.
-func (l *publicAPIRateLimiter) allow(key string, max int, window time.Duration) bool {
-	now := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	bucket, ok := l.buckets[key]
-	if !ok || now.After(bucket.resetAt) {
-		l.buckets[key] = &publicAPIRateBucket{count: 1, resetAt: now.Add(window)}
-		return true
-	}
-	bucket.count++
-	return bucket.count <= max
-}
-
-// publicAPIRateLimit builds the per-route middleware for a PUBLIC_API_RATE_LIMITS
-// entry. The key is route + IP, matching @fastify/rate-limit's child store per
-// route keyed by request.ip.
-func publicAPIRateLimit(route string) gin.HandlerFunc {
-	rule := publicAPIRateLimits[route]
-	return func(c *gin.Context) {
-		key := middleware.ClientIP(c) + ":" + route
-		if !publicAPIInlineLimiter.allow(key, rule.Max, rule.Window) {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Too many requests, please try again later"})
-			return
-		}
-		c.Next()
-	}
 }
 
 // ==================== response views ====================
@@ -4669,7 +4589,7 @@ func RegisterPublicAPI(r *gin.Engine) {
 	group.GET("/balance/logs", publicAPIBalanceLogsHandler)
 	group.GET("/balance/adjustment-requests", publicAPIAdjustmentsListHandler)
 	group.POST("/balance/adjustment-requests",
-		publicAPIRateLimit("POST /balance/adjustment-requests"), publicAPICreateAdjustmentHandler)
+		publicAPICreateAdjustmentHandler)
 
 	group.GET("/products", publicAPIProductsListHandler)
 	group.GET("/products/:id", publicAPIProductReadHandler)
@@ -4683,28 +4603,27 @@ func RegisterPublicAPI(r *gin.Engine) {
 	group.GET("/services", publicAPIServicesListHandler)
 	group.GET("/services/:id", publicAPIServiceReadHandler)
 	group.POST("/services/:id/actions",
-		publicAPIRateLimit("POST /services/:id/actions"), publicAPIServiceActionHandler)
+		publicAPIServiceActionHandler)
 	group.POST("/services/:id/renew",
-		publicAPIRateLimit("POST /services/:id/renew"), publicAPIServiceRenewHandler)
+		publicAPIServiceRenewHandler)
 	group.GET("/services/:id/tasks/:taskId",
-		publicAPIRateLimit("GET /services/:id/tasks/:taskId"), publicAPIServiceTaskReadHandler)
+		publicAPIServiceTaskReadHandler)
 	group.DELETE("/services/:id/tasks/:taskId",
-		publicAPIRateLimit("DELETE /services/:id/tasks/:taskId"), publicAPIServiceTaskCancelHandler)
+		publicAPIServiceTaskCancelHandler)
 
 	group.GET("/tickets", publicAPITicketsListHandler)
-	group.POST("/tickets", publicAPIRateLimit("POST /tickets"), publicAPITicketCreateHandler)
+	group.POST("/tickets", publicAPITicketCreateHandler)
 	group.GET("/tickets/:id", publicAPITicketReadHandler)
 	group.PATCH("/tickets/:id/status",
-		publicAPIRateLimit("PATCH /tickets/:id/status"), publicAPITicketStatusHandler)
+		publicAPITicketStatusHandler)
 	group.POST("/tickets/:id/replies",
-		publicAPIRateLimit("POST /tickets/:id/replies"), publicAPITicketReplyHandler)
+		publicAPITicketReplyHandler)
 
 	group.GET("/notifications", publicAPINotificationsListHandler)
 	group.GET("/notifications/unread-count", publicAPIUnreadCountHandler)
-	group.POST("/notifications", publicAPIRateLimit("POST /notifications"), publicAPINotificationSendHandler)
+	group.POST("/notifications", publicAPINotificationSendHandler)
 }
 
 func init() {
-	go publicAPIInlineLimiter.reap()
 	Register(RegisterPublicAPI)
 }

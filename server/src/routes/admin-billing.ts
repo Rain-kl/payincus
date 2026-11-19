@@ -1488,8 +1488,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/suspend - 管理员封停
   app.post('/api/admin/instances/:id/suspend', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const admin = request.user!
@@ -1560,8 +1559,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/unsuspend - 管理员解封
   app.post('/api/admin/instances/:id/unsuspend', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const admin = request.user!
@@ -1614,8 +1612,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/extend - 手动延期
   app.post('/api/admin/instances/:id/extend', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const admin = request.user!
@@ -1814,8 +1811,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/refund - 管理员退款
   app.post('/api/admin/instances/:id/refund', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const admin = request.user!
@@ -1952,8 +1948,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/delete-and-refund - 管理员删除实例并退款
   app.post('/api/admin/instances/:id/delete-and-refund', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const admin = request.user!
     const { id } = request.params as { id: string }
@@ -2220,8 +2215,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/apply-aff - 为实例应用AFF优惠码
   app.post('/api/admin/instances/:id/apply-aff', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const admin = request.user!
     const { id } = request.params as { id: string }
@@ -2315,8 +2309,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/update-price - 修改实例专属价格
   app.post('/api/admin/instances/:id/update-price', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const admin = request.user!
     const { id } = request.params as { id: string }
@@ -2562,8 +2555,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/:id/update-price/preview - 预览实例专属价格变更结算
   app.post('/api/admin/instances/:id/update-price/preview', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
 
@@ -2628,8 +2620,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/batch-update-price/preview - 批量预览实例专属价格变更结算
   app.post('/api/admin/instances/batch-update-price/preview', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const { instanceIds, newPrice, settleBalance } = parseBatchPriceUpdateBody(request.body)
@@ -2649,8 +2640,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/instances/batch-update-price - 批量修改实例专属价格
   app.post('/api/admin/instances/batch-update-price', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const admin = request.user!
 
@@ -3099,8 +3089,7 @@ export default async function adminBillingRoutes(app: FastifyInstance): Promise<
 
   // POST /api/admin/billing/recharge-records/:id/sync - 同步充值订单状态
   app.post('/api/admin/billing/recharge-records/:id/sync', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const admin = request.user!
     const { id } = request.params as { id: string }
@@ -3425,8 +3414,7 @@ if (provider.type === 'yipay') {
 
   // POST /api/admin/instances/create - 管理员为用户创建实例（支持免费赠送或付费实例）
   app.post('/api/admin/instances/create', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     const admin = request.user!
     const body = request.body as {
@@ -4292,8 +4280,7 @@ if (provider.type === 'yipay') {
 
   // POST /api/admin/instances/:id/upgrade-plan - 管理员升级实例方案
   app.post('/api/admin/instances/:id/upgrade-plan', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const admin = request.user!

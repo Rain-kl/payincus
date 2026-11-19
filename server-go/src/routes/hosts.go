@@ -3355,26 +3355,11 @@ func hostsStoragePoolCreateHandler(c *gin.Context) {
 	useLoop, _ := hostsValidatedBool(validated, "useLoop")
 	description, hasDescription := validated.stringValue("description")
 	purpose, _ := validated.stringValue("purpose")
-
-	if !useExisting {
-		trimmedSource := strings.TrimSpace(source)
-		trimmedSize := strings.TrimSpace(size)
-		supportsLoop := driver == "zfs" || driver == "lvm" || driver == "btrfs"
-		if supportsLoop && trimmedSource != "" && trimmedSize != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "不能同时指定 source 和 size，请明确选择物理路径或 Loop 文件模式"})
-			return
-		}
-		if driver == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "创建新存储池需要指定驱动类型"})
-			return
-		}
-		loopMode := supportsLoop && (useLoop || (trimmedSource == "" && trimmedSize != ""))
-		if (driver == "lvm" || driver == "btrfs") && trimmedSource == "" && trimmedSize == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": strings.ToUpper(driver) + " 需要指定 source（物理盘）或 size（Loop 文件）"})
-			return
-		}
-		_ = loopMode
-	}
+	// NOTE: no pre-validation here on purpose. The TypeScript performs the
+	// source/size, driver-required and lvm/btrfs checks INSIDE the route's mode
+	// branches (after getIncusClient, after the zfs/import early returns), so a
+	// request can reach a 500 "无法连接到 Incus" before any 400. The checks live
+	// in services.CreateHostStoragePool at the same positions.
 
 	var lvmUseThinPtr *bool
 	if hasLVMUseThinpool {

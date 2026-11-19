@@ -139,7 +139,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   // 生成单个兑换码
   fastify.post('/admin/generate', {
     onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -208,7 +207,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   // 批量生成兑换码
   fastify.post('/admin/batch', {
     onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -292,7 +290,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   // 管理员列表
   fastify.get('/admin/list', {
     onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     schema: {
       querystring: {
         type: 'object',
@@ -325,8 +322,7 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
 
   // 启用兑换码
   fastify.patch('/admin/:id/enable', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager]
   }, async (request, reply) => {
     const id = parsePositiveId((request.params as { id: string }).id)
     if (id === null) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
@@ -338,8 +334,7 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
 
   // 禁用兑换码
   fastify.patch('/admin/:id/disable', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager]
   }, async (request, reply) => {
     const id = parsePositiveId((request.params as { id: string }).id)
     if (id === null) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
@@ -351,8 +346,7 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
 
   // 删除兑换码
   fastify.delete('/admin/:id', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager]
   }, async (request, reply) => {
     const id = parsePositiveId((request.params as { id: string }).id)
     if (id === null) return reply.code(400).send(apiError(ErrorCode.INVALID_ID))
@@ -365,7 +359,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   // 批量禁用
   fastify.post('/admin/batch-disable', {
     onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -388,7 +381,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   // 批量删除
   fastify.post('/admin/batch-delete', {
     onRequest: [fastify.authenticate, fastify.requireAdmin, requireGiftCardManager],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -414,7 +406,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   fastify.post('/user/redeem', {
     onRequest: [fastify.authenticate],
     preHandler: [turnstileRequired],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -462,7 +453,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   fastify.post('/user/generate', {
     onRequest: [fastify.authenticate],
     preHandler: [turnstileRequired],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -514,8 +504,7 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
 
   // 用户撤销自己用余额生成且尚未兑换的礼品卡，原额退回余额
   fastify.post('/user/:id/revoke', {
-    onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate]
   }, async (request, reply) => {
     const { user } = request
     const id = parsePositiveId((request.params as { id: string }).id)
@@ -536,7 +525,6 @@ export default async function giftCardsRoutes(fastify: FastifyInstance) {
   // 用户查看自己的兑换码
   fastify.get('/user/mine', {
     onRequest: [fastify.authenticate],
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     schema: {
       querystring: {
         type: 'object',

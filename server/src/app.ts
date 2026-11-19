@@ -306,16 +306,36 @@ await fastify.register(fastifyWebsocket, {
   }
 })
 
-// 全局速率限制 (配置来自 config/rate-limit.ts)
+// 接口级别的速率限制配置注入。
+// 顺序至关重要：这个 onRoute hook 必须在 @fastify/rate-limit 注册【之前】添加。
+// 插件注册时会安装自己的 onRoute hook 并同步读取 routeOptions.config.rateLimit；
+// 若注入 hook 在插件之后，插件读到的 config 永远是 undefined，80+ 条规则全部
+// 沦为死代码（此前线上正是这个状态：只有全局 300/min 与路由内联声明生效）。
+fastify.addHook('onRoute', (routeOptions) => {
+  const rule = findRateLimitRule(routeOptions.url, routeOptions.method as string)
+  if (rule) {
+    routeOptions.config = {
+      ...routeOptions.config,
+      rateLimit: {
+        max: rule.max,
+        timeWindow: rule.timeWindow
+      }
+    }
+  }
+})
+
+// 全局速率限制 (配置来自 config/rate-limit.ts，可用 RATE_LIMIT_CONFIG 覆盖)
 await fastify.register(rateLimit, {
   global: true,
   max: globalRateLimit.max,
   timeWindow: globalRateLimit.timeWindow,
   keyGenerator: (request) => {
-    // 使用 IP + 路径作为限制键，实现接口级别限制
+    // IP + 方法 + 规则路径作为限制键。方法必须参与：多条规则共用路径但方法不同
+    // （如 GET/POST /api/tickets/*/messages 分别 60/min 与 20/min），不区分方法会让
+    // 它们共享一个计数器。
     const rule = findRateLimitRule(request.url, request.method)
     if (rule) {
-      return `${request.ip}:${rule.path}`
+      return `${request.ip}:${rule.method}:${rule.path}`
     }
     return request.ip
   },
@@ -330,26 +350,15 @@ await fastify.register(rateLimit, {
     error.retryAfter = context.after
     return error
   },
-  // 跳过白名单路径和非 API 请求
+  // 跳过白名单路径和非 API 请求；测试可用 RATE_LIMIT_DISABLED=1 完全关闭限流
   allowList: (request) => {
+    if (process.env.RATE_LIMIT_DISABLED === '1' || process.env.RATE_LIMIT_DISABLED === 'true') {
+      return true
+    }
     if (!request.url.startsWith('/api/')) {
       return true
     }
     return isWhitelisted(request.url)
-  }
-})
-
-// 应用接口级别的速率限制配置
-fastify.addHook('onRoute', (routeOptions) => {
-  const rule = findRateLimitRule(routeOptions.url, routeOptions.method as string)
-  if (rule) {
-    routeOptions.config = {
-      ...routeOptions.config,
-      rateLimit: {
-        max: rule.max,
-        timeWindow: rule.timeWindow
-      }
-    }
   }
 })
 

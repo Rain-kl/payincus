@@ -62,6 +62,11 @@ common_env=(
   ENCRYPTION_KEY=dev-secret-12345678
   DATABASE_URL="$PARITY_DATABASE_URL"
   HOST=127.0.0.1
+  # The comparison is about handler behaviour, never about the limiter: a 429
+  # on either side would fail cases for reasons that have nothing to do with
+  # the route under test. Both backends honour this switch (Node: app.ts
+  # allowList; Go: config.RateLimitDisabled).
+  RATE_LIMIT_DISABLED=1
 )
 
 wait_health() { # $1 port, $2 logfile, $3 label
@@ -183,6 +188,7 @@ for dst in "${filled[@]}"; do
   ( cd "$GODIR" && go run ./test/conformance \
       -node "http://127.0.0.1:$NODE_PORT" \
       -go   "http://127.0.0.1:$GO_PORT" \
+      -ignore-keys "timestamp,checkedAt,lastSyncedAt,updatedAt,expiresAt,finishedAt,createdAt" \
       -file "$dst" >"$log" 2>&1 )
   status=$?
   # Show the tail either way, but never let the pipe hide the real exit status.

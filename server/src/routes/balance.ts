@@ -486,8 +486,7 @@ export default async function balanceRoutes(fastify: FastifyInstance) {
       orderNo?: string
     }
   }>('/admin/:userId/adjustment-requests', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{
     Params: { userId: string }
     Body: { amount: number; reason: string; requestType?: string; sourceType?: string; sourceId?: number; orderNo?: string }
@@ -539,8 +538,7 @@ export default async function balanceRoutes(fastify: FastifyInstance) {
     Params: { requestId: string }
     Body: { remark?: string }
   }>('/admin/adjustment-requests/:requestId/approve', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{ Params: { requestId: string }; Body: { remark?: string } }>, reply: FastifyReply) => {
     const requestId = parsePositiveRouteId(request.params.requestId)
     if (!requestId) {
@@ -594,8 +592,7 @@ export default async function balanceRoutes(fastify: FastifyInstance) {
     Params: { requestId: string }
     Body: { remark?: string }
   }>('/admin/adjustment-requests/:requestId/reject', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{ Params: { requestId: string }; Body: { remark?: string } }>, reply: FastifyReply) => {
     const requestId = parsePositiveRouteId(request.params.requestId)
     if (!requestId) {
@@ -636,8 +633,7 @@ export default async function balanceRoutes(fastify: FastifyInstance) {
       remark: string
     }
   }>('/admin/:userId/adjust', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{ Params: { userId: string }; Body: { amount: number; remark: string } }>, reply: FastifyReply) => {
     const { user } = request
     const userId = parsePositiveRouteId(request.params.userId)
@@ -714,8 +710,7 @@ export default async function balanceRoutes(fastify: FastifyInstance) {
       remark?: string
     }
   }>('/admin/:userId/gift', {
-    onRequest: [fastify.authenticate, fastify.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [fastify.authenticate, fastify.requireAdmin]
   }, async (request: FastifyRequest<{ Params: { userId: string }; Body: { amount: number; remark?: string } }>, reply: FastifyReply) => {
     const { user } = request
     const userId = parsePositiveRouteId(request.params.userId)

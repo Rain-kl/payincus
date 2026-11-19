@@ -748,8 +748,7 @@ func AffGetAvailablePlansForCode(ctx context.Context, userID int32) (AffAvailabl
 		`SELECT p.id, p.name, p.price, pkg.id AS package_id, pkg.name AS pkg_name
 		   FROM package_plans p
 		   JOIN packages pkg ON pkg.id = p.package_id
-		  WHERE p.id IN ? AND p.is_active = true
-		  ORDER BY p.id`,
+		  WHERE p.id IN ? AND p.is_active = true`,
 		purchasedIDs,
 	).Scan(&plans).Error; err != nil {
 		return AffAvailablePlansResult{}, err

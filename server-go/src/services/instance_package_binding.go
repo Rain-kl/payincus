@@ -578,6 +578,9 @@ func ListImportablePackagesForHost(ctx context.Context, hostID int32) ([]ImportP
 			}
 			return plans[i].ID < plans[j].ID
 		})
+		// prisma's include always yields an array (empty when the package has no
+		// plans); a nil Go slice would serialize as JSON null.
+		option.Plans = make([]ImportPackagePlanOption, 0, len(plans))
 		for _, plan := range plans {
 			traffic := strconv.FormatInt(plan.TrafficLimit, 10)
 			speed := plan.TrafficLimitSpeed

@@ -1549,7 +1549,9 @@ func RegisterAdminHostInstanceTransfer(r *gin.Engine) {
 		}
 		incusName := c.Param("incusName")
 		if !transferNamePattern.MatchString(incusName) || len(incusName) > 63 {
-			respondAJVValidation(c, "params/incusName must match pattern \"^[a-zA-Z0-9][a-zA-Z0-9-]*$\"")
+			// The params pattern failure goes through setErrorHandler's pattern
+			// branch: "<field> format is invalid" (verified against Node).
+			respondAJVValidation(c, ajvPatternMessage("incusName"))
 			return
 		}
 
@@ -1774,11 +1776,15 @@ func RegisterAdminHostInstanceTransfer(r *gin.Engine) {
 }
 
 // transferRouteHostID parses the :hostId param (integer, 1..2147483647).
+//
+// The Fastify params schema failure goes through app.ts' setErrorHandler with
+// instancePath '/hostId' (field 'hostId') and the raw AJV keyword message —
+// verified against Node: {"error":"must be integer","code":"VALIDATION_ERROR"}.
 func transferRouteHostID(c *gin.Context) (int32, bool) {
 	raw := c.Param("hostId")
 	parsed, err := parsePositiveInt64(raw)
 	if err != nil || parsed < 1 || parsed > 2147483647 {
-		respondAJVValidation(c, "params/hostId "+ajvIntMessage(err, parsed))
+		respondAJVValidation(c, ajvIntMessage(err, parsed))
 		return 0, false
 	}
 	return int32(parsed), true
@@ -1788,7 +1794,7 @@ func transferRouteIntParam(c *gin.Context, name string) (int32, bool) {
 	raw := c.Param(name)
 	parsed, err := parsePositiveInt64(raw)
 	if err != nil || parsed < 1 || parsed > 2147483647 {
-		respondAJVValidation(c, "params/"+name+" "+ajvIntMessage(err, parsed))
+		respondAJVValidation(c, ajvIntMessage(err, parsed))
 		return 0, false
 	}
 	return int32(parsed), true

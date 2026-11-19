@@ -983,8 +983,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 创建充值订单
   app.post('/api/recharge/orders', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate]
   }, async (request, reply) => {
     try {
       if (await db.getSystemConfigBoolean('free_site_mode', false)) {
@@ -1232,8 +1231,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 取消充值订单
   app.post('/api/recharge/orders/:orderNo/cancel', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate]
   }, async (request, reply) => {
     try {
       const user = request.user!
@@ -1264,8 +1262,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 重新支付订单（获取新的支付链接）
   app.post('/api/recharge/orders/:orderNo/repay', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate]
   }, async (request, reply) => {
     try {
       if (await db.getSystemConfigBoolean('free_site_mode', false)) {
@@ -1461,8 +1458,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
   // 验证订单支付状态（主动查询易支付）
   // 用于支付完成后跳转回来时，前端主动确认订单状态
   app.post('/api/recharge/orders/:orderNo/verify', {
-    onRequest: [app.authenticate],
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate]
   }, async (request, reply) => {
     try {
       const user = request.user!
@@ -2173,8 +2169,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 创建支付渠道（管理员）
   app.post('/api/admin/payment-providers', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const input = request.body as db.CreatePaymentProviderInput
@@ -2208,8 +2203,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 更新支付渠道（管理员）
   app.put('/api/admin/payment-providers/:id', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string }
@@ -2264,8 +2258,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 更新支付渠道状态（管理员）
   app.patch('/api/admin/payment-providers/:id/status', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string }
@@ -2315,8 +2308,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 删除支付渠道（管理员）
   app.delete('/api/admin/payment-providers/:id', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const { id } = request.params as { id: string }
@@ -2402,8 +2394,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 手动完成充值订单（管理员）
   app.post('/api/admin/recharge/orders/:orderNo/complete', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const { orderNo } = request.params as { orderNo: string }
@@ -2464,8 +2455,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // 标记充值订单失败（管理员）
   app.post('/api/admin/recharge/orders/:orderNo/fail', {
-    onRequest: [app.authenticate, app.requireAdmin],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } }
+    onRequest: [app.authenticate, app.requireAdmin]
   }, async (request, reply) => {
     try {
       const { orderNo } = request.params as { orderNo: string }
@@ -2996,10 +2986,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
   // POST 回调接口
   app.post('/api/recharge/callback/:providerId', {
     preParsing: capturePaymentCallbackRawBody,
-    bodyLimit: 256 * 1024,
-    config: {
-      rateLimit: { max: 100, timeWindow: '1 minute' }
-    }
+    bodyLimit: 256 * 1024
   }, async (request, reply) => {
     try {
       const { providerId } = request.params as { providerId: string }
@@ -3012,9 +2999,7 @@ export default async function rechargeRoutes(app: FastifyInstance): Promise<void
 
   // GET 回调接口（V1版本易支付使用GET请求）
   app.get('/api/recharge/callback/:providerId', {
-    config: {
-      rateLimit: { max: 100, timeWindow: '1 minute' }
-    }
+    
   }, async (request, reply) => {
     try {
       const { providerId } = request.params as { providerId: string }

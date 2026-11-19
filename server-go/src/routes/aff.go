@@ -13,11 +13,11 @@
 //     handler. The handlers destructure `request.body` without a fallback, so a
 //     missing or JSON-null body is a TypeError in Node and is answered with the
 //     generic 500 here (affRespondInternalError).
-//   - The per-route `config: { rateLimit: ... }` blocks are dead code in Node:
-//     @fastify/rate-limit installs its onRoute hook on the plugin context before
-//     app.ts' hook is added, so only the global 300/min limit applies. config/
-//     rate_limit_gen.go has no /api/aff rule for the same reason, so both sides
-//     enforce exactly the global limit.
+//   - The per-route rate limits formerly declared inline (`config: { rateLimit
+//     ... }`) now live in server/src/config/rate-limit.ts (single source of
+//     truth, migrated 2026-11-19 when the Node hook-ordering bug was fixed) and
+//     are mirrored into config/rate_limit_gen.go; both sides enforce them
+//     identically via the shared middleware.
 //   - `packagePlanId` submitted as a JSON number outside the int32 column range
 //     is treated as "no such row" (the same convention routes/promo_codes.go
 //     documents): Prisma would reject the value instead, which is not

@@ -368,7 +368,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { affCode: string }
   }>('/:id/apply-aff', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -396,7 +395,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { months: number }
   }>('/:id/renew', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -490,7 +488,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { instanceIds: number[] }
   }>('/batch/renew-preview', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -520,7 +517,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { instanceIds: number[]; months: number }
   }>('/batch/renew', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -704,7 +700,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { newPlanId: number }
   }>('/:id/change-plan', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -875,7 +870,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { autoRenew: boolean }
   }>('/:id/auto-renew', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',
@@ -933,7 +927,6 @@ export default async function instanceBillingRoutes(fastify: FastifyInstance) {
     Body: { instanceIds: number[]; autoRenew: boolean }
   }>('/batch/auto-renew', {
     onRequest: [fastify.authenticateUser],
-    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
     schema: {
       body: {
         type: 'object',

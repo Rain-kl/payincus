@@ -28,7 +28,6 @@ export default async function adminTaskRoutes(app: FastifyInstance): Promise<voi
 
   app.post<{ Params: { id: number } }>('/api/admin/tasks/:id/stop', {
     onRequest: auth,
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: { params: taskIdSchema }
   }, async (request, reply) => {
     const task = await prisma.operationTask.findUnique({ where: { id: request.params.id } })
@@ -44,7 +43,6 @@ export default async function adminTaskRoutes(app: FastifyInstance): Promise<voi
 
   app.get<{ Params: { id: number }; Querystring: { after?: number } }>('/api/admin/tasks/:id/logs/stream', {
     onRequest: auth,
-    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
     schema: { params: taskIdSchema, querystring: { type: 'object', properties: { after: { type: 'integer', minimum: 0, maximum: 2147483647, default: 0 } } } }
   }, async (request, reply) => {
     const taskId = request.params.id

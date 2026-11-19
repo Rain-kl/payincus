@@ -370,14 +370,18 @@ func ajvCoerceField(field ajvFieldSpec, value any) (any, string) {
 		if len(field.Enum) > 0 && !ajvEnumContains(field.Enum, text) {
 			return nil, "must be equal to one of the allowed values"
 		}
-		if field.Pattern != nil && !field.Pattern.MatchString(text) {
-			return nil, ajvPatternMessage(field.Name)
+		// AJV executes keywords in schema declaration order; every Fastify schema
+		// in this codebase declares minLength before maxLength before pattern
+		// (e.g. node-security's `dataset`, transfer's `targetPath`), so a value
+		// failing both reports the length message first. Verified against Node.
+		if field.MinLength >= 0 && jsStringLength(text) < field.MinLength {
+			return nil, field.Name + " is too short"
 		}
 		if field.MaxLength >= 0 && jsStringLength(text) > field.MaxLength {
 			return nil, field.Name + " is too long"
 		}
-		if field.MinLength >= 0 && jsStringLength(text) < field.MinLength {
-			return nil, field.Name + " is too short"
+		if field.Pattern != nil && !field.Pattern.MatchString(text) {
+			return nil, ajvPatternMessage(field.Name)
 		}
 		return text, ""
 

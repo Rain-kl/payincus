@@ -2,166 +2,142 @@
   {
     "name": "logs-anon-list",
     "method": "GET",
-    "path": "/api/logs",
-    "ignoreRateLimit": true
+    "path": "/api/logs"
   },
   {
     "name": "logs-anon-list-trailing-slash",
     "method": "GET",
-    "path": "/api/logs/",
-    "ignoreRateLimit": true
+    "path": "/api/logs/"
   },
   {
     "name": "logs-anon-modules",
     "method": "GET",
-    "path": "/api/logs/modules",
-    "ignoreRateLimit": true
+    "path": "/api/logs/modules"
   },
   {
     "name": "logs-anon-risk-definitions",
     "method": "GET",
-    "path": "/api/logs/risk-definitions",
-    "ignoreRateLimit": true
+    "path": "/api/logs/risk-definitions"
   },
   {
     "name": "logs-anon-audit-export",
     "method": "GET",
     "path": "/api/logs/audit/export",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
     "name": "logs-list-defaults",
     "method": "GET",
     "path": "/api/logs",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-trailing-slash",
     "method": "GET",
     "path": "/api/logs/",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-page-clamp",
     "method": "GET",
     "path": "/api/logs?page=3&pageSize=1000",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-page-zero-falls-back",
     "method": "GET",
     "path": "/api/logs?page=0&pageSize=0",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-page-leading-zero-falls-back",
     "method": "GET",
     "path": "/api/logs?page=01&pageSize=007",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-module-filter",
     "method": "GET",
     "path": "/api/logs?module=system",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-module-padded",
     "method": "GET",
     "path": "/api/logs?module=%20%20system%20%20",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-empty-filters",
     "method": "GET",
     "path": "/api/logs?module=&search=&instanceName=",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-id-invalid-zero",
     "method": "GET",
     "path": "/api/logs?instanceId=0",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-id-invalid-empty",
     "method": "GET",
     "path": "/api/logs?instanceId=",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-id-invalid-leading-zero",
     "method": "GET",
     "path": "/api/logs?instanceId=007",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-id-invalid-text",
     "method": "GET",
     "path": "/api/logs?instanceId=abc",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-id-invalid-negative",
     "method": "GET",
     "path": "/api/logs?instanceId=-1",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-id-not-found",
     "method": "GET",
     "path": "/api/logs?instanceId=999999999",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-instance-name-filter",
     "method": "GET",
     "path": "/api/logs?instanceName=vm-1",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-list-search-filter",
     "method": "GET",
     "path": "/api/logs?search=created",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-modules",
     "method": "GET",
     "path": "/api/logs/modules",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-risk-definitions",
     "method": "GET",
     "path": "/api/logs/risk-definitions",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "logs-audit-export-invalid-instance-id",
     "method": "GET",
     "path": "/api/logs/audit/export?instanceId=abc",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
@@ -169,7 +145,6 @@
     "method": "GET",
     "path": "/api/logs/audit/export?instanceId=0",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
@@ -177,7 +152,6 @@
     "method": "GET",
     "path": "/api/logs/audit/export?limit=abc",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
@@ -185,7 +159,6 @@
     "method": "GET",
     "path": "/api/logs/audit/export?limit=0",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
@@ -193,7 +166,6 @@
     "method": "GET",
     "path": "/api/logs/audit/export?limit=5000",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
@@ -201,7 +173,6 @@
     "method": "GET",
     "path": "/api/logs/audit/export?module=system&limit=10",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true,
     "skipBody": true
   },
   {
@@ -209,38 +180,32 @@
     "method": "GET",
     "path": "/api/logs/audit/export?limit=5",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "skipBody": true,
-    "ignoreRateLimit": true
+    "skipBody": true
   },
   {
     "name": "init-commands-anon-list",
     "method": "GET",
-    "path": "/api/init-commands",
-    "ignoreRateLimit": true
+    "path": "/api/init-commands"
   },
   {
     "name": "init-commands-anon-list-trailing-slash",
     "method": "GET",
-    "path": "/api/init-commands/",
-    "ignoreRateLimit": true
+    "path": "/api/init-commands/"
   },
   {
     "name": "init-commands-anon-available",
     "method": "GET",
-    "path": "/api/init-commands/available?distro=ubuntu",
-    "ignoreRateLimit": true
+    "path": "/api/init-commands/available?distro=ubuntu"
   },
   {
     "name": "init-commands-anon-distros",
     "method": "GET",
-    "path": "/api/init-commands/distros",
-    "ignoreRateLimit": true
+    "path": "/api/init-commands/distros"
   },
   {
     "name": "init-commands-anon-detail",
     "method": "GET",
-    "path": "/api/init-commands/1",
-    "ignoreRateLimit": true
+    "path": "/api/init-commands/1"
   },
   {
     "name": "init-commands-anon-create",
@@ -252,8 +217,7 @@
       "distros": [
         "ubuntu"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-anon-update",
@@ -261,112 +225,96 @@
     "path": "/api/init-commands/1",
     "body": {
       "enabled": false
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-anon-delete",
     "method": "DELETE",
-    "path": "/api/init-commands/1",
-    "ignoreRateLimit": true
+    "path": "/api/init-commands/1"
   },
   {
     "name": "init-commands-list",
     "method": "GET",
     "path": "/api/init-commands",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-list-trailing-slash",
     "method": "GET",
     "path": "/api/init-commands/",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-distros",
     "method": "GET",
     "path": "/api/init-commands/distros",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-ubuntu",
     "method": "GET",
     "path": "/api/init-commands/available?distro=ubuntu",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-other",
     "method": "GET",
     "path": "/api/init-commands/available?distro=other",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-missing-distro",
     "method": "GET",
     "path": "/api/init-commands/available",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-empty-distro",
     "method": "GET",
     "path": "/api/init-commands/available?distro=",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-uppercase-distro",
     "method": "GET",
     "path": "/api/init-commands/available?distro=Ubuntu",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-unknown-distro",
     "method": "GET",
     "path": "/api/init-commands/available?distro=windows",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-available-duplicated-distro",
     "method": "GET",
     "path": "/api/init-commands/available?distro=ubuntu&distro=debian",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-detail-invalid-id-zero",
     "method": "GET",
     "path": "/api/init-commands/0",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-detail-invalid-id-leading-zero",
     "method": "GET",
     "path": "/api/init-commands/01",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-detail-invalid-id-negative",
     "method": "GET",
     "path": "/api/init-commands/-1",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-detail-not-found",
     "method": "GET",
     "path": "/api/init-commands/999999999",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-create-missing-name",
@@ -378,8 +326,7 @@
       "distros": [
         "ubuntu"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-missing-command",
@@ -391,8 +338,7 @@
       "distros": [
         "ubuntu"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-missing-distros",
@@ -402,8 +348,7 @@
     "body": {
       "name": "t",
       "command": "echo hi"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-empty-name",
@@ -416,8 +361,7 @@
       "distros": [
         "ubuntu"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-empty-command",
@@ -430,8 +374,7 @@
       "distros": [
         "ubuntu"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-empty-distros",
@@ -442,8 +385,7 @@
       "name": "t",
       "command": "echo hi",
       "distros": []
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-name-too-long",
@@ -456,8 +398,7 @@
       "distros": [
         "ubuntu"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-description-too-long",
@@ -471,8 +412,7 @@
         "ubuntu"
       ],
       "description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-distro-object",
@@ -485,8 +425,7 @@
       "distros": [
         {}
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-distros-object",
@@ -499,8 +438,7 @@
       "distros": {
         "a": 1
       }
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-description-object",
@@ -514,16 +452,14 @@
         "ubuntu"
       ],
       "description": {}
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-non-object-body",
     "method": "POST",
     "path": "/api/init-commands",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "body": [],
-    "ignoreRateLimit": true
+    "body": []
   },
   {
     "name": "init-commands-create-invalid-distro",
@@ -536,8 +472,7 @@
       "distros": [
         "other"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-create-invalid-distro-mixed",
@@ -551,8 +486,7 @@
         "ubuntu",
         "windows"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-invalid-id",
@@ -561,16 +495,14 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "enabled": false
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-empty-body-not-found",
     "method": "PUT",
     "path": "/api/init-commands/999999999",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "body": {},
-    "ignoreRateLimit": true
+    "body": {}
   },
   {
     "name": "init-commands-update-not-found",
@@ -579,8 +511,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "name": "t"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-empty-name",
@@ -589,8 +520,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "name": ""
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-empty-command",
@@ -599,8 +529,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "command": ""
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-empty-distros",
@@ -609,8 +538,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "distros": []
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-invalid-distro",
@@ -621,8 +549,7 @@
       "distros": [
         "other"
       ]
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-bad-enabled",
@@ -631,8 +558,7 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "enabled": "yes"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-description-object",
@@ -641,16 +567,14 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "body": {
       "description": {}
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-update-non-object-body",
     "method": "PUT",
     "path": "/api/init-commands/1",
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "body": [],
-    "ignoreRateLimit": true
+    "body": []
   },
   {
     "name": "init-commands-update-empty-json-body",
@@ -659,28 +583,24 @@
     "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
     "headers": {
       "Content-Type": "application/json"
-    },
-    "ignoreRateLimit": true
+    }
   },
   {
     "name": "init-commands-delete-invalid-id",
     "method": "DELETE",
     "path": "/api/init-commands/0",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-delete-invalid-id-leading-zero",
     "method": "DELETE",
     "path": "/api/init-commands/01",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   },
   {
     "name": "init-commands-delete-not-found",
     "method": "DELETE",
     "path": "/api/init-commands/999999999",
-    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN",
-    "ignoreRateLimit": true
+    "token": "REPLACE_WITH_A_REAL_ACCESS_TOKEN"
   }
 ]
